@@ -82,11 +82,11 @@ INSERT IGNORE INTO users (username, password, role) VALUES
 
 -- 插入測試商品
 INSERT IGNORE INTO products (name, description, image_url, points_required, stock) VALUES
-('星巴克咖啡券', '星巴克中杯咖啡飲品兌換券', '/images/starbucks.jpg', 50, 100),
-('麥當勞優惠券', '麥當勞大麥克套餐兌換券', '/images/mcdonalds.jpg', 80, 50),
-('7-11購物金', '7-11 $100 購物金', '/images/7eleven.jpg', 100, 200),
-('誠品書店購書券', '誠品書店 $200 購書券', '/images/eslite.jpg', 150, 30),
-('健身房月卡', '健身房一個月會員卡', '/images/gym.jpg', 300, 20);
+('星巴克咖啡券', '星巴克中杯咖啡飲品兌換券', '/images/feature-reward.png', 50, 100),
+('麥當勞優惠券', '麥當勞大麥克套餐兌換券', '/images/mascot.png', 80, 50),
+('7-11購物金', '7-11 $100 購物金', '/images/feature-community.png', 100, 200),
+('誠品書店購書券', '誠品書店 $200 購書券', '/images/feature-culture.png', 150, 30),
+('健身房月卡', '健身房一個月會員卡', '/images/feature-map.png', 300, 20);
 
 -- 建立 user_tasks 資料表（用戶任務記錄）
 CREATE TABLE IF NOT EXISTS user_tasks (
