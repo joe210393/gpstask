@@ -1391,11 +1391,6 @@ app.put('/api/product-redemptions/:id/status', staffOrAdminAuth, async (req, res
 const PORT = process.env.PORT || 3001;
 
 // catch-all route for static html (avoid 404 on /), 只針對非 /api/ 路徑
-app.get(/^\/(?!api\/).*/, (req, res, next) => {
-  if (req.path.match(/\.[a-zA-Z0-9]+$/)) return next();
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
 // 健康檢查端點
 app.get('/api/health', (req, res) => {
   res.json({
@@ -1410,6 +1405,11 @@ app.get('/api/health', (req, res) => {
       password: process.env.MYSQL_ROOT_PASSWORD ? '[已設定]' : '[未設定]'
     }
   });
+});
+
+app.get(/^\/(?!api\/).*/, (req, res, next) => {
+  if (req.path.match(/\.[a-zA-Z0-9]+$/)) return next();
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // 除錯：輸出環境變數（僅開發環境）
