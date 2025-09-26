@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>新增任務（工作人員）| GPS 觸發任務系統</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="icon" type="image/png" href="/images/mascot.png" />
+  <style>
+    .task-form { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); max-width: 500px; margin: 30px auto; }
+    .task-form label { display: block; margin: 12px 0 4px; font-weight: bold; }
+    .task-form input { width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc; margin-bottom: 10px; }
+    .task-form button { background: #007bff; color: #fff; border: none; border-radius: 4px; padding: 10px 20px; font-size: 1em; cursor: pointer; }
+    .task-form button:hover { background: #0056b3; }
+    /* Header styles */
+    header {
+      text-align: center;
+      position: relative;
+      background: #fff;
+      border-bottom: 1px solid #e0e0e0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      padding: 0;
+      margin-bottom: 20px;
+    }
+    .header-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 15px 20px;
+    }
+    .header-content h1 {
+      font-size: 1.8em;
+      color: #333;
+      margin: 0 0 15px 0;
+      font-weight: 600;
+    }
+    .main-nav {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+    .main-nav a {
+      color: #555;
+      text-decoration: none;
+      font-weight: 500;
+      padding: 8px 12px;
+      border-radius: 6px;
+      transition: all 0.3s ease;
+    }
+    .main-nav a:hover {
+      background: #f5f5f5;
+      color: #007bff;
+    }
+    .main-nav a.current-page {
+      background: #007bff;
+      color: white !important;
+    }
+    .main-nav span {
+      color: #666;
+      font-size: 0.9em;
+      padding: 8px 12px;
+    }
+    .main-nav button {
+      background: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    .main-nav button:hover {
+      background: #c82333;
+    }
+    .hamburger {
+      display: none;
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      font-size: 1.5em;
+      background: none;
+      border: none;
+      color: #555;
+      cursor: pointer;
+      z-index: 1001;
+      padding: 5px 10px;
+      border-radius: 4px;
+      transition: background 0.3s ease;
+    }
+    .hamburger:hover {
+      background: #f5f5f5;
+    }
+    .task-form, .task-list { margin: 0 auto; text-align: center; }
+    @media (max-width: 700px) {
+      .header-content { display: none; }
+      .header-content.open { display: flex !important; flex-direction: column; align-items: center; background: #fff; box-shadow: 0 2px 8px #eee; position: absolute; top: 0; left: 0; right: 0; z-index: 1000; padding: 18px 0 12px 0; }
+      .main-nav { flex-direction: column; gap: 10px; }
+      .main-nav a, .main-nav span, .main-nav button { display: block; margin: 10px 0; text-align: center; width: 90%; margin-left: 5%; color: #333 !important; background: none; z-index: 1002; }
+      .hamburger { display: block; }
+    }
+  </style>
+</head>
+<body>
+  <header id="mainHeader">
+    <button id="hamburgerBtn" class="hamburger" aria-label="展開選單">&#9776;</button>
+    <div class="header-content" id="headerContent">
+      <h1 id="pageTitle">新增任務</h1>
+      <nav class="main-nav">
+        <a href="/index.html">首頁</a>
+        <a href="/map.html">地圖頁</a>
+        <a href="/tasks-list.html">任務列表</a>
+        <a href="/user-tasks.html">任務審核</a>
+        <a href="/staff-dashboard.html" class="current-page" id="navStaff">新增任務</a>
+        <a href="/admin-user-tasks.html" id="navUserTasks" style="display:none;">用戶任務管理</a>
+        <a href="/products.html" id="navProducts">商品兌換</a>
+        <a href="/redeem-tasks.html" id="navRedeem">兌換商品管理</a>
+        <a href="/admin-user-tasks.html" id="loginUserInfo" style="color:#666;text-decoration:none;cursor:pointer;"></a>
+        <button id="logoutBtn" style="display:none;">登出</button>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <section class="task-form">
+      <h2>新增任務點</h2>
+      <form id="addTaskForm" enctype="multipart/form-data">
+        <div style="margin-bottom:10px;color:#555;">經緯度請貼入十進位格式，如 <b>24.678222, 121.760361</b>，可用 Google Maps 右鍵複製座標。</div>
+        <label>任務名稱 <input type="text" name="name" required /></label>
+        <label>緯度 <input type="number" name="lat" step="any" required /></label>
+        <label>經度 <input type="number" name="lng" step="any" required /></label>
+        <label>觸發半徑（公尺）<input type="number" name="radius" required /></label>
+        <label>積分 <input type="number" name="points" min="0" step="1" value="0" required /></label>
+        <label>任務說明 <textarea name="description" required style="width:100%;height:60px;"></textarea></label>
+        <label>任務照片 <input type="file" name="photo" accept="image/*" required /></label>
+        <label>YouTube 影片連結 <input type="text" name="youtubeUrl" placeholder="https://www.youtube.com/watch?v=..." /></label>
+        <button type="submit">新增任務</button>
+        <div id="addTaskMsg" style="margin-top:10px;"></div>
+      </form>
+    </section>
+    <section class="task-list">
+      <h2>所有任務</h2>
+      <ul id="allTasks"></ul>
+      <div id="editModal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);z-index:9999;align-items:center;justify-content:center;">
+        <div style="background:#fff;padding:24px 20px;border-radius:8px;max-width:400px;width:90%;margin:60px auto;position:relative;">
+          <h3>編輯任務</h3>
+          <form id="editTaskForm">
+            <input type="hidden" name="id" />
+            <label>任務名稱 <input type="text" name="name" required /></label>
+            <label>緯度 <input type="number" name="lat" step="any" required /></label>
+            <label>經度 <input type="number" name="lng" step="any" required /></label>
+            <label>觸發半徑（公尺）<input type="number" name="radius" required /></label>
+            <label>積分 <input type="number" name="points" min="0" step="1" value="0" required /></label>
+            <label>任務說明 <textarea name="description" required style="width:100%;height:60px;"></textarea></label>
+            <label>任務照片網址 <input type="text" name="photoUrl" required /></label>
+            <div style="margin-bottom:8px;font-size:0.97em;color:#888;">可直接貼網址，或重新上傳新照片：</div>
+            <input type="file" name="editPhoto" id="editPhotoInput" accept="image/*" style="margin-bottom:8px;">
+            <div><img id="editPhotoPreview" src="" alt="預覽" style="max-width:120px;max-height:80px;display:none;margin-bottom:8px;"></div>
+            <label>YouTube 影片連結 <input type="text" name="youtubeUrl" /></label>
+            <button type="submit">儲存</button>
+            <button type="button" id="closeEditModal" style="margin-left:10px;">取消</button>
+            <div id="editTaskMsg" style="margin-top:10px;"></div>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer>
+    &copy; 2025 任務網頁系統
+  </footer>
+  <script src="/js/staff-dashboard.js"></script>
+  <script>
+    // Header功能
+    window.loginUser = JSON.parse(localStorage.getItem('loginUser') || 'null');
+
+    // 權限檢查
+    if (!window.loginUser || (window.loginUser.role !== 'admin' && window.loginUser.role !== 'shop')) {
+      alert('僅限管理員或工作人員使用');
+      window.location.href = '/index.html';
+    }
+
+    // 權限檢查和導航顯示
+    if (window.loginUser) {
+      document.getElementById('loginUserInfo').textContent = getUserDisplayName(window.loginUser);
+      document.getElementById('logoutBtn').onclick = function() {
+        localStorage.removeItem('loginUser');
+        window.location.href = '/login.html';
+      };
+      document.getElementById('logoutBtn').style.display = '';
+
+      // 根據權限顯示導航鏈接
+      // 所有已登入用戶都可以看到用戶任務管理
+      document.getElementById('navUserTasks').style.display = '';
+    } else {
+      document.getElementById('loginUserInfo').textContent = '';
+      document.getElementById('logoutBtn').style.display = 'none';
+    }
+
+    function getUserDisplayName(loginUser) {
+      switch(loginUser.role) {
+        case 'admin':
+          return `管理員：${loginUser.username}`;
+        case 'shop':
+          return `商店：${loginUser.username}`;
+        case 'user':
+          return `用戶：${loginUser.username}`;
+        default:
+          return loginUser.username;
+      }
+    }
+
+    // 漢堡選單功能
+    document.getElementById('hamburgerBtn').onclick = function() {
+      document.getElementById('headerContent').classList.toggle('open');
+    };
+
+    // 點擊鏈接後關閉選單
+    document.querySelectorAll('.main-nav a, .main-nav button').forEach(element => {
+      element.addEventListener('click', function() {
+        document.getElementById('headerContent').classList.remove('open');
+      });
+    });
+  </script>
+</body>
+</html>

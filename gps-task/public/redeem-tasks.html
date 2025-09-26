@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>商品管理 | GPS 觸發任務系統</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="icon" type="image/png" href="/images/mascot.png" />
+  <style>
+    /* 標籤頁面樣式 */
+    .tab-container {
+      max-width: 1000px;
+      margin: 30px auto;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+    .tab-buttons {
+      display: flex;
+      background: #f8f9fa;
+      border-bottom: 1px solid #dee2e6;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 15px 20px;
+      border: none;
+      background: none;
+      font-size: 1em;
+      font-weight: 500;
+      color: #666;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border-bottom: 2px solid transparent;
+    }
+    .tab-btn:hover {
+      background: #e9ecef;
+      color: #333;
+    }
+    .tab-btn.active {
+      background: #fff;
+      color: #007bff;
+      border-bottom-color: #007bff;
+    }
+    .tab-content {
+      padding: 30px;
+    }
+    .tab-pane {
+      display: none;
+    }
+    .tab-pane.active {
+      display: block;
+    }
+
+
+    /* 商品管理樣式 */
+    .products-section {
+      margin-bottom: 30px;
+    }
+    .products-section h3 {
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 1.4em;
+    }
+    .add-product-btn {
+      background: #28a745;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 20px;
+      font-size: 1em;
+      cursor: pointer;
+      margin-bottom: 20px;
+    }
+    .add-product-btn:hover {
+      background: #218838;
+    }
+    .product-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 20px;
+    }
+    .product-card {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      padding: 20px;
+      border: 1px solid #e9ecef;
+    }
+    .product-name {
+      font-size: 1.2em;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 8px;
+    }
+    .product-points {
+      color: #007bff;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .product-stock {
+      color: #666;
+      margin-bottom: 15px;
+    }
+    .product-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .edit-btn {
+      background: #ffc107;
+      color: #212529;
+      border: none;
+      border-radius: 4px;
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+    .edit-btn:hover {
+      background: #e0a800;
+    }
+    .delete-btn {
+      background: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+    .delete-btn:hover {
+      background: #c82333;
+    }
+
+    /* 模態框樣式 */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+    }
+    .modal-content {
+      background: #fff;
+      border-radius: 8px;
+      padding: 30px;
+      width: 90%;
+      max-width: 500px;
+      margin: 100px auto;
+      position: relative;
+    }
+    .close-btn {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      font-size: 1.5em;
+      cursor: pointer;
+      color: #666;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 600;
+      color: #333;
+    }
+    .form-group input, .form-group textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 1em;
+    }
+    .form-group textarea {
+      height: 80px;
+      resize: vertical;
+    }
+    .form-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+    .save-btn {
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 10px 20px;
+      cursor: pointer;
+    }
+    .save-btn:hover {
+      background: #0056b3;
+    }
+    .cancel-btn {
+      background: #6c757d;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 10px 20px;
+      cursor: pointer;
+    }
+    .cancel-btn:hover {
+      background: #545b62;
+    }
+
+    /* 兌換記錄樣式 */
+    .redemption-filters {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 20px;
+      align-items: center;
+    }
+    .redemption-filters select, .redemption-filters input {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 1em;
+    }
+    .redemption-filters input {
+      flex: 1;
+      max-width: 300px;
+    }
+    .redemptions-grid {
+      display: grid;
+      gap: 15px;
+    }
+    .redemption-card {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      padding: 20px;
+      border: 1px solid #e9ecef;
+    }
+    .redemption-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    .redemption-product {
+      font-size: 1.2em;
+      font-weight: 600;
+      color: #333;
+    }
+    .redemption-user {
+      color: #007bff;
+      font-size: 1em;
+      font-weight: 600;
+      margin-bottom: 10px;
+      background: #f8f9fa;
+      padding: 6px 12px;
+      border-radius: 6px;
+      border-left: 3px solid #007bff;
+      display: inline-block;
+    }
+    .redemption-status {
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 0.8em;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .redemption-status.pending {
+      background: #fff3cd;
+      color: #856404;
+    }
+    .redemption-status.completed {
+      background: #d4edda;
+      color: #155724;
+    }
+    .redemption-status.cancelled {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    .redemption-meta {
+      display: flex;
+      gap: 20px;
+      font-size: 0.9em;
+      color: #666;
+      margin-bottom: 15px;
+    }
+    .redemption-points {
+      color: #007bff;
+      font-weight: 600;
+    }
+    .redemption-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+    .process-btn {
+      background: #28a745;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 16px;
+      cursor: pointer;
+      font-size: 0.9em;
+    }
+    .process-btn:hover {
+      background: #218838;
+    }
+    .cancel-btn {
+      background: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 16px;
+      cursor: pointer;
+      font-size: 0.9em;
+    }
+    .cancel-btn:hover {
+      background: #c82333;
+    }
+
+    @media (max-width: 600px) {
+      .tab-content { padding: 20px; }
+      .product-grid { grid-template-columns: 1fr; }
+      .redemption-filters {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .redemption-filters input {
+        max-width: none;
+      }
+      .redemption-header {
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-start;
+      }
+    }
+    /* Header styles */
+    header {
+      text-align: center;
+      position: relative;
+      background: #fff;
+      border-bottom: 1px solid #e0e0e0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      padding: 0;
+      margin-bottom: 20px;
+    }
+    .header-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 15px 20px;
+    }
+    .header-content h1 {
+      font-size: 1.8em;
+      color: #333;
+      margin: 0 0 15px 0;
+      font-weight: 600;
+    }
+    .main-nav {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+    .main-nav a {
+      color: #555;
+      text-decoration: none;
+      font-weight: 500;
+      padding: 8px 12px;
+      border-radius: 6px;
+      transition: all 0.3s ease;
+    }
+    .main-nav a:hover {
+      background: #f5f5f5;
+      color: #007bff;
+    }
+    .main-nav a.current-page {
+      background: #007bff;
+      color: white !important;
+    }
+    .main-nav span {
+      color: #666;
+      font-size: 0.9em;
+      padding: 8px 12px;
+    }
+    .main-nav button {
+      background: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    .main-nav button:hover {
+      background: #c82333;
+    }
+    .hamburger {
+      display: none;
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      font-size: 1.5em;
+      background: none;
+      border: none;
+      color: #555;
+      cursor: pointer;
+      z-index: 1001;
+      padding: 5px 10px;
+      border-radius: 4px;
+      transition: background 0.3s ease;
+    }
+    .hamburger:hover {
+      background: #f5f5f5;
+    }
+    .redeem-list, .search-bar { margin: 0 auto; text-align: center; }
+    @media (max-width: 700px) {
+      .header-content { display: none; }
+      .header-content.open { display: flex !important; flex-direction: column; align-items: center; background: #fff; box-shadow: 0 2px 8px #eee; position: absolute; top: 0; left: 0; right: 0; z-index: 1000; padding: 18px 0 12px 0; }
+      .main-nav { flex-direction: column; gap: 10px; }
+      .main-nav a, .main-nav span, .main-nav button { display: block; margin: 10px 0; text-align: center; width: 90%; margin-left: 5%; color: #333 !important; background: none; z-index: 1002; }
+      .hamburger { display: block; }
+    }
+  </style>
+</head>
+<body>
+  <header id="mainHeader">
+    <button id="hamburgerBtn" class="hamburger" aria-label="展開選單">&#9776;</button>
+    <div class="header-content" id="headerContent">
+      <h1 id="pageTitle">兌換商品管理</h1>
+      <nav class="main-nav">
+        <a href="/index.html">首頁</a>
+        <a href="/map.html">地圖頁</a>
+        <a href="/tasks-list.html">任務列表</a>
+        <a href="/user-tasks.html">任務審核</a>
+        <a href="/staff-dashboard.html" id="navStaff" style="display:none;">新增任務</a>
+        <a href="/admin-user-tasks.html" id="navUserTasks" style="display:none;">用戶任務管理</a>
+        <a href="/products.html" id="navProducts">商品兌換</a>
+        <a href="/redeem-tasks.html" id="navRedeem" style="display:none;">兌換商品管理</a>
+        <a href="/admin-user-tasks.html" id="loginUserInfo" style="color:#666;text-decoration:none;cursor:pointer;"></a>
+        <button id="logoutBtn" style="display:none;">登出</button>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <div class="tab-container">
+      <div class="tab-buttons">
+        <button class="tab-btn active" onclick="switchTab('products')">商品管理</button>
+        <button class="tab-btn" onclick="switchTab('redemptions')">商品兌換記錄</button>
+      </div>
+
+      <div class="tab-content">
+        <!-- 商品管理標籤頁 -->
+        <div id="productsTab" class="tab-pane active">
+          <section class="products-section">
+            <h3>商品管理</h3>
+            <button class="add-product-btn" onclick="openProductModal()">新增商品</button>
+            <div id="productsGrid" class="product-grid">
+              <div class="loading">載入商品中...</div>
+            </div>
+          </section>
+        </div>
+
+        <!-- 商品兌換記錄標籤頁 -->
+        <div id="redemptionsTab" class="tab-pane">
+          <section class="products-section">
+            <h3>商品兌換記錄</h3>
+            <div class="redemption-filters">
+              <select id="statusFilter">
+                <option value="">所有狀態</option>
+                <option value="pending">處理中</option>
+                <option value="completed">已完成</option>
+                <option value="cancelled">已取消</option>
+              </select>
+              <input type="text" id="searchInput" placeholder="搜尋用戶名稱或商品名稱..." />
+            </div>
+            <div id="redemptionsGrid" class="redemptions-grid">
+              <div class="loading">載入兌換記錄中...</div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <!-- 商品編輯模態框 -->
+    <div id="productModal" class="modal">
+      <div class="modal-content">
+        <span class="close-btn" onclick="closeProductModal()">&times;</span>
+        <h3 id="modalTitle">新增商品</h3>
+        <form id="productForm">
+          <div class="form-group">
+            <label>商品名稱</label>
+            <input type="text" name="name" required />
+          </div>
+          <div class="form-group">
+            <label>商品描述</label>
+            <textarea name="description" placeholder="輸入商品描述..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>圖片網址</label>
+            <input type="url" name="image_url" placeholder="https://..." />
+          </div>
+          <div class="form-group">
+            <label>所需積分</label>
+            <input type="number" name="points_required" min="1" required />
+          </div>
+          <div class="form-group">
+            <label>庫存數量</label>
+            <input type="number" name="stock" min="0" required />
+          </div>
+          <div class="form-actions">
+            <button type="button" class="cancel-btn" onclick="closeProductModal()">取消</button>
+            <button type="submit" class="save-btn">儲存</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+  <footer>
+    &copy; 2025 任務審核系統
+  </footer>
+  <script>
+    // 權限檢查與帳號顯示
+    window.loginUser = JSON.parse(localStorage.getItem('loginUser') || 'null');
+    if (!window.loginUser || (window.loginUser.role !== 'shop' && window.loginUser.role !== 'admin')) {
+      document.body.innerHTML = '<div style="max-width:400px;margin:80px auto;text-align:center;font-size:1.2em;color:#c00;">僅限工作人員或管理員登入後使用</div>';
+      throw new Error('No permission');
+    }
+    document.getElementById('loginUserInfo').textContent = '工作人員：' + (window.loginUser.username || '未知用戶');
+    document.getElementById('logoutBtn').onclick = function() {
+      localStorage.removeItem('loginUser');
+      window.location.href = '/login.html';
+    };
+    // 動態顯示 staff/admin 導覽
+    if (window.loginUser && window.loginUser.role === 'admin') {
+      document.getElementById('navStaff').style.display = '';
+      document.getElementById('navRedeem').style.display = '';
+    } else if (window.loginUser && window.loginUser.role === 'shop') {
+      document.getElementById('navRedeem').style.display = '';
+    }
+    // 載入與搜尋
+    const API_BASE = 'http://localhost:3001'; // 本地開發環境
+
+    // 商品管理變數（全局定義）
+    let currentEditingProductId = null;
+    let currentUserRole = null;
+
+    // 所有已登入用戶都可以看到用戶任務管理
+    if (window.loginUser) {
+      document.getElementById('navUserTasks').style.display = '';
+      currentUserRole = window.loginUser.role; // 設置用戶角色
+    }
+    document.getElementById('hamburgerBtn').onclick = function() {
+      document.getElementById('headerContent').classList.toggle('open');
+    };
+    document.querySelectorAll('.main-nav a').forEach(a => {
+      a.onclick = () => document.getElementById('headerContent').classList.remove('open');
+    });
+
+    // 標籤頁面切換功能
+    function switchTab(tabName) {
+      // 切換按鈕狀態
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      event.target.classList.add('active');
+
+      // 切換內容區域
+      document.querySelectorAll('.tab-pane').forEach(pane => {
+        pane.classList.remove('active');
+      });
+      document.getElementById(tabName + 'Tab').classList.add('active');
+
+      // 記錄當前標籤頁
+      currentTab = tabName;
+
+      // 載入對應的數據
+      if (tabName === 'products') {
+        loadProducts();
+      } else if (tabName === 'redemptions') {
+        loadRedemptions();
+      }
+    }
+
+    // ===== 商品管理功能 =====
+    function loadProducts() {
+      if (!window.loginUser || !window.loginUser.username) {
+        console.error('用戶信息不完整，無法載入商品');
+        document.getElementById('productsGrid').innerHTML = '<div class="empty-state"><h3>載入失敗</h3><p>請重新登入</p></div>';
+        return;
+      }
+
+      fetch(`${API_BASE}/api/products/admin`, {
+        headers: { 'x-username': encodeURIComponent(window.loginUser.username) }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          currentUserRole = data.userRole || window.loginUser.role; // 使用後端返回的角色信息
+          displayProducts(data.products);
+        } else {
+          document.getElementById('productsGrid').innerHTML = '<div class="empty-state"><h3>載入失敗</h3><p>請稍後再試</p></div>';
+        }
+      })
+      .catch(err => {
+        console.error('載入商品失敗:', err);
+        document.getElementById('productsGrid').innerHTML = '<div class="empty-state"><h3>載入失敗</h3><p>請稍後再試</p></div>';
+      });
+    }
+
+    function displayProducts(products) {
+      const container = document.getElementById('productsGrid');
+
+      if (products.length === 0) {
+        const emptyMessage = currentUserRole === 'admin'
+          ? '點擊「新增商品」按鈕來添加第一個商品'
+          : '目前沒有您管理的商品';
+        container.innerHTML = `<div class="empty-state"><h3>還沒有商品</h3><p>${emptyMessage}</p></div>`;
+        return;
+      }
+
+      container.innerHTML = '';
+
+      products.forEach(product => {
+        const productCard = document.createElement('div');
+        productCard.className = 'product-card';
+
+        const statusText = product.is_active ? '上架中' : '已下架';
+        const statusColor = product.is_active ? '#28a745' : '#dc3545';
+        const stockColor = product.stock <= 5 ? '#dc3545' : '#666';
+
+        // 檢查是否可以編輯/刪除此商品
+        const canEdit = currentUserRole === 'admin' || (window.loginUser && window.loginUser.username && product.created_by === window.loginUser.username);
+        const creatorInfo = currentUserRole === 'admin' && product.created_by
+          ? `<div class="product-creator" style="font-size: 0.9em; color: #666; margin-bottom: 10px;">創建者：${product.created_by}</div>`
+          : '';
+
+        const actionButtons = canEdit
+          ? `<div class="product-actions">
+              <button class="edit-btn" onclick="editProduct(${product.id})">編輯</button>
+              <button class="delete-btn" onclick="deleteProduct(${product.id}, '${product.name}')">刪除</button>
+             </div>`
+          : `<div class="product-actions" style="justify-content: center;">
+              <span style="color: #999; font-size: 0.9em;">只讀模式</span>
+             </div>`;
+
+        productCard.innerHTML = `
+          ${creatorInfo}
+          <div class="product-name">${product.name}</div>
+          <div class="product-points">${product.points_required} 積分</div>
+          <div class="product-stock" style="color: ${stockColor}">庫存：${product.stock}</div>
+          <div style="margin-bottom: 15px; color: ${statusColor}; font-weight: 600;">${statusText}</div>
+          ${actionButtons}
+        `;
+
+        container.appendChild(productCard);
+      });
+    }
+
+    function openProductModal(productId = null) {
+      currentEditingProductId = productId;
+      const modal = document.getElementById('productModal');
+      const form = document.getElementById('productForm');
+      const modalTitle = document.getElementById('modalTitle');
+
+      if (productId) {
+        modalTitle.textContent = '編輯商品';
+        // 載入商品數據
+        fetch(`${API_BASE}/api/products/admin`, {
+          headers: { 'x-username': encodeURIComponent(window.loginUser.username) }
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            const product = data.products.find(p => p.id == productId);
+            if (product) {
+              form.name.value = product.name;
+              form.description.value = product.description || '';
+              form.image_url.value = product.image_url || '';
+              form.points_required.value = product.points_required;
+              form.stock.value = product.stock;
+            }
+          }
+        });
+      } else {
+        modalTitle.textContent = '新增商品';
+        form.reset();
+      }
+
+      modal.style.display = 'block';
+    }
+
+    function closeProductModal() {
+      document.getElementById('productModal').style.display = 'none';
+      currentEditingProductId = null;
+    }
+
+    // 商品表單提交
+    document.getElementById('productForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      const formData = new FormData(this);
+      const productData = {
+        name: formData.get('name'),
+        description: formData.get('description'),
+        image_url: formData.get('image_url'),
+        points_required: parseInt(formData.get('points_required')),
+        stock: parseInt(formData.get('stock'))
+      };
+
+      const url = currentEditingProductId
+        ? `${API_BASE}/api/products/${currentEditingProductId}`
+        : `${API_BASE}/api/products`;
+
+      const method = currentEditingProductId ? 'PUT' : 'POST';
+
+      fetch(url, {
+        method: method,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-username': encodeURIComponent(window.loginUser.username)
+        },
+        body: JSON.stringify(productData)
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          alert(currentEditingProductId ? '商品更新成功！' : '商品新增成功！');
+          closeProductModal();
+          loadProducts();
+        } else {
+          alert(data.message || '操作失敗');
+        }
+      })
+      .catch(err => {
+        console.error('操作失敗:', err);
+        alert('操作失敗，請稍後再試');
+      });
+    });
+
+    function editProduct(productId) {
+      openProductModal(productId);
+    }
+
+    function deleteProduct(productId, productName) {
+      if (!confirm(`確定要刪除商品「${productName}」嗎？此操作無法復原。`)) {
+        return;
+      }
+
+      fetch(`${API_BASE}/api/products/${productId}`, {
+        method: 'DELETE',
+        headers: { 'x-username': encodeURIComponent(window.loginUser.username) }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          alert('商品刪除成功！');
+          loadProducts();
+        } else {
+          alert(data.message || '刪除失敗');
+        }
+      })
+      .catch(err => {
+        console.error('刪除失敗:', err);
+        alert('刪除失敗，請稍後再試');
+      });
+    }
+
+    // 點擊模態框外部關閉
+    window.onclick = function(event) {
+      const modal = document.getElementById('productModal');
+      if (event.target == modal) {
+        closeProductModal();
+      }
+    };
+
+    // 查看用戶任務詳情
+    window.viewUserTasks = function(username) {
+      // 將用戶信息存儲到localStorage，用於個人任務管理頁面
+      const userInfo = { username: username, role: 'user' };
+      localStorage.setItem('viewUser', JSON.stringify(userInfo));
+
+      // 跳轉到個人任務管理頁面
+      window.location.href = '/admin-user-tasks.html';
+    };
+
+    // ===== 初始化載入數據 =====
+    if (window.loginUser) {
+      // 載入商品數據
+      loadProducts();
+
+      // 載入兌換記錄數據
+      loadRedemptions();
+    }
+
+    // ===== 兌換記錄管理功能 =====
+
+    function loadRedemptions() {
+      if (!window.loginUser || !window.loginUser.username) {
+        console.error('用戶信息不完整，無法載入兌換記錄');
+        document.getElementById('redemptionsGrid').innerHTML = '<div class="empty-state"><h3>載入失敗</h3><p>請重新登入</p></div>';
+        return;
+      }
+
+      fetch(`${API_BASE}/api/product-redemptions/admin`, {
+        headers: { 'x-username': encodeURIComponent(window.loginUser.username) }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          allRedemptions = data.redemptions;
+          displayRedemptions(allRedemptions);
+        } else {
+          document.getElementById('redemptionsGrid').innerHTML = '<div class="empty-state"><h3>載入失敗</h3><p>請稍後再試</p></div>';
+        }
+      })
+      .catch(err => {
+        console.error('載入兌換記錄失敗:', err);
+        document.getElementById('redemptionsGrid').innerHTML = '<div class="empty-state"><h3>載入失敗</h3><p>請稍後再試</p></div>';
+      });
+    }
+
+    function displayRedemptions(redemptions) {
+      const container = document.getElementById('redemptionsGrid');
+
+      if (redemptions.length === 0) {
+        container.innerHTML = '<div class="empty-state"><h3>沒有兌換記錄</h3><p>目前沒有任何商品兌換記錄</p></div>';
+        return;
+      }
+
+      container.innerHTML = '';
+
+      redemptions.forEach(redemption => {
+        const statusClass = redemption.status;
+        const statusText = getRedemptionStatusText(redemption.status);
+
+        const redemptionCard = document.createElement('div');
+        redemptionCard.className = 'redemption-card';
+
+        const redeemedAt = new Date(redemption.redeemed_at).toLocaleString('zh-TW', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+
+        // 檢查是否可以處理此兌換記錄（管理員或商品創建者）
+        const canProcess = currentUserRole === 'admin' ||
+                          (redemption.created_by && window.loginUser && window.loginUser.username && redemption.created_by === window.loginUser.username);
+
+        const actionsHtml = (redemption.status === 'pending' && canProcess)
+          ? `
+            <div class="redemption-actions">
+              <button class="process-btn" onclick="processRedemption(${redemption.id}, 'completed')">完成兌換</button>
+              <button class="cancel-btn" onclick="processRedemption(${redemption.id}, 'cancelled')">取消兌換</button>
+            </div>
+          `
+          : (redemption.status === 'pending' && !canProcess)
+          ? `<div class="redemption-actions" style="justify-content: center;">
+              <span style="color: #999; font-size: 0.9em;">只讀模式</span>
+             </div>`
+          : '';
+
+        redemptionCard.innerHTML = `
+          <div class="redemption-header">
+            <div>
+              <div class="redemption-product">${redemption.product_name}</div>
+              <div class="redemption-user" style="cursor: pointer;" onclick="viewUserTasks('${redemption.username}')">👤 用戶：${redemption.username}</div>
+            </div>
+            <div class="redemption-status ${statusClass}">${statusText}</div>
+          </div>
+          <div class="redemption-meta">
+            <div>兌換時間：${redeemedAt}</div>
+            <div class="redemption-points">消耗積分：${redemption.points_used}</div>
+          </div>
+          ${redemption.notes ? `<div style="margin-bottom: 15px; color: #666; font-style: italic;">備註：${redemption.notes}</div>` : ''}
+          ${actionsHtml}
+        `;
+
+        container.appendChild(redemptionCard);
+      });
+    }
+
+    function getRedemptionStatusText(status) {
+      switch(status) {
+        case 'pending': return '處理中';
+        case 'completed': return '已完成';
+        case 'cancelled': return '已取消';
+        default: return status;
+      }
+    }
+
+    function processRedemption(redemptionId, status) {
+      const actionText = status === 'completed' ? '完成' : '取消';
+      const notes = prompt(`請輸入${actionText}兌換的備註（可選）：`);
+
+      fetch(`${API_BASE}/api/product-redemptions/${redemptionId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-username': encodeURIComponent(window.loginUser.username)
+        },
+        body: JSON.stringify({ status, notes })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          alert(data.message);
+          loadRedemptions(); // 重新載入數據
+          if (currentTab === 'products') {
+            loadProducts();
+          }
+        } else {
+          alert(data.message || '操作失敗');
+        }
+      })
+      .catch(err => {
+        console.error('處理兌換失敗:', err);
+        alert('操作失敗，請稍後再試');
+      });
+    }
+
+    // 篩選功能
+    let currentTab = 'products';
+
+    document.getElementById('statusFilter').addEventListener('change', function() {
+      filterRedemptions();
+    });
+
+    document.getElementById('searchInput').addEventListener('input', function() {
+      filterRedemptions();
+    });
+
+    function filterRedemptions() {
+      const statusFilter = document.getElementById('statusFilter').value;
+      const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+
+      let filteredRedemptions = allRedemptions;
+
+      // 狀態篩選
+      if (statusFilter) {
+        filteredRedemptions = filteredRedemptions.filter(r => r.status === statusFilter);
+      }
+
+      // 搜尋篩選
+      if (searchTerm) {
+        filteredRedemptions = filteredRedemptions.filter(r =>
+          r.username.toLowerCase().includes(searchTerm) ||
+          r.product_name.toLowerCase().includes(searchTerm)
+        );
+      }
+
+      displayRedemptions(filteredRedemptions);
+    }
+  </script>
+</body>
+</html> 

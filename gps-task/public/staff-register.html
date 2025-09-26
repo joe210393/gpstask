@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>工作人員註冊 | GPS 觸發任務系統</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div style="max-width:350px;margin:40px auto;">
+    <h2>工作人員註冊</h2>
+    <form id="staffRegisterForm">
+      <label>帳號 <input type="text" name="username" required /></label>
+      <label>密碼 <input type="password" name="password" required /></label>
+      <button type="submit">註冊</button>
+      <div id="registerMsg" style="margin-top:10px;"></div>
+    </form>
+  </div>
+  <script>
+  document.getElementById('staffRegisterForm').onsubmit = async function(e) {
+    e.preventDefault();
+    const username = this.username.value.trim();
+    const password = this.password.value;
+    if (!username || !password) {
+      document.getElementById('registerMsg').textContent = '請填寫帳號與密碼';
+      return;
+    }
+    const res = await fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password, role: 'shop' })
+    });
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById('registerMsg').textContent = '註冊成功，請登入';
+      this.reset();
+    } else {
+      document.getElementById('registerMsg').textContent = data.message || '註冊失敗';
+    }
+  };
+  </script>
+</body>
+</html> 
