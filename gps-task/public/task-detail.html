@@ -132,7 +132,7 @@
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     const id = urlParams.get('id');
-    const API_BASE = 'http://localhost:3001'; // 本地開發環境
+    const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : ''; // 動態檢測環境
     fetch(`${API_BASE}/api/tasks/${id}`)
       .then(res => res.json())
       .then(data => {
