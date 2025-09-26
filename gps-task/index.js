@@ -72,6 +72,23 @@ function generateToken(user) {
   );
 }
 
+// 測試資料庫連接
+async function testDatabaseConnection() {
+  let conn;
+  try {
+    console.log('🔄 測試資料庫連接...');
+    conn = await mysql.createConnection(dbConfig);
+    console.log('✅ 資料庫連接成功');
+    return true;
+  } catch (error) {
+    console.error('❌ 資料庫連接失敗:', error.message);
+    console.error('   錯誤詳情:', error);
+    return false;
+  } finally {
+    if (conn) await conn.end();
+  }
+}
+
 function verifyToken(token) {
   try {
     return jwt.verify(token, JWT_SECRET);
@@ -1424,6 +1441,16 @@ if (process.env.NODE_ENV !== 'production') {
   console.log('==================');
 }
 
+// 啟動時測試資料庫連接
+(async () => {
+  const dbConnected = await testDatabaseConnection();
+  if (!dbConnected) {
+    console.error('⚠️  警告: 資料庫連接失敗，部分功能可能無法正常運作');
+  }
+})();
+
 app.listen(PORT, () => {
   console.log('Server running on port ' + PORT);
+  console.log(`🌐 應用程式運行在: http://localhost:${PORT}`);
+  console.log(`🔍 健康檢查端點: http://localhost:${PORT}/api/health`);
 }); 
