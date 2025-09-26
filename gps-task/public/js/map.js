@@ -4,7 +4,8 @@ let tasksList = [];
 let triggeredTasks = new Set();
 let completedTaskIds = new Set();
 
-const API_BASE = 'http://localhost:3001'; // 本地開發環境
+// const API_BASE = 'http://localhost:3001'; // 本地開發環境 - 生產環境使用相對路徑
+const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
 
 // 地理位置權限狀態
 let locationPermissionGranted = false;

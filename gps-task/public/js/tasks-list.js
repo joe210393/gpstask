@@ -3,7 +3,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let userTaskStatus = {};
   let allTasks = []; // 存儲所有任務
   let currentFilter = 'all'; // 當前篩選狀態
-  const API_BASE = 'http://localhost:3001'; // 本地開發環境
+  // const API_BASE = 'http://localhost:3001'; // 本地開發環境 - 生產環境使用相對路徑
+const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
   function render(tasks) {
     const listDiv = document.getElementById('tasksList');
     listDiv.innerHTML = '';

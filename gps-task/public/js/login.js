@@ -5,7 +5,7 @@ const USERS = [
   { username: 'staff2', password: 'staff456', role: 'shop' }
 ];
 
-const API_BASE = 'http://localhost:3001'; // 本地開發環境
+// const API_BASE = 'http://localhost:3001'; // 本地開發環境 - 生產環境使用相對路徑
 
 // 一般用戶登入
 const formUser = document.getElementById('loginFormUser');

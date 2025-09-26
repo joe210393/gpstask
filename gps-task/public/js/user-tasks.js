@@ -6,7 +6,8 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  const API_BASE = 'http://localhost:3001'; // 本地開發環境
+  // const API_BASE = 'http://localhost:3001'; // 本地開發環境 - 生產環境使用相對路徑
+  const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
 
   if (window.loginUser.role === 'shop' || window.loginUser.role === 'admin') {
     document.getElementById('staffReviewSection').style.display = '';
