@@ -1396,6 +1396,34 @@ app.get(/^\/(?!api\/).*/, (req, res, next) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// 健康檢查端點
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    database: {
+      host: process.env.MYSQL_HOST ? '[已設定]' : '[未設定]',
+      port: process.env.MYSQL_PORT ? '[已設定]' : '[未設定]',
+      database: process.env.MYSQL_DATABASE ? '[已設定]' : '[未設定]',
+      username: process.env.MYSQL_USERNAME ? '[已設定]' : '[未設定]',
+      password: process.env.MYSQL_ROOT_PASSWORD ? '[已設定]' : '[未設定]'
+    }
+  });
+});
+
+// 除錯：輸出環境變數（僅開發環境）
+if (process.env.NODE_ENV !== 'production') {
+  console.log('=== 環境變數檢查 ===');
+  console.log('MYSQL_HOST:', process.env.MYSQL_HOST);
+  console.log('MYSQL_PORT:', process.env.MYSQL_PORT);
+  console.log('MYSQL_USERNAME:', process.env.MYSQL_USERNAME);
+  console.log('MYSQL_DATABASE:', process.env.MYSQL_DATABASE);
+  console.log('MYSQL_ROOT_PASSWORD:', process.env.MYSQL_ROOT_PASSWORD ? '[已設定]' : '[未設定]');
+  console.log('ALLOWED_ORIGINS:', process.env.ALLOWED_ORIGINS);
+  console.log('==================');
+}
+
 app.listen(PORT, () => {
   console.log('Server running on port ' + PORT);
 }); 
