@@ -96,6 +96,10 @@ CREATE TABLE IF NOT EXISTS user_tasks (
   status ENUM('進行中', '完成', '放棄') NOT NULL DEFAULT '進行中',
   started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   finished_at TIMESTAMP NULL,
+  redeemed BOOLEAN DEFAULT FALSE,
+  redeemed_at TIMESTAMP NULL,
+  redeemed_by VARCHAR(100) NULL,
+  answer TEXT NULL,
   FOREIGN KEY (user_id) REFERENCES users(id),
   FOREIGN KEY (task_id) REFERENCES tasks(id),
   UNIQUE KEY unique_user_task (user_id, task_id)
