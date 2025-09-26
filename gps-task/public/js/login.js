@@ -68,10 +68,14 @@ if (tabUser && tabStaff && formUser && formStaff) {
   tabUser.onclick = () => {
     formUser.style.display = '';
     formStaff.style.display = 'none';
+    tabUser.classList.add('active');
+    tabStaff.classList.remove('active');
   };
   tabStaff.onclick = () => {
     formUser.style.display = 'none';
     formStaff.style.display = '';
+    tabStaff.classList.add('active');
+    tabUser.classList.remove('active');
   };
 }
 
