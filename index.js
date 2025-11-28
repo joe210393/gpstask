@@ -6,12 +6,23 @@ const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 
 // JWT 設定
 const JWT_SECRET = process.env.JWT_SECRET || 'gps-task-secret-key-change-in-production';
 const JWT_EXPIRE = process.env.JWT_EXPIRE || '7d';
 
 const app = express();
+
+// 設定圖片上傳目錄
+// 如果 /data/public/images 存在 (Zeabur 環境)，就使用該路徑
+// 否則使用本地 public/images
+const ZEABUR_UPLOAD_PATH = '/data/public/images';
+const UPLOAD_DIR = fs.existsSync(ZEABUR_UPLOAD_PATH) 
+  ? ZEABUR_UPLOAD_PATH 
+  : path.join(__dirname, 'public/images');
+  
+console.log('📁 圖片儲存路徑:', UPLOAD_DIR);
 
 // CORS 設定 - 根據環境變數限制網域
 const allowedOrigins = process.env.ALLOWED_ORIGINS
@@ -39,6 +50,10 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(cookieParser());
 app.use(express.json({ charset: 'utf-8' }));
+
+// 優先從 UPLOAD_DIR 提供圖片服務，這對於掛載的 Volume 很重要
+// 當請求 /images/xxx.jpg 時，會先去 UPLOAD_DIR 找
+app.use('/images', express.static(UPLOAD_DIR));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // 設置響應字符集
@@ -53,9 +68,9 @@ app.use((req, res, next) => {
 const dbConfig = {
   host: process.env.MYSQL_HOST || 'hkg1.clusters.zeabur.com', // Zeabur MySQL host
   user: process.env.MYSQL_USERNAME || 'root',
-  password: process.env.MYSQL_ROOT_PASSWORD || '5Ob7dxupaEePK684MzLylS9g10Gs2kN3', // Zeabur MySQL password
+  password: process.env.MYSQL_ROOT_PASSWORD || '5N29BnfD0RbMw4Wd6y1iVPEgUI783voa', // Zeabur MySQL password
   database: process.env.MYSQL_DATABASE || 'zeabur',
-  port: process.env.MYSQL_PORT || 30586, // Zeabur MySQL port
+  port: process.env.MYSQL_PORT || 32121, // Zeabur MySQL port
   charset: 'utf8mb4' // 設置字符集為 UTF-8，避免中文亂碼
 };
 
@@ -165,7 +180,15 @@ function requireRole(...allowedRoles) {
 const upload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
-      cb(null, path.join(__dirname, 'public/images'));
+      // 確保目錄存在
+      if (!fs.existsSync(UPLOAD_DIR)) {
+        try {
+          fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+        } catch (err) {
+          console.error('建立上傳目錄失敗:', err);
+        }
+      }
+      cb(null, UPLOAD_DIR);
     },
     filename: (req, file, cb) => {
       // 生成安全的檔案名稱：時間戳 + 隨機字串 + 副檔名

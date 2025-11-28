@@ -6,7 +6,7 @@ MYSQL_PORT=${DATABASE_PORT}       // Database port (automatically set by Zeabur)
 MYSQL_ROOT_PASSWORD=${PASSWORD}   // Database password (automatically set by Zeabur)
 MYSQL_USERNAME=root               // Database username (automatically set by Zeabur)
 MYSQL_DATABASE=zeabur             // Database name (automatically set by Zeabur)
-PASSWORD=5Ob7dxupaEePK684MzLylS9g10Gs2kN3  // Actual password value
+PASSWORD=5N29BnfD0RbMw4Wd6y1iVPEgUI783voa  // Actual password value
 
 // Additional environment variables you may want to set:
 
