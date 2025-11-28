@@ -1,0 +1,20 @@
+[
+  {
+    "id": "task1",
+    "name": "第一個任務點",
+    "lat": 25.0400,
+    "lng": 121.5650,
+    "radius": 50,
+    "pageUrl": "/tasks/task1.html",
+    "iconUrl": "/images/flag-red.png"
+  },
+  {
+    "id": "task2",
+    "name": "第二個任務點",
+    "lat": 25.0385,
+    "lng": 121.5672,
+    "radius": 100,
+    "pageUrl": "/tasks/task2.html",
+    "iconUrl": "/images/flag-blue.png"
+  }
+]

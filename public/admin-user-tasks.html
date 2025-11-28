@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>個人任務管理 | GPS 觸發任務系統</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="icon" type="image/png" href="/images/mascot.png" />
+  <style>
+    /* Header styles */
+    header {
+      text-align: center;
+      position: relative;
+      background: #fff;
+      border-bottom: 1px solid #e0e0e0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      padding: 0;
+      margin-bottom: 20px;
+    }
+    .header-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 15px 20px;
+    }
+    .header-content h1 {
+      font-size: 1.8em;
+      color: #333;
+      margin: 0 0 15px 0;
+      font-weight: 600;
+    }
+    .main-nav {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+    .main-nav a {
+      color: #555;
+      text-decoration: none;
+      font-weight: 500;
+      padding: 8px 12px;
+      border-radius: 6px;
+      transition: all 0.3s ease;
+    }
+    .main-nav a:hover {
+      background: #f5f5f5;
+      color: #007bff;
+    }
+    .main-nav a.current-page {
+      background: #007bff;
+      color: white !important;
+    }
+    .main-nav span {
+      color: #666;
+      font-size: 0.9em;
+      padding: 8px 12px;
+    }
+    .main-nav button {
+      background: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    .main-nav button:hover {
+      background: #c82333;
+    }
+    .hamburger {
+      display: none;
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      font-size: 1.5em;
+      background: none;
+      border: none;
+      color: #555;
+      cursor: pointer;
+      z-index: 1001;
+      padding: 5px 10px;
+      border-radius: 4px;
+      transition: background 0.3s ease;
+    }
+    .hamburger:hover {
+      background: #f5f5f5;
+    }
+    @media (max-width: 700px) {
+      .header-content { display: none; }
+      .header-content.open { display: flex !important; flex-direction: column; align-items: center; background: #fff; box-shadow: 0 2px 8px #eee; position: absolute; top: 0; left: 0; right: 0; z-index: 1000; padding: 18px 0 12px 0; }
+      .main-nav { flex-direction: column; gap: 10px; }
+      .main-nav a, .main-nav span, .main-nav button { display: block; margin: 10px 0; text-align: center; width: 90%; margin-left: 5%; color: #333 !important; background: none; z-index: 1002; }
+      .hamburger { display: block; }
+    }
+
+    /* 個人資訊卡片 */
+    .user-info-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-radius: 16px;
+      padding: 24px;
+      margin: 20px auto;
+      max-width: 800px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+    .user-info-left {
+      flex: 1;
+      min-width: 200px;
+    }
+    .user-info-left h2 {
+      margin: 0 0 8px 0;
+      font-size: 1.5em;
+      font-weight: 600;
+    }
+    .user-info-left p {
+      margin: 4px 0;
+      opacity: 0.9;
+    }
+    .user-info-right {
+      text-align: center;
+    }
+    .points-display {
+      background: rgba(255,255,255,0.2);
+      border-radius: 12px;
+      padding: 16px;
+      backdrop-filter: blur(10px);
+    }
+    .points-display h3 {
+      margin: 0 0 8px 0;
+      font-size: 2em;
+      font-weight: bold;
+      color: #ffd700;
+    }
+    .points-display p {
+      margin: 0;
+      font-size: 0.9em;
+      opacity: 0.9;
+    }
+
+    /* 任務區域 */
+    .tasks-section {
+      max-width: 1000px;
+      margin: 30px auto;
+      padding: 0 20px;
+    }
+    .tasks-section h2 {
+      color: #333;
+      border-bottom: 2px solid #007bff;
+      padding-bottom: 8px;
+      margin-bottom: 20px;
+      font-size: 1.4em;
+    }
+
+    /* 任務卡片 */
+    .task-card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      padding: 20px;
+      margin-bottom: 16px;
+      border-left: 4px solid #007bff;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .task-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    }
+    .task-card.completed {
+      border-left-color: #28a745;
+    }
+    .task-card.in-progress {
+      border-left-color: #ffc107;
+    }
+    .task-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .task-title {
+      font-size: 1.2em;
+      font-weight: 600;
+      color: #333;
+      margin: 0;
+    }
+    .task-status {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.85em;
+      font-weight: 500;
+      text-transform: uppercase;
+    }
+    .task-status.completed {
+      background: #d4edda;
+      color: #155724;
+    }
+    .task-status.in-progress {
+      background: #fff3cd;
+      color: #856404;
+    }
+    .task-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 12px;
+      font-size: 0.9em;
+      color: #666;
+    }
+    .task-meta-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .task-description {
+      color: #555;
+      line-height: 1.6;
+      margin-bottom: 12px;
+    }
+    .task-answer {
+      background: #f8f9fa;
+      border-left: 3px solid #007bff;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+    }
+    .task-answer strong {
+      color: #007bff;
+    }
+    .task-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .task-btn {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.85em;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .task-btn.primary {
+      background: #007bff;
+      color: white;
+    }
+    .task-btn.primary:hover {
+      background: #0056b3;
+    }
+    .task-btn.secondary {
+      background: #6c757d;
+      color: white;
+    }
+    .task-btn.secondary:hover {
+      background: #545b62;
+    }
+
+    /* 空狀態 */
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #666;
+    }
+    .empty-state h3 {
+      margin-bottom: 8px;
+      color: #333;
+    }
+
+    /* 響應式設計 */
+    @media (max-width: 768px) {
+      .user-info-card {
+        flex-direction: column;
+        text-align: center;
+      }
+      .task-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      .task-meta {
+        flex-direction: column;
+        gap: 8px;
+      }
+      .task-actions {
+        justify-content: center;
+      }
+    }
+
+    /* 載入動畫 */
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+    .loading::after {
+      content: '';
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #f3f3f3;
+      border-top: 2px solid #007bff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-left: 10px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <header id="mainHeader">
+    <button id="hamburgerBtn" class="hamburger" aria-label="展開選單">&#9776;</button>
+    <div class="header-content" id="headerContent">
+      <h1 id="pageTitle">個人任務管理</h1>
+      <nav class="main-nav">
+        <a href="/index.html">首頁</a>
+        <a href="/map.html">地圖頁</a>
+        <a href="/tasks-list.html">任務列表</a>
+        <a href="/user-tasks.html">任務審核</a>
+        <a href="/staff-dashboard.html" id="navStaff" style="display:none;">新增任務</a>
+        <a href="/admin-user-tasks.html" class="current-page" id="navUserTasks">用戶任務管理</a>
+        <a href="/products.html" id="navProducts">商品兌換</a>
+        <a href="/redeem-tasks.html" id="navRedeem" style="display:none;">兌換商品管理</a>
+        <a href="/admin-user-tasks.html" id="loginUserInfo" style="color:#666;text-decoration:none;cursor:pointer;"></a>
+        <button id="logoutBtn" style="display:none;">登出</button>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <!-- 用戶資訊卡片 -->
+    <div class="user-info-card">
+      <div class="user-info-left">
+        <h2 id="userName">載入中...</h2>
+        <p id="userRole">角色：載入中...</p>
+        <p id="userJoinDate">加入時間：載入中...</p>
+      </div>
+      <div class="user-info-right">
+        <div class="points-display">
+          <h3 id="userPoints">0</h3>
+          <p>累計積分</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 進行中任務 -->
+    <section class="tasks-section">
+      <h2>📋 進行中任務</h2>
+      <div id="inProgressTasks">
+        <div class="loading">載入中...</div>
+      </div>
+    </section>
+
+    <!-- 已完成任務 -->
+    <section class="tasks-section">
+      <h2>✅ 已完成任務</h2>
+      <div id="completedTasks">
+        <div class="loading">載入中...</div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    &copy; 2025 任務網頁系統
+  </footer>
+
+  <script>
+    // Header功能
+    const loginUser = JSON.parse(localStorage.getItem('loginUser') || 'null');
+
+    // 權限檢查
+    if (!loginUser) {
+      alert('請先登入');
+      window.location.href = '/login.html';
+    }
+
+    // 檢查是否有從兌換記錄頁面跳轉過來的用戶信息
+    const viewUser = JSON.parse(localStorage.getItem('viewUser') || 'null');
+    if (viewUser) {
+      // 如果是管理員查看其他用戶的任務，使用viewUser的信息
+      if (loginUser.role === 'admin' || loginUser.role === 'shop') {
+        currentUser = viewUser;
+        // 清除臨時存儲
+        localStorage.removeItem('viewUser');
+      }
+    } else {
+      currentUser = loginUser;
+    }
+
+    // 權限檢查和導航顯示
+    if (loginUser) {
+      document.getElementById('loginUserInfo').textContent = getUserDisplayName(loginUser);
+      document.getElementById('logoutBtn').onclick = function() {
+        localStorage.removeItem('loginUser');
+        window.location.href = '/login.html';
+      };
+      document.getElementById('logoutBtn').style.display = '';
+
+      // 根據權限顯示導航鏈接
+      if (loginUser.role === 'admin') {
+        document.getElementById('navStaff').style.display = '';
+        document.getElementById('navRedeem').style.display = '';
+      } else if (loginUser.role === 'shop') {
+        document.getElementById('navStaff').style.display = '';
+        document.getElementById('navRedeem').style.display = '';
+      }
+    }
+
+    function getUserDisplayName(loginUser) {
+      switch(loginUser.role) {
+        case 'admin':
+          return `管理員：${loginUser.username}`;
+        case 'shop':
+          return `商店：${loginUser.username}`;
+        case 'user':
+          return `用戶：${loginUser.username}`;
+        default:
+          return loginUser.username;
+      }
+    }
+
+    // 漢堡選單功能
+    document.getElementById('hamburgerBtn').onclick = function() {
+      document.getElementById('headerContent').classList.toggle('open');
+    };
+
+    // 點擊鏈接後關閉選單
+    document.querySelectorAll('.main-nav a, .main-nav button').forEach(element => {
+      element.addEventListener('click', function() {
+        document.getElementById('headerContent').classList.remove('open');
+      });
+    });
+
+    // 頁面數據載入
+    const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+
+    // 載入用戶資訊
+    function loadUserInfo() {
+      document.getElementById('userName').textContent = currentUser.username;
+      document.getElementById('userRole').textContent = `角色：${getRoleDisplayName(currentUser.role)}`;
+
+      // 更新頁面標題
+      if (currentUser !== loginUser) {
+        document.getElementById('pageTitle').textContent = `查看用戶任務 - ${currentUser.username}`;
+      }
+
+      // 模擬加入時間（實際應該從API獲取）
+      const joinDate = new Date();
+      joinDate.setDate(joinDate.getDate() - 30); // 模擬30天前加入
+      document.getElementById('userJoinDate').textContent = `加入時間：${joinDate.toLocaleDateString('zh-TW')}`;
+    }
+
+    function getRoleDisplayName(role) {
+      switch(role) {
+        case 'admin': return '管理員';
+        case 'shop': return '商店';
+        case 'user': return '一般用戶';
+        default: return role;
+      }
+    }
+
+    // 載入用戶積分
+    function loadUserPoints() {
+      fetch(`${API_BASE}/api/user/points`, {
+        headers: { 'x-username': currentUser.username }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          document.getElementById('userPoints').textContent = data.totalPoints;
+        }
+      })
+      .catch(err => {
+        console.error('載入積分失敗:', err);
+      });
+    }
+
+    // 載入任務數據
+    function loadUserTasks() {
+      // 載入進行中任務
+      fetch(`${API_BASE}/api/user-tasks/all?username=${encodeURIComponent(currentUser.username)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            displayTasks(data.tasks);
+          }
+        })
+        .catch(err => {
+          console.error('載入任務失敗:', err);
+          document.getElementById('inProgressTasks').innerHTML = '<div class="empty-state"><h3>載入失敗</h3><p>請稍後再試</p></div>';
+          document.getElementById('completedTasks').innerHTML = '<div class="empty-state"><h3>載入失敗</h3><p>請稍後再試</p></div>';
+        });
+    }
+
+    // 顯示任務
+    function displayTasks(tasks) {
+      const inProgressContainer = document.getElementById('inProgressTasks');
+      const completedContainer = document.getElementById('completedTasks');
+
+      const inProgressTasks = tasks.filter(task => task.status === '進行中');
+      const completedTasks = tasks.filter(task => task.status === '完成');
+
+      // 顯示進行中任務
+      if (inProgressTasks.length === 0) {
+        inProgressContainer.innerHTML = '<div class="empty-state"><h3>目前沒有進行中的任務</h3><p>快去地圖頁面接取新任務吧！</p></div>';
+      } else {
+        inProgressContainer.innerHTML = '';
+        inProgressTasks.forEach(task => {
+          const taskCard = createTaskCard(task, 'in-progress');
+          inProgressContainer.appendChild(taskCard);
+        });
+      }
+
+      // 顯示已完成任務
+      if (completedTasks.length === 0) {
+        completedContainer.innerHTML = '<div class="empty-state"><h3>還沒有完成的任務</h3><p>完成任務就能獲得積分喔！</p></div>';
+      } else {
+        completedContainer.innerHTML = '';
+        completedTasks.forEach(task => {
+          const taskCard = createTaskCard(task, 'completed');
+          completedContainer.appendChild(taskCard);
+        });
+      }
+
+      // 積分會通過 loadUserPoints() 單獨載入
+    }
+
+    // 創建任務卡片
+    function createTaskCard(task, statusClass) {
+      const card = document.createElement('div');
+      card.className = `task-card ${statusClass}`;
+
+      const statusText = task.status === '完成' ? '已完成' : '進行中';
+      const statusClassName = task.status === '完成' ? 'completed' : 'in-progress';
+
+      card.innerHTML = `
+        <div class="task-card-header">
+          <h3 class="task-title">${task.name}</h3>
+          <span class="task-status ${statusClassName}">${statusText}</span>
+        </div>
+
+        <div class="task-meta">
+          <div class="task-meta-item">
+            📅 開始時間：${toTWTime(task.started_at)}
+          </div>
+          ${task.finished_at ? `<div class="task-meta-item">🏁 完成時間：${toTWTime(task.finished_at)}</div>` : ''}
+          <div class="task-meta-item">
+            ⭐ 獲得積分：${task.points || 0}
+          </div>
+        </div>
+
+        <div class="task-description">
+          ${task.description}
+        </div>
+
+        ${task.photoUrl ? `<img src="${task.photoUrl}" alt="任務照片" style="max-width:200px; max-height:120px; border-radius:8px; margin:10px 0;">` : ''}
+
+        ${task.answer ? `
+          <div class="task-answer">
+            <strong>您的答案：</strong> ${task.answer}
+          </div>
+        ` : ''}
+
+        <div class="task-actions">
+          <a href="/task-detail.html?id=${task.id}" class="task-btn primary">查看詳情</a>
+          ${task.status === '進行中' ? `<button class="task-btn secondary" onclick="editAnswer(${task.user_task_id}, '${task.answer || ''}')">編輯答案</button>` : ''}
+        </div>
+      `;
+
+      return card;
+    }
+
+    // 編輯答案功能
+    window.editAnswer = function(taskId, currentAnswer) {
+      const newAnswer = prompt('請輸入您的答案：', currentAnswer);
+      if (newAnswer !== null && newAnswer.trim() !== '') {
+        fetch(`${API_BASE}/api/user-tasks/${taskId}/answer`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answer: newAnswer.trim() })
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            alert('答案已更新！');
+            loadUserPoints(); // 重新載入積分（如果任務完成會獲得積分）
+            loadUserTasks(); // 重新載入任務
+          } else {
+            alert(data.message || '更新失敗');
+          }
+        })
+        .catch(err => {
+          console.error('更新答案失敗:', err);
+          alert('更新失敗，請稍後再試');
+        });
+      }
+    };
+
+    // 時間格式化函數
+    function toTWTime(str) {
+      if (!str) return '-';
+      const d = new Date(str);
+      d.setHours(d.getHours() + 8);
+      return d.toISOString().replace('T',' ').slice(0,19);
+    }
+
+    // 初始化頁面
+    loadUserInfo();
+    loadUserPoints();
+    loadUserTasks();
+  </script>
+</body>
+</html>

@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>商品兌換 | GPS 觸發任務系統</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="icon" type="image/png" href="/images/mascot.png" />
+  <style>
+    /* Header styles */
+    header {
+      text-align: center;
+      position: relative;
+      background: #fff;
+      border-bottom: 1px solid #e0e0e0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      padding: 0;
+      margin-bottom: 20px;
+    }
+    .header-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 15px 20px;
+    }
+    .header-content h1 {
+      font-size: 1.8em;
+      color: #333;
+      margin: 0 0 15px 0;
+      font-weight: 600;
+    }
+    .main-nav {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+    .main-nav a {
+      color: #555;
+      text-decoration: none;
+      font-weight: 500;
+      padding: 8px 12px;
+      border-radius: 6px;
+      transition: all 0.3s ease;
+    }
+    .main-nav a:hover {
+      background: #f5f5f5;
+      color: #007bff;
+    }
+    .main-nav a.current-page {
+      background: #007bff;
+      color: white !important;
+    }
+    .main-nav span {
+      color: #666;
+      font-size: 0.9em;
+      padding: 8px 12px;
+    }
+    .main-nav button {
+      background: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    .main-nav button:hover {
+      background: #c82333;
+    }
+    .hamburger {
+      display: none;
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      font-size: 1.5em;
+      background: none;
+      border: none;
+      color: #555;
+      cursor: pointer;
+      z-index: 1001;
+      padding: 5px 10px;
+      border-radius: 4px;
+      transition: background 0.3s ease;
+    }
+    .hamburger:hover {
+      background: #f5f5f5;
+    }
+    @media (max-width: 700px) {
+      .header-content { display: none; }
+      .header-content.open { display: flex !important; flex-direction: column; align-items: center; background: #fff; box-shadow: 0 2px 8px #eee; position: absolute; top: 0; left: 0; right: 0; z-index: 1000; padding: 18px 0 12px 0; }
+      .main-nav { flex-direction: column; gap: 10px; }
+      .main-nav a, .main-nav span, .main-nav button { display: block; margin: 10px 0; text-align: center; width: 90%; margin-left: 5%; color: #333 !important; background: none; z-index: 1002; }
+      .hamburger { display: block; }
+    }
+
+    /* 用戶積分卡片 */
+    .user-points-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-radius: 16px;
+      padding: 24px;
+      margin: 20px auto;
+      max-width: 400px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .user-points-card h2 {
+      margin: 0 0 8px 0;
+      font-size: 1.2em;
+      opacity: 0.9;
+    }
+    .points-display {
+      font-size: 3em;
+      font-weight: bold;
+      margin: 10px 0;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    .points-label {
+      font-size: 0.9em;
+      opacity: 0.8;
+    }
+
+    /* 商品區域 */
+    .products-section {
+      max-width: 1200px;
+      margin: 30px auto;
+      padding: 0 20px;
+    }
+    .products-section h2 {
+      color: #333;
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 2em;
+      font-weight: 600;
+    }
+
+    /* 商品網格 */
+    .products-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+      margin-bottom: 40px;
+    }
+
+    /* 商品卡片 */
+    .product-card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      overflow: hidden;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      border: 2px solid #f8f9fa;
+    }
+    .product-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+      border-color: #007bff;
+    }
+    .product-image {
+      width: 100%;
+      height: 200px;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3em;
+      color: #666;
+      position: relative;
+    }
+    .product-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .product-image.placeholder {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    .product-content {
+      padding: 20px;
+    }
+    .product-name {
+      font-size: 1.3em;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 8px;
+    }
+    .product-description {
+      color: #666;
+      margin-bottom: 15px;
+      line-height: 1.5;
+    }
+    .product-creator {
+      color: #666;
+      font-size: 0.9em;
+      margin-bottom: 10px;
+      padding: 6px 12px;
+      background: #f8f9fa;
+      border-radius: 12px;
+      border-left: 3px solid #007bff;
+      display: inline-block;
+      font-weight: 500;
+    }
+    .product-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    .product-points {
+      background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 1.1em;
+      box-shadow: 0 2px 8px rgba(255,154,158,0.3);
+    }
+    .product-stock {
+      color: #666;
+      font-size: 0.9em;
+    }
+    .product-stock.low-stock {
+      color: #dc3545;
+      font-weight: 600;
+    }
+    .redeem-btn {
+      width: 100%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 1em;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .redeem-btn:hover {
+      background: linear-gradient(135deg, #5a6fd8 0%, #6b46c1 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(102,126,234,0.4);
+    }
+    .redeem-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    .redeem-btn.insufficient {
+      background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+    }
+    .own-product-notice {
+      width: 100%;
+      padding: 12px 20px;
+      background: linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%);
+      color: #d63031;
+      border: none;
+      border-radius: 25px;
+      font-size: 0.9em;
+      font-weight: 600;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(255,107,107,0.3);
+    }
+
+    /* 兌換記錄區域 */
+    .redemption-history {
+      margin-top: 50px;
+      padding-top: 30px;
+      border-top: 2px solid #e9ecef;
+    }
+    .redemption-history h2 {
+      color: #333;
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 1.8em;
+    }
+
+    /* 記錄卡片 */
+    .redemption-card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      padding: 20px;
+      margin-bottom: 16px;
+      border-left: 4px solid #28a745;
+    }
+    .redemption-card.pending {
+      border-left-color: #ffc107;
+    }
+    .redemption-card.cancelled {
+      border-left-color: #dc3545;
+    }
+    .redemption-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .redemption-product {
+      font-size: 1.1em;
+      font-weight: 600;
+      color: #333;
+    }
+    .redemption-status {
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 0.8em;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .redemption-status.completed {
+      background: #d4edda;
+      color: #155724;
+    }
+    .redemption-status.pending {
+      background: #fff3cd;
+      color: #856404;
+    }
+    .redemption-status.cancelled {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    .redemption-meta {
+      display: flex;
+      gap: 20px;
+      font-size: 0.9em;
+      color: #666;
+      margin-bottom: 8px;
+    }
+    .redemption-points {
+      color: #007bff;
+      font-weight: 600;
+    }
+
+    /* 空狀態 */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #666;
+    }
+    .empty-state h3 {
+      margin-bottom: 16px;
+      color: #333;
+      font-size: 1.5em;
+    }
+    .empty-state p {
+      margin-bottom: 20px;
+      font-size: 1.1em;
+    }
+
+    /* 載入動畫 */
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+    .loading::after {
+      content: '';
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #f3f3f3;
+      border-top: 2px solid #007bff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-left: 10px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* 響應式設計 */
+    @media (max-width: 768px) {
+      .products-grid {
+        grid-template-columns: 1fr;
+      }
+      .user-points-card {
+        margin: 20px 20px;
+        max-width: none;
+      }
+      .product-creator {
+        font-size: 0.8em;
+        padding: 5px 10px;
+        margin-bottom: 8px;
+      }
+      .own-product-notice {
+        font-size: 0.8em;
+        padding: 10px 15px;
+      }
+      .product-meta {
+        flex-direction: column;
+        gap: 8px;
+        align-items: flex-start;
+      }
+      .redemption-header {
+        flex-direction: column;
+        gap: 8px;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header id="mainHeader">
+    <button id="hamburgerBtn" class="hamburger" aria-label="展開選單">&#9776;</button>
+    <div class="header-content" id="headerContent">
+      <h1 id="pageTitle">商品兌換</h1>
+      <nav class="main-nav">
+        <a href="/index.html">首頁</a>
+        <a href="/map.html">地圖頁</a>
+        <a href="/tasks-list.html">任務列表</a>
+        <a href="/user-tasks.html">任務審核</a>
+        <a href="/staff-dashboard.html" id="navStaff" style="display:none;">新增任務</a>
+        <a href="/admin-user-tasks.html" id="navUserTasks">個人任務管理</a>
+        <a href="/products.html" class="current-page">商品兌換</a>
+        <a href="/redeem-tasks.html" id="navRedeem" style="display:none;">兌換商品管理</a>
+        <span id="loginUserInfo"></span>
+        <button id="logoutBtn" style="display:none;">登出</button>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <!-- 用戶積分卡片 -->
+    <div class="user-points-card">
+      <h2>我的積分</h2>
+      <div class="points-display" id="userPoints">0</div>
+      <div class="points-label">累計積分</div>
+    </div>
+
+    <!-- 商品列表 -->
+    <section class="products-section">
+      <h2>🎁 可兌換商品</h2>
+      <div id="productsGrid" class="products-grid">
+        <div class="loading">載入商品中...</div>
+      </div>
+    </section>
+
+    <!-- 兌換記錄 -->
+    <section class="products-section redemption-history">
+      <h2>📋 兌換記錄</h2>
+      <div id="redemptionHistory">
+        <div class="loading">載入記錄中...</div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    &copy; 2025 任務網頁系統
+  </footer>
+
+  <script>
+    // Header功能
+    const loginUser = JSON.parse(localStorage.getItem('loginUser') || 'null');
+
+    // 權限檢查
+    if (!loginUser) {
+      alert('請先登入');
+      window.location.href = '/login.html';
+    }
+
+    // 權限檢查和導航顯示
+    if (loginUser) {
+      document.getElementById('loginUserInfo').textContent = getUserDisplayName(loginUser);
+      document.getElementById('logoutBtn').onclick = function() {
+        localStorage.removeItem('loginUser');
+        window.location.href = '/login.html';
+      };
+      document.getElementById('logoutBtn').style.display = '';
+
+      // 根據權限顯示導航鏈接
+      if (loginUser.role === 'admin') {
+        document.getElementById('navStaff').style.display = '';
+        document.getElementById('navRedeem').style.display = '';
+      } else if (loginUser.role === 'shop') {
+        document.getElementById('navStaff').style.display = '';
+        document.getElementById('navRedeem').style.display = '';
+      }
+      // 所有已登入用戶都可以看到用戶任務管理
+      document.getElementById('navUserTasks').style.display = '';
+    }
+
+    function getUserDisplayName(loginUser) {
+      switch(loginUser.role) {
+        case 'admin':
+          return `管理員：${loginUser.username}`;
+        case 'shop':
+          return `商店：${loginUser.username}`;
+        case 'user':
+          return `用戶：${loginUser.username}`;
+        default:
+          return loginUser.username;
+      }
+    }
+
+    // 漢堡選單功能
+    document.getElementById('hamburgerBtn').onclick = function() {
+      document.getElementById('headerContent').classList.toggle('open');
+    };
+
+    // 點擊鏈接後關閉選單
+    document.querySelectorAll('.main-nav a, .main-nav button').forEach(element => {
+      element.addEventListener('click', function() {
+        document.getElementById('headerContent').classList.remove('open');
+      });
+    });
+
+    // 頁面數據載入
+    const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+
+    // 載入用戶積分
+    function loadUserPoints() {
+      fetch(`${API_BASE}/api/user/points`, {
+        headers: { 'x-username': loginUser.username }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          document.getElementById('userPoints').textContent = data.totalPoints;
+        }
+      })
+      .catch(err => {
+        console.error('載入積分失敗:', err);
+      });
+    }
+
+    // 載入商品列表
+    function loadProducts() {
+      fetch(`${API_BASE}/api/products`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          displayProducts(data.products);
+        } else {
+          document.getElementById('productsGrid').innerHTML = '<div class="empty-state"><h3>載入失敗</h3><p>請稍後再試</p></div>';
+        }
+      })
+      .catch(err => {
+        console.error('載入商品失敗:', err);
+        document.getElementById('productsGrid').innerHTML = '<div class="empty-state"><h3>載入失敗</h3><p>請稍後再試</p></div>';
+      });
+    }
+
+    // 顯示商品
+    function displayProducts(products) {
+      const container = document.getElementById('productsGrid');
+
+      if (products.length === 0) {
+        container.innerHTML = '<div class="empty-state"><h3>目前沒有可兌換的商品</h3><p>敬請期待！</p></div>';
+        return;
+      }
+
+      container.innerHTML = '';
+
+      products.forEach(product => {
+        const productCard = document.createElement('div');
+        productCard.className = 'product-card';
+
+        const stockClass = product.stock <= 5 ? 'low-stock' : '';
+        const isLowStock = product.stock <= 5;
+        const stockText = isLowStock ? `僅剩 ${product.stock} 個` : `庫存：${product.stock}`;
+
+        // 顯示創建者信息
+        const creatorInfo = product.creator_username
+          ? `<div class="product-creator">👤 分享者：${product.creator_username}</div>`
+          : '';
+
+        // 檢查是否是自己的商品（工作人員不能兌換自己的商品）
+        const isOwnProduct = loginUser && loginUser.username === product.created_by;
+        const isStaff = loginUser && loginUser.role === 'shop';
+
+        let redeemButtonHtml;
+        if (product.stock <= 0) {
+          redeemButtonHtml = `<button class="redeem-btn disabled" disabled>已售完</button>`;
+        } else if (isStaff && isOwnProduct) {
+          redeemButtonHtml = `<div class="own-product-notice">⚠️ 無法兌換自己的商品</div>`;
+        } else {
+          redeemButtonHtml = `<button class="redeem-btn" onclick="redeemProduct(${product.id}, ${product.points_required}, ${product.stock})">立即兌換</button>`;
+        }
+
+        productCard.innerHTML = `
+          <div class="product-image ${product.image_url ? '' : 'placeholder'}">
+            ${product.image_url ? `<img src="${product.image_url}" alt="${product.name}">` : '🎁'}
+          </div>
+          <div class="product-content">
+            <div class="product-name">${product.name}</div>
+            <div class="product-description">${product.description || '無描述'}</div>
+            ${creatorInfo}
+            <div class="product-meta">
+              <div class="product-points">${product.points_required} 積分</div>
+              <div class="product-stock ${stockClass}">${stockText}</div>
+            </div>
+            ${redeemButtonHtml}
+          </div>
+        `;
+
+        container.appendChild(productCard);
+      });
+    }
+
+    // 兌換商品
+    window.redeemProduct = function(productId, pointsRequired, stock) {
+      if (stock <= 0) {
+        alert('商品已售完！');
+        return;
+      }
+
+      const currentPoints = parseInt(document.getElementById('userPoints').textContent);
+      if (currentPoints < pointsRequired) {
+        alert(`積分不足！需要 ${pointsRequired} 積分，您目前有 ${currentPoints} 積分。`);
+        return;
+      }
+
+      if (!confirm(`確定要兌換這個商品嗎？將消耗 ${pointsRequired} 積分。`)) {
+        return;
+      }
+
+      fetch(`${API_BASE}/api/products/${productId}/redeem`, {
+        method: 'POST',
+        headers: { 'x-username': loginUser.username }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          alert(data.message);
+          // 重新載入數據
+          loadUserPoints();
+          loadProducts();
+          loadRedemptionHistory();
+        } else {
+          alert(data.message || '兌換失敗');
+        }
+      })
+      .catch(err => {
+        console.error('兌換失敗:', err);
+        alert('兌換失敗，請稍後再試');
+      });
+    };
+
+    // 載入兌換記錄
+    function loadRedemptionHistory() {
+      fetch(`${API_BASE}/api/products/redemptions`, {
+        headers: { 'x-username': loginUser.username }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          displayRedemptionHistory(data.redemptions);
+        }
+      })
+      .catch(err => {
+        console.error('載入兌換記錄失敗:', err);
+        document.getElementById('redemptionHistory').innerHTML = '<div class="empty-state"><h3>載入失敗</h3><p>請稍後再試</p></div>';
+      });
+    }
+
+    // 顯示兌換記錄
+    function displayRedemptionHistory(redemptions) {
+      const container = document.getElementById('redemptionHistory');
+
+      if (redemptions.length === 0) {
+        container.innerHTML = '<div class="empty-state"><h3>還沒有兌換記錄</h3><p>快去兌換商品吧！</p></div>';
+        return;
+      }
+
+      container.innerHTML = '';
+
+      redemptions.forEach(redemption => {
+        const statusClass = redemption.status;
+        const statusText = getStatusText(redemption.status);
+
+        const redemptionCard = document.createElement('div');
+        redemptionCard.className = `redemption-card ${statusClass}`;
+
+        redemptionCard.innerHTML = `
+          <div class="redemption-header">
+            <div class="redemption-product">${redemption.product_name}</div>
+            <div class="redemption-status ${statusClass}">${statusText}</div>
+          </div>
+          <div class="redemption-meta">
+            <div>兌換時間：${formatDate(redemption.redeemed_at)}</div>
+            <div class="redemption-points">消耗積分：${redemption.points_used}</div>
+          </div>
+          ${redemption.notes ? `<div style="margin-top: 8px; color: #666; font-style: italic;">備註：${redemption.notes}</div>` : ''}
+        `;
+
+        container.appendChild(redemptionCard);
+      });
+    }
+
+    // 狀態文字轉換
+    function getStatusText(status) {
+      switch(status) {
+        case 'pending': return '處理中';
+        case 'completed': return '已完成';
+        case 'cancelled': return '已取消';
+        default: return status;
+      }
+    }
+
+    // 日期格式化
+    function formatDate(dateStr) {
+      const date = new Date(dateStr);
+      return date.toLocaleString('zh-TW', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    // 初始化頁面
+    loadUserPoints();
+    loadProducts();
+    loadRedemptionHistory();
+  </script>
+</body>
+</html>
