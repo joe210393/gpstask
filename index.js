@@ -59,6 +59,8 @@ const dbConfig = {
   charset: 'utf8mb4' // 設置字符集為 UTF-8，避免中文亂碼
 };
 
+const ALLOWED_TASK_TYPES = ['qa', 'multiple_choice', 'photo'];
+
 // JWT 工具函數
 function generateToken(user) {
   return jwt.sign(
@@ -395,7 +397,16 @@ app.get('/api/tasks/admin', authenticateToken, requireRole('shop', 'admin'), asy
 
 // 新增任務
 app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
-  const { name, lat, lng, radius, description, photoUrl, youtubeUrl, points } = req.body;
+  const { name, lat, lng, radius, description, photoUrl, youtubeUrl, points, task_type, options, correct_answer } = req.body;
+  console.log('[POST /api/tasks] Received:', {
+    name,
+    lat,
+    lng,
+    task_type,
+    optionsType: Array.isArray(options) ? 'array' : typeof options,
+    correct_answer
+  });
+
   if (!name || !lat || !lng || !radius || !description || !photoUrl) {
     return res.status(400).json({ success: false, message: '缺少參數' });
   }
@@ -405,10 +416,15 @@ app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
     conn = await mysql.createConnection(dbConfig);
     const username = req.headers['x-username'];
     const pts = Number(points) || 0;
+    const type = ALLOWED_TASK_TYPES.includes(task_type) ? task_type : 'qa';
+    if (!ALLOWED_TASK_TYPES.includes(task_type)) {
+      console.warn(`[POST /api/tasks] 無效 task_type(${task_type})，已改為 qa`);
+    }
+    const opts = options ? JSON.stringify(options) : null;
 
     await conn.execute(
-      'INSERT INTO tasks (name, lat, lng, radius, description, photoUrl, iconUrl, youtubeUrl, points, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [name, lat, lng, radius, description, photoUrl, '/images/flag-red.png', youtubeUrl || null, pts, username]
+      'INSERT INTO tasks (name, lat, lng, radius, description, photoUrl, iconUrl, youtubeUrl, points, created_by, task_type, options, correct_answer) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [name, lat, lng, radius, description, photoUrl, '/images/flag-red.png', youtubeUrl || null, pts, username, type, opts, correct_answer || null]
     );
     res.json({ success: true, message: '新增成功' });
   } catch (err) {
@@ -420,7 +436,7 @@ app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
 });
 
 // 安全的檔案上傳 API
-app.post('/api/upload', authenticateToken, requireRole('shop', 'admin'), (req, res) => {
+app.post('/api/upload', authenticateToken, requireRole('user', 'shop', 'admin'), (req, res) => {
   // 使用 multer 中間層處理檔案上傳
   upload.single('photo')(req, res, (err) => {
     if (err) {
@@ -581,7 +597,10 @@ app.get('/api/tasks/:id', async (req, res) => {
 // 編輯任務
 app.put('/api/tasks/:id', staffOrAdminAuth, async (req, res) => {
   const { id } = req.params;
-  const { name, lat, lng, radius, description, photoUrl, youtubeUrl, points } = req.body;
+  console.log(`[PUT /api/tasks/${id}] 收到更新請求`);
+  console.log('Request Body:', req.body);
+
+  const { name, lat, lng, radius, description, photoUrl, youtubeUrl, points, task_type, options, correct_answer } = req.body;
   if (!name || !lat || !lng || !radius || !description || !photoUrl) {
     return res.status(400).json({ success: false, message: '缺少參數' });
   }
@@ -619,9 +638,15 @@ app.put('/api/tasks/:id', staffOrAdminAuth, async (req, res) => {
     }
 
     const pts = Number(points) || 0;
+    const type = ALLOWED_TASK_TYPES.includes(task_type) ? task_type : 'qa';
+    if (!ALLOWED_TASK_TYPES.includes(task_type)) {
+      console.warn(`[PUT /api/tasks/${id}] 無效 task_type(${task_type})，已改為 qa`);
+    }
+    const opts = options ? JSON.stringify(options) : null;
+
     await conn.execute(
-      'UPDATE tasks SET name=?, lat=?, lng=?, radius=?, description=?, photoUrl=?, youtubeUrl=?, points=? WHERE id=?',
-      [name, lat, lng, radius, description, photoUrl, youtubeUrl || null, pts, id]
+      'UPDATE tasks SET name=?, lat=?, lng=?, radius=?, description=?, photoUrl=?, youtubeUrl=?, points=?, task_type=?, options=?, correct_answer=? WHERE id=?',
+      [name, lat, lng, radius, description, photoUrl, youtubeUrl || null, pts, type, opts, correct_answer || null, id]
     );
     res.json({ success: true, message: '更新成功' });
   } catch (err) {
@@ -810,7 +835,7 @@ app.get('/api/user-tasks/in-progress', staffOrAdminAuth, async (req, res) => {
     }
 
     const userRole = userRows[0].role;
-    let sql = `SELECT ut.id as user_task_id, ut.user_id, ut.task_id, ut.status, ut.started_at, ut.finished_at, ut.redeemed, ut.redeemed_at, ut.redeemed_by, ut.answer, u.username, t.name as task_name, t.description, t.points, t.created_by as task_creator
+    let sql = `SELECT ut.id as user_task_id, ut.user_id, ut.task_id, ut.status, ut.started_at, ut.finished_at, ut.redeemed, ut.redeemed_at, ut.redeemed_by, ut.answer, u.username, t.name as task_name, t.description, t.points, t.created_by as task_creator, t.task_type
       FROM user_tasks ut
       JOIN users u ON ut.user_id = u.id
       JOIN tasks t ON ut.task_id = t.id
@@ -861,7 +886,7 @@ app.get('/api/user-tasks/to-redeem', staffOrAdminAuth, async (req, res) => {
     }
 
     const userRole = userRows[0].role;
-    let sql = `SELECT ut.id as user_task_id, ut.user_id, ut.task_id, ut.status, ut.started_at, ut.finished_at, ut.redeemed, ut.redeemed_at, ut.redeemed_by, u.username, t.name as task_name, t.description, t.points, t.created_by as task_creator
+    let sql = `SELECT ut.id as user_task_id, ut.user_id, ut.task_id, ut.status, ut.started_at, ut.finished_at, ut.redeemed, ut.redeemed_at, ut.redeemed_by, u.username, t.name as task_name, t.description, t.points, t.created_by as task_creator, t.task_type
       FROM user_tasks ut
       JOIN users u ON ut.user_id = u.id
       JOIN tasks t ON ut.task_id = t.id
@@ -893,7 +918,7 @@ app.get('/api/user-tasks/to-redeem', staffOrAdminAuth, async (req, res) => {
   }
 });
 
-// 儲存/更新猜謎答案
+// 儲存/更新猜謎答案或提交選擇題答案
 app.patch('/api/user-tasks/:id/answer', async (req, res) => {
   const { id } = req.params;
   const { answer } = req.body;
@@ -901,8 +926,60 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
   let conn;
   try {
     conn = await mysql.createConnection(dbConfig);
-    await conn.execute('UPDATE user_tasks SET answer = ? WHERE id = ?', [answer, id]);
-    res.json({ success: true, message: '答案已儲存' });
+
+    // 1. 取得任務資訊
+    const [rows] = await conn.execute(`
+      SELECT ut.*, t.task_type, t.correct_answer, t.points, t.name as task_name, ut.user_id, ut.task_id
+      FROM user_tasks ut
+      JOIN tasks t ON ut.task_id = t.id
+      WHERE ut.id = ?
+    `, [id]);
+
+    if (rows.length === 0) return res.status(404).json({ success: false, message: '任務不存在' });
+    const userTask = rows[0];
+
+    if (userTask.status === '完成') {
+       return res.json({ success: true, message: '任務已完成，無需更新' });
+    }
+
+    let isCompleted = false;
+    let message = '答案已儲存';
+
+    // 2. 檢查是否為選擇題且答案正確
+    if (userTask.task_type === 'multiple_choice') {
+      if (userTask.correct_answer && answer === userTask.correct_answer) {
+        isCompleted = true;
+        message = '答對了！任務完成！';
+      } else {
+        // 選擇題答錯，不完成任務
+        message = '答案不正確，請再試一次';
+      }
+    }
+
+    // 3. 更新狀態
+    if (isCompleted) {
+       await conn.beginTransaction();
+       try {
+         await conn.execute('UPDATE user_tasks SET answer = ?, status = "完成", finished_at = NOW() WHERE id = ?', [answer, id]);
+
+         // 記錄積分交易
+         if (userTask.points > 0) {
+            await conn.execute(
+              'INSERT INTO point_transactions (user_id, type, points, description, reference_type, reference_id) VALUES (?, ?, ?, ?, ?, ?)',
+              [userTask.user_id, 'earned', userTask.points, `完成任務: ${userTask.task_name}`, 'task_completion', userTask.task_id]
+            );
+         }
+         await conn.commit();
+       } catch (e) {
+         await conn.rollback();
+         throw e;
+       }
+    } else {
+       // 只更新答案，狀態不變（保持進行中）
+       await conn.execute('UPDATE user_tasks SET answer = ? WHERE id = ?', [answer, id]);
+    }
+
+    res.json({ success: true, message, isCompleted });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
@@ -1279,7 +1356,7 @@ app.get('/api/product-redemptions/admin', staffOrAdminAuth, async (req, res) => 
     if (userRole === 'admin') {
       // 管理員可以看到所有兌換記錄
       query = `
-        SELECT pr.*, p.name as product_name, p.image_url, u.username
+        SELECT pr.*, p.name as product_name, p.image_url, p.created_by as merchant_name, u.username
         FROM product_redemptions pr
         JOIN products p ON pr.product_id = p.id
         JOIN users u ON pr.user_id = u.id
@@ -1289,7 +1366,7 @@ app.get('/api/product-redemptions/admin', staffOrAdminAuth, async (req, res) => 
     } else {
       // 工作人員只能看到自己管理的商品的兌換記錄
       query = `
-        SELECT pr.*, p.name as product_name, p.image_url, u.username
+        SELECT pr.*, p.name as product_name, p.image_url, p.created_by as merchant_name, u.username
         FROM product_redemptions pr
         JOIN products p ON pr.product_id = p.id
         JOIN users u ON pr.user_id = u.id

@@ -2,9 +2,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const loginUser = JSON.parse(localStorage.getItem('loginUser') || 'null');
   let userTaskStatus = {};
   let allTasks = []; // 存儲所有任務
-  let currentFilter = 'all'; // 當前篩選狀態
+  let currentFilter = 'incomplete'; // 預設僅顯示未完成
   // const API_BASE = 'http://localhost:3001'; // 本地開發環境 - 生產環境使用相對路徑
-const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+const API_BASE = '';
   function render(tasks) {
     const listDiv = document.getElementById('tasksList');
     listDiv.innerHTML = '';
@@ -18,20 +18,23 @@ const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:30
     }
 
     tasks.forEach(task => {
-      const completed = userTaskStatus[task.id] === '完成';
       const card = document.createElement('div');
-      card.className = 'task-card';
+      card.className = 'card';
       card.innerHTML = `
-        <div class="task-card-img">
-          <img src="${task.photoUrl}" alt="任務照片" data-imgbig="1">
-        </div>
-        <div class="task-card-info">
-          <div class="task-card-title">${task.name}</div>
-          <div class="task-card-points">${task.points || 0} 積分</div>
-          <div class="task-card-status">${completed ? '<span style=\'color:green;\'>已完成</span>' : '<span style=\'color:#f59e42;\'>待完成</span>'}</div>
-          <div class="task-card-btns">
-            <a class="task-btn" href="/task-detail.html?id=${task.id}">前往任務說明</a>
-            <button class="task-btn nav-map-btn" data-lat="${task.lat}" data-lng="${task.lng}">導航到地圖</button>
+        <img src="${task.photoUrl}" class="card-img" alt="任務照片" data-imgbig="1" onerror="this.src='/images/mascot.png'">
+        <div class="card-body">
+          <div class="card-title">${task.name}</div>
+          <div class="card-text">
+            <div class="mb-2">
+              <span class="text-primary" style="font-weight:600;">💰 ${task.points || 0} 積分</span>
+            </div>
+            <div>
+              ${renderStatusBadge(task)}
+            </div>
+          </div>
+          <div class="card-footer">
+            <a class="btn btn-secondary" href="/task-detail.html?id=${task.id}" style="padding: 0.4rem 1rem; font-size: 0.9rem;">任務說明</a>
+            <button class="btn btn-primary nav-map-btn" data-lat="${task.lat}" data-lng="${task.lng}" style="padding: 0.4rem 1rem; font-size: 0.9rem;">導航</button>
           </div>
         </div>
       `;
@@ -45,7 +48,7 @@ const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:30
       });
     });
     // 圖片放大功能
-    document.querySelectorAll('.task-card-img img[data-imgbig]').forEach(img => {
+    document.querySelectorAll('.card-img[data-imgbig]').forEach(img => {
       img.addEventListener('click', function() {
         const modalBg = document.getElementById('imgModalBg');
         const modalImg = document.getElementById('imgModalImg');
@@ -55,22 +58,32 @@ const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:30
     });
   }
 
+  function renderStatusBadge(task) {
+    const status = userTaskStatus[task.id];
+    if (status === '進行中') {
+      return '<span style="color:#f97316;font-weight:600;">⏳ 已接取待完成</span>';
+    }
+    if (!status) {
+      return '<span style="color:#10b981;font-weight:600;">🆕 尚未接取</span>';
+    }
+    if (status === '完成') {
+      return '<span class="text-success" style="font-weight:600;">✓ 已完成</span>';
+    }
+    return `<span style="color:#6b7280;font-weight:600;">${status}</span>`;
+  }
+
   // 篩選任務
   function filterTasks() {
-    let filteredTasks = [...allTasks];
-
-    switch (currentFilter) {
-      case 'completed':
-        filteredTasks = allTasks.filter(task => userTaskStatus[task.id] === '完成');
-        break;
-      case 'incomplete':
-        filteredTasks = allTasks.filter(task => userTaskStatus[task.id] !== '完成');
-        break;
-      case 'all':
-      default:
-        filteredTasks = [...allTasks];
-        break;
-    }
+    const filteredTasks = allTasks.filter(task => {
+      const status = userTaskStatus[task.id];
+      if (currentFilter === 'incomplete') {
+        return status === '進行中';
+      }
+      if (currentFilter === 'notJoined') {
+        return !status;
+      }
+      return true;
+    });
 
     render(filteredTasks);
   }
@@ -78,29 +91,30 @@ const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:30
   // 更新任務計數
   function updateTaskCount(tasks) {
     const countElement = document.getElementById('taskCount');
-    const totalTasks = allTasks.length;
+    const totalVisible = allTasks.length;
     const shownTasks = tasks.length;
 
     let filterText = '';
     switch (currentFilter) {
-      case 'completed':
-        filterText = '已完成任務';
-        break;
       case 'incomplete':
-        filterText = '未完成任務';
+        filterText = '已接取待完成';
+        break;
+      case 'notJoined':
+        filterText = '未接取任務';
         break;
       case 'all':
       default:
-        filterText = '全部任務';
+        filterText = '可接任務';
         break;
     }
 
-    countElement.textContent = `${filterText}：${shownTasks} / 共 ${totalTasks} 個任務`;
+    countElement.textContent = `${filterText}：${shownTasks} / 共 ${totalVisible} 個任務`;
   }
 
   // 設置篩選器事件監聽器
   const filterSelect = document.getElementById('taskStatusFilter');
   if (filterSelect) {
+    filterSelect.value = currentFilter;
     filterSelect.addEventListener('change', function() {
       currentFilter = this.value;
       filterTasks();

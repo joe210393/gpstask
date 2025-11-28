@@ -15,10 +15,10 @@
       <nav class="main-nav">
         <a href="/index.html">首頁</a>
         <a href="/map.html">地圖頁</a>
-        <a href="/tasks-list.html" class="current-page">任務列表</a>
+        <a href="/tasks-list.html" class="current-page" id="navTasksList">任務列表</a>
         <a href="/user-tasks.html">任務審核</a>
         <a href="/staff-dashboard.html" id="navStaff" style="display:none;">新增任務</a>
-        <a href="/admin-user-tasks.html" id="navUserTasks" style="display:none;">用戶任務管理</a>
+        <a href="/user-dashboard.html" id="navUserTasks" style="display:none;">用戶任務管理</a>
         <a href="/products.html" id="navProducts">商品兌換</a>
         <a href="/redeem-tasks.html" id="navRedeem" style="display:none;">兌換商品管理</a>
         <a href="/admin-user-tasks.html" id="loginUserInfo" style="color:#666;text-decoration:none;cursor:pointer;"></a>
@@ -173,13 +173,13 @@
       <label for="taskStatusFilter">篩選任務狀態：</label>
       <select id="taskStatusFilter">
         <option value="all">全部任務</option>
-        <option value="completed">已完成任務</option>
-        <option value="incomplete">未完成任務</option>
+        <option value="notJoined">未接取任務</option>
+        <option value="incomplete">已接取待完成</option>
       </select>
       <span id="taskCount" class="task-count">共 0 個任務</span>
     </div>
 
-    <div id="tasksList"></div>
+    <div id="tasksList" class="card-grid"></div>
   </main>
   <footer>
     &copy; 2025 任務網頁系統
@@ -201,9 +201,14 @@
       document.getElementById('navStaff').style.display = '';
       document.getElementById('navRedeem').style.display = '';
     }
-    // 所有已登入用戶都可以看到用戶任務管理
-    if (loginUser) {
+    // 所有已登入用戶都可以看到用戶任務管理 (僅限一般用戶)
+    if (loginUser && loginUser.role === 'user') {
       document.getElementById('navUserTasks').style.display = '';
+    }
+    // 工作人員與管理員不顯示任務列表
+    if (loginUser && (loginUser.role === 'shop' || loginUser.role === 'admin')) {
+      const navTasksList = document.getElementById('navTasksList');
+      if (navTasksList) navTasksList.style.display = 'none';
     }
     if (loginUser) {
       document.getElementById('loginUserInfo').textContent = (loginUser.role === 'shop' ? '商店：' : '使用者：') + loginUser.username;
@@ -222,5 +227,6 @@
       a.onclick = () => document.getElementById('headerContent').classList.remove('open');
     });
   </script>
+  <script src="/js/nav-access.js"></script>
 </body>
 </html>

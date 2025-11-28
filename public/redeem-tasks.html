@@ -6,7 +6,228 @@
   <title>商品管理 | GPS 觸發任務系統</title>
   <link rel="stylesheet" href="/css/style.css" />
   <link rel="icon" type="image/png" href="/images/mascot.png" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
   <style>
+    /* 現代化設計變數 */
+    :root {
+      --primary-color: #6366f1;
+      --secondary-color: #8b5cf6;
+      --accent-color: #f59e0b;
+      --success-color: #10b981;
+      --glass-bg: rgba(255, 255, 255, 0.15);
+      --glass-border: rgba(255, 255, 255, 0.18);
+      --shadow-light: 0 8px 32px rgba(31, 38, 135, 0.37);
+      --shadow-dark: 0 4px 16px rgba(0, 0, 0, 0.1);
+      --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      --gradient-accent: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+
+    /* 全局樣式 */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      line-height: 1.6;
+      color: #1f2937;
+      /* 使用首頁的背景風格，但可能需要調整以免影響閱讀 */
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Header 樣式 - 玻璃擬態 */
+    header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      background: var(--glass-bg);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--glass-border);
+      box-shadow: var(--shadow-light);
+      transition: all 0.3s ease;
+    }
+
+    .header-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    .header-content h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: var(--gradient-primary);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin: 0;
+    }
+
+    .main-nav {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: nowrap;
+      overflow: hidden;
+    }
+
+    .main-nav a {
+      color: #374151;
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 0.875rem;
+      padding: 0.4rem 0.8rem;
+      border-radius: 0.5rem;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .main-nav a::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: var(--gradient-accent);
+      transition: left 0.3s ease;
+      z-index: -1;
+    }
+
+    .main-nav a:hover::before,
+    .main-nav a.current-page::before {
+      left: 0;
+    }
+
+    .main-nav a:hover,
+    .main-nav a.current-page {
+      color: white;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(79, 172, 254, 0.3);
+    }
+
+    .main-nav span {
+      color: #6b7280;
+      font-size: 0.875rem;
+      padding: 0.5rem 1rem;
+      background: rgba(255, 255, 255, 0.5);
+      border-radius: 0.75rem;
+      backdrop-filter: blur(10px);
+    }
+
+    .main-nav button {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: white;
+      border: none;
+      border-radius: 0.75rem;
+      padding: 0.5rem 1.5rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+    }
+
+    .main-nav button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+    }
+
+    .hamburger {
+      display: none;
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      color: #374151;
+      cursor: pointer;
+      padding: 0.5rem;
+      border-radius: 0.5rem;
+      transition: all 0.3s ease;
+      position: absolute;
+      right: 1rem;
+      top: 0.75rem;
+      z-index: 1100;
+    }
+
+    .hamburger:hover {
+      background: rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(10px);
+    }
+
+    /* 主內容區域調整 */
+    main {
+      margin-top: 120px;
+      padding: 2rem 1rem;
+      min-height: calc(100vh - 160px);
+    }
+
+    /* 響應式設計 */
+    @media (max-width: 768px) {
+      .header-content {
+        padding: 1rem;
+        position: relative;
+      }
+
+      .header-content h1 {
+        font-size: 1.25rem;
+        margin-bottom: 0;
+        width: auto;
+        text-align: left;
+        flex-grow: 1;
+      }
+
+      .main-nav {
+        display: none;
+        position: fixed;
+        top: 60px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        flex-direction: column;
+        padding: 2rem 1rem;
+        gap: 1rem;
+        overflow-y: auto;
+        z-index: 999;
+        border-top: 1px solid var(--glass-border);
+      }
+
+      .header-content.open .main-nav {
+        display: flex;
+      }
+
+      .main-nav a, .main-nav button, .main-nav span {
+        width: 100%;
+        text-align: center;
+        padding: 1rem;
+        font-size: 1.1rem;
+        background: rgba(255, 255, 255, 0.5);
+        border-radius: 12px;
+      }
+
+      .main-nav a.current-page {
+        background: var(--primary-color);
+        color: white !important;
+      }
+
+      .hamburger {
+        display: block;
+      }
+    }
+
     /* 標籤頁面樣式 */
     .tab-container {
       max-width: 1000px;
@@ -331,114 +552,34 @@
         align-items: flex-start;
       }
     }
-    /* Header styles */
-    header {
+    
+    /* Footer */
+    footer {
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(10px);
+      border-top: 1px solid var(--glass-border);
+      padding: 2rem 1rem;
       text-align: center;
-      position: relative;
-      background: #fff;
-      border-bottom: 1px solid #e0e0e0;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-      padding: 0;
-      margin-bottom: 20px;
-    }
-    .header-content {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 15px 20px;
-    }
-    .header-content h1 {
-      font-size: 1.8em;
-      color: #333;
-      margin: 0 0 15px 0;
-      font-weight: 600;
-    }
-    .main-nav {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 18px;
-      flex-wrap: wrap;
-    }
-    .main-nav a {
-      color: #555;
-      text-decoration: none;
-      font-weight: 500;
-      padding: 8px 12px;
-      border-radius: 6px;
-      transition: all 0.3s ease;
-    }
-    .main-nav a:hover {
-      background: #f5f5f5;
-      color: #007bff;
-    }
-    .main-nav a.current-page {
-      background: #007bff;
-      color: white !important;
-    }
-    .main-nav span {
-      color: #666;
-      font-size: 0.9em;
-      padding: 8px 12px;
-    }
-    .main-nav button {
-      background: #dc3545;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      padding: 8px 16px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background 0.3s ease;
-    }
-    .main-nav button:hover {
-      background: #c82333;
-    }
-    .hamburger {
-      display: none;
-      position: absolute;
-      top: 15px;
-      right: 15px;
-      font-size: 1.5em;
-      background: none;
-      border: none;
-      color: #555;
-      cursor: pointer;
-      z-index: 1001;
-      padding: 5px 10px;
-      border-radius: 4px;
-      transition: background 0.3s ease;
-    }
-    .hamburger:hover {
-      background: #f5f5f5;
-    }
-    .redeem-list, .search-bar { margin: 0 auto; text-align: center; }
-    @media (max-width: 700px) {
-      .header-content { display: none; }
-      .header-content.open { display: flex !important; flex-direction: column; align-items: center; background: #fff; box-shadow: 0 2px 8px #eee; position: absolute; top: 0; left: 0; right: 0; z-index: 1000; padding: 18px 0 12px 0; }
-      .main-nav { flex-direction: column; gap: 10px; }
-      .main-nav a, .main-nav span, .main-nav button { display: block; margin: 10px 0; text-align: center; width: 90%; margin-left: 5%; color: #333 !important; background: none; z-index: 1002; }
-      .hamburger { display: block; }
+      color: #6b7280;
+      margin-top: 4rem;
     }
   </style>
 </head>
 <body>
   <header id="mainHeader">
-    <button id="hamburgerBtn" class="hamburger" aria-label="展開選單">&#9776;</button>
     <div class="header-content" id="headerContent">
-      <h1 id="pageTitle">兌換商品管理</h1>
+      <h1 id="pageTitle">GPS 任務系統</h1>
+      <button id="hamburgerBtn" class="hamburger" aria-label="展開選單">&#9776;</button>
       <nav class="main-nav">
         <a href="/index.html">首頁</a>
         <a href="/map.html">地圖頁</a>
-        <a href="/tasks-list.html">任務列表</a>
+        <a href="/tasks-list.html" id="navTasksList">任務列表</a>
         <a href="/user-tasks.html">任務審核</a>
         <a href="/staff-dashboard.html" id="navStaff" style="display:none;">新增任務</a>
-        <a href="/admin-user-tasks.html" id="navUserTasks" style="display:none;">用戶任務管理</a>
+        <a href="/user-dashboard.html" id="navUserTasks" style="display:none;">用戶任務管理</a>
         <a href="/products.html" id="navProducts">商品兌換</a>
-        <a href="/redeem-tasks.html" id="navRedeem" style="display:none;">兌換商品管理</a>
-        <a href="/admin-user-tasks.html" id="loginUserInfo" style="color:#666;text-decoration:none;cursor:pointer;"></a>
+        <a href="/redeem-tasks.html" id="navRedeem" class="current-page">兌換商品管理</a>
+        <span id="loginUserInfo" style="color:#6b7280;text-decoration:none;cursor:pointer;"></span>
         <button id="logoutBtn" style="display:none;">登出</button>
       </nav>
     </div>
@@ -500,6 +641,11 @@
           <div class="form-group">
             <label>圖片網址</label>
             <input type="url" name="image_url" placeholder="https://..." />
+            <div style="margin-top: 5px; font-size: 0.9em; color: #666;">或上傳圖片：</div>
+            <input type="file" id="productImageFile" accept="image/*" style="margin-top: 5px;" />
+            <div id="imagePreviewContainer" style="display: none; margin-top: 10px;">
+              <img id="imagePreview" src="" alt="預覽圖片" style="max-width: 150px; max-height: 150px; border: 1px solid #ddd; border-radius: 4px;" />
+            </div>
           </div>
           <div class="form-group">
             <label>所需積分</label>
@@ -518,7 +664,7 @@
     </div>
   </main>
   <footer>
-    &copy; 2025 任務審核系統
+    &copy; 2025 GPS 任務系統 - 地方開箱任務遊戲 | <a href="https://laijiubo.zeabur.app/" target="_blank" style="color: #6b7280; text-decoration: none;">來就補多媒體行銷 製作</a>
   </footer>
   <script>
     // 權限檢查與帳號顯示
@@ -527,30 +673,49 @@
       document.body.innerHTML = '<div style="max-width:400px;margin:80px auto;text-align:center;font-size:1.2em;color:#c00;">僅限工作人員或管理員登入後使用</div>';
       throw new Error('No permission');
     }
-    document.getElementById('loginUserInfo').textContent = '工作人員：' + (window.loginUser.username || '未知用戶');
+    document.getElementById('loginUserInfo').textContent = getUserDisplayName(window.loginUser);
     document.getElementById('logoutBtn').onclick = function() {
       localStorage.removeItem('loginUser');
       window.location.href = '/login.html';
     };
+    document.getElementById('logoutBtn').style.display = '';
+
     // 動態顯示 staff/admin 導覽
     if (window.loginUser && window.loginUser.role === 'admin') {
       document.getElementById('navStaff').style.display = '';
-      document.getElementById('navRedeem').style.display = '';
+      // document.getElementById('navRedeem').style.display = ''; // 已經預設顯示
     } else if (window.loginUser && window.loginUser.role === 'shop') {
-      document.getElementById('navRedeem').style.display = '';
+      // document.getElementById('navRedeem').style.display = ''; // 已經預設顯示
     }
-    // 載入與搜尋
-    const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : ''; // 動態檢測環境
-
-    // 商品管理變數（全局定義）
-    let currentEditingProductId = null;
-    let currentUserRole = null;
-
-    // 所有已登入用戶都可以看到用戶任務管理
-    if (window.loginUser) {
-      document.getElementById('navUserTasks').style.display = '';
-      currentUserRole = window.loginUser.role; // 設置用戶角色
+    
+    // 工作人員與管理員不顯示任務列表和用戶任務管理
+    if (window.loginUser && (window.loginUser.role === 'shop' || window.loginUser.role === 'admin')) {
+      const navTasksList = document.getElementById('navTasksList');
+      if (navTasksList) navTasksList.style.display = 'none';
+      const navUserTasks = document.getElementById('navUserTasks');
+      if (navUserTasks) navUserTasks.style.display = 'none';
+    } else {
+       // 一般用戶顯示用戶任務管理
+       if (window.loginUser && window.loginUser.role === 'user') {
+         const navUserTasks = document.getElementById('navUserTasks');
+         if (navUserTasks) navUserTasks.style.display = '';
+       }
     }
+
+    function getUserDisplayName(loginUser) {
+      switch(loginUser.role) {
+        case 'admin':
+          return `管理員：${loginUser.username}`;
+        case 'shop':
+          return `商店：${loginUser.username}`;
+        case 'user':
+          return `用戶：${loginUser.username}`;
+        default:
+          return loginUser.username;
+      }
+    }
+
+    // 漢堡選單功能
     document.getElementById('hamburgerBtn').onclick = function() {
       document.getElementById('headerContent').classList.toggle('open');
     };
@@ -663,6 +828,11 @@
       const modal = document.getElementById('productModal');
       const form = document.getElementById('productForm');
       const modalTitle = document.getElementById('modalTitle');
+      
+      // 重置預覽
+      document.getElementById('productImageFile').value = '';
+      document.getElementById('imagePreviewContainer').style.display = 'none';
+      document.getElementById('imagePreview').src = '';
 
       if (productId) {
         modalTitle.textContent = '編輯商品';
@@ -680,6 +850,12 @@
               form.image_url.value = product.image_url || '';
               form.points_required.value = product.points_required;
               form.stock.value = product.stock;
+              
+              // 顯示現有圖片預覽
+              if (product.image_url) {
+                document.getElementById('imagePreview').src = product.image_url;
+                document.getElementById('imagePreviewContainer').style.display = 'block';
+              }
             }
           }
         });
@@ -695,16 +871,70 @@
       document.getElementById('productModal').style.display = 'none';
       currentEditingProductId = null;
     }
+    
+    // 監聽文件選擇變更以預覽
+    document.getElementById('productImageFile').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          document.getElementById('imagePreview').src = e.target.result;
+          document.getElementById('imagePreviewContainer').style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
 
     // 商品表單提交
-    document.getElementById('productForm').addEventListener('submit', function(e) {
+    document.getElementById('productForm').addEventListener('submit', async function(e) {
       e.preventDefault();
 
       const formData = new FormData(this);
+      let imageUrl = formData.get('image_url');
+      
+      // 處理圖片上傳
+      const imageFile = document.getElementById('productImageFile').files[0];
+      if (imageFile) {
+        try {
+          const uploadFormData = new FormData();
+          uploadFormData.append('photo', imageFile);
+          
+          // 顯示上傳中提示 (可選)
+          const submitBtn = this.querySelector('button[type="submit"]');
+          const originalBtnText = submitBtn.textContent;
+          submitBtn.textContent = '圖片上傳中...';
+          submitBtn.disabled = true;
+          
+          const uploadRes = await fetch(`${API_BASE}/api/upload`, {
+            method: 'POST',
+            headers: { 'x-username': encodeURIComponent(window.loginUser.username) },
+            body: uploadFormData
+          });
+          
+          const uploadData = await uploadRes.json();
+          
+          if (uploadData.success) {
+            imageUrl = uploadData.url;
+          } else {
+            alert('圖片上傳失敗: ' + (uploadData.message || '未知錯誤'));
+            submitBtn.textContent = originalBtnText;
+            submitBtn.disabled = false;
+            return;
+          }
+          
+          submitBtn.textContent = originalBtnText;
+          submitBtn.disabled = false;
+        } catch (err) {
+          console.error('上傳錯誤:', err);
+          alert('圖片上傳發生錯誤');
+          return;
+        }
+      }
+
       const productData = {
         name: formData.get('name'),
         description: formData.get('description'),
-        image_url: formData.get('image_url'),
+        image_url: imageUrl,
         points_required: parseInt(formData.get('points_required')),
         stock: parseInt(formData.get('stock'))
       };
@@ -786,6 +1016,8 @@
     };
 
     // ===== 初始化載入數據 =====
+    const API_BASE = '';
+    
     if (window.loginUser) {
       // 載入商品數據
       loadProducts();
@@ -867,6 +1099,7 @@
           <div class="redemption-header">
             <div>
               <div class="redemption-product">${redemption.product_name}</div>
+              <div style="font-size: 0.9em; color: #666; margin-bottom: 5px;">🏪 商家：${redemption.merchant_name || '未知'}</div>
               <div class="redemption-user" style="cursor: pointer;" onclick="viewUserTasks('${redemption.username}')">👤 用戶：${redemption.username}</div>
             </div>
             <div class="redemption-status ${statusClass}">${statusText}</div>
@@ -955,5 +1188,6 @@
       displayRedemptions(filteredRedemptions);
     }
   </script>
+  <script src="/js/nav-access.js"></script>
 </body>
-</html> 
+</html>

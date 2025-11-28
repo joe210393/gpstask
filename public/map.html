@@ -123,10 +123,10 @@
       <nav class="main-nav">
         <a href="/index.html">首頁</a>
         <a href="/map.html" class="current-page">地圖頁</a>
-        <a href="/tasks-list.html">任務列表</a>
+        <a href="/tasks-list.html" id="navTasksList">任務列表</a>
         <a href="/user-tasks.html">任務審核</a>
         <a href="/staff-dashboard.html" id="navStaff" style="display:none;">新增任務</a>
-        <a href="/admin-user-tasks.html" id="navUserTasks" style="display:none;">用戶任務管理</a>
+        <a href="/user-dashboard.html" id="navUserTasks" style="display:none;">用戶任務管理</a>
         <a href="/products.html" id="navProducts">商品兌換</a>
         <a href="/redeem-tasks.html" id="navRedeem" style="display:none;">兌換商品管理</a>
         <a href="/admin-user-tasks.html" id="loginUserInfo" style="color:#666;text-decoration:none;cursor:pointer;"></a>
@@ -171,8 +171,15 @@
         document.getElementById('navStaff').style.display = '';
         document.getElementById('navRedeem').style.display = '';
       }
-      // 所有已登入用戶都可以看到用戶任務管理
-      document.getElementById('navUserTasks').style.display = '';
+      // 所有已登入用戶都可以看到用戶任務管理 (僅限一般用戶)
+      if (loginUser.role === 'user') {
+        document.getElementById('navUserTasks').style.display = '';
+      }
+      // 工作人員與管理員不顯示任務列表
+      if (loginUser.role === 'shop' || loginUser.role === 'admin') {
+        const navTasksList = document.getElementById('navTasksList');
+        if (navTasksList) navTasksList.style.display = 'none';
+      }
     }
 
     function getUserDisplayName(loginUser) {
@@ -201,5 +208,6 @@
     });
   </script>
   <script src="/js/map.js"></script>
+  <script src="/js/nav-access.js"></script>
 </body>
 </html>

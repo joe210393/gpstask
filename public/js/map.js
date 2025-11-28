@@ -5,7 +5,7 @@ let triggeredTasks = new Set();
 let completedTaskIds = new Set();
 
 // const API_BASE = 'http://localhost:3001'; // 本地開發環境 - 生產環境使用相對路徑
-const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+const API_BASE = '';
 
 // 地理位置權限狀態
 let locationPermissionGranted = false;
@@ -39,7 +39,7 @@ function requestLocationPermission() {
               locationPermissionDenied = true;
               reject(err);
             },
-            { enableHighAccuracy: true, timeout: 10000 }
+            { enableHighAccuracy: true, timeout: 20000 }
           );
         }
       });
@@ -54,7 +54,7 @@ function requestLocationPermission() {
           locationPermissionDenied = true;
           reject(err);
         },
-        { enableHighAccuracy: true, timeout: 10000 }
+        { enableHighAccuracy: true, timeout: 20000 }
       );
     }
   });
@@ -101,11 +101,12 @@ function handleLocationError(error) {
       showManualLocation = true;
       break;
     case 3: // TIMEOUT
-      errorMessage = '取得位置資訊逾時。';
-      showManualLocation = true;
-      break;
+      errorMessage = '取得位置資訊逾時，將嘗試重新定位...';
+      // 不直接顯示手動定位，而是嘗試使用較低的精度重新定位
+      initMapWithLowAccuracy();
+      return;
     default:
-      if (error.message.includes('不支援')) {
+      if (error.message && error.message.includes('不支援')) {
         errorMessage = '您的瀏覽器不支援地理位置功能。';
         showManualLocation = true;
       } else {
@@ -122,6 +123,26 @@ function handleLocationError(error) {
   } else {
     showLocationStatus(errorMessage, 'warning');
   }
+}
+
+// 使用較低精度嘗試重新定位
+function initMapWithLowAccuracy() {
+  showLocationStatus('正在嘗試以較低精度重新定位...', 'loading');
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const { latitude, longitude } = pos.coords;
+      initMap(latitude, longitude, 18);
+      showLocationStatus('定位成功！(低精度模式)', 'success');
+      startGeolocation();
+    },
+    err => {
+       console.warn('低精度定位也失敗:', err.message);
+       // 如果還是失敗，回退到預設處理
+       initMap(24.757, 121.753, 16);
+       showManualLocationOption('無法取得您的位置資訊 (定位逾時)');
+    },
+    { enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 }
+  );
 }
 
 // 初始化地圖

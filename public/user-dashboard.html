@@ -54,6 +54,255 @@
     .main-nav button:hover {
       background: #c82333;
     }
+
+    .dashboard-main {
+      max-width: 1100px;
+      margin: 0 auto 60px;
+      padding: 0 1rem 2rem;
+    }
+
+    .dashboard-hero {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .stat-card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 1.2rem;
+      padding: 1.5rem;
+      box-shadow: var(--shadow-sm);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card.primary {
+      background: linear-gradient(135deg, var(--primary-color), #6b7bff);
+      color: #fff;
+      border: none;
+      box-shadow: 0 15px 30px rgba(91, 123, 255, 0.35);
+    }
+
+    .stat-card .stat-label {
+      font-size: 0.95rem;
+      color: rgba(255,255,255,0.85);
+      margin-bottom: 0.5rem;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-card .stat-value {
+      font-size: 2.4rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .stat-card .stat-subtitle {
+      font-size: 0.95rem;
+      margin-top: 0.35rem;
+      color: rgba(255,255,255,0.85);
+    }
+
+    .stat-card:not(.primary) .stat-label {
+      color: var(--text-secondary);
+    }
+
+    .stat-card:not(.primary) .stat-subtitle {
+      color: var(--text-secondary);
+    }
+
+    .task-filter-bar {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 1rem;
+      padding: 1rem 1.25rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: flex-end;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 1.5rem;
+    }
+
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      min-width: 200px;
+      flex: 1;
+    }
+
+    .filter-group label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 0.35rem;
+    }
+
+    .filter-group select,
+    .filter-group input {
+      border: 1px solid #d1d5db;
+      border-radius: 0.6rem;
+      padding: 0.6rem 0.75rem;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+
+    .filter-group select:focus,
+    .filter-group input:focus {
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 2px rgba(66, 99, 255, 0.15);
+    }
+
+    .task-count-badge {
+      font-weight: 600;
+      color: var(--text-secondary);
+      background: #f4f6fb;
+      padding: 0.65rem 1rem;
+      border-radius: 0.75rem;
+      min-width: 140px;
+      text-align: center;
+    }
+
+    .task-card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .task-card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 1rem;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      box-shadow: var(--shadow-light);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .task-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 15px 30px rgba(15, 23, 42, 0.08);
+    }
+
+    .task-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 0.75rem;
+    }
+
+    .task-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin: 0;
+      color: var(--text-primary);
+    }
+
+    .status-badge {
+      padding: 0.2rem 0.8rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .status-progress { background: rgba(59,130,246,0.15); color: #2563eb; }
+    .status-done { background: rgba(16,185,129,0.15); color: #059669; }
+    .status-abort { background: rgba(248,113,113,0.15); color: #dc2626; }
+
+    .task-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      margin-bottom: 0.75rem;
+    }
+
+    .task-desc {
+      color: var(--text-primary);
+      font-size: 0.95rem;
+      margin-bottom: 1rem;
+      line-height: 1.5;
+    }
+
+    .task-card-footer {
+      margin-top: auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .task-card-footer a {
+      flex: 1;
+      text-align: center;
+    }
+
+    .task-card-footer .btn-secondary {
+      background: #f3f4f6;
+      color: #374151;
+      border: none;
+      width: 100%;
+    }
+
+    .empty-state {
+      grid-column: 1 / -1;
+      background: #fff;
+      border: 1px dashed #cbd5f5;
+      border-radius: 1rem;
+      text-align: center;
+      padding: 2.5rem 1rem;
+      color: var(--text-secondary);
+    }
+
+    .empty-state h3 {
+      margin-bottom: 0.4rem;
+      color: var(--text-primary);
+    }
+
+    @media (max-width: 700px) {
+      .task-filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .task-count-badge {
+        width: 100%;
+      }
+      .header-content {
+        display: none;
+      }
+      .header-content.open {
+        display: flex !important;
+        flex-direction: column;
+        align-items: center;
+        background: #fff;
+        box-shadow: 0 2px 8px #eee;
+        position: absolute;
+        top: 0; left:0; right:0;
+        z-index: 1000;
+        padding: 18px 0 12px 0;
+      }
+      .main-nav {
+        flex-direction: column;
+        gap: 10px;
+      }
+      .main-nav a, .main-nav span, .main-nav button {
+        display: block;
+        margin: 10px 0;
+        text-align: center;
+        width: 90%;
+        margin-left: 5%;
+        color: #333 !important;
+        background: none;
+        z-index: 1002;
+      }
+      .hamburger {
+        display: block;
+      }
+    }
   </style>
 </head>
 <body>
@@ -65,19 +314,56 @@
         <a href="/index.html">首頁</a>
         <a href="/map.html">地圖頁</a>
         <a href="/tasks-list.html">任務列表</a>
-        <a href="/user-tasks.html" class="current-page">任務審核</a>
+        <a href="/user-dashboard.html" class="current-page">用戶任務管理</a>
         <a href="/staff-dashboard.html" id="navStaff" style="display:none;">新增任務</a>
-        <a href="/admin-user-tasks.html" id="navUserTasks" style="display:none;">用戶任務管理</a>
         <a href="/products.html" id="navProducts">商品兌換</a>
         <a href="/redeem-tasks.html" id="navRedeem" style="display:none;">兌換商品管理</a>
-        <a href="/admin-user-tasks.html" id="loginUserInfo" style="color:#666;text-decoration:none;cursor:pointer;"></a>
+        <span id="loginUserInfo" style="color:#666;text-decoration:none;cursor:pointer;"></span>
         <button id="logoutBtn" style="display:none;">登出</button>
       </nav>
     </div>
   </header>
-  <main>
-    <h2>目前進行中的任務</h2>
-    <ul id="currentTasks"></ul>
+  <main class="dashboard-main">
+    <section class="dashboard-hero">
+      <div class="stat-card primary">
+        <div class="stat-label">我的積分</div>
+        <div class="stat-value" id="userPoints">0</div>
+        <div class="stat-subtitle">累積可用點數</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">進行中任務</div>
+        <div class="stat-value" id="inProgressStat">0</div>
+        <div class="stat-subtitle">等待完成</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">已完成任務</div>
+        <div class="stat-value" id="completedStat">0</div>
+        <div class="stat-subtitle">歡迎繼續累積</div>
+      </div>
+    </section>
+
+    <section class="task-filter-bar">
+      <div class="filter-group">
+        <label for="statusFilter">任務狀態</label>
+        <select id="statusFilter">
+          <option value="all">全部任務</option>
+          <option value="進行中">進行中</option>
+          <option value="放棄">已放棄</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="taskSearch">搜尋任務</label>
+        <input type="text" id="taskSearch" placeholder="輸入任務名稱或描述">
+      </div>
+      <div class="task-count-badge" id="taskCount">0 個任務</div>
+    </section>
+
+    <section id="taskCards" class="task-card-grid">
+      <div class="empty-state" id="taskEmptyState">
+        <h3>目前沒有任務</h3>
+        <p>可以前往任務列表探索新的挑戰！</p>
+      </div>
+    </section>
   </main>
   <footer>
     &copy; 2025 任務網頁系統
@@ -85,11 +371,14 @@
   <script src="/js/user-dashboard.js"></script>
   <script>
     // Header功能
-    const loginUser = JSON.parse(localStorage.getItem('loginUser') || 'null');
+    if (typeof window.loginUser === 'undefined') {
+      window.loginUser = JSON.parse(localStorage.getItem('loginUser') || 'null');
+    }
+    const headerLoginUser = window.loginUser;
 
     // 權限檢查和導航顯示
-    if (loginUser) {
-      document.getElementById('loginUserInfo').textContent = getUserDisplayName(loginUser);
+    if (headerLoginUser) {
+      document.getElementById('loginUserInfo').textContent = getUserDisplayName(headerLoginUser);
       document.getElementById('logoutBtn').onclick = function() {
         localStorage.removeItem('loginUser');
         window.location.href = '/login.html';
@@ -97,15 +386,13 @@
       document.getElementById('logoutBtn').style.display = '';
 
       // 根據權限顯示導航鏈接
-      if (loginUser.role === 'admin') {
+      if (headerLoginUser.role === 'admin') {
         document.getElementById('navStaff').style.display = '';
         document.getElementById('navRedeem').style.display = '';
-      } else if (loginUser.role === 'shop') {
+      } else if (headerLoginUser.role === 'shop') {
         document.getElementById('navStaff').style.display = '';
         document.getElementById('navRedeem').style.display = '';
       }
-      // 所有已登入用戶都可以看到用戶任務管理
-      document.getElementById('navUserTasks').style.display = '';
     } else {
       document.getElementById('loginUserInfo').textContent = '';
       document.getElementById('logoutBtn').style.display = 'none';
@@ -136,5 +423,6 @@
       });
     });
   </script>
+  <script src="/js/nav-access.js"></script>
 </body>
 </html>

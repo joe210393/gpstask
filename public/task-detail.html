@@ -3,193 +3,246 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>任務說明</title>
+  <title>任務詳情 | GPS 觸發任務系統</title>
   <link rel="stylesheet" href="/css/style.css" />
   <link rel="icon" type="image/png" href="/images/mascot.png" />
   <style>
-    .task-detail { max-width: 600px; margin: 40px auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 32px 24px; }
-    .task-detail img { max-width: 100%; max-height: 240px; display: block; margin: 20px auto; }
-    .task-detail iframe { display: block; margin: 20px auto; }
-    /* Header styles */
-    header {
-      text-align: center;
-      position: relative;
-      background: #fff;
-      border-bottom: 1px solid #e0e0e0;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-      padding: 0;
-      margin-bottom: 20px;
-    }
-    .header-content {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      max-width: 1200px;
+    .detail-wrapper {
+      max-width: 900px;
       margin: 0 auto;
-      padding: 15px 20px;
+      padding: 2rem 1rem 4rem;
     }
-    .header-content h1 {
-      font-size: 1.8em;
-      color: #333;
-      margin: 0 0 15px 0;
+    .detail-card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 1.5rem;
+      box-shadow: var(--shadow-lg);
+      padding: 2rem;
+    }
+    .task-type-chip {
+      display: inline-block;
+      padding: 0.2rem 0.9rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
       font-weight: 600;
+      background: var(--gradient-primary);
+      color: #fff;
     }
-    .main-nav {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 18px;
-      flex-wrap: wrap;
+    .task-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 0.5rem;
+      margin: 1.25rem 0;
+      font-size: 0.95rem;
+      color: var(--text-secondary);
     }
-    .main-nav a {
-      color: #555;
-      text-decoration: none;
-      font-weight: 500;
-      padding: 8px 12px;
-      border-radius: 6px;
-      transition: all 0.3s ease;
+    .task-detail-img {
+      width: 100%;
+      border-radius: 1rem;
+      margin: 1.25rem 0;
+      object-fit: cover;
+      box-shadow: var(--shadow-light);
     }
-    .main-nav a:hover {
-      background: #f5f5f5;
-      color: #007bff;
+    #taskDetail h2 {
+      margin: 0;
+      font-size: 1.6rem;
+      color: var(--text-primary);
     }
-    .main-nav a.current-page {
-      background: #007bff;
-      color: white !important;
-    }
-    .main-nav span {
-      color: #666;
-      font-size: 0.9em;
-      padding: 8px 12px;
-    }
-    .main-nav button {
-      background: #dc3545;
-      color: white;
+    #taskDetail iframe {
+      width: 100%;
+      max-width: 640px;
+      height: 360px;
       border: none;
-      border-radius: 6px;
-      padding: 8px 16px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background 0.3s ease;
+      border-radius: 1rem;
+      margin-top: 1rem;
+      box-shadow: var(--shadow-light);
     }
-    .main-nav button:hover {
-      background: #c82333;
+    .task-detail-loading {
+      text-align: center;
+      color: var(--text-secondary);
+      padding: 2rem 1rem;
     }
-    .hamburger {
-      display: none;
-      position: absolute;
-      top: 15px;
-      right: 15px;
-      font-size: 1.5em;
-      background: none;
-      border: none;
-      color: #555;
-      cursor: pointer;
-      z-index: 1001;
-      padding: 5px 10px;
-      border-radius: 4px;
-      transition: background 0.3s ease;
+    .detail-actions {
+      margin-top: 1.5rem;
     }
-    .hamburger:hover {
-      background: #f5f5f5;
+    .detail-actions .btn {
+      width: 100%;
     }
-    @media (max-width: 700px) {
-      .header-content { display: none; }
-      .header-content.open { display: flex !important; flex-direction: column; align-items: center; background: #fff; box-shadow: 0 2px 8px #eee; position: absolute; top: 0; left: 0; right: 0; z-index: 1000; padding: 18px 0 12px 0; }
-      .main-nav { flex-direction: column; gap: 10px; }
-      .main-nav a, .main-nav span, .main-nav button { display: block; margin: 10px 0; text-align: center; width: 90%; margin-left: 5%; color: #333 !important; background: none; z-index: 1002; }
-      .hamburger { display: block; }
+    .answer-container {
+      margin-top: 2rem;
     }
   </style>
 </head>
 <body>
   <header id="mainHeader">
-    <button id="hamburgerBtn" class="hamburger" aria-label="展開選單">&#9776;</button>
     <div class="header-content" id="headerContent">
       <h1 id="pageTitle">任務詳情</h1>
+      <button id="hamburgerBtn" class="hamburger" aria-label="展開選單">&#9776;</button>
       <nav class="main-nav">
         <a href="/index.html">首頁</a>
         <a href="/map.html">地圖頁</a>
-        <a href="/tasks-list.html">任務列表</a>
+        <a href="/tasks-list.html" id="navTasksList">任務列表</a>
         <a href="/user-tasks.html">任務審核</a>
         <a href="/staff-dashboard.html" id="navStaff" style="display:none;">新增任務</a>
-        <a href="/admin-user-tasks.html" id="navUserTasks" style="display:none;">用戶任務管理</a>
-        <a href="/products.html" id="navProducts">商品兌換</a>
+        <a href="/user-dashboard.html" id="navUserTasks" style="display:none;">用戶任務管理</a>
+        <a href="/products.html">商品兌換</a>
         <a href="/redeem-tasks.html" id="navRedeem" style="display:none;">兌換商品管理</a>
-        <a href="/admin-user-tasks.html" id="loginUserInfo" style="color:#666;text-decoration:none;cursor:pointer;"></a>
+        <span id="loginUserInfo" style="display:none; color:var(--text-secondary); padding:0.5rem 1rem;"></span>
         <button id="logoutBtn" style="display:none;">登出</button>
       </nav>
     </div>
   </header>
+
   <main>
-    <div class="task-detail" id="taskDetail">
-      載入中...
-    </div>
+    <section class="detail-wrapper">
+      <div class="detail-card">
+        <div id="taskDetail" class="task-detail-loading">
+          <div class="loading-spinner"></div>
+          <p style="margin-top:0.75rem;">載入任務中...</p>
+        </div>
+      </div>
+    </section>
   </main>
+
   <footer>
-    &copy; 2025 任務網頁系統
+    &copy; 2025 GPS 任務系統 - 地方開箱任務遊戲
   </footer>
+
+  <script>
+    const loginUser = JSON.parse(localStorage.getItem('loginUser') || 'null');
+    window.loginUser = loginUser;
+
+    const userInfoSpan = document.getElementById('loginUserInfo');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    if (loginUser) {
+      userInfoSpan.style.display = 'inline-block';
+      userInfoSpan.textContent = getUserDisplayName(loginUser);
+      logoutBtn.style.display = 'inline-block';
+      logoutBtn.onclick = function() {
+        localStorage.removeItem('loginUser');
+        window.location.href = '/login.html';
+      };
+
+      if (loginUser.role === 'admin' || loginUser.role === 'shop') {
+        document.getElementById('navStaff').style.display = '';
+        document.getElementById('navRedeem').style.display = '';
+      }
+      if (loginUser.role === 'user') {
+        document.getElementById('navUserTasks').style.display = '';
+      }
+      if (loginUser.role === 'shop' || loginUser.role === 'admin') {
+        const navTasksList = document.getElementById('navTasksList');
+        if (navTasksList) navTasksList.style.display = 'none';
+      }
+    }
+
+    function getUserDisplayName(user) {
+      switch(user.role) {
+        case 'admin': return `管理員：${user.username}`;
+        case 'shop': return `商店：${user.username}`;
+        case 'user': return `用戶：${user.username}`;
+        default: return user.username;
+      }
+    }
+
+    document.getElementById('hamburgerBtn').onclick = function() {
+      document.getElementById('headerContent').classList.toggle('open');
+    };
+    document.querySelectorAll('.main-nav a, .main-nav button').forEach(element => {
+      element.addEventListener('click', () => document.getElementById('headerContent').classList.remove('open'));
+    });
+  </script>
+
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     const id = urlParams.get('id');
-    const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : ''; // 動態檢測環境
-    fetch(`${API_BASE}/api/tasks/${id}`)
-      .then(res => res.json())
-      .then(data => {
-        if (!data.success) {
-          document.getElementById('taskDetail').textContent = '找不到任務';
-          return;
-        }
-        const t = data.task;
-        document.getElementById('taskDetail').innerHTML = `
-          <h2>任務名稱：${t.name}</h2>
-          <div style="margin:18px 0 8px 0;font-weight:bold;">任務說明：</div>
-          <div style="margin-bottom:18px;">${t.description}</div>
-          <div style="font-weight:bold;">任務照片：</div>
-          <img src="${t.photoUrl}" alt="任務照片">
-          ${t.youtubeUrl ? `<div style=\"margin-top:18px;\"><iframe width=\"360\" height=\"203\" src=\"${t.youtubeUrl.replace('watch?v=','embed/')}\" frameborder=\"0\" allowfullscreen></iframe></div>` : ''}
-          <button id="startTaskBtn">開始任務</button>
-          <div id="taskMsg" style="margin-top:15px;"></div>
-          <div id="answerSection"></div>
-        `;
-        const loginUser = JSON.parse(localStorage.getItem('loginUser') || 'null');
-        if (loginUser && loginUser.role === 'shop') {
-          document.getElementById('startTaskBtn').style.display = 'none';
-          document.getElementById('taskMsg').textContent = '工作人員帳號無法參與任務';
-        } else {
+    const API_BASE = '';
+    const taskDetailEl = document.getElementById('taskDetail');
+
+    if (!id) {
+      taskDetailEl.innerHTML = '<div class="text-center text-danger">未指定任務 ID</div>';
+    } else {
+      fetch(`${API_BASE}/api/tasks/${id}`)
+        .then(res => res.json())
+        .then(data => {
+          if (!data.success || !data.task) {
+            taskDetailEl.innerHTML = '<div class="text-center text-danger">找不到任務</div>';
+            return;
+          }
+          const t = data.task;
+
+          const typeMap = {
+            qa: '問答題',
+            multiple_choice: '選擇題',
+            photo: '拍照任務'
+          };
+          const taskTypeLabel = typeMap[t.task_type] || '問答題';
+
+          // 解析選項（如果是 JSON 字串）
+          let options = [];
+          if (t.task_type === 'multiple_choice' && t.options) {
+            options = typeof t.options === 'string' ? JSON.parse(t.options) : t.options;
+          }
+
+          taskDetailEl.innerHTML = `
+            <h2>${t.name}</h2>
+            <div class="task-meta-grid">
+              <span class="task-type-chip">${taskTypeLabel}</span>
+              <span>📍 (${t.lat}, ${t.lng})</span>
+              <span>🎯 半徑：${t.radius} 公尺</span>
+              <span>💰 積分：${t.points || 0}</span>
+            </div>
+            <div style="margin-bottom:18px; color:var(--text-secondary); line-height:1.6;">${t.description}</div>
+            <img src="${t.photoUrl}" alt="任務照片" class="task-detail-img" onerror="this.src='/images/mascot.png'">
+            ${t.youtubeUrl ? `<div><iframe src="${t.youtubeUrl.replace('watch?v=','embed/')}" allowfullscreen></iframe></div>` : ''}
+            <div class="detail-actions">
+              <button id="startTaskBtn" class="btn btn-primary">開始任務</button>
+              <div id="taskMsg" style="margin-top:15px; font-weight:600;"></div>
+            </div>
+            <div id="answerSection" class="answer-container"></div>
+          `;
+
+          const startTaskBtn = document.getElementById('startTaskBtn');
+          const taskMsgEl = document.getElementById('taskMsg');
+
+          if (loginUser && loginUser.role === 'shop') {
+            startTaskBtn.style.display = 'none';
+            taskMsgEl.textContent = '工作人員帳號無法參與任務';
+            return;
+          }
+
           if (loginUser && loginUser.username) {
             fetch(`${API_BASE}/api/user-tasks/all?username=${encodeURIComponent(loginUser.username)}`)
               .then(res => res.json())
               .then(udata => {
-                if (udata.success && udata.tasks) {
-                  // 檢查是否已經完成過這個任務
+                if (udata.success && Array.isArray(udata.tasks)) {
+                  // 已完成
                   const completedTask = udata.tasks.find(x => x.id == t.id && x.status === '完成');
                   if (completedTask) {
-                    document.getElementById('startTaskBtn').textContent = '任務已完成';
-                    document.getElementById('startTaskBtn').disabled = true;
-                    document.getElementById('startTaskBtn').style.backgroundColor = '#6c757d';
-                    document.getElementById('taskMsg').textContent = '您已完成此任務';
-                    document.getElementById('taskMsg').style.color = '#28a745';
-                    document.getElementById('taskMsg').style.fontWeight = 'bold';
+                    startTaskBtn.textContent = '任務已完成';
+                    startTaskBtn.disabled = true;
+                    startTaskBtn.style.backgroundColor = '#6c757d';
+                    taskMsgEl.textContent = '您已完成此任務';
+                    taskMsgEl.style.color = '#28a745';
                     return;
                   }
-
-                  // 檢查是否正在進行中
+                  // 進行中
                   const inProgressTask = udata.tasks.find(x => x.id == t.id && x.status === '進行中');
                   if (inProgressTask) {
                     showAnswerSection(inProgressTask.user_task_id, inProgressTask.answer || '');
-                    document.getElementById('startTaskBtn').disabled = true;
-                    document.getElementById('taskMsg').textContent = '任務進行中！';
+                    startTaskBtn.disabled = true;
+                    taskMsgEl.textContent = '任務進行中！';
                   }
                 }
               })
-              .catch(err => {
-                console.error('檢查任務狀態失敗:', err);
-              });
+              .catch(err => console.error('檢查任務狀態失敗:', err));
           }
-          document.getElementById('startTaskBtn').onclick = function() {
+
+          startTaskBtn.onclick = function() {
             if (!loginUser || !loginUser.username) {
-              document.getElementById('taskMsg').textContent = '請先登入';
+              taskMsgEl.textContent = '請先登入';
+              taskMsgEl.style.color = '#dc3545';
               return;
             }
             fetch(`${API_BASE}/api/user-tasks`, {
@@ -198,91 +251,210 @@
               body: JSON.stringify({ username: loginUser.username, task_id: t.id })
             })
             .then(res => res.json())
-            .then(data => {
-              if (data.success) {
-                document.getElementById('taskMsg').textContent = '任務進行中！';
-                document.getElementById('startTaskBtn').disabled = true;
+            .then(resp => {
+              if (resp.success) {
+                taskMsgEl.textContent = '任務進行中！';
+                taskMsgEl.style.color = 'var(--primary-color)';
+                startTaskBtn.disabled = true;
                 fetch(`${API_BASE}/api/user-tasks/all?username=${encodeURIComponent(loginUser.username)}`)
                   .then(res => res.json())
                   .then(udata => {
-                    if (udata.success && udata.tasks) {
+                    if (udata.success && Array.isArray(udata.tasks)) {
                       const ut = udata.tasks.find(x => x.id == t.id && x.status === '進行中');
                       if (ut) showAnswerSection(ut.user_task_id, ut.answer || '');
                     }
                   });
               } else {
-                document.getElementById('taskMsg').textContent = data.message || '加入失敗';
-                // 如果是已經完成的任務，顯示特殊的樣式
-                if (data.message && data.message.includes('已完成過')) {
-                  document.getElementById('taskMsg').style.color = '#dc3545';
-                  document.getElementById('taskMsg').style.fontWeight = 'bold';
-                  document.getElementById('startTaskBtn').textContent = '任務已完成';
-                  document.getElementById('startTaskBtn').disabled = true;
-                  document.getElementById('startTaskBtn').style.backgroundColor = '#6c757d';
+                taskMsgEl.textContent = resp.message || '加入失敗';
+                taskMsgEl.style.color = '#dc3545';
+                if (resp.message && resp.message.includes('已完成過')) {
+                  startTaskBtn.textContent = '任務已完成';
+                  startTaskBtn.disabled = true;
+                  startTaskBtn.style.backgroundColor = '#6c757d';
                 }
               }
             });
           };
-        }
-        function showAnswerSection(userTaskId, answer) {
-          const answerDiv = document.getElementById('answerSection');
-          answerDiv.innerHTML = `
-            <div style='margin:18px 0 6px 0;'><b style='color:#7c3aed;'>猜謎答案：</b></div>
-            <textarea id="answerInput" rows="3" style="width:90%;max-width:400px;border-radius:6px;padding:8px;" placeholder="若此題有猜謎，請在此輸入答案">${answer || ''}</textarea>
-            <button id="submitAnswerBtn" style="margin-left:8px;">送出答案</button>
-            <span id="answerMsg" style="margin-left:8px;color:#007bff;"></span>
-          `;
-          document.getElementById('submitAnswerBtn').onclick = async function() {
-            const val = document.getElementById('answerInput').value.trim();
+
+          function showAnswerSection(userTaskId, currentAnswer) {
+            const answerDiv = document.getElementById('answerSection');
+            answerDiv.innerHTML = '';
+
+            const container = document.createElement('div');
+            container.style.padding = '15px';
+            container.style.background = '#f8f9fa';
+            container.style.borderRadius = '8px';
+
+            const title = document.createElement('div');
+            title.style.fontWeight = 'bold';
+            title.style.marginBottom = '10px';
+            title.style.color = '#7c3aed';
+            title.textContent = '提交答案：';
+            container.appendChild(title);
+
+            if (t.task_type === 'multiple_choice') {
+              const form = document.createElement('div');
+              options.forEach((opt, index) => {
+                const wrapper = document.createElement('label');
+                wrapper.style.display = 'flex';
+                wrapper.style.alignItems = 'center';
+                wrapper.style.gap = '8px';
+                wrapper.style.marginBottom = '8px';
+
+                const radio = document.createElement('input');
+                radio.type = 'radio';
+                radio.name = 'mc_option';
+                radio.value = opt;
+                if (currentAnswer === opt) radio.checked = true;
+
+                wrapper.appendChild(radio);
+                wrapper.appendChild(document.createTextNode(opt));
+                form.appendChild(wrapper);
+              });
+              container.appendChild(form);
+
+              const submitBtn = document.createElement('button');
+              submitBtn.textContent = '送出答案';
+              submitBtn.className = 'btn btn-primary';
+              submitBtn.style.marginTop = '10px';
+              submitBtn.onclick = () => {
+                const selected = form.querySelector('input[name="mc_option"]:checked');
+                if (!selected) {
+                  alert('請選擇一個答案');
+                  return;
+                }
+                submitAnswer(userTaskId, selected.value);
+              };
+              container.appendChild(submitBtn);
+            } else if (t.task_type === 'photo') {
+              const fileInput = document.createElement('input');
+              fileInput.type = 'file';
+              fileInput.accept = 'image/*';
+              fileInput.style.marginBottom = '10px';
+
+              const preview = document.createElement('img');
+              preview.style.maxWidth = '200px';
+              preview.style.display = currentAnswer ? 'block' : 'none';
+              preview.style.marginTop = '10px';
+              if (currentAnswer && currentAnswer.startsWith('/images/')) {
+                 preview.src = currentAnswer;
+              }
+
+              fileInput.onchange = (e) => {
+                 const file = e.target.files[0];
+                 if (file) {
+                   const reader = new FileReader();
+                   reader.onload = (ev) => {
+                     preview.src = ev.target.result;
+                     preview.style.display = 'block';
+                   };
+                   reader.readAsDataURL(file);
+                 }
+              };
+
+              container.appendChild(fileInput);
+              container.appendChild(preview);
+
+              const submitBtn = document.createElement('button');
+              submitBtn.textContent = '上傳照片並送出';
+              submitBtn.className = 'btn btn-primary';
+              submitBtn.style.display = 'block';
+              submitBtn.style.marginTop = '10px';
+              submitBtn.onclick = async () => {
+                 const file = fileInput.files[0];
+                 if (!file) {
+                   alert('請選擇照片');
+                   return;
+                 }
+
+                 const msg = document.getElementById('answerMsg');
+                 msg.textContent = '上傳中...';
+                 try {
+                   const fd = new FormData();
+                   fd.append('photo', file);
+                   const uploadRes = await fetch(`${API_BASE}/api/upload`, {
+                      method: 'POST',
+                      headers: loginUser ? { 'x-username': loginUser.username } : {},
+                      body: fd
+                   });
+                   const uploadData = await uploadRes.json();
+                   if(!uploadData.success) {
+                      msg.textContent = uploadData.message || '上傳失敗';
+                      return;
+                   }
+                   submitAnswer(userTaskId, uploadData.url);
+                 } catch (e) {
+                   msg.textContent = '上傳錯誤';
+                 }
+              };
+              container.appendChild(submitBtn);
+            } else {
+              const textarea = document.createElement('textarea');
+              textarea.rows = 3;
+              textarea.style.width = '100%';
+              textarea.style.borderRadius = '6px';
+              textarea.style.padding = '8px';
+              textarea.placeholder = '請在此輸入答案';
+              textarea.value = currentAnswer || '';
+              container.appendChild(textarea);
+
+              const submitBtn = document.createElement('button');
+              submitBtn.textContent = '送出答案';
+              submitBtn.className = 'btn btn-primary';
+              submitBtn.style.marginTop = '10px';
+              submitBtn.onclick = () => {
+                const val = textarea.value.trim();
+                if (!val) { alert('請輸入答案'); return; }
+                submitAnswer(userTaskId, val);
+              };
+              container.appendChild(submitBtn);
+            }
+
+            const msgSpan = document.createElement('div');
+            msgSpan.id = 'answerMsg';
+            msgSpan.style.marginTop = '10px';
+            msgSpan.style.color = '#007bff';
+            container.appendChild(msgSpan);
+
+            answerDiv.appendChild(container);
+          }
+
+          async function submitAnswer(userTaskId, val) {
             const msg = document.getElementById('answerMsg');
-            if (!val) { msg.textContent = '請輸入答案'; return; }
+            if (!msg) return;
             msg.textContent = '儲存中...';
-            const res = await fetch(`${API_BASE}/api/user-tasks/${userTaskId}/answer`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ answer: val })
-            });
-            const data = await res.json();
-            if (data.success) msg.textContent = '答案已儲存';
-            else msg.textContent = data.message || '儲存失敗';
-          };
-        }
-      });
-  </script>
-  <script>
-    // 動態顯示帳號與登出
-    window.loginUser = JSON.parse(localStorage.getItem('loginUser') || 'null');
-    const loginUser = window.loginUser;
-    if (loginUser) {
-      document.getElementById('loginUserInfo').textContent = (loginUser.role === 'shop' ? '商店：' : '使用者：') + loginUser.username;
-      document.getElementById('logoutBtn').onclick = function() {
-        localStorage.removeItem('loginUser');
-        window.location.href = '/login.html';
-      };
-      // 所有已登入用戶都可以看到用戶任務管理
-      document.getElementById('navUserTasks').style.display = '';
-    } else {
-      document.getElementById('loginUserInfo').textContent = '';
-      document.getElementById('logoutBtn').style.display = 'none';
+            try {
+              const res = await fetch(`${API_BASE}/api/user-tasks/${userTaskId}/answer`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ answer: val })
+              });
+              const data = await res.json();
+              if (data.success) {
+                msg.textContent = data.message;
+                if (data.isCompleted) {
+                   msg.style.color = '#28a745';
+                   msg.style.fontWeight = 'bold';
+                   document.getElementById('answerSection').querySelectorAll('button').forEach(b => b.disabled = true);
+                   const startBtn = document.getElementById('startTaskBtn');
+                   startBtn.textContent = '任務已完成';
+                   startBtn.style.backgroundColor = '#28a745';
+                }
+              } else {
+                msg.textContent = data.message || '儲存失敗';
+                msg.style.color = '#dc3545';
+              }
+            } catch(e) {
+              msg.textContent = '連線失敗';
+              msg.style.color = '#dc3545';
+            }
+          }
+        })
+        .catch(() => {
+          taskDetailEl.innerHTML = '<div class="text-center text-danger">載入任務時發生錯誤</div>';
+        });
     }
   </script>
-  <script>
-    document.getElementById('hamburgerBtn').onclick = function() {
-      document.getElementById('headerContent').classList.toggle('open');
-    };
-    document.querySelectorAll('.main-nav a').forEach(a => {
-      a.onclick = () => document.getElementById('headerContent').classList.remove('open');
-    });
-  </script>
-  <script>
-    // 動態顯示 staff/admin 導覽
-    const loginUser = JSON.parse(localStorage.getItem('loginUser') || 'null');
-    if (loginUser && loginUser.role === 'admin') {
-      document.getElementById('navStaff').style.display = '';
-      document.getElementById('navRedeem').style.display = '';
-    } else if (loginUser && loginUser.role === 'shop') {
-      document.getElementById('navRedeem').style.display = '';
-    }
-  </script>
+  <script src="/js/nav-access.js"></script>
 </body>
-</html> 
+</html>

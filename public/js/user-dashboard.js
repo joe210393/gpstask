@@ -1,29 +1,188 @@
-// 權限檢查
-const loginUser = JSON.parse(localStorage.getItem('loginUser') || 'null');
-if (!loginUser || loginUser.role !== 'user') {
+const API_BASE = '';
+const dashboardUser = (typeof window.loginUser !== 'undefined' && window.loginUser)
+  ? window.loginUser
+  : JSON.parse(localStorage.getItem('loginUser') || 'null');
+
+if (!dashboardUser || dashboardUser.role !== 'user') {
+  alert('此頁面僅限一般用戶使用，請先登入用戶帳號');
   window.location.href = '/login.html';
 }
 
-document.getElementById('loginUserInfo').textContent = `使用者：${loginUser.username}`;
-document.getElementById('logoutBtn').onclick = function() {
-  localStorage.removeItem('loginUser');
-  window.location.href = '/login.html';
+const state = {
+  tasks: [],
+  summary: {
+    total: 0,
+    inProgress: 0,
+    completed: 0,
+    aborted: 0
+  }
 };
 
-fetch('/data/tasks.json')
-  .then(res => res.json())
-  .then(tasks => {
-    const ul = document.getElementById('currentTasks');
-    let hasTask = false;
-    tasks.forEach(task => {
-      if (localStorage.getItem(task.id + 'Completed') !== 'true') {
-        hasTask = true;
-        const li = document.createElement('li');
-        li.innerHTML = `<strong>${task.name}</strong> <a href="${task.pageUrl}">前往任務</a>`;
-        ul.appendChild(li);
-      }
-    });
-    if (!hasTask) {
-      ul.innerHTML = '<li>恭喜你，所有任務都已完成！</li>';
-    }
+const taskCardsEl = document.getElementById('taskCards');
+const emptyStateEl = document.getElementById('taskEmptyState');
+const taskCountEl = document.getElementById('taskCount');
+const statusFilterEl = document.getElementById('statusFilter');
+const searchInputEl = document.getElementById('taskSearch');
+const pointsEl = document.getElementById('userPoints');
+const inProgressStatEl = document.getElementById('inProgressStat');
+const completedStatEl = document.getElementById('completedStat');
+
+const statusClassMap = {
+  '進行中': 'status-progress',
+  '完成': 'status-done',
+  '放棄': 'status-abort'
+};
+
+initDashboard();
+
+function initDashboard() {
+  bindFilters();
+  loadPoints();
+  loadTasks();
+}
+
+function bindFilters() {
+  statusFilterEl.addEventListener('change', applyFilters);
+  searchInputEl.addEventListener('input', () => {
+    applyFilters();
   });
+}
+
+async function loadPoints() {
+  try {
+    const res = await fetch(`${API_BASE}/api/user/points`, {
+      headers: { 'x-username': dashboardUser.username }
+    });
+    const data = await res.json();
+    if (data.success) {
+      pointsEl.textContent = data.totalPoints || 0;
+    }
+  } catch (err) {
+    console.error('載入積分失敗', err);
+  }
+}
+
+async function loadTasks() {
+  try {
+    const res = await fetch(`${API_BASE}/api/user-tasks/all?username=${encodeURIComponent(dashboardUser.username)}`);
+    const data = await res.json();
+    if (!data.success) {
+      throw new Error(data.message || '載入任務失敗');
+    }
+    const rawTasks = (data.tasks || []).map(task => ({
+      id: task.id,
+      userTaskId: task.user_task_id,
+      name: task.name,
+      description: task.description || '尚無描述',
+      status: task.status,
+      points: task.points || 0,
+      lat: task.lat,
+      lng: task.lng,
+      started_at: task.started_at,
+      finished_at: task.finished_at,
+      photoUrl: task.photoUrl || '',
+      radius: task.radius || 0
+    }));
+
+    const summary = {
+      total: rawTasks.length,
+      inProgress: rawTasks.filter(task => task.status === '進行中').length,
+      completed: rawTasks.filter(task => task.status === '完成').length,
+      aborted: rawTasks.filter(task => task.status === '放棄').length
+    };
+
+    const activeTasks = rawTasks.filter(task => task.status !== '完成');
+
+    state.tasks = activeTasks;
+    state.summary = summary;
+    updateStats();
+    applyFilters();
+  } catch (err) {
+    console.error(err);
+    showErrorState(err.message || '無法載入任務列表');
+  }
+}
+
+function updateStats() {
+  const { total, inProgress, completed } = state.summary;
+  inProgressStatEl.textContent = inProgress;
+  completedStatEl.textContent = completed;
+  taskCountEl.textContent = `${state.tasks.length} 個任務`;
+}
+
+function applyFilters() {
+  let filtered = [...state.tasks];
+  const statusValue = statusFilterEl.value;
+  const keyword = (searchInputEl.value || '').trim().toLowerCase();
+
+  if (statusValue !== 'all') {
+    filtered = filtered.filter(task => task.status === statusValue);
+  }
+
+  if (keyword) {
+    filtered = filtered.filter(task =>
+      task.name.toLowerCase().includes(keyword) ||
+      task.description.toLowerCase().includes(keyword)
+    );
+  }
+
+  taskCountEl.textContent = `${filtered.length} 個任務`;
+  renderTaskCards(filtered);
+}
+
+function renderTaskCards(list) {
+  taskCardsEl.innerHTML = '';
+  if (!list.length) {
+    emptyStateEl.style.display = 'block';
+    taskCardsEl.appendChild(emptyStateEl);
+    return;
+  }
+  emptyStateEl.style.display = 'none';
+
+  list.forEach(task => {
+    const card = document.createElement('article');
+    card.className = 'task-card';
+    const statusClass = statusClassMap[task.status] || 'status-progress';
+    const finishedInfo = task.finished_at ? `<span>🏁 完成：${formatDate(task.finished_at)}</span>` : '';
+    const detailUrl = `/task-detail.html?id=${task.id}`;
+    const mapUrl = task.lat && task.lng ? `/map.html?focusLat=${task.lat}&focusLng=${task.lng}` : '/map.html';
+
+    card.innerHTML = `
+      <div class="task-card-header">
+        <h3 class="task-title">${task.name}</h3>
+        <span class="status-badge ${statusClass}">${task.status}</span>
+      </div>
+      <div class="task-meta">
+        <span>📅 開始：${formatDate(task.started_at)}</span>
+        ${finishedInfo}
+        <span>💰 ${task.points} 積分</span>
+      </div>
+      <p class="task-desc">${task.description}</p>
+      <div class="task-card-footer">
+        <a class="btn btn-primary" href="${detailUrl}">查看任務</a>
+        <a class="btn btn-secondary" href="${mapUrl}">在地圖查看</a>
+      </div>
+    `;
+    taskCardsEl.appendChild(card);
+  });
+}
+
+function showErrorState(message) {
+  taskCardsEl.innerHTML = `
+    <div class="empty-state" style="border-style: solid;">
+      <h3>載入失敗</h3>
+      <p>${message}</p>
+    </div>
+  `;
+}
+
+function formatDate(str) {
+  if (!str) return '—';
+  try {
+    const d = new Date(str);
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '—';
+  }
+}

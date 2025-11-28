@@ -6,155 +6,124 @@
   <title>登入 | GPS 觸發任務系統</title>
   <link rel="stylesheet" href="/css/style.css" />
   <link rel="icon" type="image/png" href="/images/mascot.png" />
-  <style>
-    body { background: linear-gradient(120deg, #f9e7ff 0%, #e0f7fa 100%); min-height: 100vh; }
-    .login-box { max-width: 400px; margin: 60px auto; background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.10); padding: 40px 32px 32px 32px; }
-    .login-tabs { display: flex; gap: 0; margin-bottom: 28px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px #eee; }
-    .login-tabs button { flex: 1; padding: 16px 0; font-size: 1.1em; font-weight: bold; border: none; background: #f3f3f3; color: #888; cursor: pointer; transition: background 0.2s, color 0.2s; }
-    .login-tabs button.active, .login-tabs button:focus { background: #7c3aed; color: #fff; }
-    .login-box label { display: block; margin: 18px 0 6px; font-weight: bold; color: #7c3aed; }
-    .login-box input { width: 100%; padding: 12px; border-radius: 6px; border: 1px solid #ccc; margin-bottom: 16px; font-size: 1.1em; }
-    .login-box button[type="submit"] { width: 100%; background: #7c3aed; color: #fff; border: none; border-radius: 6px; padding: 14px; font-size: 1.15em; font-weight: bold; cursor: pointer; margin-top: 8px; box-shadow: 0 2px 8px #e0e0e0; transition: background 0.2s; }
-    .login-box button[type="submit"]:hover { background: #5b21b6; }
-    .login-error, #loginMsgUser, #loginMsgStaff { color: #c00; margin-top: 10px; font-size: 1em; min-height: 24px; text-align: center; }
-    .login-box form { margin-bottom: 0; }
-    @media (max-width: 600px) {
-      .login-box { padding: 24px 8px; }
-      .login-tabs button { font-size: 1em; padding: 12px 0; }
-    }
-    /* Header styles */
-    header {
-      text-align: center;
-      position: relative;
-      background: #fff;
-      border-bottom: 1px solid #e0e0e0;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-      padding: 0;
-      margin-bottom: 20px;
-    }
-    .header-content {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 15px 20px;
-    }
-    .header-content h1 {
-      font-size: 1.8em;
-      color: #333;
-      margin: 0 0 15px 0;
-      font-weight: 600;
-    }
-    .main-nav {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 18px;
-      flex-wrap: wrap;
-    }
-    .main-nav a {
-      color: #555;
-      text-decoration: none;
-      font-weight: 500;
-      padding: 8px 12px;
-      border-radius: 6px;
-      transition: all 0.3s ease;
-    }
-    .main-nav a:hover {
-      background: #f5f5f5;
-      color: #007bff;
-    }
-    .main-nav a.current-page {
-      background: #007bff;
-      color: white !important;
-    }
-    .main-nav span {
-      color: #666;
-      font-size: 0.9em;
-      padding: 8px 12px;
-    }
-    .main-nav button {
-      background: #dc3545;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      padding: 8px 16px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background 0.3s ease;
-    }
-    .main-nav button:hover {
-      background: #c82333;
-    }
-    .hamburger {
-      display: none;
-      position: absolute;
-      top: 15px;
-      right: 15px;
-      font-size: 1.5em;
-      background: none;
-      border: none;
-      color: #555;
-      cursor: pointer;
-      z-index: 1001;
-      padding: 5px 10px;
-      border-radius: 4px;
-      transition: background 0.3s ease;
-    }
-    .hamburger:hover {
-      background: #f5f5f5;
-    }
-    @media (max-width: 700px) {
-      .header-content { display: none; }
-      .header-content.open { display: flex !important; flex-direction: column; align-items: center; background: #fff; box-shadow: 0 2px 8px #eee; position: absolute; top: 0; left: 0; right: 0; z-index: 1000; padding: 18px 0 12px 0; }
-      .main-nav { flex-direction: column; gap: 10px; }
-      .main-nav a, .main-nav span, .main-nav button { display: block; margin: 10px 0; text-align: center; width: 90%; margin-left: 5%; color: #333 !important; background: none; z-index: 1002; }
-      .hamburger { display: block; }
-    }
-  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <header id="mainHeader">
-    <button id="hamburgerBtn" class="hamburger" aria-label="展開選單">&#9776;</button>
     <div class="header-content" id="headerContent">
       <h1 id="pageTitle">登入</h1>
+      <button id="hamburgerBtn" class="hamburger" aria-label="展開選單">&#9776;</button>
       <nav class="main-nav">
         <a href="/index.html">首頁</a>
         <a href="/map.html">地圖頁</a>
-        <a href="/tasks-list.html">任務列表</a>
+        <a href="/tasks-list.html" id="navTasksList">任務列表</a>
         <a href="/user-tasks.html">任務審核</a>
         <a href="/staff-dashboard.html" id="navStaff" style="display:none;">新增任務</a>
-        <a href="/admin-user-tasks.html" id="navUserTasks" style="display:none;">用戶任務管理</a>
+        <a href="/user-dashboard.html" id="navUserTasks" style="display:none;">用戶任務管理</a>
         <a href="/products.html" id="navProducts">商品兌換</a>
         <a href="/redeem-tasks.html" id="navRedeem" style="display:none;">兌換商品管理</a>
-        <a href="/admin-user-tasks.html" id="loginUserInfo" style="color:#666;text-decoration:none;cursor:pointer;"></a>
+        <span id="loginUserInfo" style="display:none; color:var(--text-secondary); padding:0.5rem 1rem;"></span>
         <button id="logoutBtn" style="display:none;">登出</button>
       </nav>
     </div>
   </header>
+
   <main>
-    <div class="login-box">
-      <div class="login-tabs">
-        <button id="tabUser" type="button" class="active">一般用戶登入</button>
-        <button id="tabStaff" type="button">工作人員登入</button>
+    <div class="form-container">
+      <h2 class="text-center mb-4" style="color:var(--text-primary);">歡迎回來</h2>
+      
+      <div class="tab-container" style="box-shadow:none; border: 1px solid #e5e7eb; margin-bottom: 1.5rem;">
+        <div class="tab-buttons">
+          <button id="tabUser" type="button" class="tab-btn active">一般用戶登入</button>
+          <button id="tabStaff" type="button" class="tab-btn">工作人員登入</button>
+        </div>
       </div>
+
       <form id="loginFormUser">
-        <label>手機門號 <input type="text" name="username" required pattern="[0-9]{10}" maxlength="10" autocomplete="username" /></label>
-        <button type="submit">登入</button>
-        <div id="loginMsgUser"></div>
+        <div class="form-group">
+          <label class="form-label">手機門號</label>
+          <input class="form-input" type="text" name="username" required pattern="[0-9]{10}" maxlength="10" autocomplete="username" placeholder="請輸入10碼手機號碼" />
+        </div>
+        <button type="submit" class="btn btn-primary w-100">登入</button>
+        <div id="loginMsgUser" class="text-danger mt-2 text-center" style="min-height: 24px;"></div>
       </form>
+
       <form id="loginFormStaff" style="display:none;">
-        <label>帳號 <input type="text" name="username" required autocomplete="username" /></label>
-        <label>密碼 <input type="password" name="password" required autocomplete="current-password" /></label>
-        <button type="submit">登入</button>
-        <div id="loginMsgStaff"></div>
+        <div class="form-group">
+          <label class="form-label">帳號</label>
+          <input class="form-input" type="text" name="username" required autocomplete="username" placeholder="請輸入工作人員帳號" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">密碼</label>
+          <input class="form-input" type="password" name="password" required autocomplete="current-password" placeholder="請輸入密碼" />
+        </div>
+        <button type="submit" class="btn btn-primary w-100">登入</button>
+        <div id="loginMsgStaff" class="text-danger mt-2 text-center" style="min-height: 24px;"></div>
       </form>
+      
+      <div class="text-center mt-4" style="border-top: 1px solid #eee; padding-top: 1rem;">
+        <span style="color: var(--text-secondary);">還沒有帳號？</span>
+        <a href="/register.html" style="color: var(--primary-color); text-decoration: none; font-weight: 500;">立即註冊</a>
+      </div>
     </div>
   </main>
+
   <footer>
-    &copy; 2025 任務網頁系統
+    &copy; 2025 GPS 任務系統 - 地方開箱任務遊戲
   </footer>
   <script src="/js/login.js"></script>
+  <script>
+    // Header功能
+    const loginUser = JSON.parse(localStorage.getItem('loginUser') || 'null');
+
+    if (loginUser) {
+        const userInfoSpan = document.getElementById('loginUserInfo');
+        userInfoSpan.style.display = 'inline-block';
+        userInfoSpan.textContent = getUserDisplayName(loginUser);
+        
+        const logoutBtn = document.getElementById('logoutBtn');
+        logoutBtn.style.display = 'inline-block';
+        logoutBtn.onclick = function() {
+            localStorage.removeItem('loginUser');
+            window.location.href = '/login.html';
+        };
+
+        // 根據權限顯示導航鏈接
+        if (loginUser.role === 'admin') {
+            document.getElementById('navStaff').style.display = '';
+            document.getElementById('navRedeem').style.display = '';
+        } else if (loginUser.role === 'shop') {
+            document.getElementById('navStaff').style.display = '';
+            document.getElementById('navRedeem').style.display = '';
+        }
+        if (loginUser.role === 'user') {
+            document.getElementById('navUserTasks').style.display = '';
+        }
+        
+        // 隱藏任務列表對工作人員
+        if (loginUser.role === 'shop' || loginUser.role === 'admin') {
+            const navTasksList = document.getElementById('navTasksList');
+            if (navTasksList) navTasksList.style.display = 'none';
+        }
+    }
+
+    function getUserDisplayName(loginUser) {
+        switch(loginUser.role) {
+            case 'admin': return `管理員：${loginUser.username}`;
+            case 'shop': return `商店：${loginUser.username}`;
+            case 'user': return `用戶：${loginUser.username}`;
+            default: return loginUser.username;
+        }
+    }
+
+    document.getElementById('hamburgerBtn').onclick = function() {
+        document.getElementById('headerContent').classList.toggle('open');
+    };
+    
+    document.querySelectorAll('.main-nav a').forEach(a => {
+        a.onclick = () => document.getElementById('headerContent').classList.remove('open');
+    });
+  </script>
+  <script src="/js/nav-access.js"></script>
 </body>
 </html>

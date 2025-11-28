@@ -10,7 +10,21 @@ if (typeof window.loginUser === 'undefined') {
 const loginUser = window.loginUser;
 
 // const API_BASE = 'http://localhost:3001'; // 本地開發環境 - 生產環境使用相對路徑
-const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+const API_BASE = '';
+
+// 初始化任務類型切換邏輯
+function setupTaskTypeToggle(selectId, divId) {
+  const select = document.getElementById(selectId);
+  const div = document.getElementById(divId);
+  if (select && div) {
+    select.addEventListener('change', function() {
+      div.style.display = this.value === 'multiple_choice' ? 'block' : 'none';
+    });
+  }
+}
+
+setupTaskTypeToggle('taskTypeSelect', 'multipleChoiceOptions');
+setupTaskTypeToggle('editTaskTypeSelect', 'editMultipleChoiceOptions');
 
 // 讀取任務列表
 function loadTasks() {
@@ -20,34 +34,58 @@ function loadTasks() {
     .then(res => res.json())
     .then(data => {
       if (!data.success) return;
-      const ul = document.getElementById('allTasks');
-      ul.innerHTML = '';
+      const container = document.getElementById('allTasks');
+      container.innerHTML = '';
 
       // 顯示用戶角色信息
       const userRole = data.userRole || loginUser.role;
-      const roleText = userRole === 'admin' ? '管理員' : '工作人員';
-
+      
       if (data.tasks.length === 0) {
-        ul.innerHTML = `<li style="text-align:center;color:#666;padding:20px;">目前沒有任務${userRole === 'staff' ? '（您只能看到自己創建的任務）' : ''}</li>`;
+        container.innerHTML = `<div style="grid-column: 1/-1; text-align:center;color:#666;padding:20px;">目前沒有任務${userRole === 'staff' ? '（您只能看到自己創建的任務）' : ''}</div>`;
         return;
       }
 
       data.tasks.forEach(task => {
-        const li = document.createElement('li');
+        const card = document.createElement('div');
+        card.className = 'card';
 
         // 創建者信息（只有管理員能看到）
         const creatorInfo = (userRole === 'admin' && task.created_by)
-          ? `<div style="color:#666;font-size:0.9em;margin-bottom:5px;">創建者：${task.created_by}</div>`
+          ? `<div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.5rem;">👤 ${task.created_by}</div>`
           : '';
+        
+        // 任務類型顯示
+        let typeText = '問答題';
+        let typeColor = 'bg-gray-100 text-gray-800';
+        if (task.task_type === 'multiple_choice') { typeText = '選擇題'; }
+        else if (task.task_type === 'photo') { typeText = '拍照任務'; }
 
-        li.innerHTML = creatorInfo +
-          `<strong>${task.name}</strong> (${task.lat}, ${task.lng}) 半徑:${task.radius}m 積分:${task.points || 0}<br>說明: ${task.description}<br><img src="${task.photoUrl}" alt="任務照片" style="max-width:120px;max-height:80px;">` +
-          (task.youtubeUrl ? `<br><iframe width="200" height="113" src="${task.youtubeUrl.replace('watch?v=','embed/')}" frameborder="0" allowfullscreen></iframe>` : '') +
-          `<br><button class="editBtn" data-id="${task.id}">編輯</button> <button class="delBtn" data-id="${task.id}">刪除</button>`;
-        ul.appendChild(li);
+        card.innerHTML = `
+          <img src="${task.photoUrl}" class="card-img" alt="任務照片" style="height:160px;" onerror="this.src='/images/mascot.png'">
+          <div class="card-body">
+            ${creatorInfo}
+            <div class="card-title" style="font-size:1.1rem; display:flex; justify-content:space-between; align-items:start;">
+              <span>${task.name}</span>
+              <span style="font-size:0.8rem; background:#f3f4f6; padding:2px 8px; border-radius:12px; white-space:nowrap;">${typeText}</span>
+            </div>
+            <div class="card-text">
+              <div style="font-size:0.9rem; margin-bottom:4px;">📍 (${task.lat}, ${task.lng})</div>
+              <div style="font-size:0.9rem; margin-bottom:4px;">🎯 半徑: ${task.radius}m</div>
+              <div style="font-size:0.9rem; font-weight:600; color:var(--primary-color);">💰 積分: ${task.points || 0}</div>
+              <div style="font-size:0.9rem; margin-top:8px; color:var(--text-secondary); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
+                ${task.description}
+              </div>
+            </div>
+            <div class="card-footer">
+              <button class="btn btn-primary editBtn" data-id="${task.id}" style="padding:0.4rem 1rem; font-size:0.9rem;">編輯</button>
+              <button class="btn btn-danger delBtn" data-id="${task.id}" style="padding:0.4rem 1rem; font-size:0.9rem; margin-left:auto;">刪除</button>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
       });
       // 編輯按鈕
-      ul.querySelectorAll('.editBtn').forEach(btn => {
+      container.querySelectorAll('.editBtn').forEach(btn => {
         btn.onclick = function() {
           const id = this.dataset.id;
           fetch(`${API_BASE}/api/tasks/${id}`)
@@ -65,6 +103,35 @@ function loadTasks() {
               form.description.value = t.description;
               form.photoUrl.value = t.photoUrl;
               form.youtubeUrl.value = t.youtubeUrl || '';
+              
+              // 設置任務類型與選項
+              form.task_type.value = t.task_type || 'qa';
+              const editOptionsDiv = document.getElementById('editMultipleChoiceOptions');
+              editOptionsDiv.style.display = (t.task_type === 'multiple_choice') ? 'block' : 'none';
+              
+              if (t.task_type === 'multiple_choice' && t.options) {
+                const opts = typeof t.options === 'string' ? JSON.parse(t.options) : t.options;
+                if (Array.isArray(opts) && opts.length >= 4) {
+                  form.optionA.value = opts[0];
+                  form.optionB.value = opts[1];
+                  form.optionC.value = opts[2];
+                  form.optionD.value = opts[3];
+                  
+                  // 設置正確答案選中狀態
+                  if (t.correct_answer === opts[0]) form.correct_answer_select.value = 'A';
+                  else if (t.correct_answer === opts[1]) form.correct_answer_select.value = 'B';
+                  else if (t.correct_answer === opts[2]) form.correct_answer_select.value = 'C';
+                  else if (t.correct_answer === opts[3]) form.correct_answer_select.value = 'D';
+                }
+              } else {
+                // 清空選項
+                form.optionA.value = '';
+                form.optionB.value = '';
+                form.optionC.value = '';
+                form.optionD.value = '';
+                form.correct_answer_select.value = 'A';
+              }
+
               document.getElementById('editTaskMsg').textContent = '';
               // 預覽現有圖片
               const preview = document.getElementById('editPhotoPreview');
@@ -75,12 +142,14 @@ function loadTasks() {
                 preview.style.display = 'none';
               }
               document.getElementById('editPhotoInput').value = '';
-              document.getElementById('editModal').style.display = 'flex';
+              
+              // 開啟 Modal
+              document.getElementById('editModal').classList.add('show');
             });
         };
       });
       // 刪除按鈕
-      ul.querySelectorAll('.delBtn').forEach(btn => {
+      container.querySelectorAll('.delBtn').forEach(btn => {
         btn.onclick = function() {
           if (!confirm('確定要刪除這個任務嗎？')) return;
           const id = this.dataset.id;
@@ -111,6 +180,32 @@ document.getElementById('addTaskForm').addEventListener('submit', async function
   const description = form.description.value.trim();
   const photoFile = form.photo.files[0];
   const youtubeUrl = form.youtubeUrl.value.trim();
+  
+  // 處理任務類型與選項
+  const task_type = form.task_type.value;
+  console.log('新增任務表單 - task_type:', task_type);
+  let options = null;
+  let correct_answer = null;
+  
+  if (task_type === 'multiple_choice') {
+    const optA = form.optionA.value.trim();
+    const optB = form.optionB.value.trim();
+    const optC = form.optionC.value.trim();
+    const optD = form.optionD.value.trim();
+    
+    if (!optA || !optB || !optC || !optD) {
+      document.getElementById('addTaskMsg').textContent = '請填寫所有選擇題選項';
+      return;
+    }
+    options = [optA, optB, optC, optD];
+    
+    const sel = form.correct_answer_select.value;
+    if (sel === 'A') correct_answer = optA;
+    else if (sel === 'B') correct_answer = optB;
+    else if (sel === 'C') correct_answer = optC;
+    else if (sel === 'D') correct_answer = optD;
+  }
+
   document.getElementById('addTaskMsg').textContent = '';
   if (!photoFile) {
     document.getElementById('addTaskMsg').textContent = '請選擇任務照片';
@@ -138,25 +233,35 @@ document.getElementById('addTaskForm').addEventListener('submit', async function
         'Content-Type': 'application/json',
         'x-username': loginUser.username
       },
-      body: JSON.stringify({ name, lat, lng, radius, points, description, photoUrl, youtubeUrl })
+      body: JSON.stringify({ name, lat, lng, radius, points, description, photoUrl, youtubeUrl, task_type, options, correct_answer })
     });
     const data = await res.json();
     if (data.success) {
       document.getElementById('addTaskMsg').textContent = '新增成功！';
       form.reset();
+      // 重置選項顯示
+      document.getElementById('multipleChoiceOptions').style.display = 'none';
       loadTasks();
     } else {
       document.getElementById('addTaskMsg').textContent = data.message || '新增失敗';
     }
   } catch (err) {
+    console.error(err);
     document.getElementById('addTaskMsg').textContent = '伺服器連線失敗';
   }
 });
 
 // 編輯彈窗關閉
-document.getElementById('closeEditModal').onclick = function() {
-  document.getElementById('editModal').style.display = 'none';
-};
+function closeModal() {
+  document.getElementById('editModal').classList.remove('show');
+}
+
+const closeEditModalBtn = document.getElementById('closeEditModal');
+if(closeEditModalBtn) closeEditModalBtn.onclick = closeModal;
+
+const cancelEditModalBtn = document.getElementById('cancelEditModal');
+if(cancelEditModalBtn) cancelEditModalBtn.onclick = closeModal;
+
 
 // 編輯表單送出
 document.getElementById('editTaskForm').addEventListener('submit', function(e) {
@@ -171,18 +276,48 @@ document.getElementById('editTaskForm').addEventListener('submit', function(e) {
   const description = form.description.value.trim();
   const photoUrl = form.photoUrl.value.trim();
   const youtubeUrl = form.youtubeUrl.value.trim();
+  
+  // 處理任務類型與選項
+  const task_type = form.task_type.value;
+  console.log('正在提交編輯表單，任務類型:', task_type); // Debug Log
+  let options = null;
+  let correct_answer = null;
+  
+  if (task_type === 'multiple_choice') {
+    const optA = form.optionA.value.trim();
+    const optB = form.optionB.value.trim();
+    const optC = form.optionC.value.trim();
+    const optD = form.optionD.value.trim();
+    
+    if (!optA || !optB || !optC || !optD) {
+      document.getElementById('editTaskMsg').textContent = '請填寫所有選擇題選項';
+      return;
+    }
+    options = [optA, optB, optC, optD];
+    
+    const sel = form.correct_answer_select.value;
+    if (sel === 'A') correct_answer = optA;
+    else if (sel === 'B') correct_answer = optB;
+    else if (sel === 'C') correct_answer = optC;
+    else if (sel === 'D') correct_answer = optD;
+  } else {
+    // 如果不是選擇題，確保 options 和 correct_answer 為 null (傳遞給後端以清空)
+    options = null;
+    correct_answer = null;
+  }
+
   document.getElementById('editTaskMsg').textContent = '';
   fetch(`${API_BASE}/api/tasks/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', 'x-username': loginUser.username },
-    body: JSON.stringify({ name, lat, lng, radius, points, description, photoUrl, youtubeUrl })
+    body: JSON.stringify({ name, lat, lng, radius, points, description, photoUrl, youtubeUrl, task_type, options, correct_answer })
   })
   .then(res => res.json())
   .then(data => {
     if (data.success) {
       document.getElementById('editTaskMsg').textContent = '更新成功！';
       setTimeout(() => {
-        document.getElementById('editModal').style.display = 'none';
+        closeModal();
         loadTasks();
       }, 800);
     } else {
