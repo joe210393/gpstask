@@ -38,12 +38,14 @@ if (formStaff) {
   formStaff.onsubmit = async function(e) {
     e.preventDefault();
     const username = this.username.value.trim();
-    const password = this.password.value;
+    const password = this.password.value.trim();
+
     const res = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password, role: 'shop' })
     });
+
     const data = await res.json();
     if (data.success) {
       localStorage.setItem('loginUser', JSON.stringify(data.user));
