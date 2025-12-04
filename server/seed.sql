@@ -23,7 +23,10 @@ CREATE TABLE IF NOT EXISTS tasks (
   photoUrl VARCHAR(255) NOT NULL,
   iconUrl VARCHAR(255) NOT NULL DEFAULT '/images/flag-red.png',
   youtubeUrl VARCHAR(500) NULL,
-  created_by VARCHAR(100) -- 記錄創建此任務的工作人員帳號
+  created_by VARCHAR(100), -- 記錄創建此任務的工作人員帳號
+  task_type ENUM('qa', 'multiple_choice', 'photo') NOT NULL DEFAULT 'qa',
+  options JSON NULL,
+  correct_answer VARCHAR(255) NULL
 );
 
 -- 建立 products 資料表（兌換商品）

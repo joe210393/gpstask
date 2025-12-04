@@ -211,21 +211,43 @@ document.getElementById('addTaskForm').addEventListener('submit', async function
     document.getElementById('addTaskMsg').textContent = '請選擇任務照片';
     return;
   }
+  
+  // 客戶端檢查檔案大小
+  if (photoFile.size > 5 * 1024 * 1024) {
+    document.getElementById('addTaskMsg').textContent = '檔案大小超過 5MB 限制';
+    return;
+  }
+
+  // 客戶端檢查檔案類型
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  if (!allowedTypes.includes(photoFile.type)) {
+    document.getElementById('addTaskMsg').textContent = '不支援的檔案類型。只允許 JPG、PNG、GIF、WebP';
+    return;
+  }
+
   try {
     // 1. 上傳圖片
     const fd = new FormData();
     fd.append('photo', photoFile);
+    
+    document.getElementById('addTaskMsg').textContent = '圖片上傳中...';
+    
     const uploadRes = await fetch(`${API_BASE}/api/upload`, {
       method: 'POST',
       headers: { 'x-username': loginUser.username },
-      body: fd
+      body: fd,
+      credentials: 'include' // 確保發送 cookies (JWT)
     });
+    
     const uploadData = await uploadRes.json();
     if (!uploadData.success) {
+      console.error('圖片上傳失敗:', uploadData);
       document.getElementById('addTaskMsg').textContent = uploadData.message || '圖片上傳失敗';
       return;
     }
+    
     // 2. 新增任務
+    document.getElementById('addTaskMsg').textContent = '任務建立中...';
     const photoUrl = uploadData.url;
     const res = await fetch(`${API_BASE}/api/tasks`, {
       method: 'POST',
