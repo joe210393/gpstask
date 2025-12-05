@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>選單管理</title>
+  <link rel="stylesheet" href="/css/admin.css">
+  <script defer src="/js/admin.js"></script>
+</head>
+<body>
+  <div id="admin-header"></div>
+  <main class="admin-container container">
+    <h1 class="mb-4">選單管理</h1>
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>拖拉排序</h3>
+        <ul id="menus-list" style="list-style:none;padding:0;margin-top:8px"></ul>
+        <button id="save-order" class="mt-3">儲存排序</button>
+      </div>
+      <div class="card">
+        <h3>新增 / 編輯</h3>
+        <form id="menu-form" class="mt-2">
+          <input type="hidden" name="id">
+          <div><label>Parent ID</label><input name="parent_id" placeholder="null"></div>
+          <div><label>Title</label><input name="title" required></div>
+          <div><label>Slug</label><input name="slug" placeholder="about"></div>
+          <div><label>URL</label><input name="url" placeholder="外部連結時使用"></div>
+          <div><label>Order</label><input name="order_index" type="number" value="0"></div>
+          <div class="mt-2"><label><input type="checkbox" name="visible" checked> 顯示</label></div>
+          <div class="mt-3">
+            <button type="submit">儲存</button>
+            <button type="button" id="menu-delete" class="ghost">刪除</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+  
+</body>
+</html>
+

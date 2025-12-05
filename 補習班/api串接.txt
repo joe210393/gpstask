@@ -1,0 +1,83 @@
+### 基本規範
+- Base URL: http://localhost:3000
+- 認證
+  - 前台會員：Session Cookie（登入後自動帶）
+  - 後台使用者：Session Cookie（登入後自動帶）
+- CSRF
+  - 取得: GET /api/public/csrf → 回傳 { csrfToken }
+  - 送出: 所有 POST/PUT/DELETE 都需在 header 加 CSRF-Token: <token>
+- 回應格式
+  - 成功: 物件或列表
+  - 失敗: { error: "..." }
+- 速率限制（已啟用，前端僅需正常呼叫）
+  - 登入/上傳/聯絡表單：輕量限流
+
+### 公開/前台 API
+- 設定與選單
+  - GET /api/public/settings → 站台設定（含背景/LINE 等）
+  - GET /api/public/menus → 前台導覽選單
+- 頁面/內容
+  - GET /api/public/pages/:slug → 單頁
+  - GET /api/public/posts?page&limit&search → 部落格列表（含封面/摘要/分頁）
+  - GET /api/public/posts/:slug → 部落格內文
+  - GET /api/public/news?page&limit&search → 最新消息列表
+  - GET /api/public/news/:slug → 最新消息內文
+  - GET /api/public/leaderboard → 傳奇榜列表（已發佈）
+  - GET /api/public/leaderboard/:slug → 傳奇榜內文
+  - GET /api/public/plans → 方案列表（已發佈）
+  - GET /api/public/plans/:slug → 方案內文
+  - GET /api/public/trial → 課程試讀列表（article/video）
+  - GET /api/public/slides → 首頁輪播
+- 會員內容（依會員等級篩選）
+  - GET /api/public/courses → 上課內容列表（YouTube 連結，需登入才會依等級回傳）
+  - GET /api/public/materials → 上課教材（可下載的媒體，依等級回傳）
+- 聯絡表單
+  - POST /api/public/contact（name, email, phone, message）
+
+### 會員 API（需登入）
+- 帳號
+  - POST /api/public/members/register（完整註冊欄位；重複 email/username 會擋下）
+  - POST /api/public/members/login（account=password/email 或 username）
+  - POST /api/public/members/logout
+  - GET /api/public/members/me → 當前會員概要（未登入回 null）
+  - GET /api/public/members/profile → 會員完整資料（需登入）
+- 上傳/下載
+  - POST /api/public/members/upload（multipart，欄位名 files，可多檔）
+    - 允許：圖片/影片/PDF/Word/PPT/Excel/TXT/CSV（500MB）
+  - GET /api/public/members/files → 會員檔案清單（含舊 public 與新私有目錄）
+  - GET /api/public/members/files/:filename → 受保護下載（僅本人可下載）
+
+### 後台 API（需登入）
+- 認證
+  - POST /api/admin/login、POST /api/admin/logout、GET /api/admin/me
+- 設定/關於頁
+  - GET/POST /api/admin/settings
+- GET /api/admin/about（關於院長/我們/基金帳戶）
+  - POST /api/admin/pages（upsert 單頁）
+- 媒體
+  - POST /api/admin/media/upload（file）
+  - GET /api/admin/media?page&limit&q
+  - GET /api/admin/media/:id/usage（查被哪些內容使用）
+  - DELETE /api/admin/media/:id
+- 內容 CRUD（皆為標準 REST）
+  - posts: GET/POST/PUT/DELETE /api/admin/posts(/:id)
+  - news: GET/POST/PUT/DELETE /api/admin/news(/:id)
+  - leaderboard: GET/POST/PUT/DELETE /api/admin/leaderboard(/:id)
+  - plans: GET/POST/PUT/DELETE /api/admin/plans(/:id)
+  - courses: GET/POST/PUT/DELETE /api/admin/courses(/:id)
+  - materials: GET/POST/PUT/DELETE /api/admin/materials(/:id)
+  - slides: GET/POST/PUT/DELETE /api/admin/slides(/:id)
+  - menus: GET/POST/PUT/DELETE /api/admin/menus(/:id)、POST /api/admin/menus/reorder
+- 會員管理
+  - GET /api/admin/members?q=...（支援 email/name/username/id_number 搜尋）
+  - GET /api/admin/members/:id → 詳細資料（繁中欄位）
+  - PUT /api/admin/members/:id（tier/is_active/name）
+  - DELETE /api/admin/members/:id（會遞迴刪除該會員的私有上傳資料夾）
+  - GET /api/admin/members/:id/files → 該會員檔案清單（私有）
+  - DELETE /api/admin/members/:id/files/:filename → 刪除單一檔案
+- 後台使用者
+  - GET/POST /api/admin/users
+  - PUT /api/admin/users/:id（調整角色、需改密碼旗標）
+  - POST /api/admin/users/:id/password（重設密碼）
+  - DELETE /api/admin/users/:id
+

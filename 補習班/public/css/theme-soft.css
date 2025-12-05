@@ -1,0 +1,33 @@
+:root {
+  --page-bg: #fff8f3;
+  --card-bg: #fffdf9;
+  --text-color: #1c1917;
+  --muted-text: #7c6b5d;
+  --btn-bg: #f97316;
+  --btn-text: #fff8f3;
+  --link-color: #fb923c;
+}
+body {
+  background: var(--page-bg);
+  color: var(--text-color);
+}
+.card {
+  background: var(--card-bg);
+  border: 1px solid #f1e7dd;
+}
+.btn {
+  background: var(--btn-bg);
+  color: var(--btn-text);
+}
+.btn.ghost {
+  background: transparent;
+  border-color: #fcd34d;
+  color: var(--muted-text);
+}
+a {
+  color: var(--link-color);
+}
+.line-float {
+  background: #f59e0b;
+}
+

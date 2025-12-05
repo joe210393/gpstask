@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>媒體庫</title>
+  <link rel="stylesheet" href="/css/admin.css">
+  <script defer src="/js/admin.js"></script>
+</head>
+<body>
+  <div id="admin-header"></div>
+  <main class="admin-container container">
+    <h1 class="mb-4">媒體庫</h1>
+    <div class="card">
+      <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="file" id="file">
+        <button id="upload-btn">上傳</button>
+        <input id="media-q" placeholder="搜尋檔名/MIME" style="max-width:240px">
+        <button id="media-search" class="ghost">搜尋</button>
+        <button id="media-delete-selected" class="ghost" style="margin-left:auto" disabled>刪除選取</button>
+      </div>
+      <div class="mt-2">
+        <table id="media-table"><thead><tr><th><input type="checkbox" id="media-select-all"></th><th>預覽</th><th>ID</th><th>檔名</th><th>MIME</th><th>建立時間</th><th>操作</th></tr></thead><tbody></tbody></table>
+        <div id="media-pager" style="margin-top:1rem;display:flex;gap:8px;justify-content:center;"></div>
+      </div>
+    </div>
+  </main>
+  
+</body>
+</html>
+

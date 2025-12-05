@@ -1,0 +1,58 @@
+/* Admin base */
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Arial, sans-serif; color: #111827; background: #f5f6f8; }
+a { color: inherit; text-decoration: none; }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+
+/* Header */
+.admin-header { position: sticky; top: 0; z-index: 60; background:#111827; color:#fff; border-bottom: 1px solid #0b1220; }
+.admin-nav { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 0; align-items: center; }
+.admin-nav a { display: inline-flex; padding: 8px 12px; border-radius: 8px; color: #fff; }
+.admin-nav a:hover { background: rgba(255,255,255,.1); }
+.admin-nav a#logout { margin-left: auto; background: #ef4444; }
+
+/* Layout */
+.admin-container { padding: 20px 0 40px; }
+.card { background:#fff; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,.06); padding:16px; border:1px solid #eef0f4; }
+.grid { display:grid; gap: 16px; }
+.grid.cols-2 { grid-template-columns: 1fr 1fr; }
+@media (max-width: 900px){ .grid.cols-2 { grid-template-columns: 1fr; } }
+
+.media-thumb {
+  width: 80px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  display: block;
+}
+
+/* Forms */
+label { display:block; font-weight:600; margin:10px 0 6px; }
+input, textarea, select { width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; background:#fff; }
+button, .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:10px 14px; border-radius:10px; background:#111827; color:#fff; border:none; font-weight:700; cursor:pointer; }
+.btn.ghost, button.ghost { background:#e5e7eb; color:#111827; }
+
+/* Tables */
+table { width:100%; border-collapse: collapse; background:#fff; border-radius: 12px; overflow: hidden; }
+th, td { padding: 10px 12px; border-bottom: 1px solid #eef0f4; text-align: left; }
+thead th { background: #f3f4f6; font-weight: 700; }
+tbody tr:hover { background: #fafafa; }
+
+/* Helpers */
+.mt-2 { margin-top:8px; } .mt-3 { margin-top:12px; } .mt-4 { margin-top:16px; } .mt-6 { margin-top:24px; }
+.mb-2 { margin-bottom:8px; } .mb-4 { margin-bottom:16px; }
+.center { text-align:center; }
+
+/* Rich editor content */
+.editor img { max-width: 100%; height: auto; display: block; margin: 8px 0; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+.editor { min-height: 600px !important; font-size: 16px; line-height: 1.7; }
+
+/* Horizontal media picker for plans cover */
+.modal .grid.horizontal-cards { display: grid; grid-template-columns: repeat(5, minmax(120px,1fr)); gap: 12px; }
+.modal .grid.horizontal-cards button { display: flex; align-items: center; flex-direction: column; gap: 8px; padding: 12px 10px; border-radius: 12px; border:1px solid #e5e7eb; background:#fff; overflow:hidden; height: 100%; text-align:center; }
+.modal .grid.horizontal-cards img { width: 100%; height: 120px; object-fit: cover; border-radius: 8px; flex: 0 0 auto; }
+
+
+/* Utilities */
+.hidden { display: none !important; }

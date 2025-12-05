@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>傳奇榜</title>
+  <link rel="stylesheet" href="/css/site.css">
+  <style>.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}.card{background:#fff;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.06);padding:16px}</style>
+  <script defer src="/js/cms.js"></script>
+</head>
+<body data-page="leaderboard">
+  <header id="site-header" class="site-header"></header>
+  <main class="container">
+    <h1>傳奇榜</h1>
+    <p class="mb-4">在這邊的每一個傳奇，之前都是普通人。<br/>他們可以，你也可以</p>
+    <!-- 排序與搜尋已移除 -->
+    <div id="leaderboard-list" class="grid"></div>
+  </main>
+  <a id="line-float" class="line-float" target="_blank" rel="noopener">LINE</a>
+  <template id="leaderboard-item-tpl">
+    <article class="card">
+      <img data-prop="src:cover_url" alt="" style="width:100%;height:180px;object-fit:cover;margin-bottom:12px;">
+      <h3 data-prop="text:title"></h3>
+      <p data-prop="text:excerpt"></p>
+      <a class="btn ghost" data-prop="href:link">了解更多</a>
+    </article>
+  </template>
+</body>
+</html>
+

@@ -1,0 +1,31 @@
+:root {
+  --page-bg: #f7f7f7;
+  --card-bg: #ffffff;
+  --text-color: #111827;
+  --muted-text: #475467;
+  --btn-bg: #111827;
+  --btn-text: #ffffff;
+  --link-color: #1d4ed8;
+}
+body {
+  background: var(--page-bg);
+  color: var(--text-color);
+}
+.card {
+  background: var(--card-bg);
+}
+.btn {
+  background: var(--btn-bg);
+  color: var(--btn-text);
+}
+.btn.ghost {
+  background: transparent;
+  border-color: #d1d5db;
+}
+a {
+  color: var(--link-color);
+}
+.line-float {
+  background: #06c755;
+}
+

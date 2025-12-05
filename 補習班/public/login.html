@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>會員登入</title>
+  <link rel="stylesheet" href="/css/site.css">
+  <script defer src="/js/cms.js"></script>
+  <script defer src="/js/member.js"></script>
+</head>
+<body>
+  <header id="site-header" class="site-header"></header>
+  <main class="container">
+    <h1>會員登入</h1>
+    <form id="login-form" class="card" style="max-width:420px">
+      <label>帳號（Email 或自訂帳號）</label>
+      <input name="account" type="text" required>
+      <label>密碼</label>
+      <input name="password" type="password" required>
+      <div class="mt-3" style="display:flex;gap:8px;align-items:center">
+        <button type="submit">登入</button>
+        <span>還沒有帳戶？</span>
+        <a class="btn ghost" href="/register.html">請註冊</a>
+      </div>
+      <div id="msg" class="mt-2" style="color:#c00"></div>
+    </form>
+  </main>
+  <footer class="site-footer" id="site-footer"></footer>
+</body>
+</html>
+
+

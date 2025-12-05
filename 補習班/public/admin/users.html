@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>使用者</title>
+  <link rel="stylesheet" href="/css/admin.css">
+  <script defer src="/js/admin.js"></script>
+  </head>
+<body>
+  <div id="admin-header"></div>
+  <main class="admin-container container">
+    <h1 class="mb-4">使用者</h1>
+    <div class="grid cols-2">
+      <div class="card">
+        <table id="users-table"><thead><tr><th>ID</th><th>Username</th><th>Role</th><th>Must Change</th><th>操作</th></tr></thead><tbody></tbody></table>
+      </div>
+      <div class="card">
+        <h3>新增使用者</h3>
+        <form id="users-form" class="mt-2">
+          <div><label>Username</label><input name="username" required></div>
+          <div><label>Password</label><input type="password" name="password" required></div>
+          <div><label>Role</label>
+            <select name="role">
+              <option value="admin">admin</option>
+              <option value="editor">editor</option>
+            </select>
+          </div>
+          <div class="mt-3"><button type="submit">新增</button></div>
+        </form>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
+

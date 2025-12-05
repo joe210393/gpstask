@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Home</title>
+  <link rel="stylesheet" href="/css/site.css">
+  <style>
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Arial, sans-serif; }
+    header, footer { padding: 16px; background: rgba(255,255,255,.8); backdrop-filter: blur(8px); }
+    .container { max-width: 1080px; margin: 0 auto; padding: 16px; }
+    #hero { padding: 64px 16px; text-align:center; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap:16px; }
+    .card { background:#fff; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,.06); padding:16px; }
+    .line-float { position: fixed; right: 16px; bottom: 16px; width: 56px; height: 56px; border-radius: 50%; background: #06C755; color: #fff; display:flex; align-items:center; justify-content:center; text-decoration:none; font-weight:700; box-shadow:0 10px 24px rgba(0,0,0,.2); }
+  </style>
+  <script defer src="/js/cms.js"></script>
+  <script defer src="/js/ui.js"></script>
+  </head>
+<body data-page="home">
+  <header id="site-header" class="site-header"></header>
+  <main class="container">
+    <section id="hero" class="mb-4 full-bleed">
+      <div id="slider" class="slider fullscreen">
+        <div id="slides" class="slides">
+          <!-- slides injected by cms.js -->
+        </div>
+        <div class="controls">
+          <button class="btn ghost" id="prev">‹</button>
+          <div id="dots" class="dots"></div>
+          <button class="btn ghost" id="next">›</button>
+        </div>
+      </div>
+    </section>
+    <section id="hero">
+    </section>
+    <section id="latest-news" data-list="news.items">
+      <h2>最新消息</h2>
+      <div class="grid" data-target="list"></div>
+    </section>
+    <section id="latest-posts" data-list="posts.items" class="mt-4">
+      <h2>部落格精選</h2>
+      <div class="grid" data-target="list"></div>
+    </section>
+    <section id="latest-legend" class="mt-4">
+      <h2>傳奇榜 精選</h2>
+      <div class="grid" data-target="list"></div>
+    </section>
+  </main>
+  <a id="line-float" class="line-float" target="_blank" rel="noopener">LINE</a>
+
+  <template id="news-item-tpl">
+    <article class="card">
+      <img data-prop="src:cover_url" alt="" style="width:100%;height:180px;object-fit:cover;margin-bottom:12px;">
+      <h3 data-prop="text:title"></h3>
+      <p data-prop="text:excerpt"></p>
+      <a class="btn ghost" data-prop="href:link">閱讀更多</a>
+    </article>
+  </template>
+
+  <template id="post-item-tpl">
+    <article class="card">
+      <img data-prop="src:cover_url" alt="" style="width:100%;height:180px;object-fit:cover;margin-bottom:12px;">
+      <h3 data-prop="text:title"></h3>
+      <p data-prop="text:excerpt"></p>
+      <a class="btn ghost" data-prop="href:link">閱讀更多</a>
+    </article>
+  </template>
+
+  <template id="legend-item-tpl">
+    <article class="card">
+      <img data-prop="src:cover_url" alt="" style="width:100%;height:180px;object-fit:cover;margin-bottom:12px;">
+      <h3 data-prop="text:title"></h3>
+      <p data-prop="text:excerpt"></p>
+      <a class="btn ghost" data-prop="href:link">了解更多</a>
+    </article>
+  </template>
+
+  <footer class="site-footer" id="site-footer"></footer>
+</body>
+</html>
+
+

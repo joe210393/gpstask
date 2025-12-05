@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>設定</title>
+  <link rel="stylesheet" href="/css/admin.css">
+  <script defer src="/js/admin.js"></script>
+</head>
+<body>
+  <div id="admin-header"></div>
+  <main class="admin-container container">
+    <div class="card">
+      <h1 class="mb-4">站台設定</h1>
+      <div class="grid cols-2">
+        <div>
+          <label>Site Name</label>
+          <input id="site_name" placeholder="Site Name">
+        </div>
+        <div>
+          <label>LINE URL</label>
+          <input id="line_url" placeholder="https://lin.ee/...">
+        </div>
+        <div>
+          <label>Default BG Color</label>
+          <input id="default_bg_color" value="#f7f7f7">
+        </div>
+        <div>
+          <label>前台風格</label>
+          <select id="theme_selector">
+            <option value="default">預設</option>
+            <option value="dark">深色</option>
+            <option value="soft">柔和</option>
+          </select>
+        </div>
+      </div>
+      <h3 class="mt-6 mb-2">每頁背景（從媒體庫選擇圖片）</h3>
+      <div class="grid cols-2">
+        <div><label>Home 背景圖</label><div class="row"><input id="bg_home_url" placeholder="/uploads/..." readonly><button type="button" class="ghost" data-pick="bg_home_url">選擇</button><button type="button" class="ghost" data-upload="bg_home_url">上傳</button></div></div>
+        <div><label>Blog 背景圖</label><div class="row"><input id="bg_blog_url" placeholder="/uploads/..." readonly><button type="button" class="ghost" data-pick="bg_blog_url">選擇</button><button type="button" class="ghost" data-upload="bg_blog_url">上傳</button></div></div>
+        <div><label>Blog 內文 背景圖</label><div class="row"><input id="bg_blog_post_url" placeholder="/uploads/..." readonly><button type="button" class="ghost" data-pick="bg_blog_post_url">選擇</button><button type="button" class="ghost" data-upload="bg_blog_post_url">上傳</button></div></div>
+        <div><label>News 背景圖</label><div class="row"><input id="bg_news_url" placeholder="/uploads/..." readonly><button type="button" class="ghost" data-pick="bg_news_url">選擇</button><button type="button" class="ghost" data-upload="bg_news_url">上傳</button></div></div>
+        <div><label>News 內文 背景圖</label><div class="row"><input id="bg_news_post_url" placeholder="/uploads/..." readonly><button type="button" class="ghost" data-pick="bg_news_post_url">選擇</button><button type="button" class="ghost" data-upload="bg_news_post_url">上傳</button></div></div>
+        <div><label>Leaderboard 背景圖</label><div class="row"><input id="bg_leaderboard_url" placeholder="/uploads/..." readonly><button type="button" class="ghost" data-pick="bg_leaderboard_url">選擇</button><button type="button" class="ghost" data-upload="bg_leaderboard_url">上傳</button></div></div>
+        <div><label>Plans 背景圖</label><div class="row"><input id="bg_plans_url" placeholder="/uploads/..." readonly><button type="button" class="ghost" data-pick="bg_plans_url">選擇</button><button type="button" class="ghost" data-upload="bg_plans_url">上傳</button></div></div>
+        <div><label>Trial 背景圖</label><div class="row"><input id="bg_trial_url" placeholder="/uploads/..." readonly><button type="button" class="ghost" data-pick="bg_trial_url">選擇</button><button type="button" class="ghost" data-upload="bg_trial_url">上傳</button></div></div>
+        <div><label>Contact 背景圖</label><div class="row"><input id="bg_contact_url" placeholder="/uploads/..." readonly><button type="button" class="ghost" data-pick="bg_contact_url">選擇</button><button type="button" class="ghost" data-upload="bg_contact_url">上傳</button></div></div>
+        <div><label>About 背景圖</label><div class="row"><input id="bg_about_url" placeholder="/uploads/..." readonly><button type="button" class="ghost" data-pick="bg_about_url">選擇</button><button type="button" class="ghost" data-upload="bg_about_url">上傳</button></div></div>
+      </div>
+      <input type="file" id="bg-upload-file" accept="image/*" style="display:none">
+      <div id="picker" class="card mt-4" style="display:none">
+        <div class="row" style="justify-content:space-between;align-items:center"><h3 class="mb-2">選擇背景圖片</h3><button class="ghost" id="picker-close">關閉</button></div>
+        <div id="picker-grid" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px"></div>
+        <div class="pager mt-3" id="picker-pager"></div>
+      </div>
+      <div class="mt-4"><button id="save-settings">儲存</button></div>
+    </div>
+  </main>
+  
+</body>
+</html>
+

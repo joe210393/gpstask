@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>課程方案</title>
+  <link rel="stylesheet" href="/css/site.css">
+  <style>
+    .plans-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(260px, 1fr));
+      gap: 24px;
+    }
+    .plans-pager {
+      margin-top: 32px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+    }
+    .plans-pager a {
+      padding: 8px 14px;
+      border: 1px solid #d1d5db;
+      border-radius: 999px;
+      text-decoration: none;
+      color: #374151;
+      font-size: 0.95rem;
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
+    }
+    .plans-pager a.active-page,
+    .plans-pager a:hover {
+      background: #111827;
+      color: #fff;
+      border-color: transparent;
+    }
+    @media (max-width: 1100px) {
+      .plans-grid {
+        grid-template-columns: repeat(2, minmax(240px, 1fr));
+      }
+    }
+    @media (max-width: 700px) {
+      .plans-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+  <script defer src="/js/cms.js"></script>
+</head>
+<body data-page="plans">
+  <header id="site-header" class="site-header"></header>
+  <main class="container">
+    <h1>課程方案</h1>
+    <div id="plans-list" class="plans-grid"></div>
+    <nav id="plans-pager" class="plans-pager" aria-label="課程方案分頁"></nav>
+  </main>
+  <a id="line-float" class="line-float" target="_blank" rel="noopener">LINE</a>
+  <template id="plan-item-tpl">
+    <article class="card">
+      <img data-prop="src:cover_url" alt="" style="width:100%;height:180px;object-fit:cover;margin-bottom:12px;">
+      <h3 data-prop="text:name"></h3>
+      <p data-prop="text:tagline"></p>
+      <strong data-prop="text:price"></strong>
+      <p data-prop="text:preview"></p>
+      <a class="btn ghost" data-prop="href:link">閱讀更多</a>
+    </article>
+  </template>
+</body>
+</html>
+

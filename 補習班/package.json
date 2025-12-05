@@ -1,0 +1,45 @@
+{
+  "name": "site-cms",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Static HTML + JS site with Node.js (Express) API and MySQL CMS backend",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "seed": "node src/scripts/seed.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "cms",
+    "express",
+    "mysql",
+    "static",
+    "html"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "csurf": "^1.11.0",
+    "dayjs": "^1.11.13",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "express-session": "^1.18.2",
+    "helmet": "^8.1.0",
+    "knex": "^3.1.0",
+    "mongo-express": "^1.1.0-rc-3",
+    "morgan": "^1.10.1",
+    "multer": "^2.0.2",
+    "mysql2": "^3.14.3",
+    "nodemailer": "^7.0.5",
+    "sanitize-html": "^2.17.0",
+    "sharp": "^0.34.3",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}

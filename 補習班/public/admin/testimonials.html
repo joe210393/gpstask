@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>實例見證編輯</title>
+  <link rel="stylesheet" href="/css/admin.css">
+  <style>
+    .toolbar { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+    .toolbar button { padding:6px 10px; }
+    .editor { min-height: 240px; border:1px solid #e5e7eb; border-radius:10px; padding:12px; background:#fff; }
+  </style>
+  <script defer src="/js/admin.js"></script>
+</head>
+<body>
+  <div id="admin-header"></div>
+  <main class="admin-container container">
+    <h1 class="mb-4">實例見證編輯</h1>
+    <div class="card mb-4">
+      <table id="testimonials-table" class="table">
+        <thead><tr><th>ID</th><th>標題</th><th>Slug</th><th>發佈</th><th>操作</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h3>新增/編輯 實例見證</h3>
+      <form id="testimonials-form" class="grid cols-1 gap-4">
+        <input type="hidden" name="id">
+        <div><label>標題</label><input name="title" required></div>
+        <div><label>網址 Slug (唯一識別碼)</label><input name="slug" required></div>
+        <div><label>簡述 (列表顯示)</label><textarea name="excerpt" rows="3"></textarea></div>
+        <div>
+          <label>嵌入影片網址 (YouTube)</label>
+          <input name="video_url" placeholder="https://www.youtube.com/watch?v=..." style="width:100%;">
+          <small style="color:#666;display:block;margin-top:4px;">支援 YouTube 連結</small>
+        </div>
+        <div>
+          <label>封面圖 (Media ID)</label>
+          <div class="row">
+            <input id="testimonials-cover" name="cover_media_id" type="number" placeholder="Media ID">
+            <button type="button" class="ghost" id="testimonials-cover-pick">選擇</button>
+            <button type="button" class="ghost" id="testimonials-cover-upload">上傳</button>
+            <input type="file" id="testimonials-cover-file" accept="image/*" hidden>
+          </div>
+        </div>
+        <div>
+          <label>發佈時間</label>
+          <input type="datetime-local" id="testimonials-published" name="published_at">
+        </div>
+        <div>
+          <label class="checkbox-label">
+            <input type="checkbox" id="testimonials-published-flag" name="is_published">
+            <span>發佈</span>
+          </label>
+        </div>
+        <div>
+          <label>完整內容 (選填)</label>
+          <div id="testimonials-toolbar" class="toolbar">
+            <button type="button" data-cmd="bold">粗體</button>
+            <button type="button" data-cmd="italic">斜體</button>
+            <button type="button" data-cmd="insertUnorderedList">清單</button>
+            <button type="button" data-cmd="formatBlock" data-value="h2">H2</button>
+            <button type="button" id="testimonials-insert-img" class="ghost">圖片</button>
+            <input type="file" id="testimonials-insert-file" accept="image/*" hidden>
+          </div>
+          <div id="testimonials-editor" class="editor" contenteditable="true"></div>
+        </div>
+        <div><button type="submit">儲存</button></div>
+      </form>
+    </div>
+    
+    <!-- Media Picker Modal -->
+    <div id="testimonials-picker" class="card mt-4" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:999; width:90%; max-width:800px; max-height:90vh; overflow:auto; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+      <div class="row" style="justify-content:space-between;align-items:center"><h3 class="mb-2">選擇封面圖片</h3><button class="ghost" id="testimonials-picker-close">關閉</button></div>
+      <div id="testimonials-picker-grid" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px"></div>
+      <div class="pager mt-3" id="testimonials-picker-pager"></div>
+    </div>
+  </main>
+</body>
+</html>
+

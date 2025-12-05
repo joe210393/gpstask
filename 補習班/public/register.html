@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>會員註冊</title>
+  <link rel="stylesheet" href="/css/site.css">
+  <script defer src="/js/cms.js"></script>
+  <script defer src="/js/member.js"></script>
+</head>
+<body>
+  <header id="site-header" class="site-header"></header>
+  <main class="container">
+    <h1 class="mb-4">會員註冊</h1>
+    <form id="reg-form" class="card" style="max-width:900px;margin:0 auto;border:1px solid #eef0f4;">
+      <p style="color:#374151;margin-top:0">請填寫真實資料以利身份驗證與後續服務，我們將妥善保護您的個資。</p>
+      <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
+        <div><label>中文姓名</label><input name="chinese_name" type="text"></div>
+        <div><label>英文姓名</label><input name="english_name" type="text"></div>
+        <div><label>性別</label>
+          <select name="gender"><option value="">—</option><option value="male">男</option><option value="female">女</option><option value="other">其他</option></select>
+        </div>
+        <div><label>出生日期</label><input name="birth_date" type="date"></div>
+        <div><label>身分證字號</label><input name="id_number" type="text"></div>
+        <div><label>行動電話</label><input name="phone_mobile" type="tel"></div>
+        <div><label>市話</label><input name="phone_landline" type="tel"></div>
+        <div class="colspan" style="grid-column:1 / -1"><label>通訊地址</label><input name="address" type="text"></div>
+        <div><label>LINE ID</label><input name="line_id" type="text"></div>
+        <div class="colspan" style="grid-column:1 / -1"><label>特殊需求</label><input name="special_needs" type="text"></div>
+        <div><label>推薦人/介紹人</label><input name="referrer" type="text"></div>
+        <div><label>帳號（Email 或自訂帳號）</label><input name="username" type="text" placeholder="可留空以使用 Email"></div>
+        <div><label>Email</label><input name="email" type="email" required></div>
+        <div><label>密碼</label><input name="password" type="password" required></div>
+        <div class="colspan" style="grid-column:1 / -1"><label>密碼提示問題</label><input name="password_hint_question" type="text" placeholder="例如：我第一隻寵物的名字？"></div>
+        <div class="colspan" style="grid-column:1 / -1"><label>提示答案</label><input name="password_hint_answer" type="text"></div>
+      </div>
+      <div class="mt-3" style="display:flex;gap:12px;align-items:center;justify-content:flex-end">
+        <a class="btn ghost" href="/login.html">已有帳號？登入</a>
+        <button type="submit">註冊</button>
+      </div>
+      <div id="msg" class="mt-2" style="color:#c00"></div>
+    </form>
+  </main>
+  <footer class="site-footer" id="site-footer"></footer>
+</body>
+</html>
+
+

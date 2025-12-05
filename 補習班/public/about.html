@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>關於</title>
+  <link rel="stylesheet" href="/css/site.css">
+  <script defer src="/js/cms.js"></script>
+  <script defer src="/js/ui.js"></script>
+  <style>
+    nav.about ul{list-style:none;padding:0;margin:0;display:flex;gap:12px}
+    nav.about li{position:relative}
+    nav.about li ul{position:absolute;left:0;top:100%;display:none;background:#fff;border-radius:8px;box-shadow:0 8px 20px rgba(0,0,0,.1);padding:8px}
+    nav.about li:hover ul{display:block}
+  </style>
+</head>
+<body data-page="about">
+  <header id="site-header" class="container"></header>
+  <main class="container">
+    <h1>關於</h1>
+    <nav class="about">
+      <ul>
+        <li>
+          <a href="#">關於</a>
+          <ul>
+            <li><a href="/about-teacher.html">關於院長</a></li>
+            <li><a href="/about-us.html">關於我們</a></li>
+            <li><a href="/about-ftmo.html">關於 FTMO</a></li>
+          </ul>
+        </li>
+      </ul>
+    </nav>
+    <section id="about-content"></section>
+  </main>
+  <a id="line-float" class="line-float" target="_blank" rel="noopener">LINE</a>
+</body>
+</html>
+

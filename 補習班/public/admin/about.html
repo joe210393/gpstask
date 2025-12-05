@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>關於內容</title>
+  <link rel="stylesheet" href="/css/admin.css">
+  <style>
+    .toolbar { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+    .toolbar button { padding:6px 10px; }
+    .editor { min-height: 240px; border:1px solid #e5e7eb; border-radius:10px; padding:12px; background:#fff; }
+  </style>
+  <script defer src="/js/admin.js"></script>
+</head>
+<body>
+  <div id="admin-header"></div>
+  <main class="admin-container container">
+    <h1 class="mb-4">關於內容編輯</h1>
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>關於院長</h3>
+        <div class="toolbar">
+          <button data-cmd="bold">粗體</button>
+          <button data-cmd="italic">斜體</button>
+          <button data-cmd="insertUnorderedList">項目符號</button>
+          <button data-cmd="formatBlock" data-value="h2">H2</button>
+          <button id="teacher-insert-img" class="ghost">插入圖片</button>
+          <input type="file" id="teacher-file" accept="image/*" hidden>
+        </div>
+        <div id="teacher-editor" class="editor" contenteditable="true"></div>
+        <div class="mt-2"><label>背景圖片 Media ID</label> <div class="row"><input id="teacher-bg" type="number" placeholder="可留空" style="max-width:140px"><button class="ghost" id="teacher-bg-pick" type="button">選擇</button><button class="ghost" id="teacher-bg-upload" type="button">上傳</button><input type="file" id="teacher-bg-file" accept="image/*" hidden></div></div>
+        <div class="mt-2"><button id="teacher-save">儲存</button></div>
+      </div>
+      <div class="card">
+        <h3>關於我們</h3>
+        <div class="toolbar">
+          <button data-cmd="bold">粗體</button>
+          <button data-cmd="italic">斜體</button>
+          <button data-cmd="insertUnorderedList">項目符號</button>
+          <button data-cmd="formatBlock" data-value="h2">H2</button>
+          <button id="aboutus-insert-img" class="ghost">插入圖片</button>
+          <input type="file" id="aboutus-file" accept="image/*" hidden>
+        </div>
+        <div id="aboutus-editor" class="editor" contenteditable="true"></div>
+        <div class="mt-2"><label>背景圖片 Media ID</label> <div class="row"><input id="aboutus-bg" type="number" placeholder="可留空" style="max-width:140px"><button class="ghost" id="aboutus-bg-pick" type="button">選擇</button><button class="ghost" id="aboutus-bg-upload" type="button">上傳</button><input type="file" id="aboutus-bg-file" accept="image/*" hidden></div></div>
+        <div class="mt-2"><button id="aboutus-save">儲存</button></div>
+      </div>
+      <div class="card">
+        <h3>關於基金帳戶</h3>
+        <div class="toolbar">
+          <button data-cmd="bold">粗體</button>
+          <button data-cmd="italic">斜體</button>
+          <button data-cmd="insertUnorderedList">項目符號</button>
+          <button data-cmd="formatBlock" data-value="h2">H2</button>
+          <button id="ftmo-insert-img" class="ghost">插入圖片</button>
+          <input type="file" id="ftmo-file" accept="image/*" hidden>
+        </div>
+        <div id="ftmo-editor" class="editor" contenteditable="true"></div>
+        <div class="mt-2"><label>背景圖片 Media ID</label> <div class="row"><input id="ftmo-bg" type="number" placeholder="可留空" style="max-width:140px"><button class="ghost" id="ftmo-bg-pick" type="button">選擇</button><button class="ghost" id="ftmo-bg-upload" type="button">上傳</button><input type="file" id="ftmo-bg-file" accept="image/*" hidden></div></div>
+        <div class="mt-2"><button id="ftmo-save">儲存</button></div>
+      </div>
+    </div>
+    <div id="about-picker" class="card mt-4" style="display:none">
+      <div class="row" style="justify-content:space-between;align-items:center"><h3 class="mb-2">選擇背景圖片</h3><button class="ghost" id="about-picker-close">關閉</button></div>
+      <div id="about-picker-grid" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px"></div>
+      <div class="pager mt-3" id="about-picker-pager"></div>
+    </div>
+  </main>
+</body>
+</html>
