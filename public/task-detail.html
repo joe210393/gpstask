@@ -285,6 +285,23 @@
             container.style.background = '#f8f9fa';
             container.style.borderRadius = '8px';
 
+            // AR 按鈕
+            const arBtn = document.createElement('button');
+            arBtn.className = 'btn';
+            arBtn.style.width = '100%';
+            arBtn.style.marginBottom = '15px';
+            arBtn.style.background = '#fd7e14'; // 橙色以示區別
+            arBtn.style.color = 'white';
+            arBtn.style.fontWeight = 'bold';
+            arBtn.style.border = 'none';
+            arBtn.style.borderRadius = '6px';
+            arBtn.style.padding = '10px';
+            arBtn.innerHTML = '📸 開啟 AR 尋找線索';
+            arBtn.onclick = () => {
+              window.location.href = `/ar-view.html?taskId=${t.id}&lat=${t.lat}&lng=${t.lng}`;
+            };
+            container.appendChild(arBtn);
+
             const title = document.createElement('div');
             title.style.fontWeight = 'bold';
             title.style.marginBottom = '10px';

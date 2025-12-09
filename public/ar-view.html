@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>AR 尋找線索</title>
+    <!-- A-Frame -->
+    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+    <!-- AR.js for A-Frame -->
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: sans-serif; }
+        .ui-overlay {
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            z-index: 999;
+            pointer-events: none; /* 讓點擊穿透到 AR 場景 */
+        }
+        .btn {
+            background: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            pointer-events: auto; /* 恢復按鈕點擊 */
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .info-box {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            text-align: center;
+            z-index: 999;
+        }
+    </style>
+</head>
+<body style="margin: 0; overflow: hidden;">
+
+    <div class="info-box">
+        <div id="status">正在定位中...</div>
+        <small id="dist-debug"></small>
+    </div>
+
+    <div class="ui-overlay">
+        <button id="backBtn" class="btn">🔙 返回填寫答案</button>
+    </div>
+
+    <!-- 
+        vr-mode-ui="enabled: false": 隱藏 VR 按鈕
+        arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;": AR.js 設定
+    -->
+    <a-scene
+        vr-mode-ui="enabled: false"
+        embedded
+        arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
+    >
+        <!-- 資源預加載 -->
+        <a-assets>
+            <img id="mascot-img" src="/images/mascot.png">
+        </a-assets>
+
+        <!-- 相機與 GPS -->
+        <a-camera gps-camera rotation-reader></a-camera>
+
+        <!-- 
+            AR 物件將由 JavaScript 動態加入 
+            我們會放置一個永遠面向用戶的圖片 (Billboard)
+        -->
+    </a-scene>
+
+    <script>
+        // 取得網址參數
+        const urlParams = new URLSearchParams(window.location.search);
+        const targetLat = parseFloat(urlParams.get('lat'));
+        const targetLng = parseFloat(urlParams.get('lng'));
+        const taskId = urlParams.get('taskId');
+
+        // 返回按鈕功能
+        document.getElementById('backBtn').onclick = function() {
+            if (taskId) {
+                window.location.href = `/task-detail.html?id=${taskId}`;
+            } else {
+                window.history.back();
+            }
+        };
+
+        // 檢查是否有座標
+        if (!targetLat || !targetLng) {
+            document.getElementById('status').innerText = "錯誤：無效的任務座標";
+        } else {
+            // 動態新增 AR 物件
+            const scene = document.querySelector('a-scene');
+
+            // 創建一個實體 (Entity)
+            const entity = document.createElement('a-image');
+            entity.setAttribute('src', '#mascot-img');
+            entity.setAttribute('scale', '5 5 5'); // 調整大小
+            entity.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
+            
+            // 添加簡單的動畫 (上下浮動)
+            entity.setAttribute('animation', 'property: position; to: 0 1 0; dir: alternate; dur: 2000; loop: true');
+
+            // 加入場景
+            scene.appendChild(entity);
+
+            document.getElementById('status').innerText = "請轉動手機尋找任務目標！";
+
+            // 監聽距離 (除錯用)
+            entity.addEventListener('gps-entity-place-update-position', (event) => {
+                const distance = event.detail.distance;
+                document.getElementById('dist-debug').innerText = `距離目標: ${distance.toFixed(0)} 公尺`;
+            });
+        }
+    </script>
+</body>
+</html>
