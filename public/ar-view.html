@@ -6,8 +6,11 @@
     <title>AR 尋找線索</title>
     <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-    <!-- AR.js for A-Frame -->
+    <!-- AR.js -->
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+    <!-- Look-at component (確保物件面向鏡頭) -->
+    <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
+    
     <style>
         body { margin: 0; overflow: hidden; font-family: sans-serif; }
         .ui-overlay {
@@ -46,7 +49,7 @@
             z-index: 999;
         }
         
-        /* 2D 導航箭頭 */
+        /* 2D 導航箭頭 (遠距離用) */
         #arrow-container {
             position: fixed;
             top: 50%;
@@ -72,30 +75,6 @@
             margin-top: 10px;
             text-align: center;
         }
-
-        /* 2D 寶箱 (HUD 模式 - HTML 覆蓋層) */
-        #hud-chest-container {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 950;
-            display: none; /* 預設隱藏 */
-            text-align: center;
-            pointer-events: none;
-        }
-        #hud-chest-img {
-            width: 60vw; /* 螢幕寬度的 60% */
-            max-width: 300px;
-            height: auto;
-            filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.8));
-            animation: floatChest 2s ease-in-out infinite;
-        }
-        @keyframes floatChest {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-20px); }
-            100% { transform: translateY(0px); }
-        }
     </style>
 </head>
 <body style="margin: 0; overflow: hidden;">
@@ -112,12 +91,6 @@
         <div class="arrow-text">目標方向</div>
     </div>
 
-    <!-- 2D 寶箱 (HTML HUD) -->
-    <div id="hud-chest-container">
-        <img id="hud-chest-img" src="/images/mascot.png" alt="寶箱">
-        <div style="color: white; font-weight: bold; font-size: 1.2em; margin-top: 10px; text-shadow: 0 2px 4px black;">找到目標了！</div>
-    </div>
-
     <div class="ui-overlay">
         <button id="backBtn" class="btn">🔙 返回填寫答案</button>
     </div>
@@ -126,16 +99,35 @@
         vr-mode-ui="enabled: false"
         embedded
         arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
-        renderer="logarithmicDepthBuffer: true;" 
+        renderer="logarithmicDepthBuffer: true; antialias: true; colorManagement: true;" 
     >
         <a-assets>
             <img id="mascot-img" src="/images/mascot.png">
         </a-assets>
 
-        <a-camera gps-camera rotation-reader></a-camera>
+        <!-- 增加環境光，確保 3D 物件不會變黑 -->
+        <a-light type="ambient" color="#ffffff" intensity="1.5"></a-light>
+        <a-light type="directional" color="#ffffff" intensity="1" position="-1 1 0"></a-light>
 
-        <!-- 遠處 GPS 寶箱 (保留做為參考，雖然可能飄移) -->
-        <!-- 由 JS 動態加入 -->
+        <a-camera gps-camera rotation-reader>
+            <!-- 這裡不掛載任何子物件，確保使用世界座標 -->
+        </a-camera>
+
+        <!-- 
+            3D 寶箱實體 
+            初始隱藏，等到 GPS 定位後再顯示
+            使用 look-at="[gps-camera]" 確保永遠面向使用者
+        -->
+        <a-image
+            id="ar-chest"
+            src="#mascot-img"
+            scale="5 5 5"
+            visible="false"
+            look-at="[gps-camera]"
+            position="0 0 -100" 
+            animation="property: position; to: 0 0.5 0; dir: alternate; dur: 2000; loop: true; easing: easeInOutSine"
+        ></a-image>
+
     </a-scene>
 
     <script>
@@ -155,37 +147,36 @@
         if (!targetLat || !targetLng) {
             document.getElementById('status').innerText = "錯誤：無效的任務座標";
         } else {
-            const scene = document.querySelector('a-scene');
-
-            // 建立遠處的 GPS 目標 (A-Frame)
-            const gpsTarget = document.createElement('a-image');
-            gpsTarget.setAttribute('id', 'gps-target');
-            gpsTarget.setAttribute('src', '#mascot-img');
-            gpsTarget.setAttribute('scale', '8 8 8'); 
-            gpsTarget.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
-            gpsTarget.setAttribute('material', 'shader: flat; opacity: 1; transparent: true'); 
-            gpsTarget.setAttribute('look-at', '[gps-camera]'); 
-            gpsTarget.setAttribute('visible', 'true');
-            scene.appendChild(gpsTarget);
-
+            const arChest = document.getElementById('ar-chest');
             const arrowContainer = document.getElementById('arrow-container');
             const navArrow = document.getElementById('nav-arrow');
-            const hudChestContainer = document.getElementById('hud-chest-container');
             
             let userLat = null;
             let userLng = null;
             let userHeading = 0;
+            
+            // 狀態變數
+            let isNearbyMode = false;
+            let nearbyLat = null;
+            let nearbyLng = null;
 
+            // 1. 初始化遠處目標
+            arChest.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
+
+            // 監聽 GPS 更新
             window.addEventListener('gps-camera-update-position', function(e) {
                 userLat = e.detail.position.latitude;
                 userLng = e.detail.position.longitude;
                 
+                // 計算實際距離
                 const dist = haversineDistance(userLat, userLng, targetLat, targetLng);
                 document.getElementById('dist-debug').innerText = `距離目標: ${dist.toFixed(0)}m`;
                 
-                updateArrowAndTarget(dist);
+                // 核心邏輯
+                updateARLogic(dist);
             });
 
+            // 監聽羅盤
             window.addEventListener('deviceorientation', function(event) {
                 if (event.webkitCompassHeading) {
                     userHeading = event.webkitCompassHeading;
@@ -198,35 +189,54 @@
                 }
             });
 
-            function updateArrowAndTarget(dist) {
-                // 放寬距離限制到 15 公尺
-                if(dist < 15) {
-                    // === 近距離模式 ===
-                    document.getElementById('status').innerText = "目標就在眼前！";
-                    document.getElementById('debug-log').innerText = "模式: 近距離 (HTML HUD)";
-                    
-                    arrowContainer.style.display = 'none';
-                    
-                    // 顯示 HTML 寶箱
-                    hudChestContainer.style.display = 'block';
-                    
-                    // 隱藏 3D GPS 寶箱
-                    gpsTarget.setAttribute('visible', 'false');
-
+            function updateARLogic(dist) {
+                // 如果進入 15 公尺內，切換為近距離模式
+                if (dist < 15) {
+                    if (!isNearbyMode) {
+                        // === 切換到近距離模式 ===
+                        isNearbyMode = true;
+                        
+                        // 計算「使用者正前方 3 公尺」的虛擬座標
+                        // 這樣寶箱就會出現在使用者面前，而不是頭頂或腳下
+                        const forwardPosition = calculateDestination(userLat, userLng, 3, userHeading);
+                        nearbyLat = forwardPosition.lat;
+                        nearbyLng = forwardPosition.lng;
+                        
+                        // 更新寶箱位置到這個新座標
+                        arChest.setAttribute('gps-entity-place', `latitude: ${nearbyLat}; longitude: ${nearbyLng};`);
+                        
+                        // 放大寶箱 (近距離看起來要有魄力)
+                        arChest.setAttribute('scale', '4 4 4');
+                        arChest.setAttribute('visible', 'true');
+                        
+                        // 隱藏導航箭頭
+                        arrowContainer.style.display = 'none';
+                        
+                        document.getElementById('status').innerText = "目標就在眼前！";
+                        document.getElementById('debug-log').innerText = "模式: 3D 近距離 (Re-anchored)";
+                    } else {
+                        // 如果已經在近距離模式，我們保持寶箱位置不變
+                        // 這樣使用者可以繞著它走 (True 3D experience)
+                        // 除非距離變得太遠 (>20m)，才重置
+                    }
                 } else {
-                    // === 遠距離模式 ===
-                    document.getElementById('status').innerText = "跟隨箭頭尋找目標";
-                    document.getElementById('debug-log').innerText = "模式: 導航 (Nav)";
+                    if (isNearbyMode && dist > 20) {
+                        // === 切換回遠距離模式 ===
+                        isNearbyMode = false;
+                        
+                        // 恢復到真實 GPS 座標
+                        arChest.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
+                        arChest.setAttribute('scale', '10 10 10'); // 遠處要大一點才看得到
+                        arChest.setAttribute('visible', 'true');
+                        
+                        document.getElementById('status').innerText = "跟隨箭頭尋找目標";
+                        document.getElementById('debug-log').innerText = "模式: 3D 導航 (GPS)";
+                    }
                     
-                    arrowContainer.style.display = 'block';
-                    
-                    // 隱藏 HTML 寶箱
-                    hudChestContainer.style.display = 'none';
-                    
-                    // 顯示 3D GPS 寶箱
-                    gpsTarget.setAttribute('visible', 'true');
-                    
-                    updateArrowRotation();
+                    if (!isNearbyMode) {
+                        arrowContainer.style.display = 'block';
+                        document.getElementById('status').innerText = "跟隨箭頭尋找目標";
+                    }
                 }
             }
 
@@ -235,6 +245,27 @@
                 const targetBearing = calculateBearing(userLat, userLng, targetLat, targetLng);
                 let arrowRotation = targetBearing - userHeading;
                 navArrow.style.transform = `rotate(${arrowRotation}deg)`;
+            }
+
+            // --- 數學計算函式 ---
+
+            // 計算目標點座標 (給定起點、距離、方位角)
+            function calculateDestination(lat, lng, distMeters, bearing) {
+                const R = 6371e3; // 地球半徑 (米)
+                const angularDist = distMeters / R;
+                const radLat = toRadians(lat);
+                const radLng = toRadians(lng);
+                const radBearing = toRadians(bearing);
+
+                const destLat = Math.asin(Math.sin(radLat) * Math.cos(angularDist) + 
+                                        Math.cos(radLat) * Math.sin(angularDist) * Math.cos(radBearing));
+                const destLng = radLng + Math.atan2(Math.sin(radBearing) * Math.sin(angularDist) * Math.cos(radLat), 
+                                                    Math.cos(angularDist) - Math.sin(radLat) * Math.sin(destLat));
+                
+                return {
+                    lat: toDegrees(destLat),
+                    lng: toDegrees(destLng)
+                };
             }
 
             function calculateBearing(startLat, startLng, destLat, destLng) {
