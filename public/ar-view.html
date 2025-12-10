@@ -70,24 +70,37 @@
         <!-- 相機 -->
         <a-camera gps-camera rotation-reader>
             <!-- 
-                導航箭頭 (固定在相機前方)
-                位置: 0 0 -2 (在鏡頭前方 2 米處)
-                初始旋轉: -90 0 0 (平躺指向前方)
+                1. 導航箭頭 (HUD)
+                   改為更簡單的 triangle 幾何，並確保它在極近距離 (z=-1)
+                   shader: flat 確保不受光照影響
             -->
-            <a-cone
+            <a-triangle
                 id="guide-arrow"
-                position="0 -0.5 -2" 
-                rotation="90 0 0"
-                radius-bottom="0.1" 
-                radius-top="0" 
-                height="0.3" 
-                color="#ff0000"
-                material="opacity: 0.8; transparent: true"
+                vertex-a="0 0.15 0"
+                vertex-b="-0.1 -0.15 0"
+                vertex-c="0.1 -0.15 0"
+                position="0 -0.5 -1"
+                material="color: #ff0000; shader: flat; side: double; opacity: 0.9;"
                 visible="false"
-            ></a-cone>
+            ></a-triangle>
+
+            <!-- 
+                2. 近距離寶箱 (強制顯示)
+                   當距離 < 10m 時，我們顯示這個「假」寶箱
+                   它固定在相機前方 (z=-3)，確保用戶一定看得到
+            -->
+            <a-image
+                id="nearby-target"
+                src="#mascot-img"
+                position="0 0 -3"
+                scale="1.5 1.5 1.5"
+                visible="false"
+                animation="property: position; to: 0 0.2 -3; dir: alternate; dur: 1500; loop: true"
+            ></a-image>
         </a-camera>
 
-        <!-- 目標實體將由 JS 動態加入 -->
+        <!-- 3. 遠距離寶箱 (GPS 定位) -->
+        <!-- 將由 JS 動態加入 -->
     </a-scene>
 
     <script>
@@ -109,16 +122,18 @@
         } else {
             const scene = document.querySelector('a-scene');
 
-            // 1. 建立遠處的目標物 (寶箱/吉祥物)
-            const targetEntity = document.createElement('a-image');
-            targetEntity.setAttribute('src', '#mascot-img');
-            targetEntity.setAttribute('scale', '5 5 5');
-            targetEntity.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
-            targetEntity.setAttribute('animation', 'property: position; to: 0 1 0; dir: alternate; dur: 2000; loop: true');
-            scene.appendChild(targetEntity);
+            // 建立遠處的 GPS 目標
+            const gpsTarget = document.createElement('a-image');
+            gpsTarget.setAttribute('id', 'gps-target');
+            gpsTarget.setAttribute('src', '#mascot-img');
+            gpsTarget.setAttribute('scale', '5 5 5');
+            gpsTarget.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
+            gpsTarget.setAttribute('visible', 'true');
+            scene.appendChild(gpsTarget);
 
-            // 2. 處理導航箭頭邏輯
             const guideArrow = document.getElementById('guide-arrow');
+            const nearbyTarget = document.getElementById('nearby-target');
+            
             let userLat = null;
             let userLng = null;
             let userHeading = 0;
@@ -127,59 +142,71 @@
             window.addEventListener('gps-camera-update-position', function(e) {
                 userLat = e.detail.position.latitude;
                 userLng = e.detail.position.longitude;
-                updateArrow();
                 
-                // 計算距離
                 const dist = haversineDistance(userLat, userLng, targetLat, targetLng);
                 document.getElementById('dist-debug').innerText = `距離目標: ${dist.toFixed(0)}m`;
                 
-                if(dist < 20) {
-                    document.getElementById('status').innerText = "目標就在附近！";
-                    guideArrow.setAttribute('color', '#00ff00'); // 靠近變綠色
-                } else {
-                    document.getElementById('status').innerText = "跟隨紅色箭頭尋找目標";
-                    guideArrow.setAttribute('color', '#ff0000');
-                }
+                updateArrowAndTarget(dist);
             });
 
-            // 監聽手機羅盤方向 (DeviceOrientation)
+            // 監聽手機羅盤方向
             window.addEventListener('deviceorientation', function(event) {
-                // alpha: 裝置繞 z 軸旋轉的角度 (0-360)，0 為北方
-                // webkitCompassHeading: iOS 專用
                 if (event.webkitCompassHeading) {
                     userHeading = event.webkitCompassHeading;
                 } else if (event.alpha) {
                     userHeading = 360 - event.alpha;
                 }
-                updateArrow();
+                // 即時更新箭頭旋轉 (即使 GPS 沒更新)
+                if (userLat) {
+                    updateArrowRotation();
+                }
             });
 
-            function updateArrow() {
-                if (userLat === null || userLng === null) {
+            function updateArrowAndTarget(dist) {
+                if(dist < 10) {
+                    // === 近距離模式 ===
+                    document.getElementById('status').innerText = "目標就在眼前！";
+                    
+                    // 1. 隱藏導航箭頭 (已經到了，不需要箭頭)
                     guideArrow.setAttribute('visible', 'false');
-                    return;
+                    
+                    // 2. 顯示「近距離寶箱」 (固定在眼前)
+                    nearbyTarget.setAttribute('visible', 'true');
+                    
+                    // 3. 隱藏「GPS 寶箱」 (避免重複或飄移)
+                    gpsTarget.setAttribute('visible', 'false');
+
+                } else {
+                    // === 遠距離模式 ===
+                    document.getElementById('status').innerText = "跟隨箭頭尋找目標";
+                    
+                    // 1. 顯示導航箭頭
+                    guideArrow.setAttribute('visible', 'true');
+                    guideArrow.setAttribute('material', 'color: #ff0000');
+                    
+                    // 2. 隱藏「近距離寶箱」
+                    nearbyTarget.setAttribute('visible', 'false');
+                    
+                    // 3. 顯示「GPS 寶箱」
+                    gpsTarget.setAttribute('visible', 'true');
+                    
+                    updateArrowRotation();
                 }
+            }
 
-                guideArrow.setAttribute('visible', 'true');
+            function updateArrowRotation() {
+                if (!guideArrow.getAttribute('visible')) return;
 
-                // 1. 計算目標相對於北方的方位角 (Bearing)
                 const targetBearing = calculateBearing(userLat, userLng, targetLat, targetLng);
-
-                // 2. 計算箭頭應該旋轉的角度
-                // 目標方位 - 用戶朝向 = 箭頭應該偏轉的角度
-                // 例如：目標在正北 (0度)，我朝向東 (90度)，箭頭應該往左轉 90 度 (-90) 指向北
+                // 計算相對角度
                 let arrowRotation = targetBearing - userHeading;
                 
-                // A-Frame 的旋轉座標系：Y 軸旋轉
-                // 原始圓錐是平躺的 (rotation="90 0 0")
-                // 我們需要轉動 Z 軸或是修正 Y 軸
-                // 這裡我們直接旋轉整個圓錐的 Z 軸 (因為它已經躺下了)
-                guideArrow.setAttribute('rotation', `90 0 ${-arrowRotation}`);
+                // 旋轉 Z 軸 (因為三角形是平面的，我們讓它像指針一樣轉)
+                // 0度指向上，所以我們要減去旋轉量
+                guideArrow.setAttribute('rotation', `0 0 ${-arrowRotation}`);
             }
 
             // --- 輔助函式 ---
-
-            // 計算方位角 (Bearing)
             function calculateBearing(startLat, startLng, destLat, destLng) {
                 const startLatRad = toRadians(startLat);
                 const startLngRad = toRadians(startLng);
@@ -194,29 +221,21 @@
                 return (brng + 360) % 360;
             }
 
-            // Haversine 距離公式
             function haversineDistance(lat1, lon1, lat2, lon2) {
-                const R = 6371e3; // metres
+                const R = 6371e3; 
                 const φ1 = toRadians(lat1);
                 const φ2 = toRadians(lat2);
                 const Δφ = toRadians(lat2 - lat1);
                 const Δλ = toRadians(lon2 - lon1);
-
                 const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
                         Math.cos(φ1) * Math.cos(φ2) *
                         Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
                 const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
                 return R * c;
             }
 
-            function toRadians(degrees) {
-                return degrees * Math.PI / 180;
-            }
-
-            function toDegrees(radians) {
-                return radians * 180 / Math.PI;
-            }
+            function toRadians(degrees) { return degrees * Math.PI / 180; }
+            function toDegrees(radians) { return radians * 180 / Math.PI; }
         }
     </script>
 </body>
