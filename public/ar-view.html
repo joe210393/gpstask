@@ -23,6 +23,23 @@
             pointer-events: none;
         }
 
+        #start-sensor-btn {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 999;
+            padding: 15px 30px;
+            background: #28a745;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            border: none;
+            border-radius: 50px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            pointer-events: auto;
+            display: none; /* 預設隱藏，需要時才顯示 */
+        }
+
         .info-box {
             position: fixed;
             top: 20px;
@@ -172,6 +189,7 @@
     </div>
 
     <div class="ui-layer">
+        <button id="start-sensor-btn">📲 點擊啟用 AR 感測器</button>
         <div class="info-box">
             <div id="status">啟動相機中...</div>
             <div id="debug-info" style="font-size:0.8em; color:#ffeb3b; margin-top:5px;"></div>
@@ -271,23 +289,52 @@
         const arrow = document.getElementById('guide-arrow');
         const debug = document.getElementById('debug-info');
         const status = document.getElementById('status');
+        const startSensorBtn = document.getElementById('start-sensor-btn');
         
         let userLat = null, userLng = null;
         let deviceHeading = 0;
+        let sensorActive = false;
 
-        if ('geolocation' in navigator) {
-            navigator.geolocation.watchPosition(
-                pos => {
-                    userLat = pos.coords.latitude;
-                    userLng = pos.coords.longitude;
-                    updateAR();
-                },
-                err => status.innerText = "GPS 錯誤: " + err.message,
-                { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
-            );
+        // iOS 13+ 需要使用者互動才能開啟感測器權限
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            startSensorBtn.style.display = 'block';
+            startSensorBtn.onclick = () => {
+                DeviceOrientationEvent.requestPermission()
+                    .then(response => {
+                        if (response === 'granted') {
+                            startSensorBtn.style.display = 'none';
+                            initSensors();
+                        } else {
+                            alert('需要感測器權限才能運作 AR');
+                        }
+                    })
+                    .catch(console.error);
+            };
+        } else {
+            // Android 或舊版 iOS 直接啟動
+            initSensors();
         }
 
-        if (window.DeviceOrientationEvent) {
+        function initSensors() {
+            sensorActive = true;
+            
+            // 啟動 GPS
+            if ('geolocation' in navigator) {
+                navigator.geolocation.watchPosition(
+                    pos => {
+                        userLat = pos.coords.latitude;
+                        userLng = pos.coords.longitude;
+                        updateAR();
+                    },
+                    err => {
+                        status.innerText = "GPS 錯誤: " + err.message;
+                        console.error(err);
+                    },
+                    { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+                );
+            }
+
+            // 啟動羅盤
             window.addEventListener('deviceorientation', event => {
                 if (event.webkitCompassHeading) {
                     deviceHeading = event.webkitCompassHeading;
@@ -298,8 +345,29 @@
             }, true);
         }
 
+        if ('geolocation' in navigator) {
+            // 即使還沒點按鈕，先偷跑 GPS (不涉及 DeviceOrientation)
+            navigator.geolocation.watchPosition(
+                pos => {
+                    userLat = pos.coords.latitude;
+                    userLng = pos.coords.longitude;
+                    // 如果按鈕還在顯示，先只更新狀態文字
+                    if (!sensorActive) {
+                        status.innerText = `GPS 已鎖定 (等待感測器)`;
+                    } else {
+                        updateAR();
+                    }
+                },
+                err => status.innerText = "GPS 定位中...", 
+                { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+            );
+        }
+
         function updateAR() {
-            if (!userLat || !targetLat) return;
+            if (!userLat || !targetLat) {
+                status.innerText = `GPS 定位中... (目標:${targetLat},${targetLng})`;
+                return;
+            }
 
             const dist = haversineDistance(userLat, userLng, targetLat, targetLng);
             const bearing = calculateBearing(userLat, userLng, targetLat, targetLng);
@@ -310,7 +378,8 @@
             while (delta < -180) delta += 360;
             while (delta > 180) delta -= 360;
 
-            debug.innerText = `方位: ${bearing.toFixed(0)}° / 手機: ${deviceHeading.toFixed(0)}°`;
+            debug.innerText = `方位:${bearing.toFixed(0)}° 手機:${deviceHeading.toFixed(0)}° 差:${delta.toFixed(0)}°\nGPS: ${userLat.toFixed(5)}, ${userLng.toFixed(5)}`;
+            // ... 後續邏輯不變 ...
 
             const fov = 30; 
 
