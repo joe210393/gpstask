@@ -51,44 +51,51 @@
 
     <div class="info-box">
         <div id="status">正在定位中...</div>
-        <small id="dist-debug"></small>
+        <div id="dist-debug" style="font-size: 1.2em; font-weight: bold; color: #ffeb3b;"></div>
     </div>
 
     <div class="ui-overlay">
         <button id="backBtn" class="btn">🔙 返回填寫答案</button>
     </div>
 
-    <!-- 
-        vr-mode-ui="enabled: false": 隱藏 VR 按鈕
-        arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;": AR.js 設定
-    -->
     <a-scene
         vr-mode-ui="enabled: false"
         embedded
         arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
     >
-        <!-- 資源預加載 -->
         <a-assets>
             <img id="mascot-img" src="/images/mascot.png">
         </a-assets>
 
-        <!-- 相機與 GPS -->
-        <a-camera gps-camera rotation-reader></a-camera>
+        <!-- 相機 -->
+        <a-camera gps-camera rotation-reader>
+            <!-- 
+                導航箭頭 (固定在相機前方)
+                位置: 0 0 -2 (在鏡頭前方 2 米處)
+                初始旋轉: -90 0 0 (平躺指向前方)
+            -->
+            <a-cone
+                id="guide-arrow"
+                position="0 -0.5 -2" 
+                rotation="90 0 0"
+                radius-bottom="0.1" 
+                radius-top="0" 
+                height="0.3" 
+                color="#ff0000"
+                material="opacity: 0.8; transparent: true"
+                visible="false"
+            ></a-cone>
+        </a-camera>
 
-        <!-- 
-            AR 物件將由 JavaScript 動態加入 
-            我們會放置一個永遠面向用戶的圖片 (Billboard)
-        -->
+        <!-- 目標實體將由 JS 動態加入 -->
     </a-scene>
 
     <script>
-        // 取得網址參數
         const urlParams = new URLSearchParams(window.location.search);
         const targetLat = parseFloat(urlParams.get('lat'));
         const targetLng = parseFloat(urlParams.get('lng'));
         const taskId = urlParams.get('taskId');
 
-        // 返回按鈕功能
         document.getElementById('backBtn').onclick = function() {
             if (taskId) {
                 window.location.href = `/task-detail.html?id=${taskId}`;
@@ -97,32 +104,119 @@
             }
         };
 
-        // 檢查是否有座標
         if (!targetLat || !targetLng) {
             document.getElementById('status').innerText = "錯誤：無效的任務座標";
         } else {
-            // 動態新增 AR 物件
             const scene = document.querySelector('a-scene');
 
-            // 創建一個實體 (Entity)
-            const entity = document.createElement('a-image');
-            entity.setAttribute('src', '#mascot-img');
-            entity.setAttribute('scale', '5 5 5'); // 調整大小
-            entity.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
-            
-            // 添加簡單的動畫 (上下浮動)
-            entity.setAttribute('animation', 'property: position; to: 0 1 0; dir: alternate; dur: 2000; loop: true');
+            // 1. 建立遠處的目標物 (寶箱/吉祥物)
+            const targetEntity = document.createElement('a-image');
+            targetEntity.setAttribute('src', '#mascot-img');
+            targetEntity.setAttribute('scale', '5 5 5');
+            targetEntity.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
+            targetEntity.setAttribute('animation', 'property: position; to: 0 1 0; dir: alternate; dur: 2000; loop: true');
+            scene.appendChild(targetEntity);
 
-            // 加入場景
-            scene.appendChild(entity);
+            // 2. 處理導航箭頭邏輯
+            const guideArrow = document.getElementById('guide-arrow');
+            let userLat = null;
+            let userLng = null;
+            let userHeading = 0;
 
-            document.getElementById('status').innerText = "請轉動手機尋找任務目標！";
-
-            // 監聽距離 (除錯用)
-            entity.addEventListener('gps-entity-place-update-position', (event) => {
-                const distance = event.detail.distance;
-                document.getElementById('dist-debug').innerText = `距離目標: ${distance.toFixed(0)} 公尺`;
+            // 監聽 GPS 更新
+            window.addEventListener('gps-camera-update-position', function(e) {
+                userLat = e.detail.position.latitude;
+                userLng = e.detail.position.longitude;
+                updateArrow();
+                
+                // 計算距離
+                const dist = haversineDistance(userLat, userLng, targetLat, targetLng);
+                document.getElementById('dist-debug').innerText = `距離目標: ${dist.toFixed(0)}m`;
+                
+                if(dist < 20) {
+                    document.getElementById('status').innerText = "目標就在附近！";
+                    guideArrow.setAttribute('color', '#00ff00'); // 靠近變綠色
+                } else {
+                    document.getElementById('status').innerText = "跟隨紅色箭頭尋找目標";
+                    guideArrow.setAttribute('color', '#ff0000');
+                }
             });
+
+            // 監聽手機羅盤方向 (DeviceOrientation)
+            window.addEventListener('deviceorientation', function(event) {
+                // alpha: 裝置繞 z 軸旋轉的角度 (0-360)，0 為北方
+                // webkitCompassHeading: iOS 專用
+                if (event.webkitCompassHeading) {
+                    userHeading = event.webkitCompassHeading;
+                } else if (event.alpha) {
+                    userHeading = 360 - event.alpha;
+                }
+                updateArrow();
+            });
+
+            function updateArrow() {
+                if (userLat === null || userLng === null) {
+                    guideArrow.setAttribute('visible', 'false');
+                    return;
+                }
+
+                guideArrow.setAttribute('visible', 'true');
+
+                // 1. 計算目標相對於北方的方位角 (Bearing)
+                const targetBearing = calculateBearing(userLat, userLng, targetLat, targetLng);
+
+                // 2. 計算箭頭應該旋轉的角度
+                // 目標方位 - 用戶朝向 = 箭頭應該偏轉的角度
+                // 例如：目標在正北 (0度)，我朝向東 (90度)，箭頭應該往左轉 90 度 (-90) 指向北
+                let arrowRotation = targetBearing - userHeading;
+                
+                // A-Frame 的旋轉座標系：Y 軸旋轉
+                // 原始圓錐是平躺的 (rotation="90 0 0")
+                // 我們需要轉動 Z 軸或是修正 Y 軸
+                // 這裡我們直接旋轉整個圓錐的 Z 軸 (因為它已經躺下了)
+                guideArrow.setAttribute('rotation', `90 0 ${-arrowRotation}`);
+            }
+
+            // --- 輔助函式 ---
+
+            // 計算方位角 (Bearing)
+            function calculateBearing(startLat, startLng, destLat, destLng) {
+                const startLatRad = toRadians(startLat);
+                const startLngRad = toRadians(startLng);
+                const destLatRad = toRadians(destLat);
+                const destLngRad = toRadians(destLng);
+
+                const y = Math.sin(destLngRad - startLngRad) * Math.cos(destLatRad);
+                const x = Math.cos(startLatRad) * Math.sin(destLatRad) -
+                        Math.sin(startLatRad) * Math.cos(destLatRad) * Math.cos(destLngRad - startLngRad);
+                let brng = Math.atan2(y, x);
+                brng = toDegrees(brng);
+                return (brng + 360) % 360;
+            }
+
+            // Haversine 距離公式
+            function haversineDistance(lat1, lon1, lat2, lon2) {
+                const R = 6371e3; // metres
+                const φ1 = toRadians(lat1);
+                const φ2 = toRadians(lat2);
+                const Δφ = toRadians(lat2 - lat1);
+                const Δλ = toRadians(lon2 - lon1);
+
+                const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                        Math.cos(φ1) * Math.cos(φ2) *
+                        Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+                return R * c;
+            }
+
+            function toRadians(degrees) {
+                return degrees * Math.PI / 180;
+            }
+
+            function toDegrees(radians) {
+                return radians * 180 / Math.PI;
+            }
         }
     </script>
 </body>
