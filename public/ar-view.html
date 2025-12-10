@@ -116,7 +116,7 @@
     <!-- AR 世界 -->
     <div id="ar-world">
         <!-- 寶箱 -->
-        <div id="chest-obj">
+        <div id="chest-obj" style="cursor: pointer;">
             <img id="chest-img" src="/images/mascot.png" alt="寶箱">
             <div style="color:white; text-align:center; text-shadow:0 2px 2px black; font-weight:bold; margin-top:10px;">點擊開啟!</div>
         </div>
@@ -153,6 +153,16 @@
         document.getElementById('btn-back').onclick = () => {
             if (taskId) window.location.href = `/task-detail.html?id=${taskId}`;
             else window.history.back();
+        };
+
+        // 點擊寶箱事件
+        document.getElementById('chest-obj').onclick = () => {
+            if (taskId) {
+                // 帶上 ar_found=true 參數回到任務頁
+                window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
+            } else {
+                alert("測試模式：寶箱已開啟！");
+            }
         };
 
         // 3. 感測器邏輯
