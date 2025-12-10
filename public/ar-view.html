@@ -2,38 +2,29 @@
 <html>
 <head>
     <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>AR 尋找線索</title>
-    <!-- A-Frame -->
-    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-    <!-- AR.js -->
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
-    
     <style>
-        body { margin: 0; overflow: hidden; font-family: sans-serif; }
-        .ui-overlay {
+        body { margin: 0; overflow: hidden; background: black; font-family: sans-serif; }
+        
+        /* 相機背景 */
+        #camera-feed {
             position: fixed;
-            bottom: 20px;
-            left: 0;
-            width: 100%;
-            text-align: center;
-            z-index: 999;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            object-fit: cover;
+            z-index: 1;
+        }
+
+        /* UI 層 */
+        .ui-layer {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 10;
             pointer-events: none;
         }
-        .btn {
-            background: #007bff;
-            color: white;
-            padding: 12px 24px;
-            border: none;
-            border-radius: 50px;
-            font-size: 16px;
-            font-weight: bold;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-            pointer-events: auto;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-        }
+
         .info-box {
             position: fixed;
             top: 20px;
@@ -44,236 +35,238 @@
             padding: 10px 20px;
             border-radius: 20px;
             text-align: center;
-            z-index: 999;
+            pointer-events: auto;
+        }
+
+        .btn-back {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #007bff;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            pointer-events: auto;
+            cursor: pointer;
+            z-index: 20;
+        }
+
+        /* 虛擬世界層 (用來放寶箱) */
+        #ar-world {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 5;
+            perspective: 800px; /* 3D 透視感 */
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        /* 寶箱物件 */
+        #chest-obj {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 200px; height: 200px;
+            margin-left: -100px; margin-top: -100px;
+            transform-style: preserve-3d;
+            display: none; /* 初始隱藏 */
         }
         
-        #arrow-container {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 900;
-            pointer-events: none;
+        #chest-img {
+            width: 100%; height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 10px 10px rgba(0,0,0,0.5));
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+
+        /* 導航箭頭 (當寶箱在畫面外時顯示) */
+        #guide-arrow {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 60px; height: 60px;
+            margin-left: -30px; margin-top: -30px;
             display: none;
         }
-        #nav-arrow {
-            width: 0; 
-            height: 0; 
-            border-left: 30px solid transparent;
-            border-right: 30px solid transparent;
-            border-bottom: 80px solid rgba(255, 0, 0, 0.8);
-            filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
-            transform-origin: center bottom;
-        }
-        .arrow-text {
-            color: white;
-            font-weight: bold;
-            text-shadow: 1px 1px 2px black;
-            margin-top: 10px;
-            text-align: center;
+        #guide-arrow::after {
+            content: '';
+            display: block;
+            width: 100%; height: 100%;
+            border-top: 10px solid #ff3b30;
+            border-right: 10px solid #ff3b30;
+            transform: rotate(45deg);
+            box-shadow: 2px -2px 2px rgba(0,0,0,0.2);
         }
     </style>
 </head>
-<body style="margin: 0; overflow: hidden;">
+<body>
 
-    <div class="info-box">
-        <div id="status">正在定位中...</div>
-        <div id="dist-debug" style="font-size: 1.2em; font-weight: bold; color: #ffeb3b;"></div>
-        <div id="debug-log" style="font-size: 0.8em; color: #ccc;"></div>
+    <!-- 相機畫面 -->
+    <video id="camera-feed" autoplay playsinline muted></video>
+
+    <!-- AR 世界 -->
+    <div id="ar-world">
+        <!-- 寶箱 -->
+        <div id="chest-obj">
+            <img id="chest-img" src="/images/mascot.png" alt="寶箱">
+            <div style="color:white; text-align:center; text-shadow:0 2px 2px black; font-weight:bold; margin-top:10px;">點擊開啟!</div>
+        </div>
+        <!-- 導航箭頭 -->
+        <div id="guide-arrow"></div>
     </div>
 
-    <div id="arrow-container">
-        <div id="nav-arrow"></div>
-        <div class="arrow-text">目標方向</div>
+    <!-- UI -->
+    <div class="ui-layer">
+        <div class="info-box">
+            <div id="status">啟動相機中...</div>
+            <div id="debug-info" style="font-size:0.8em; color:#ffeb3b; margin-top:5px;"></div>
+        </div>
+        <button id="btn-back" class="btn-back">🔙 返回填寫答案</button>
     </div>
-
-    <div class="ui-overlay">
-        <button id="backBtn" class="btn">🔙 返回填寫答案</button>
-    </div>
-
-    <a-scene
-        vr-mode-ui="enabled: false"
-        embedded
-        arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
-        renderer="logarithmicDepthBuffer: true;" 
-    >
-        
-        <!-- 增加環境光 -->
-        <a-light type="ambient" color="#ffffff" intensity="2"></a-light>
-
-        <a-camera gps-camera rotation-reader>
-            <!-- 
-                保險二：HUD 紅球
-                直接掛在相機上，位置 z=-2 (眼前2米)
-                初始隱藏，近距離模式才打開
-            -->
-            <a-sphere
-                id="hud-sphere"
-                color="red"
-                radius="0.2"
-                position="0 0 -2"
-                material="shader: flat; opacity: 0.8"
-                visible="false"
-                animation="property: position; to: 0 0.1 -2; dir: alternate; dur: 1000; loop: true"
-            ></a-sphere>
-        </a-camera>
-
-        <!-- 
-            保險一：3D 黃方塊 (取代原本的圖片)
-            GPS 定位
-        -->
-        <a-box
-            id="ar-box"
-            color="yellow"
-            scale="2 2 2"
-            material="shader: flat" 
-            visible="false"
-            position="0 0 0" 
-            animation="property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear"
-        ></a-box>
-
-    </a-scene>
 
     <script>
+        // 1. 啟動相機
+        const video = document.getElementById('camera-feed');
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+            .then(stream => {
+                video.srcObject = stream;
+            })
+            .catch(err => {
+                document.getElementById('status').innerText = "無法存取相機: " + err.message;
+            });
+
+        // 2. 取得任務座標
         const urlParams = new URLSearchParams(window.location.search);
         const targetLat = parseFloat(urlParams.get('lat'));
         const targetLng = parseFloat(urlParams.get('lng'));
         const taskId = urlParams.get('taskId');
 
-        document.getElementById('backBtn').onclick = function() {
-            if (taskId) {
-                window.location.href = `/task-detail.html?id=${taskId}`;
-            } else {
-                window.history.back();
-            }
+        document.getElementById('btn-back').onclick = () => {
+            if (taskId) window.location.href = `/task-detail.html?id=${taskId}`;
+            else window.history.back();
         };
 
-        if (!targetLat || !targetLng) {
-            document.getElementById('status').innerText = "錯誤：無效的任務座標";
-        } else {
-            const arBox = document.getElementById('ar-box');
-            const hudSphere = document.getElementById('hud-sphere');
-            const arrowContainer = document.getElementById('arrow-container');
-            const navArrow = document.getElementById('nav-arrow');
-            
-            let userLat = null;
-            let userLng = null;
-            let userHeading = 0;
-            let isNearbyMode = false;
+        // 3. 感測器邏輯
+        const chest = document.getElementById('chest-obj');
+        const arrow = document.getElementById('guide-arrow');
+        const debug = document.getElementById('debug-info');
+        const status = document.getElementById('status');
+        
+        let userLat = null, userLng = null;
+        let deviceHeading = 0; // 手機朝向 (0=北, 90=東)
 
-            // 初始化：把黃方塊放到 GPS 座標
-            arBox.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
+        // 啟動 GPS
+        if ('geolocation' in navigator) {
+            navigator.geolocation.watchPosition(
+                pos => {
+                    userLat = pos.coords.latitude;
+                    userLng = pos.coords.longitude;
+                    updateAR();
+                },
+                err => status.innerText = "GPS 錯誤: " + err.message,
+                { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
+            );
+        }
 
-            window.addEventListener('gps-camera-update-position', function(e) {
-                userLat = e.detail.position.latitude;
-                userLng = e.detail.position.longitude;
-                
-                const dist = haversineDistance(userLat, userLng, targetLat, targetLng);
-                document.getElementById('dist-debug').innerText = `距離目標: ${dist.toFixed(0)}m`;
-                
-                updateARLogic(dist);
-            });
-
-            window.addEventListener('deviceorientation', function(event) {
+        // 啟動羅盤
+        if (window.DeviceOrientationEvent) {
+            window.addEventListener('deviceorientation', event => {
+                // iOS 使用 webkitCompassHeading, Android 使用 alpha (需校正)
                 if (event.webkitCompassHeading) {
-                    userHeading = event.webkitCompassHeading;
+                    deviceHeading = event.webkitCompassHeading;
                 } else if (event.alpha) {
-                    userHeading = 360 - event.alpha;
+                    // 簡易 Android 修正 (實際上 Android 的 alpha 0 並非總是北方，通常需要 getRotationMatrix)
+                    // 但為了簡化，我們先假設 alpha 是相對的，或者使用 absolute 模式
+                    deviceHeading = 360 - event.alpha;
                 }
+                updateAR();
+            }, true);
+        }
+
+        // 核心 AR 運算
+        function updateAR() {
+            if (!userLat || !targetLat) return;
+
+            // 計算距離與方位
+            const dist = haversineDistance(userLat, userLng, targetLat, targetLng);
+            const bearing = calculateBearing(userLat, userLng, targetLat, targetLng);
+            
+            status.innerText = `距離目標: ${dist.toFixed(0)}m`;
+            
+            // 計算「目標方位」與「手機朝向」的角度差 (Delta Angle)
+            // 例如：目標在正北 (0度)，我朝向東 (90度)，差值為 -90度 (目標在我的左邊)
+            let delta = bearing - deviceHeading;
+            // 正規化到 -180 ~ 180
+            while (delta < -180) delta += 360;
+            while (delta > 180) delta -= 360;
+
+            debug.innerText = `方位: ${bearing.toFixed(0)}° / 手機: ${deviceHeading.toFixed(0)}° / 差: ${delta.toFixed(0)}°`;
+
+            // 視野範圍 (FOV) 假設為 60度 (左右各 30度)
+            const fov = 30; 
+
+            if (Math.abs(delta) < fov) {
+                // === 目標在視野內 ===
+                arrow.style.display = 'none';
+                chest.style.display = 'block';
+
+                // 計算螢幕上的水平位置 (CSS transform)
+                // 差 0 度 -> 正中間 (0px)
+                // 差 -30 度 -> 最左邊
+                // 差 +30 度 -> 最右邊
+                // 簡單映射：每 1 度 = 10px 位移 (這可以根據螢幕寬度調整)
+                const screenWidth = window.innerWidth;
+                const xOffset = (delta / fov) * (screenWidth / 2);
                 
-                if (userLat) {
-                    updateArrowRotation();
-                }
-            });
+                // 距離越遠，寶箱越小 (簡單透視)
+                // 5m 內最大 (scale 1.5)，50m 外最小 (scale 0.5)
+                let scale = 1.5 - (Math.min(dist, 50) / 50); 
+                if (scale < 0.5) scale = 0.5;
 
-            function updateARLogic(dist) {
-                if (dist < 15) {
-                    if (!isNearbyMode) {
-                        isNearbyMode = true;
-                        
-                        // 1. 計算前方 3 米座標，把黃方塊移過去
-                        const forwardPosition = calculateDestination(userLat, userLng, 3, userHeading);
-                        arBox.setAttribute('gps-entity-place', `latitude: ${forwardPosition.lat}; longitude: ${forwardPosition.lng};`);
-                        arBox.setAttribute('visible', 'true');
-                        
-                        // 2. 顯示 HUD 紅球 (雙重保險)
-                        hudSphere.setAttribute('visible', 'true');
-                        
-                        // 隱藏導航箭頭
-                        arrowContainer.style.display = 'none';
-                        
-                        document.getElementById('status').innerText = "目標就在眼前！";
-                        document.getElementById('debug-log').innerText = "模式: 3D測試 (黃方塊 + 紅球)";
-                    }
-                } else {
-                    if (isNearbyMode && dist > 20) {
-                        isNearbyMode = false;
-                        
-                        // 恢復遠距離模式
-                        arBox.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
-                        arBox.setAttribute('visible', 'true'); // 遠處也顯示黃方塊
-                        hudSphere.setAttribute('visible', 'false');
-                        
-                        document.getElementById('status').innerText = "跟隨箭頭尋找目標";
-                        document.getElementById('debug-log').innerText = "模式: 3D導航";
-                    }
-                    
-                    if (!isNearbyMode) {
-                        arrowContainer.style.display = 'block';
-                        document.getElementById('status').innerText = "跟隨箭頭尋找目標";
-                    }
-                }
+                chest.style.transform = `translate(${xOffset}px, 0) scale(${scale})`;
+
+            } else {
+                // === 目標在視野外 ===
+                chest.style.display = 'none';
+                arrow.style.display = 'block';
+                
+                // 旋轉箭頭指向目標
+                // 如果 delta 是負的 (目標在左)，箭頭指左 (-90度)
+                // 如果 delta 是正的 (目標在右)，箭頭指右 (90度)
+                // 這裡我們做一個平滑旋轉
+                arrow.style.transform = `rotate(${delta}deg) translate(0, -100px)`; // 往該方向偏移
             }
+        }
 
-            function updateArrowRotation() {
-                if (arrowContainer.style.display === 'none') return;
-                const targetBearing = calculateBearing(userLat, userLng, targetLat, targetLng);
-                let arrowRotation = targetBearing - userHeading;
-                navArrow.style.transform = `rotate(${arrowRotation}deg)`;
-            }
+        // --- 數學工具 ---
+        function haversineDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const φ1 = lat1 * Math.PI/180;
+            const φ2 = lat2 * Math.PI/180;
+            const Δφ = (lat2-lat1) * Math.PI/180;
+            const Δλ = (lon2-lon1) * Math.PI/180;
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                    Math.cos(φ1) * Math.cos(φ2) *
+                    Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
 
-            // --- 數學計算函式 ---
-            function calculateDestination(lat, lng, distMeters, bearing) {
-                const R = 6371e3;
-                const angularDist = distMeters / R;
-                const radLat = toRadians(lat);
-                const radLng = toRadians(lng);
-                const radBearing = toRadians(bearing);
-                const destLat = Math.asin(Math.sin(radLat) * Math.cos(angularDist) + 
-                                        Math.cos(radLat) * Math.sin(angularDist) * Math.cos(radBearing));
-                const destLng = radLng + Math.atan2(Math.sin(radBearing) * Math.sin(angularDist) * Math.cos(radLat), 
-                                                    Math.cos(angularDist) - Math.sin(radLat) * Math.sin(destLat));
-                return { lat: toDegrees(destLat), lng: toDegrees(destLng) };
-            }
-
-            function calculateBearing(startLat, startLng, destLat, destLng) {
-                const startLatRad = toRadians(startLat);
-                const startLngRad = toRadians(startLng);
-                const destLatRad = toRadians(destLat);
-                const destLngRad = toRadians(destLng);
-                const y = Math.sin(destLngRad - startLngRad) * Math.cos(destLatRad);
-                const x = Math.cos(startLatRad) * Math.sin(destLatRad) -
-                        Math.sin(startLatRad) * Math.cos(destLatRad) * Math.cos(destLngRad - startLngRad);
-                let brng = Math.atan2(y, x);
-                brng = toDegrees(brng);
-                return (brng + 360) % 360;
-            }
-
-            function haversineDistance(lat1, lon1, lat2, lon2) {
-                const R = 6371e3; 
-                const φ1 = toRadians(lat1);
-                const φ2 = toRadians(lat2);
-                const Δφ = toRadians(lat2 - lat1);
-                const Δλ = toRadians(lon2 - lon1);
-                const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-                        Math.cos(φ1) * Math.cos(φ2) *
-                        Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                return R * c;
-            }
-
-            function toRadians(degrees) { return degrees * Math.PI / 180; }
-            function toDegrees(radians) { return radians * 180 / Math.PI; }
+        function calculateBearing(startLat, startLng, destLat, destLng) {
+            const y = Math.sin((destLng-startLng) * Math.PI/180) * Math.cos(destLat * Math.PI/180);
+            const x = Math.cos(startLat * Math.PI/180) * Math.sin(destLat * Math.PI/180) -
+                    Math.sin(startLat * Math.PI/180) * Math.cos(destLat * Math.PI/180) * Math.cos((destLng-startLng) * Math.PI/180);
+            const brng = Math.atan2(y, x) * 180 / Math.PI;
+            return (brng + 360) % 360;
         }
     </script>
 </body>
