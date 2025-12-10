@@ -110,17 +110,98 @@
             animation: float 3s ease-in-out infinite;
         }
 
-        /* YouTube 影片框 */
+        /* YouTube 影片框 - 電視外觀 */
         #video-frame {
-            width: 200px; height: 150px;
-            border: 4px solid #fff;
-            border-radius: 10px;
-            box-shadow: 0 0 20px rgba(0, 123, 255, 0.8);
-            background: black;
+            width: 240px; height: 160px;
+            background: #000;
+            border: 12px solid #222; /* 電視黑邊框 */
+            border-bottom-width: 25px; /* 下巴加厚 */
+            border-radius: 8px;
+            box-shadow: 
+                0 0 0 2px #444, /* 細微反光邊緣 */
+                0 10px 20px rgba(0,0,0,0.6), /* 懸浮陰影 */
+                inset 0 0 20px rgba(0,0,0,0.8); /* 螢幕內凹感 */
             display: none;
             animation: float 3s ease-in-out infinite;
+            position: relative;
         }
-        
+
+        /* 電視品牌 Logo 模擬 */
+        #video-frame::after {
+            content: 'GPS TASK';
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #555;
+            font-size: 8px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            pointer-events: none;
+        }
+
+        /* 電視電源燈 */
+        #video-frame::before {
+            content: '';
+            position: absolute;
+            bottom: -16px;
+            right: 15px;
+            width: 4px; height: 4px;
+            background: #0f0;
+            border-radius: 50%;
+            box-shadow: 0 0 4px #0f0;
+            pointer-events: none;
+        }
+
+        /* 放大檢視 Modal */
+        #ar-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            padding: 20px;
+        }
+        #ar-modal .modal-content {
+            background: rgba(30,30,30,0.95);
+            border-radius: 16px;
+            padding: 20px;
+            max-width: 90vw;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+            border: 1px solid #444;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        #ar-modal img, #ar-modal iframe {
+            max-width: 100%;
+            max-height: 50vh;
+            border-radius: 8px;
+        }
+        #ar-modal .modal-actions {
+            display: flex;
+            gap: 15px;
+            width: 100%;
+            justify-content: center;
+        }
+        #ar-modal button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        #ar-modal button:active { transform: scale(0.95); }
+        .btn-close { background: #6c757d; color: white; }
+        .btn-reply { background: #28a745; color: white; box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4); }
+
         /* 只有圖片時，讓它居中 */
         #chest-obj.only-image .ar-content-row {
             justify-content: center;
@@ -182,10 +263,23 @@
                 </div>
             </div>
 
-            <div id="tap-hint" style="color:white; text-align:center; text-shadow:0 2px 2px black; font-weight:bold; margin-top:10px;">點擊領取獎勵!</div>
+            <div id="tap-hint" style="color:white; text-align:center; text-shadow:0 2px 2px black; font-weight:bold; margin-top:10px;">點擊查看詳情</div>
         </div>
         
         <div id="guide-arrow"></div>
+    </div>
+
+    <!-- 放大檢視 Modal -->
+    <div id="ar-modal">
+        <div class="modal-content">
+            <div id="modal-body" style="display:flex; flex-direction:column; gap:10px; align-items:center; width:100%;">
+                <!-- 內容動態插入 -->
+            </div>
+            <div class="modal-actions">
+                <button class="btn-close" id="modal-close">關閉</button>
+                <button class="btn-reply" id="modal-submit">✍️ 點擊回覆問題</button>
+            </div>
+        </div>
     </div>
 
     <div class="ui-layer">
@@ -280,15 +374,6 @@
             else window.history.back();
         };
 
-        // 點擊事件 (無論是影片還是圖片，點擊外框都算完成)
-        document.getElementById('chest-obj').onclick = () => {
-            if (taskId) {
-                window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
-            } else {
-                alert("測試模式：目標已找到！");
-            }
-        };
-
         // 3. 感測器與 AR 邏輯
         const chest = document.getElementById('chest-obj');
         const arrow = document.getElementById('guide-arrow');
@@ -296,11 +381,58 @@
         const status = document.getElementById('status');
         const startOverlay = document.getElementById('start-overlay');
         const startBtn = document.getElementById('start-btn');
+        const arModal = document.getElementById('ar-modal');
+        const modalBody = document.getElementById('modal-body');
+        const modalClose = document.getElementById('modal-close');
+        const modalSubmit = document.getElementById('modal-submit');
         
         let userLat = null, userLng = null;
         let deviceHeading = 0;
 
-        // 點擊「開始搜尋」按鈕
+        // 點擊事件：開啟放大檢視
+        document.getElementById('chest-obj').onclick = () => {
+            const chestImg = document.getElementById('chest-img');
+            const videoFrame = document.getElementById('video-frame');
+            const ytPlayer = document.getElementById('yt-player');
+
+            modalBody.innerHTML = ''; // 清空舊內容
+
+            // 如果有圖片，複製進 Modal
+            if (chestImg.style.display !== 'none') {
+                const img = document.createElement('img');
+                img.src = chestImg.src;
+                modalBody.appendChild(img);
+            }
+
+            // 如果有影片，複製進 Modal
+            if (videoFrame.style.display !== 'none') {
+                const iframe = document.createElement('iframe');
+                iframe.src = ytPlayer.src;
+                iframe.style.width = '100%';
+                iframe.style.height = '200px'; // Modal 內的高度
+                iframe.style.border = 'none';
+                iframe.allow = 'autoplay; encrypted-media';
+                iframe.allowFullscreen = true;
+                modalBody.appendChild(iframe);
+            }
+
+            arModal.style.display = 'flex';
+        };
+
+        // Modal 關閉
+        modalClose.onclick = () => {
+            arModal.style.display = 'none';
+            modalBody.innerHTML = ''; // 清空以停止影片播放
+        };
+
+        // Modal 回覆問題
+        modalSubmit.onclick = () => {
+            if (taskId) {
+                window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
+            } else {
+                alert("測試模式：目標已找到！");
+            }
+        };
         startBtn.onclick = async () => {
             // 1. 請求感測器權限 (iOS 13+)
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
