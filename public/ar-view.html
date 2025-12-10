@@ -388,6 +388,9 @@
         
         let userLat = null, userLng = null;
         let deviceHeading = 0;
+        let lastHeading = 0; // 平滑化用：上一次的角度
+        let smoothedHeading = 0; // 平滑化用：計算後的角度
+        let isObjectVisible = false; // 磁滯鎖定用：目前物體是否可見
 
         // 點擊事件：開啟放大檢視
         document.getElementById('chest-obj').onclick = () => {
@@ -479,11 +482,27 @@
 
             // 啟動羅盤
             window.addEventListener('deviceorientation', event => {
+                let currentHeading = 0;
                 if (event.webkitCompassHeading) {
-                    deviceHeading = event.webkitCompassHeading;
+                    currentHeading = event.webkitCompassHeading;
                 } else if (event.alpha) {
-                    deviceHeading = 360 - event.alpha;
+                    currentHeading = 360 - event.alpha;
                 }
+                
+                // === 羅盤平滑化 (Weighted Smoothing) ===
+                // 處理 0/360 度交界問題 (例如 359 -> 1 度)
+                let diff = currentHeading - lastHeading;
+                if (diff > 180) diff -= 360;
+                if (diff < -180) diff += 360;
+                
+                // alpha 係數：越小越平滑但反應越慢，越大越靈敏但越抖
+                // 0.15 是一個不錯的平衡點
+                const alpha = 0.15; 
+                lastHeading += diff * alpha;
+                
+                // 正規化回 0-360
+                deviceHeading = (lastHeading + 360) % 360;
+                
                 updateAR();
             }, true);
         }
@@ -508,14 +527,20 @@
             debug.innerText = `方位:${bearing.toFixed(0)}° 手機:${deviceHeading.toFixed(0)}° 差:${delta.toFixed(0)}°\nGPS: ${userLat.toFixed(5)}, ${userLng.toFixed(5)}`;
             // ... 後續邏輯不變 ...
 
-            const fov = 30; 
+            // === 視角磁滯鎖定 (Hysteresis) ===
+            // 如果已經看見，則放寬視野 (50度)；如果沒看見，則收緊視野 (30度)
+            const fov = isObjectVisible ? 50 : 30; 
 
             if (Math.abs(delta) < fov) {
-                arrow.style.display = 'none';
-                chest.style.display = 'block';
+                // 進入視野
+                if (!isObjectVisible) {
+                    isObjectVisible = true;
+                    arrow.style.display = 'none';
+                    chest.style.display = 'block';
+                }
 
                 const screenWidth = window.innerWidth;
-                const xOffset = (delta / fov) * (screenWidth / 2);
+                const xOffset = (delta / 40) * (screenWidth / 2); // 分母固定為 40，避免移動速度隨 fov 改變
                 
                 // 距離縮放
                 let scale = 1.2 - (Math.min(dist, 50) / 60); 
@@ -524,8 +549,13 @@
                 chest.style.transform = `translate(${xOffset}px, 0) scale(${scale})`;
 
             } else {
-                chest.style.display = 'none';
-                arrow.style.display = 'block';
+                // 離開視野
+                if (isObjectVisible) {
+                    isObjectVisible = false;
+                    chest.style.display = 'none';
+                    arrow.style.display = 'block';
+                }
+                
                 arrow.style.transform = `rotate(${delta}deg) translate(0, -100px)`; 
             }
         }
