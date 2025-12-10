@@ -11,6 +11,11 @@ const API_BASE = '';
 let locationPermissionGranted = false;
 let locationPermissionDenied = false;
 
+// 防抖動變數
+let lastUserLat = 0;
+let lastUserLng = 0;
+const MIN_UPDATE_DISTANCE = 0.003; // 最小更新距離 (約 3 公尺)，小於此距離不更新地圖，防止閃爍
+
 // 地理位置權限處理
 function requestLocationPermission() {
   return new Promise((resolve, reject) => {
@@ -681,38 +686,50 @@ function watchPosition() {
   navigator.geolocation.watchPosition(
     pos => {
       const { latitude, longitude } = pos.coords;
-      userLatLng = { lat: latitude, lng: longitude };
+      
+      // === 防抖動處理 ===
+      // 計算與上一次位置的距離
+      const moveDist = haversineDistance(lastUserLat, lastUserLng, latitude, longitude);
+      
+      // 只有當移動距離超過 MIN_UPDATE_DISTANCE (3公尺) 時才更新地圖上的 Marker
+      if (moveDist > MIN_UPDATE_DISTANCE) {
+          lastUserLat = latitude;
+          lastUserLng = longitude;
+          
+          userLatLng = { lat: latitude, lng: longitude };
 
-      // 更新用戶位置標記
-      if (!userMarker) {
-        userMarker = L.marker([latitude, longitude], {
-          icon: L.icon({
-            iconUrl: '/images/red-arrow.svg',
-            iconSize: [64, 64],
-            iconAnchor: [32, 32]
-          })
-        }).addTo(map);
-        // 首次設置用戶位置時，將地圖中心點設置為用戶位置
-        map.setView([latitude, longitude], map.getZoom());
-      } else {
-        userMarker.setLatLng([latitude, longitude]);
-        // 更新位置時，將地圖中心點設置為用戶位置
-        map.setView([latitude, longitude], map.getZoom());
+          // 更新用戶位置標記
+          if (!userMarker) {
+            userMarker = L.marker([latitude, longitude], {
+              icon: L.icon({
+                iconUrl: '/images/red-arrow.svg',
+                iconSize: [64, 64],
+                iconAnchor: [32, 32]
+              })
+            }).addTo(map);
+            // 首次設置用戶位置時，將地圖中心點設置為用戶位置
+            map.setView([latitude, longitude], map.getZoom());
+          } else {
+            userMarker.setLatLng([latitude, longitude]);
+            // 注意：我們不再每次都強制 setView，這樣用戶拖動地圖時不會一直被拉回去
+            // 只有當偏離太遠時才拉回 (可選)
+            // map.setView([latitude, longitude], map.getZoom()); 
+          }
+
+          // 啟用距離顯示並更新所有任務距離
+          if (!distanceDisplayEnabled) {
+            distanceDisplayEnabled = true;
+            addDistanceControls();
+          }
+
+          // 更新所有任務的距離顯示
+          tasksList.forEach(task => {
+            updateTaskDistance(task);
+          });
+
+          // 檢查任務 proximity
+          checkProximity(latitude, longitude);
       }
-
-      // 啟用距離顯示並更新所有任務距離
-      if (!distanceDisplayEnabled) {
-        distanceDisplayEnabled = true;
-        addDistanceControls();
-      }
-
-      // 更新所有任務的距離顯示
-      tasksList.forEach(task => {
-        updateTaskDistance(task);
-      });
-
-      // 檢查任務 proximity
-      checkProximity(latitude, longitude);
     },
     err => handleGeoError(err),
     { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
@@ -727,7 +744,8 @@ function handleGeoError(err) {
     case 3: msg = '定位超時，請重新整理'; break;
     default: msg = '定位發生未知錯誤';
   }
-  alert(msg);
+  // alert(msg); // 減少干擾，只在控制台輸出
+  console.warn(msg);
 }
 
 function checkProximity(userLat, userLng) {
