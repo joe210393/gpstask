@@ -17,7 +17,7 @@
             width: 100%;
             text-align: center;
             z-index: 999;
-            pointer-events: none; /* 讓點擊穿透到 AR 場景 */
+            pointer-events: none;
         }
         .btn {
             background: #007bff;
@@ -28,7 +28,7 @@
             font-size: 16px;
             font-weight: bold;
             box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-            pointer-events: auto; /* 恢復按鈕點擊 */
+            pointer-events: auto;
             cursor: pointer;
             text-decoration: none;
             display: inline-block;
@@ -45,6 +45,33 @@
             text-align: center;
             z-index: 999;
         }
+        
+        /* 2D 導航箭頭樣式 */
+        #arrow-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 900;
+            pointer-events: none;
+            display: none; /* 預設隱藏 */
+        }
+        #nav-arrow {
+            width: 0; 
+            height: 0; 
+            border-left: 30px solid transparent;
+            border-right: 30px solid transparent;
+            border-bottom: 80px solid rgba(255, 0, 0, 0.8);
+            filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
+            transform-origin: center bottom; /* 以底部中心為旋轉軸 */
+        }
+        .arrow-text {
+            color: white;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px black;
+            margin-top: 10px;
+            text-align: center;
+        }
     </style>
 </head>
 <body style="margin: 0; overflow: hidden;">
@@ -52,6 +79,13 @@
     <div class="info-box">
         <div id="status">正在定位中...</div>
         <div id="dist-debug" style="font-size: 1.2em; font-weight: bold; color: #ffeb3b;"></div>
+        <div id="debug-log" style="font-size: 0.8em; color: #ccc;"></div>
+    </div>
+
+    <!-- 2D 導航箭頭 -->
+    <div id="arrow-container">
+        <div id="nav-arrow"></div>
+        <div class="arrow-text">目標方向</div>
     </div>
 
     <div class="ui-overlay">
@@ -67,39 +101,25 @@
             <img id="mascot-img" src="/images/mascot.png">
         </a-assets>
 
-        <!-- 相機 -->
         <a-camera gps-camera rotation-reader>
             <!-- 
-                1. 導航箭頭 (HUD)
-                   改為更簡單的 triangle 幾何，並確保它在極近距離 (z=-1)
-                   shader: flat 確保不受光照影響
-            -->
-            <a-triangle
-                id="guide-arrow"
-                vertex-a="0 0.15 0"
-                vertex-b="-0.1 -0.15 0"
-                vertex-c="0.1 -0.15 0"
-                position="0 -0.5 -1"
-                material="color: #ff0000; shader: flat; side: double; opacity: 0.9;"
-                visible="false"
-            ></a-triangle>
-
-            <!-- 
-                2. 近距離寶箱 (強制顯示)
-                   當距離 < 10m 時，我們顯示這個「假」寶箱
-                   它固定在相機前方 (z=-3)，確保用戶一定看得到
+                近距離寶箱 (強制顯示)
+                加大尺寸 scale="3 3 3"
+                使用 shader: flat 確保不受光照影響 (永遠全亮)
+                位置 z=-4 (前方4米), y=0 (視線高度)
             -->
             <a-image
                 id="nearby-target"
                 src="#mascot-img"
-                position="0 0 -3"
-                scale="1.5 1.5 1.5"
+                position="0 0 -4"
+                scale="3 3 3"
                 visible="false"
-                animation="property: position; to: 0 0.2 -3; dir: alternate; dur: 1500; loop: true"
+                material="shader: flat; opacity: 1;"
+                animation="property: position; to: 0 0.2 -4; dir: alternate; dur: 1500; loop: true"
             ></a-image>
         </a-camera>
 
-        <!-- 3. 遠距離寶箱 (GPS 定位) -->
+        <!-- 遠處 GPS 寶箱 -->
         <!-- 將由 JS 動態加入 -->
     </a-scene>
 
@@ -126,12 +146,14 @@
             const gpsTarget = document.createElement('a-image');
             gpsTarget.setAttribute('id', 'gps-target');
             gpsTarget.setAttribute('src', '#mascot-img');
-            gpsTarget.setAttribute('scale', '5 5 5');
+            gpsTarget.setAttribute('scale', '8 8 8'); // 遠處的要更大
             gpsTarget.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
+            gpsTarget.setAttribute('material', 'shader: flat; opacity: 1;'); // 確保可見
             gpsTarget.setAttribute('visible', 'true');
             scene.appendChild(gpsTarget);
 
-            const guideArrow = document.getElementById('guide-arrow');
+            const arrowContainer = document.getElementById('arrow-container');
+            const navArrow = document.getElementById('nav-arrow');
             const nearbyTarget = document.getElementById('nearby-target');
             
             let userLat = null;
@@ -156,38 +178,36 @@
                 } else if (event.alpha) {
                     userHeading = 360 - event.alpha;
                 }
-                // 即時更新箭頭旋轉 (即使 GPS 沒更新)
+                
                 if (userLat) {
                     updateArrowRotation();
                 }
             });
 
             function updateArrowAndTarget(dist) {
-                if(dist < 10) {
+                // 放寬距離限制到 15 公尺，讓寶箱更容易出現
+                if(dist < 15) {
                     // === 近距離模式 ===
                     document.getElementById('status').innerText = "目標就在眼前！";
+                    document.getElementById('debug-log').innerText = "模式: 近距離 (Nearby)";
                     
-                    // 1. 隱藏導航箭頭 (已經到了，不需要箭頭)
-                    guideArrow.setAttribute('visible', 'false');
+                    // 隱藏 2D 箭頭
+                    arrowContainer.style.display = 'none';
                     
-                    // 2. 顯示「近距離寶箱」 (固定在眼前)
+                    // 顯示近距離寶箱
                     nearbyTarget.setAttribute('visible', 'true');
-                    
-                    // 3. 隱藏「GPS 寶箱」 (避免重複或飄移)
                     gpsTarget.setAttribute('visible', 'false');
 
                 } else {
                     // === 遠距離模式 ===
                     document.getElementById('status').innerText = "跟隨箭頭尋找目標";
+                    document.getElementById('debug-log').innerText = "模式: 導航 (Nav)";
                     
-                    // 1. 顯示導航箭頭
-                    guideArrow.setAttribute('visible', 'true');
-                    guideArrow.setAttribute('material', 'color: #ff0000');
+                    // 顯示 2D 箭頭
+                    arrowContainer.style.display = 'block';
                     
-                    // 2. 隱藏「近距離寶箱」
+                    // 隱藏近距離寶箱
                     nearbyTarget.setAttribute('visible', 'false');
-                    
-                    // 3. 顯示「GPS 寶箱」
                     gpsTarget.setAttribute('visible', 'true');
                     
                     updateArrowRotation();
@@ -195,15 +215,14 @@
             }
 
             function updateArrowRotation() {
-                if (!guideArrow.getAttribute('visible')) return;
+                if (arrowContainer.style.display === 'none') return;
 
                 const targetBearing = calculateBearing(userLat, userLng, targetLat, targetLng);
                 // 計算相對角度
                 let arrowRotation = targetBearing - userHeading;
                 
-                // 旋轉 Z 軸 (因為三角形是平面的，我們讓它像指針一樣轉)
-                // 0度指向上，所以我們要減去旋轉量
-                guideArrow.setAttribute('rotation', `0 0 ${-arrowRotation}`);
+                // 旋轉 2D 箭頭
+                navArrow.style.transform = `rotate(${arrowRotation}deg)`;
             }
 
             // --- 輔助函式 ---
