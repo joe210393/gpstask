@@ -125,65 +125,6 @@
             border: none;
         }
 
-        /* 放大檢視 Modal */
-        #ar-modal {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.8);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 20;
-            padding: 20px;
-        }
-        #ar-modal .modal-content {
-            background: rgba(20,20,20,0.9);
-            border-radius: 12px;
-            padding: 16px;
-            max-width: 90vw;
-            max-height: 90vh;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            align-items: center;
-        }
-        #ar-modal .modal-body {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-        #ar-modal img,
-        #ar-modal iframe {
-            max-width: 400px;
-            max-height: 260px;
-            border-radius: 10px;
-            box-shadow: 0 6px 18px rgba(0,0,0,0.4);
-        }
-        #ar-modal .modal-actions {
-            display: flex;
-            gap: 10px;
-            width: 100%;
-            justify-content: center;
-        }
-        #ar-modal button {
-            padding: 10px 16px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-        #ar-modal .btn-primary {
-            background: #007bff;
-            color: white;
-        }
-        #ar-modal .btn-secondary {
-            background: #6c757d;
-            color: white;
-        }
-
         @keyframes float {
             0%, 100% { transform: translateY(0); }
             50% { transform: translateY(-20px); }
@@ -228,22 +169,6 @@
         </div>
         
         <div id="guide-arrow"></div>
-    </div>
-
-    <!-- 放大檢視 Modal -->
-    <div id="ar-modal">
-        <div class="modal-content">
-            <div class="modal-body">
-                <img id="modal-image" src="" alt="AR 圖片" style="display:none;">
-                <div id="modal-video-frame" style="display:none;">
-                    <iframe id="modal-yt" src="" allow="autoplay; encrypted-media" allowfullscreen></iframe>
-                </div>
-            </div>
-            <div class="modal-actions">
-                <button class="btn-secondary" id="modal-close">關閉</button>
-                <button class="btn-primary" id="modal-submit">點擊回覆答案</button>
-            </div>
-        </div>
     </div>
 
     <div class="ui-layer">
@@ -332,40 +257,8 @@
             else window.history.back();
         };
 
-        // 點擊事件：開啟放大檢視 (不直接跳轉)
+        // 點擊事件 (無論是影片還是圖片，點擊外框都算完成)
         document.getElementById('chest-obj').onclick = () => {
-            const chestImg = document.getElementById('chest-img');
-            const videoFrame = document.getElementById('video-frame');
-
-            modalHasImage = chestImg.style.display !== 'none';
-            modalHasVideo = videoFrame.style.display !== 'none';
-
-            if (modalHasImage) {
-                modalImg.src = chestImg.src;
-                modalImg.style.display = 'block';
-            } else {
-                modalImg.style.display = 'none';
-            }
-
-            if (modalHasVideo) {
-                modalVideoFrame.style.display = 'block';
-                modalYt.src = document.getElementById('yt-player').src;
-            } else {
-                modalVideoFrame.style.display = 'none';
-                modalYt.src = '';
-            }
-
-            arModal.style.display = 'flex';
-        };
-
-        // Modal 按鈕：關閉
-        modalClose.onclick = () => {
-            arModal.style.display = 'none';
-            modalYt.src = ''; // 停止播放
-        };
-
-        // Modal 按鈕：點擊回覆答案 -> 回任務頁
-        modalSubmit.onclick = () => {
             if (taskId) {
                 window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
             } else {
@@ -378,15 +271,6 @@
         const arrow = document.getElementById('guide-arrow');
         const debug = document.getElementById('debug-info');
         const status = document.getElementById('status');
-        // Modal 元件
-        const arModal = document.getElementById('ar-modal');
-        const modalImg = document.getElementById('modal-image');
-        const modalVideoFrame = document.getElementById('modal-video-frame');
-        const modalYt = document.getElementById('modal-yt');
-        const modalClose = document.getElementById('modal-close');
-        const modalSubmit = document.getElementById('modal-submit');
-        let modalHasImage = false;
-        let modalHasVideo = false;
         
         let userLat = null, userLng = null;
         let deviceHeading = 0;
