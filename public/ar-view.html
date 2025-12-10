@@ -189,9 +189,17 @@
     </div>
 
     <div class="ui-layer">
-        <button id="start-sensor-btn">📲 點擊啟用 AR 感測器</button>
+        <!-- 啟動蓋板 -->
+        <div id="start-overlay" style="position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:2000; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white;">
+            <div style="font-size:1.5rem; font-weight:bold; margin-bottom:20px; text-align:center;">準備好了嗎？</div>
+            <div style="margin-bottom:30px; color:#ccc; text-align:center; max-width:80%;">需要您的相機與方向感測器權限<br>以進行 AR 導航</div>
+            <button id="start-btn" style="padding:15px 40px; font-size:1.2rem; background:#007bff; color:white; border:none; border-radius:50px; font-weight:bold; box-shadow:0 0 20px rgba(0,123,255,0.5);">
+                🚀 開始搜尋
+            </button>
+        </div>
+
         <div class="info-box">
-            <div id="status">啟動相機中...</div>
+            <div id="status">等待啟動...</div>
             <div id="debug-info" style="font-size:0.8em; color:#ffeb3b; margin-top:5px;"></div>
         </div>
         <button id="btn-back" class="btn-back">🔙 返回填寫答案</button>
@@ -199,13 +207,10 @@
 
     <script>
         const API_BASE = ''; // 本地用空字串
-
-        // 1. 啟動相機
         const video = document.getElementById('camera-feed');
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-            .then(stream => { video.srcObject = stream; })
-            .catch(err => { document.getElementById('status').innerText = "相機錯誤: " + err.message; });
-
+        
+        // 移除自動啟動相機，改為在 startBtn.onclick 中啟動
+        
         // 2. 取得任務資訊
         const urlParams = new URLSearchParams(window.location.search);
         // 注意：這裡我們主要依賴 API 回傳的座標，但如果網址有傳 lat/lng 也會先用
@@ -289,35 +294,42 @@
         const arrow = document.getElementById('guide-arrow');
         const debug = document.getElementById('debug-info');
         const status = document.getElementById('status');
-        const startSensorBtn = document.getElementById('start-sensor-btn');
+        const startOverlay = document.getElementById('start-overlay');
+        const startBtn = document.getElementById('start-btn');
         
         let userLat = null, userLng = null;
         let deviceHeading = 0;
-        let sensorActive = false;
 
-        // iOS 13+ 需要使用者互動才能開啟感測器權限
-        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-            startSensorBtn.style.display = 'block';
-            startSensorBtn.onclick = () => {
-                DeviceOrientationEvent.requestPermission()
-                    .then(response => {
-                        if (response === 'granted') {
-                            startSensorBtn.style.display = 'none';
-                            initSensors();
-                        } else {
-                            alert('需要感測器權限才能運作 AR');
-                        }
-                    })
-                    .catch(console.error);
-            };
-        } else {
-            // Android 或舊版 iOS 直接啟動
+        // 點擊「開始搜尋」按鈕
+        startBtn.onclick = async () => {
+            // 1. 請求感測器權限 (iOS 13+)
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                try {
+                    const permission = await DeviceOrientationEvent.requestPermission();
+                    if (permission !== 'granted') {
+                        alert('需要感測器權限才能顯示導航箭頭');
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+
+            // 2. 啟動相機
+            startCamera();
+
+            // 3. 隱藏蓋板
+            startOverlay.style.display = 'none';
             initSensors();
+        };
+
+        function startCamera() {
+            status.innerText = '啟動相機中...';
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                .then(stream => { video.srcObject = stream; })
+                .catch(err => { document.getElementById('status').innerText = "相機錯誤: " + err.message; });
         }
 
         function initSensors() {
-            sensorActive = true;
-            
             // 啟動 GPS
             if ('geolocation' in navigator) {
                 navigator.geolocation.watchPosition(
@@ -328,7 +340,6 @@
                     },
                     err => {
                         status.innerText = "GPS 錯誤: " + err.message;
-                        console.error(err);
                     },
                     { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
                 );
@@ -345,23 +356,7 @@
             }, true);
         }
 
-        if ('geolocation' in navigator) {
-            // 即使還沒點按鈕，先偷跑 GPS (不涉及 DeviceOrientation)
-            navigator.geolocation.watchPosition(
-                pos => {
-                    userLat = pos.coords.latitude;
-                    userLng = pos.coords.longitude;
-                    // 如果按鈕還在顯示，先只更新狀態文字
-                    if (!sensorActive) {
-                        status.innerText = `GPS 已鎖定 (等待感測器)`;
-                    } else {
-                        updateAR();
-                    }
-                },
-                err => status.innerText = "GPS 定位中...", 
-                { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
-            );
-        }
+        // 移除原有的自動啟動邏輯，改由按鈕觸發
 
         function updateAR() {
             if (!userLat || !targetLat) {
