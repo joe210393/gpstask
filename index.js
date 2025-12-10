@@ -420,14 +420,15 @@ app.get('/api/tasks/admin', authenticateToken, requireRole('shop', 'admin'), asy
 
 // 新增任務
 app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
-  const { name, lat, lng, radius, description, photoUrl, youtubeUrl, points, task_type, options, correct_answer } = req.body;
+  const { name, lat, lng, radius, description, photoUrl, youtubeUrl, ar_image_url, points, task_type, options, correct_answer } = req.body;
   console.log('[POST /api/tasks] Received:', {
     name,
     lat,
     lng,
     task_type,
     optionsType: Array.isArray(options) ? 'array' : typeof options,
-    correct_answer
+    correct_answer,
+    ar_image_url
   });
 
   if (!name || !lat || !lng || !radius || !description || !photoUrl) {
@@ -446,8 +447,8 @@ app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
     const opts = options ? JSON.stringify(options) : null;
 
     await conn.execute(
-      'INSERT INTO tasks (name, lat, lng, radius, description, photoUrl, iconUrl, youtubeUrl, points, created_by, task_type, options, correct_answer) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [name, lat, lng, radius, description, photoUrl, '/images/flag-red.png', youtubeUrl || null, pts, username, type, opts, correct_answer || null]
+      'INSERT INTO tasks (name, lat, lng, radius, description, photoUrl, iconUrl, youtubeUrl, ar_image_url, points, created_by, task_type, options, correct_answer) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [name, lat, lng, radius, description, photoUrl, '/images/flag-red.png', youtubeUrl || null, ar_image_url || null, pts, username, type, opts, correct_answer || null]
     );
     res.json({ success: true, message: '新增成功' });
   } catch (err) {
@@ -623,7 +624,7 @@ app.put('/api/tasks/:id', staffOrAdminAuth, async (req, res) => {
   console.log(`[PUT /api/tasks/${id}] 收到更新請求`);
   console.log('Request Body:', req.body);
 
-  const { name, lat, lng, radius, description, photoUrl, youtubeUrl, points, task_type, options, correct_answer } = req.body;
+  const { name, lat, lng, radius, description, photoUrl, youtubeUrl, ar_image_url, points, task_type, options, correct_answer } = req.body;
   if (!name || !lat || !lng || !radius || !description || !photoUrl) {
     return res.status(400).json({ success: false, message: '缺少參數' });
   }
@@ -668,8 +669,8 @@ app.put('/api/tasks/:id', staffOrAdminAuth, async (req, res) => {
     const opts = options ? JSON.stringify(options) : null;
 
     await conn.execute(
-      'UPDATE tasks SET name=?, lat=?, lng=?, radius=?, description=?, photoUrl=?, youtubeUrl=?, points=?, task_type=?, options=?, correct_answer=? WHERE id=?',
-      [name, lat, lng, radius, description, photoUrl, youtubeUrl || null, pts, type, opts, correct_answer || null, id]
+      'UPDATE tasks SET name=?, lat=?, lng=?, radius=?, description=?, photoUrl=?, youtubeUrl=?, ar_image_url=?, points=?, task_type=?, options=?, correct_answer=? WHERE id=?',
+      [name, lat, lng, radius, description, photoUrl, youtubeUrl || null, ar_image_url || null, pts, type, opts, correct_answer || null, id]
     );
     res.json({ success: true, message: '更新成功' });
   } catch (err) {

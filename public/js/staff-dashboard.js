@@ -103,6 +103,17 @@ function loadTasks() {
               form.description.value = t.description;
               form.photoUrl.value = t.photoUrl;
               form.youtubeUrl.value = t.youtubeUrl || '';
+              form.ar_image_url.value = t.ar_image_url || '';
+              
+              // 預覽 AR 圖片
+              const arPreview = document.getElementById('editArImagePreview');
+              if (t.ar_image_url) {
+                arPreview.src = t.ar_image_url;
+                arPreview.style.display = '';
+              } else {
+                arPreview.style.display = 'none';
+              }
+              document.getElementById('editArImageInput').value = '';
               
               // 設置任務類型與選項
               form.task_type.value = t.task_type || 'qa';
@@ -180,6 +191,7 @@ document.getElementById('addTaskForm').addEventListener('submit', async function
   const description = form.description.value.trim();
   const photoFile = form.photo.files[0];
   const youtubeUrl = form.youtubeUrl.value.trim();
+  const arImageFile = form.arImage?.files[0]; // 選填
   
   // 處理任務類型與選項
   const task_type = form.task_type.value;
@@ -246,7 +258,28 @@ document.getElementById('addTaskForm').addEventListener('submit', async function
       return;
     }
     
-    // 2. 新增任務
+    // 2. 上傳 AR 圖片（如果有）
+    let arImageUrl = null;
+    if (arImageFile) {
+      document.getElementById('addTaskMsg').textContent = 'AR 圖片上傳中...';
+      const arFd = new FormData();
+      arFd.append('photo', arImageFile);
+      const arUploadRes = await fetch(`${API_BASE}/api/upload`, {
+        method: 'POST',
+        headers: { 'x-username': loginUser.username },
+        body: arFd,
+        credentials: 'include'
+      });
+      const arUploadData = await arUploadRes.json();
+      if (arUploadData.success) {
+        arImageUrl = arUploadData.url;
+      } else {
+        document.getElementById('addTaskMsg').textContent = 'AR 圖片上傳失敗: ' + (arUploadData.message || '未知錯誤');
+        return;
+      }
+    }
+    
+    // 3. 新增任務
     document.getElementById('addTaskMsg').textContent = '任務建立中...';
     const photoUrl = uploadData.url;
     const res = await fetch(`${API_BASE}/api/tasks`, {
@@ -255,7 +288,7 @@ document.getElementById('addTaskForm').addEventListener('submit', async function
         'Content-Type': 'application/json',
         'x-username': loginUser.username
       },
-      body: JSON.stringify({ name, lat, lng, radius, points, description, photoUrl, youtubeUrl, task_type, options, correct_answer })
+      body: JSON.stringify({ name, lat, lng, radius, points, description, photoUrl, youtubeUrl, ar_image_url: arImageUrl, task_type, options, correct_answer })
     });
     const data = await res.json();
     if (data.success) {
@@ -286,7 +319,7 @@ if(cancelEditModalBtn) cancelEditModalBtn.onclick = closeModal;
 
 
 // 編輯表單送出
-document.getElementById('editTaskForm').addEventListener('submit', function(e) {
+document.getElementById('editTaskForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   const form = this;
   const id = form.id.value;
@@ -298,6 +331,8 @@ document.getElementById('editTaskForm').addEventListener('submit', function(e) {
   const description = form.description.value.trim();
   const photoUrl = form.photoUrl.value.trim();
   const youtubeUrl = form.youtubeUrl.value.trim();
+  let arImageUrl = form.ar_image_url.value.trim() || null;
+  const editArImageFile = form.editArImage?.files[0]; // 選填
   
   // 處理任務類型與選項
   const task_type = form.task_type.value;
@@ -328,24 +363,56 @@ document.getElementById('editTaskForm').addEventListener('submit', function(e) {
     correct_answer = null;
   }
 
-  document.getElementById('editTaskMsg').textContent = '';
-  fetch(`${API_BASE}/api/tasks/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'x-username': loginUser.username },
-    body: JSON.stringify({ name, lat, lng, radius, points, description, photoUrl, youtubeUrl, task_type, options, correct_answer })
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.success) {
-      document.getElementById('editTaskMsg').textContent = '更新成功！';
-      setTimeout(() => {
-        closeModal();
-        loadTasks();
-      }, 800);
-    } else {
-      document.getElementById('editTaskMsg').textContent = data.message || '更新失敗';
+  document.getElementById('editTaskMsg').textContent = '更新中...';
+  
+  // 如果有上傳新的 AR 圖片，先上傳
+  (async () => {
+    if (editArImageFile) {
+      try {
+        const arFd = new FormData();
+        arFd.append('photo', editArImageFile);
+        const arUploadRes = await fetch(`${API_BASE}/api/upload`, {
+          method: 'POST',
+          headers: { 'x-username': loginUser.username },
+          body: arFd,
+          credentials: 'include'
+        });
+        const arUploadData = await arUploadRes.json();
+        if (arUploadData.success) {
+          arImageUrl = arUploadData.url;
+        } else {
+          document.getElementById('editTaskMsg').textContent = 'AR 圖片上傳失敗: ' + (arUploadData.message || '未知錯誤');
+          return;
+        }
+      } catch (err) {
+        document.getElementById('editTaskMsg').textContent = 'AR 圖片上傳錯誤';
+        return;
+      }
     }
-  });
+    
+    // 更新任務
+    fetch(`${API_BASE}/api/tasks/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'x-username': loginUser.username },
+      body: JSON.stringify({ name, lat, lng, radius, points, description, photoUrl, youtubeUrl, ar_image_url: arImageUrl, task_type, options, correct_answer })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        document.getElementById('editTaskMsg').textContent = '更新成功！';
+        setTimeout(() => {
+          closeModal();
+          loadTasks();
+        }, 800);
+      } else {
+        document.getElementById('editTaskMsg').textContent = data.message || '更新失敗';
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      document.getElementById('editTaskMsg').textContent = '更新失敗';
+    });
+  })();
 });
 
 // 編輯照片即時上傳與預覽

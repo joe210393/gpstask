@@ -65,21 +65,29 @@
             overflow: hidden;
         }
 
-        /* 寶箱與影片容器 */
+        /* 寶箱物件容器 */
         #chest-obj {
             position: absolute;
             top: 50%; left: 50%;
-            width: 300px; height: 200px; /* 寬高比 3:2 適合影片 */
-            margin-left: -150px; margin-top: -100px;
+            width: 350px;
+            margin-left: -175px; margin-top: -100px;
             transform-style: preserve-3d;
             display: none;
             cursor: pointer;
-            pointer-events: auto; /* 允許點擊 */
+            pointer-events: auto;
+        }
+        
+        /* AR 內容容器（圖片和影片並排） */
+        .ar-content-row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            justify-content: center;
         }
         
         /* 預設寶箱圖片 */
         #chest-img {
-            width: 100%; height: 100%;
+            width: 150px; height: 150px;
             object-fit: contain;
             filter: drop-shadow(0 10px 10px rgba(0,0,0,0.5));
             animation: float 3s ease-in-out infinite;
@@ -87,13 +95,29 @@
 
         /* YouTube 影片框 */
         #video-frame {
-            width: 100%; height: 100%;
+            width: 200px; height: 150px;
             border: 4px solid #fff;
             border-radius: 10px;
             box-shadow: 0 0 20px rgba(0, 123, 255, 0.8);
             background: black;
-            display: none; /* 預設隱藏，有影片才顯示 */
+            display: none;
             animation: float 3s ease-in-out infinite;
+        }
+        
+        /* 只有圖片時，讓它居中 */
+        #chest-obj.only-image .ar-content-row {
+            justify-content: center;
+        }
+        #chest-obj.only-image #chest-img {
+            width: 200px; height: 200px;
+        }
+        
+        /* 只有影片時，讓它居中 */
+        #chest-obj.only-video .ar-content-row {
+            justify-content: center;
+        }
+        #chest-obj.only-video #video-frame {
+            width: 300px; height: 200px;
         }
         
         iframe {
@@ -129,14 +153,16 @@
     <video id="camera-feed" autoplay playsinline muted></video>
 
     <div id="ar-world">
-        <!-- 容器：可能是圖片，也可能是影片 -->
+        <!-- 容器：可能是圖片、影片，或兩者都有 -->
         <div id="chest-obj">
-            <!-- 1. 預設寶箱 -->
-            <img id="chest-img" src="/images/mascot.png" alt="寶箱">
-            
-            <!-- 2. YouTube 影片 -->
-            <div id="video-frame">
-                <iframe id="yt-player" src="" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+            <div class="ar-content-row">
+                <!-- 1. AR 專用圖片 -->
+                <img id="chest-img" src="/images/mascot.png" alt="AR 圖片" style="display:none;">
+                
+                <!-- 2. YouTube 影片 -->
+                <div id="video-frame" style="display:none;">
+                    <iframe id="yt-player" src="" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+                </div>
             </div>
 
             <div id="tap-hint" style="color:white; text-align:center; text-shadow:0 2px 2px black; font-weight:bold; margin-top:10px;">點擊領取獎勵!</div>
@@ -183,17 +209,43 @@
                             targetLng = task.lng;
                         }
 
+                        const chestObj = document.getElementById('chest-obj');
+                        const chestImg = document.getElementById('chest-img');
+                        const videoFrame = document.getElementById('video-frame');
+                        let hasImage = false;
+                        let hasVideo = false;
+
+                        // 檢查是否有 AR 專用圖片
+                        if (task.ar_image_url) {
+                            chestImg.src = task.ar_image_url;
+                            chestImg.style.display = 'block';
+                            hasImage = true;
+                        }
+
                         // 檢查是否有 YouTube 連結
                         if (task.youtubeUrl) {
                             const ytId = extractYouTubeId(task.youtubeUrl);
                             if (ytId) {
-                                // 切換為影片模式
-                                document.getElementById('chest-img').style.display = 'none';
-                                document.getElementById('video-frame').style.display = 'block';
-                                document.getElementById('tap-hint').innerText = "觀看影片並點擊完成!";
-                                // 設定 iframe src (自動播放, 靜音以允許自動播放)
+                                videoFrame.style.display = 'block';
                                 document.getElementById('yt-player').src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0&controls=1&playsinline=1`;
+                                hasVideo = true;
                             }
+                        }
+
+                        // 如果都沒有，顯示預設寶箱
+                        if (!hasImage && !hasVideo) {
+                            chestImg.src = '/images/mascot.png';
+                            chestImg.style.display = 'block';
+                            hasImage = true;
+                        }
+
+                        // 設定容器類別（用於樣式調整）
+                        if (hasImage && hasVideo) {
+                            chestObj.className = 'has-both';
+                        } else if (hasImage) {
+                            chestObj.className = 'only-image';
+                        } else if (hasVideo) {
+                            chestObj.className = 'only-video';
                         }
                     }
                 })
@@ -269,7 +321,7 @@
                 const screenWidth = window.innerWidth;
                 const xOffset = (delta / fov) * (screenWidth / 2);
                 
-                // 距離縮放 (影片框比較大，稍微調整比例)
+                // 距離縮放
                 let scale = 1.2 - (Math.min(dist, 50) / 60); 
                 if (scale < 0.4) scale = 0.4;
 

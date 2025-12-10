@@ -195,7 +195,7 @@
             </div>
             <div style="margin-bottom:18px; color:var(--text-secondary); line-height:1.6;">${t.description}</div>
             <img src="${t.photoUrl}" alt="任務照片" class="task-detail-img" onerror="this.src='/images/mascot.png'">
-            ${t.youtubeUrl ? `<div><iframe src="${t.youtubeUrl.replace('watch?v=','embed/')}" allowfullscreen></iframe></div>` : ''}
+            <!-- YouTube 影片已移至 AR 模式，此處不再顯示 -->
             <div class="detail-actions">
               <button id="startTaskBtn" class="btn btn-primary">開始任務</button>
               <div id="taskMsg" style="margin-top:15px; font-weight:600;"></div>
