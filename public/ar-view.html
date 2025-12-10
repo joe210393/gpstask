@@ -7,7 +7,6 @@
     <style>
         body { margin: 0; overflow: hidden; background: black; font-family: sans-serif; }
         
-        /* 相機背景 */
         #camera-feed {
             position: fixed;
             top: 0; left: 0;
@@ -16,7 +15,6 @@
             z-index: 1;
         }
 
-        /* UI 層 */
         .ui-layer {
             position: fixed;
             top: 0; left: 0;
@@ -56,27 +54,30 @@
             z-index: 20;
         }
 
-        /* 虛擬世界層 (用來放寶箱) */
+        /* 虛擬世界層 */
         #ar-world {
             position: fixed;
             top: 0; left: 0;
             width: 100%; height: 100%;
             z-index: 5;
-            perspective: 800px; /* 3D 透視感 */
+            perspective: 800px;
             pointer-events: none;
             overflow: hidden;
         }
 
-        /* 寶箱物件 */
+        /* 寶箱與影片容器 */
         #chest-obj {
             position: absolute;
             top: 50%; left: 50%;
-            width: 200px; height: 200px;
-            margin-left: -100px; margin-top: -100px;
+            width: 300px; height: 200px; /* 寬高比 3:2 適合影片 */
+            margin-left: -150px; margin-top: -100px;
             transform-style: preserve-3d;
-            display: none; /* 初始隱藏 */
+            display: none;
+            cursor: pointer;
+            pointer-events: auto; /* 允許點擊 */
         }
         
+        /* 預設寶箱圖片 */
         #chest-img {
             width: 100%; height: 100%;
             object-fit: contain;
@@ -84,12 +85,27 @@
             animation: float 3s ease-in-out infinite;
         }
 
+        /* YouTube 影片框 */
+        #video-frame {
+            width: 100%; height: 100%;
+            border: 4px solid #fff;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 123, 255, 0.8);
+            background: black;
+            display: none; /* 預設隱藏，有影片才顯示 */
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        iframe {
+            width: 100%; height: 100%;
+            border: none;
+        }
+
         @keyframes float {
             0%, 100% { transform: translateY(0); }
             50% { transform: translateY(-20px); }
         }
 
-        /* 導航箭頭 (當寶箱在畫面外時顯示) */
         #guide-arrow {
             position: absolute;
             top: 50%; left: 50%;
@@ -110,21 +126,25 @@
 </head>
 <body>
 
-    <!-- 相機畫面 -->
     <video id="camera-feed" autoplay playsinline muted></video>
 
-    <!-- AR 世界 -->
     <div id="ar-world">
-        <!-- 寶箱 -->
-        <div id="chest-obj" style="cursor: pointer;">
+        <!-- 容器：可能是圖片，也可能是影片 -->
+        <div id="chest-obj">
+            <!-- 1. 預設寶箱 -->
             <img id="chest-img" src="/images/mascot.png" alt="寶箱">
-            <div style="color:white; text-align:center; text-shadow:0 2px 2px black; font-weight:bold; margin-top:10px;">點擊開啟!</div>
+            
+            <!-- 2. YouTube 影片 -->
+            <div id="video-frame">
+                <iframe id="yt-player" src="" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+            </div>
+
+            <div id="tap-hint" style="color:white; text-align:center; text-shadow:0 2px 2px black; font-weight:bold; margin-top:10px;">點擊領取獎勵!</div>
         </div>
-        <!-- 導航箭頭 -->
+        
         <div id="guide-arrow"></div>
     </div>
 
-    <!-- UI -->
     <div class="ui-layer">
         <div class="info-box">
             <div id="status">啟動相機中...</div>
@@ -134,47 +154,75 @@
     </div>
 
     <script>
+        const API_BASE = ''; // 本地用空字串
+
         // 1. 啟動相機
         const video = document.getElementById('camera-feed');
         navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-            .then(stream => {
-                video.srcObject = stream;
-            })
-            .catch(err => {
-                document.getElementById('status').innerText = "無法存取相機: " + err.message;
-            });
+            .then(stream => { video.srcObject = stream; })
+            .catch(err => { document.getElementById('status').innerText = "相機錯誤: " + err.message; });
 
-        // 2. 取得任務座標
+        // 2. 取得任務資訊
         const urlParams = new URLSearchParams(window.location.search);
-        const targetLat = parseFloat(urlParams.get('lat'));
-        const targetLng = parseFloat(urlParams.get('lng'));
+        // 注意：這裡我們主要依賴 API 回傳的座標，但如果網址有傳 lat/lng 也會先用
+        let targetLat = parseFloat(urlParams.get('lat'));
+        let targetLng = parseFloat(urlParams.get('lng'));
         const taskId = urlParams.get('taskId');
+
+        // 載入任務詳情 (為了拿 YouTube 連結)
+        if (taskId) {
+            fetch(`${API_BASE}/api/tasks/${taskId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.task) {
+                        const task = data.task;
+                        
+                        // 更新座標 (以資料庫為準)
+                        if (task.lat && task.lng) {
+                            targetLat = task.lat;
+                            targetLng = task.lng;
+                        }
+
+                        // 檢查是否有 YouTube 連結
+                        if (task.youtubeUrl) {
+                            const ytId = extractYouTubeId(task.youtubeUrl);
+                            if (ytId) {
+                                // 切換為影片模式
+                                document.getElementById('chest-img').style.display = 'none';
+                                document.getElementById('video-frame').style.display = 'block';
+                                document.getElementById('tap-hint').innerText = "觀看影片並點擊完成!";
+                                // 設定 iframe src (自動播放, 靜音以允許自動播放)
+                                document.getElementById('yt-player').src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0&controls=1&playsinline=1`;
+                            }
+                        }
+                    }
+                })
+                .catch(err => console.error("無法載入任務詳情:", err));
+        }
 
         document.getElementById('btn-back').onclick = () => {
             if (taskId) window.location.href = `/task-detail.html?id=${taskId}`;
             else window.history.back();
         };
 
-        // 點擊寶箱事件
+        // 點擊事件 (無論是影片還是圖片，點擊外框都算完成)
         document.getElementById('chest-obj').onclick = () => {
             if (taskId) {
-                // 帶上 ar_found=true 參數回到任務頁
                 window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
             } else {
-                alert("測試模式：寶箱已開啟！");
+                alert("測試模式：目標已找到！");
             }
         };
 
-        // 3. 感測器邏輯
+        // 3. 感測器與 AR 邏輯
         const chest = document.getElementById('chest-obj');
         const arrow = document.getElementById('guide-arrow');
         const debug = document.getElementById('debug-info');
         const status = document.getElementById('status');
         
         let userLat = null, userLng = null;
-        let deviceHeading = 0; // 手機朝向 (0=北, 90=東)
+        let deviceHeading = 0;
 
-        // 啟動 GPS
         if ('geolocation' in navigator) {
             navigator.geolocation.watchPosition(
                 pos => {
@@ -187,77 +235,53 @@
             );
         }
 
-        // 啟動羅盤
         if (window.DeviceOrientationEvent) {
             window.addEventListener('deviceorientation', event => {
-                // iOS 使用 webkitCompassHeading, Android 使用 alpha (需校正)
                 if (event.webkitCompassHeading) {
                     deviceHeading = event.webkitCompassHeading;
                 } else if (event.alpha) {
-                    // 簡易 Android 修正 (實際上 Android 的 alpha 0 並非總是北方，通常需要 getRotationMatrix)
-                    // 但為了簡化，我們先假設 alpha 是相對的，或者使用 absolute 模式
                     deviceHeading = 360 - event.alpha;
                 }
                 updateAR();
             }, true);
         }
 
-        // 核心 AR 運算
         function updateAR() {
             if (!userLat || !targetLat) return;
 
-            // 計算距離與方位
             const dist = haversineDistance(userLat, userLng, targetLat, targetLng);
             const bearing = calculateBearing(userLat, userLng, targetLat, targetLng);
             
             status.innerText = `距離目標: ${dist.toFixed(0)}m`;
             
-            // 計算「目標方位」與「手機朝向」的角度差 (Delta Angle)
-            // 例如：目標在正北 (0度)，我朝向東 (90度)，差值為 -90度 (目標在我的左邊)
             let delta = bearing - deviceHeading;
-            // 正規化到 -180 ~ 180
             while (delta < -180) delta += 360;
             while (delta > 180) delta -= 360;
 
-            debug.innerText = `方位: ${bearing.toFixed(0)}° / 手機: ${deviceHeading.toFixed(0)}° / 差: ${delta.toFixed(0)}°`;
+            debug.innerText = `方位: ${bearing.toFixed(0)}° / 手機: ${deviceHeading.toFixed(0)}°`;
 
-            // 視野範圍 (FOV) 假設為 60度 (左右各 30度)
             const fov = 30; 
 
             if (Math.abs(delta) < fov) {
-                // === 目標在視野內 ===
                 arrow.style.display = 'none';
                 chest.style.display = 'block';
 
-                // 計算螢幕上的水平位置 (CSS transform)
-                // 差 0 度 -> 正中間 (0px)
-                // 差 -30 度 -> 最左邊
-                // 差 +30 度 -> 最右邊
-                // 簡單映射：每 1 度 = 10px 位移 (這可以根據螢幕寬度調整)
                 const screenWidth = window.innerWidth;
                 const xOffset = (delta / fov) * (screenWidth / 2);
                 
-                // 距離越遠，寶箱越小 (簡單透視)
-                // 5m 內最大 (scale 1.5)，50m 外最小 (scale 0.5)
-                let scale = 1.5 - (Math.min(dist, 50) / 50); 
-                if (scale < 0.5) scale = 0.5;
+                // 距離縮放 (影片框比較大，稍微調整比例)
+                let scale = 1.2 - (Math.min(dist, 50) / 60); 
+                if (scale < 0.4) scale = 0.4;
 
                 chest.style.transform = `translate(${xOffset}px, 0) scale(${scale})`;
 
             } else {
-                // === 目標在視野外 ===
                 chest.style.display = 'none';
                 arrow.style.display = 'block';
-                
-                // 旋轉箭頭指向目標
-                // 如果 delta 是負的 (目標在左)，箭頭指左 (-90度)
-                // 如果 delta 是正的 (目標在右)，箭頭指右 (90度)
-                // 這裡我們做一個平滑旋轉
-                arrow.style.transform = `rotate(${delta}deg) translate(0, -100px)`; // 往該方向偏移
+                arrow.style.transform = `rotate(${delta}deg) translate(0, -100px)`; 
             }
         }
 
-        // --- 數學工具 ---
         function haversineDistance(lat1, lon1, lat2, lon2) {
             const R = 6371e3;
             const φ1 = lat1 * Math.PI/180;
@@ -277,6 +301,12 @@
                     Math.sin(startLat * Math.PI/180) * Math.cos(destLat * Math.PI/180) * Math.cos((destLng-startLng) * Math.PI/180);
             const brng = Math.atan2(y, x) * 180 / Math.PI;
             return (brng + 360) % 360;
+        }
+
+        function extractYouTubeId(url) {
+            const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[7].length == 11) ? match[7] : null;
         }
     </script>
 </body>
