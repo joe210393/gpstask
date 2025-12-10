@@ -46,6 +46,7 @@
             z-index: 999;
         }
         
+        /* 2D 導航箭頭 */
         #arrow-container {
             position: fixed;
             top: 50%;
@@ -71,6 +72,30 @@
             margin-top: 10px;
             text-align: center;
         }
+
+        /* 2D 寶箱 (HUD 模式 - HTML 覆蓋層) */
+        #hud-chest-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 950;
+            display: none; /* 預設隱藏 */
+            text-align: center;
+            pointer-events: none;
+        }
+        #hud-chest-img {
+            width: 60vw; /* 螢幕寬度的 60% */
+            max-width: 300px;
+            height: auto;
+            filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.8));
+            animation: floatChest 2s ease-in-out infinite;
+        }
+        @keyframes floatChest {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+            100% { transform: translateY(0px); }
+        }
     </style>
 </head>
 <body style="margin: 0; overflow: hidden;">
@@ -81,9 +106,16 @@
         <div id="debug-log" style="font-size: 0.8em; color: #ccc;"></div>
     </div>
 
+    <!-- 2D 導航箭頭 -->
     <div id="arrow-container">
         <div id="nav-arrow"></div>
         <div class="arrow-text">目標方向</div>
+    </div>
+
+    <!-- 2D 寶箱 (HTML HUD) -->
+    <div id="hud-chest-container">
+        <img id="hud-chest-img" src="/images/mascot.png" alt="寶箱">
+        <div style="color: white; font-weight: bold; font-size: 1.2em; margin-top: 10px; text-shadow: 0 2px 4px black;">找到目標了！</div>
     </div>
 
     <div class="ui-overlay">
@@ -100,34 +132,9 @@
             <img id="mascot-img" src="/images/mascot.png">
         </a-assets>
 
-        <a-camera gps-camera rotation-reader>
-            <!-- 
-                1. 絕對鎖定寶箱 (Camera Child)
-                   這東西是長在相機上的，絕對不會跑掉。
-                   位置 z=-3 (眼前3米)
-            -->
-            <a-entity id="nearby-group" visible="false" position="0 0 -3">
-                
-                <!-- 寶箱圖片 -->
-                <a-image
-                    src="#mascot-img"
-                    scale="3 3 3"
-                    material="shader: flat; opacity: 1; transparent: true"
-                    animation="property: position; to: 0 0.2 0; dir: alternate; dur: 1500; loop: true"
-                ></a-image>
+        <a-camera gps-camera rotation-reader></a-camera>
 
-                <!-- 除錯用紅色方塊 (如果圖片載入失敗，至少看得到這個) -->
-                <a-box
-                    color="red"
-                    scale="0.5 0.5 0.5"
-                    position="1 0 0"
-                    material="shader: flat"
-                ></a-box>
-            </a-entity>
-
-        </a-camera>
-
-        <!-- 遠處 GPS 寶箱 -->
+        <!-- 遠處 GPS 寶箱 (保留做為參考，雖然可能飄移) -->
         <!-- 由 JS 動態加入 -->
     </a-scene>
 
@@ -150,20 +157,20 @@
         } else {
             const scene = document.querySelector('a-scene');
 
-            // 建立遠處的 GPS 目標
+            // 建立遠處的 GPS 目標 (A-Frame)
             const gpsTarget = document.createElement('a-image');
             gpsTarget.setAttribute('id', 'gps-target');
             gpsTarget.setAttribute('src', '#mascot-img');
             gpsTarget.setAttribute('scale', '8 8 8'); 
             gpsTarget.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
             gpsTarget.setAttribute('material', 'shader: flat; opacity: 1; transparent: true'); 
-            gpsTarget.setAttribute('look-at', '[gps-camera]'); // 讓它永遠面向鏡頭
+            gpsTarget.setAttribute('look-at', '[gps-camera]'); 
             gpsTarget.setAttribute('visible', 'true');
             scene.appendChild(gpsTarget);
 
             const arrowContainer = document.getElementById('arrow-container');
             const navArrow = document.getElementById('nav-arrow');
-            const nearbyGroup = document.getElementById('nearby-group');
+            const hudChestContainer = document.getElementById('hud-chest-container');
             
             let userLat = null;
             let userLng = null;
@@ -192,26 +199,31 @@
             });
 
             function updateArrowAndTarget(dist) {
+                // 放寬距離限制到 15 公尺
                 if(dist < 15) {
                     // === 近距離模式 ===
                     document.getElementById('status').innerText = "目標就在眼前！";
-                    document.getElementById('debug-log').innerText = "模式: 近距離 (Nearby) - 顯示 HUD";
+                    document.getElementById('debug-log').innerText = "模式: 近距離 (HTML HUD)";
                     
                     arrowContainer.style.display = 'none';
                     
-                    // 顯示 HUD 群組
-                    nearbyGroup.setAttribute('visible', 'true');
+                    // 顯示 HTML 寶箱
+                    hudChestContainer.style.display = 'block';
+                    
+                    // 隱藏 3D GPS 寶箱
                     gpsTarget.setAttribute('visible', 'false');
 
                 } else {
                     // === 遠距離模式 ===
                     document.getElementById('status').innerText = "跟隨箭頭尋找目標";
-                    document.getElementById('debug-log').innerText = "模式: 導航 (Nav) - 隱藏 HUD";
+                    document.getElementById('debug-log').innerText = "模式: 導航 (Nav)";
                     
                     arrowContainer.style.display = 'block';
                     
-                    // 隱藏 HUD 群組
-                    nearbyGroup.setAttribute('visible', 'false');
+                    // 隱藏 HTML 寶箱
+                    hudChestContainer.style.display = 'none';
+                    
+                    // 顯示 3D GPS 寶箱
                     gpsTarget.setAttribute('visible', 'true');
                     
                     updateArrowRotation();
