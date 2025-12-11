@@ -527,8 +527,8 @@
             debug.innerText = `方位:${bearing.toFixed(0)}° 手機:${deviceHeading.toFixed(0)}° 差:${delta.toFixed(0)}°\nGPS: ${userLat.toFixed(5)}, ${userLng.toFixed(5)}`;
 
             // === 3. 距離判斷 ===
-            // 只有距離夠近 (例如 50m 內) 才顯示寶箱，否則強制顯示箭頭
-            const VISIBLE_DISTANCE = 50; 
+            // 只有距離夠近 (例如 15m 內) 才顯示寶箱，否則強制顯示箭頭
+            const VISIBLE_DISTANCE = 15; 
 
             // 如果太遠，強制顯示導航箭頭
             if (dist > VISIBLE_DISTANCE) {
