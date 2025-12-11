@@ -117,42 +117,53 @@
             </div>
           </div>
           
-          <div class="form-group">
-            <label class="form-label">任務類型</label>
-            <select name="task_type" id="taskTypeSelect" class="form-select">
-              <option value="qa">問答題</option>
-              <option value="multiple_choice">選擇題</option>
-              <option value="photo">拍照/上傳照片</option>
-            </select>
-          </div>
-          
-          <div id="multipleChoiceOptions" style="display:none;background:#f9f9f9;padding:15px;border-radius:8px;margin-bottom:20px;border:1px solid #eee;">
             <div class="form-group">
-              <label class="form-label">選項 A</label>
-              <input class="form-input" type="text" name="optionA" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">選項 B</label>
-              <input class="form-input" type="text" name="optionB" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">選項 C</label>
-              <input class="form-input" type="text" name="optionC" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">選項 D</label>
-              <input class="form-input" type="text" name="optionD" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">正確答案</label>
-              <select name="correct_answer_select" class="form-select">
-                <option value="A">選項 A</option>
-                <option value="B">選項 B</option>
-                <option value="C">選項 C</option>
-                <option value="D">選項 D</option>
+              <label class="form-label">任務類型</label>
+              <select name="task_type" id="taskTypeSelect" class="form-select">
+                <option value="qa">問答題 (人工審核)</option>
+                <option value="multiple_choice">選擇題 (自動驗證)</option>
+                <option value="photo">拍照/上傳照片 (人工審核)</option>
+                <option value="number">數字解謎 (自動驗證)</option>
+                <option value="keyword">關鍵字解碼 (自動驗證)</option>
+                <option value="location">地理圍欄打卡 (自動驗證)</option>
               </select>
             </div>
-          </div>
+
+            <div id="multipleChoiceOptions" style="display:none;background:#f9f9f9;padding:15px;border-radius:8px;margin-bottom:20px;border:1px solid #eee;">
+              <div class="form-group">
+                 <label class="form-label">選項 A</label>
+                 <input class="form-input" type="text" name="optionA" />
+              </div>
+              <div class="form-group">
+                 <label class="form-label">選項 B</label>
+                 <input class="form-input" type="text" name="optionB" />
+              </div>
+              <div class="form-group">
+                 <label class="form-label">選項 C</label>
+                 <input class="form-input" type="text" name="optionC" />
+              </div>
+              <div class="form-group">
+                 <label class="form-label">選項 D</label>
+                 <input class="form-input" type="text" name="optionD" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">正確答案</label>
+                <select name="correct_answer_select" class="form-select">
+                  <option value="A">選項 A</option>
+                  <option value="B">選項 B</option>
+                  <option value="C">選項 C</option>
+                  <option value="D">選項 D</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="standardAnswerBlock" style="display:none;background:#f0f8ff;padding:15px;border-radius:8px;margin-bottom:20px;border:1px solid #cce5ff;">
+              <div class="form-group">
+                <label class="form-label">標準答案</label>
+                <input class="form-input" type="text" name="correct_answer_text" placeholder="請輸入正確的數字或關鍵字" />
+                <small style="color:var(--text-secondary);display:block;margin-top:4px;">系統將精確比對此答案 (不分大小寫)</small>
+              </div>
+            </div>
           
           <div class="form-group">
             <label class="form-label">任務說明</label>
@@ -269,9 +280,12 @@
             <div class="form-group">
               <label class="form-label">任務類型</label>
               <select name="task_type" id="editTaskTypeSelect" class="form-select">
-                <option value="qa">問答題</option>
-                <option value="multiple_choice">選擇題</option>
-                <option value="photo">拍照/上傳照片</option>
+                <option value="qa">問答題 (人工審核)</option>
+                <option value="multiple_choice">選擇題 (自動驗證)</option>
+                <option value="photo">拍照/上傳照片 (人工審核)</option>
+                <option value="number">數字解謎 (自動驗證)</option>
+                <option value="keyword">關鍵字解碼 (自動驗證)</option>
+                <option value="location">地理圍欄打卡 (自動驗證)</option>
               </select>
             </div>
 
@@ -300,6 +314,14 @@
                   <option value="C">選項 C</option>
                   <option value="D">選項 D</option>
                 </select>
+              </div>
+            </div>
+
+            <div id="editStandardAnswerBlock" style="display:none;background:#f0f8ff;padding:15px;border-radius:8px;margin-bottom:20px;border:1px solid #cce5ff;">
+              <div class="form-group">
+                <label class="form-label">標準答案</label>
+                <input class="form-input" type="text" name="correct_answer_text" placeholder="請輸入正確的數字或關鍵字" />
+                <small style="color:var(--text-secondary);display:block;margin-top:4px;">系統將精確比對此答案 (不分大小寫)</small>
               </div>
             </div>
 

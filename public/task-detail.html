@@ -276,6 +276,18 @@
             });
           };
 
+          // Haversine 距離計算
+          function haversineDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c; // Km
+          }
+
           function showAnswerSection(userTaskId, currentAnswer) {
             const answerDiv = document.getElementById('answerSection');
             answerDiv.innerHTML = '';
@@ -309,7 +321,108 @@
             title.textContent = '提交答案：';
             container.appendChild(title);
 
-            if (t.task_type === 'multiple_choice') {
+            if (t.task_type === 'number') {
+              const input = document.createElement('input');
+              input.type = 'number';
+              input.className = 'form-input';
+              input.placeholder = '請輸入數字密碼';
+              input.style.fontSize = '1.5rem';
+              input.style.letterSpacing = '2px';
+              input.style.textAlign = 'center';
+              input.style.padding = '10px';
+              input.value = currentAnswer;
+              container.appendChild(input);
+
+              const submitBtn = document.createElement('button');
+              submitBtn.textContent = '🔓 解鎖';
+              submitBtn.className = 'btn btn-primary';
+              submitBtn.style.marginTop = '15px';
+              submitBtn.style.width = '100%';
+              submitBtn.onclick = () => {
+                 if(!input.value) return alert('請輸入密碼');
+                 submitAnswer(userTaskId, input.value);
+              };
+              container.appendChild(submitBtn);
+
+            } else if (t.task_type === 'keyword') {
+              const input = document.createElement('input');
+              input.type = 'text';
+              input.className = 'form-input';
+              input.placeholder = '請輸入關鍵字...';
+              input.value = currentAnswer;
+              container.appendChild(input);
+
+              const hint = document.createElement('small');
+              hint.style.color = '#666';
+              hint.style.display = 'block';
+              hint.style.marginTop = '5px';
+              hint.textContent = '💡 提示：請輸入標準名稱 (例如 "白鷺")';
+              container.appendChild(hint);
+
+              const submitBtn = document.createElement('button');
+              submitBtn.textContent = '🔍 解碼';
+              submitBtn.className = 'btn btn-primary';
+              submitBtn.style.marginTop = '15px';
+              submitBtn.style.width = '100%';
+              submitBtn.onclick = () => {
+                 if(!input.value.trim()) return alert('請輸入關鍵字');
+                 submitAnswer(userTaskId, input.value);
+              };
+              container.appendChild(submitBtn);
+
+            } else if (t.task_type === 'location') {
+              const info = document.createElement('div');
+              info.innerHTML = `
+                <div style="text-align:center; padding:20px; background:white; border-radius:8px; border:1px dashed #ccc; margin-bottom:15px;">
+                  <div style="font-size:3rem; margin-bottom:10px;">📍</div>
+                  <p style="margin:0; color:#333;">請移動到目標地點</p>
+                  <p style="margin:5px 0 0 0; font-size:0.9rem; color:#666;">到達後點擊下方按鈕進行驗證</p>
+                  <div id="gpsStatus" style="font-size:0.9rem; color:#007bff; margin-top:10px; font-weight:bold;">等待定位...</div>
+                </div>
+              `;
+              container.appendChild(info);
+
+              const checkBtn = document.createElement('button');
+              checkBtn.textContent = '📍 我已到達 (檢查位置)';
+              checkBtn.className = 'btn btn-primary';
+              checkBtn.style.width = '100%';
+              checkBtn.onclick = () => {
+                const statusEl = document.getElementById('gpsStatus');
+                statusEl.textContent = '正在獲取精確位置...';
+                checkBtn.disabled = true;
+
+                if (!navigator.geolocation) {
+                  statusEl.textContent = '您的裝置不支援 GPS';
+                  return;
+                }
+
+                navigator.geolocation.getCurrentPosition(
+                  (pos) => {
+                    const d = haversineDistance(pos.coords.latitude, pos.coords.longitude, t.lat, t.lng);
+                    // 設定 50 公尺的寬容度 (考慮到 GPS 飄移，放寬一點比較友善，或者用 t.radius)
+                    const limit = (t.radius || 30) / 1000; // 轉為公里
+                    
+                    if (d <= limit) {
+                       statusEl.textContent = `✅ 位置正確！(距離 ${Math.round(d*1000)}m)`;
+                       statusEl.style.color = 'green';
+                       // 自動送出通關密語。請務必在後台將此類任務的標準答案設為 "ARRIVED"
+                       submitAnswer(userTaskId, 'ARRIVED'); 
+                    } else {
+                       statusEl.textContent = `❌ 距離目標太遠 (${Math.round(d*1000)}m)，請再靠近一點！`;
+                       statusEl.style.color = '#dc3545';
+                       checkBtn.disabled = false;
+                    }
+                  },
+                  (err) => {
+                    statusEl.textContent = '無法獲取位置，請確認 GPS 已開啟';
+                    checkBtn.disabled = false;
+                  },
+                  { enableHighAccuracy: true, timeout: 10000 }
+                );
+              };
+              container.appendChild(checkBtn);
+
+            } else if (t.task_type === 'multiple_choice') {
               const form = document.createElement('div');
               options.forEach((opt, index) => {
                 const wrapper = document.createElement('label');

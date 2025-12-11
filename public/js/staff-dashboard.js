@@ -124,18 +124,24 @@ setupCategoryToggle('taskCategorySelect', 'questFields', 'timedFields');
 setupCategoryToggle('editTaskCategorySelect', 'editQuestFields', 'editTimedFields');
 
 // 初始化任務類型切換邏輯
-function setupTaskTypeToggle(selectId, divId) {
+function setupTaskTypeToggle(selectId, divId, standardAnswerDivId) {
   const select = document.getElementById(selectId);
   const div = document.getElementById(divId);
-  if (select && div) {
+  const standardAnswerDiv = document.getElementById(standardAnswerDivId);
+  
+  if (select) {
     select.addEventListener('change', function() {
-      div.style.display = this.value === 'multiple_choice' ? 'block' : 'none';
+      const val = this.value;
+      if (div) div.style.display = (val === 'multiple_choice') ? 'block' : 'none';
+      if (standardAnswerDiv) {
+        standardAnswerDiv.style.display = (val === 'number' || val === 'keyword') ? 'block' : 'none';
+      }
     });
   }
 }
 
-setupTaskTypeToggle('taskTypeSelect', 'multipleChoiceOptions');
-setupTaskTypeToggle('editTaskTypeSelect', 'editMultipleChoiceOptions');
+setupTaskTypeToggle('taskTypeSelect', 'multipleChoiceOptions', 'standardAnswerBlock');
+setupTaskTypeToggle('editTaskTypeSelect', 'editMultipleChoiceOptions', 'editStandardAnswerBlock');
 
 // 確保先載入劇情，再載入任務
 loadQuestChains().then(() => {
@@ -338,7 +344,10 @@ function loadTasks() {
               // 設置任務類型與選項
               form.task_type.value = t.task_type || 'qa';
               const editOptionsDiv = document.getElementById('editMultipleChoiceOptions');
+              const editStandardAnswerDiv = document.getElementById('editStandardAnswerBlock');
+              
               editOptionsDiv.style.display = (t.task_type === 'multiple_choice') ? 'block' : 'none';
+              editStandardAnswerDiv.style.display = (t.task_type === 'number' || t.task_type === 'keyword') ? 'block' : 'none';
               
               if (t.task_type === 'multiple_choice' && t.options) {
                 const opts = typeof t.options === 'string' ? JSON.parse(t.options) : t.options;
@@ -354,13 +363,21 @@ function loadTasks() {
                   else if (t.correct_answer === opts[2]) form.correct_answer_select.value = 'C';
                   else if (t.correct_answer === opts[3]) form.correct_answer_select.value = 'D';
                 }
-              } else {
+              } else if (t.task_type === 'number' || t.task_type === 'keyword') {
+                form.correct_answer_text.value = t.correct_answer || '';
                 // 清空選項
                 form.optionA.value = '';
                 form.optionB.value = '';
                 form.optionC.value = '';
                 form.optionD.value = '';
+              } else {
+                // 清空選項和標準答案
+                form.optionA.value = '';
+                form.optionB.value = '';
+                form.optionC.value = '';
+                form.optionD.value = '';
                 form.correct_answer_select.value = 'A';
+                form.correct_answer_text.value = '';
               }
 
               document.getElementById('editTaskMsg').textContent = '';
@@ -443,6 +460,12 @@ document.getElementById('addTaskForm').addEventListener('submit', async function
     else if (sel === 'B') correct_answer = optB;
     else if (sel === 'C') correct_answer = optC;
     else if (sel === 'D') correct_answer = optD;
+  } else if (task_type === 'number' || task_type === 'keyword') {
+    correct_answer = form.correct_answer_text.value.trim();
+    if (!correct_answer) {
+      document.getElementById('addTaskMsg').textContent = '請輸入標準答案';
+      return;
+    }
   }
 
   document.getElementById('addTaskMsg').textContent = '';
@@ -596,8 +619,15 @@ document.getElementById('editTaskForm').addEventListener('submit', async functio
     else if (sel === 'B') correct_answer = optB;
     else if (sel === 'C') correct_answer = optC;
     else if (sel === 'D') correct_answer = optD;
+  } else if (task_type === 'number' || task_type === 'keyword') {
+    correct_answer = form.correct_answer_text.value.trim();
+    if (!correct_answer) {
+      document.getElementById('editTaskMsg').textContent = '請輸入標準答案';
+      return;
+    }
+    options = null; // 確保 options 為 null
   } else {
-    // 如果不是選擇題，確保 options 和 correct_answer 為 null (傳遞給後端以清空)
+    // 如果不是選擇題或自動驗證題，確保 options 和 correct_answer 為 null
     options = null;
     correct_answer = null;
   }

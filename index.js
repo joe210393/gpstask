@@ -74,7 +74,7 @@ const dbConfig = {
   charset: 'utf8mb4' // 設置字符集為 UTF-8，避免中文亂碼
 };
 
-const ALLOWED_TASK_TYPES = ['qa', 'multiple_choice', 'photo'];
+const ALLOWED_TASK_TYPES = ['qa', 'multiple_choice', 'photo', 'number', 'keyword', 'location'];
 
 // JWT 工具函數
 function generateToken(user) {
@@ -1100,13 +1100,13 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
     let isCompleted = false;
     let message = '答案已儲存';
 
-    // 2. 檢查是否為選擇題且答案正確
-    if (userTask.task_type === 'multiple_choice') {
-      if (userTask.correct_answer && answer === userTask.correct_answer) {
+    // 2. 檢查是否為自動驗證題型且答案正確
+    if (['multiple_choice', 'number', 'keyword'].includes(userTask.task_type)) {
+      if (userTask.correct_answer && answer.trim().toLowerCase() === userTask.correct_answer.trim().toLowerCase()) {
         isCompleted = true;
         message = '答對了！任務完成！';
       } else {
-        // 選擇題答錯，不完成任務
+        // 答錯，不完成任務
         message = '答案不正確，請再試一次';
       }
     }
