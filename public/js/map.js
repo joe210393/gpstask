@@ -460,6 +460,11 @@ function createTaskPopup(task) {
     ? formatDistance(haversineDistance(userLatLng.lat, userLatLng.lng, task.lat, task.lng))
     : '';
 
+  // 檢查使用者權限
+  const userJson = localStorage.getItem('user');
+  const loginUser = userJson ? JSON.parse(userJson) : null;
+  const isStaffOrAdmin = loginUser && (loginUser.role === 'admin' || loginUser.role === 'shop' || loginUser.role === 'staff');
+
   return `
     <div class="task-popup-content">
       <div class="task-popup-header">
@@ -473,7 +478,10 @@ function createTaskPopup(task) {
         ${distance ? `<div class="task-distance">📍 距離：${distance}</div>` : ''}
         <div class="task-actions">
           <a href="/task-detail.html?id=${task.id}" class="task-detail-btn">📖 查看詳情</a>
-          <button onclick="showTaskCard(${task.id})" class="task-card-btn">🎯 開始任務</button>
+          ${isStaffOrAdmin 
+            ? `<button onclick="alert('管理員或工作人員無法接取任務')" class="task-card-btn" style="background-color: #6c757d; cursor: not-allowed;">🚫 管理員無法接任務</button>`
+            : `<button onclick="showTaskCard(${task.id})" class="task-card-btn">🎯 開始任務</button>`
+          }
         </div>
       </div>
     </div>
@@ -484,6 +492,11 @@ function createTaskPopup(task) {
 function showTaskCard(taskId) {
   const task = tasksList.find(t => t.id === taskId);
   if (!task) return;
+
+  // 檢查使用者權限
+  const userJson = localStorage.getItem('user');
+  const loginUser = userJson ? JSON.parse(userJson) : null;
+  const isStaffOrAdmin = loginUser && (loginUser.role === 'admin' || loginUser.role === 'shop' || loginUser.role === 'staff');
 
   const modal = document.createElement('div');
   modal.className = 'task-modal';
@@ -531,7 +544,10 @@ function showTaskCard(taskId) {
         ` : ''}
 
         <div class="task-actions-modal">
-          <a href="/task-detail.html?id=${task.id}" class="btn-primary">前往任務頁面</a>
+          ${isStaffOrAdmin 
+            ? `<button onclick="alert('管理員或工作人員無法接取任務')" class="btn-secondary" style="background-color: #6c757d;">🚫 管理員無法接任務</button>`
+            : `<a href="/task-detail.html?id=${task.id}" class="btn-primary">前往任務頁面</a>`
+          }
           <button onclick="closeTaskModal()" class="btn-secondary">關閉</button>
         </div>
       </div>

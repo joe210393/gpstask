@@ -83,6 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
           ${disabledHint}
           <div class="actions">
             <button class="btn btn-primary staffFinishBtn" data-id="${task.user_task_id}" ${hasAnswer ? '' : 'disabled style="opacity:0.5;cursor:not-allowed;"'}>設為完成</button>
+            ${window.loginUser.role === 'admin' ? `<button class="btn btn-danger staffDeleteBtn" data-id="${task.user_task_id}" style="background:#dc3545;color:white;">刪除紀錄</button>` : ''}
             <a class="btn btn-secondary" href="${detailUrl}" target="_blank" style="display:block;text-align:center;margin-top:0.5rem;">查看詳情</a>
           </div>
         `;
@@ -91,6 +92,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       staffResultCount.textContent = `共 ${total} 筆任務，顯示第 ${staffCurrentPage} / ${totalPages} 頁`;
       renderStaffPagination(totalPages);
+      
+      // 綁定「設為完成」按鈕事件
       staffCardGrid.querySelectorAll('.staffFinishBtn').forEach(btn => {
         if (btn.disabled) return;
         btn.onclick = function() {
@@ -119,6 +122,35 @@ document.addEventListener('DOMContentLoaded', () => {
           });
         };
       });
+
+      // 綁定「刪除紀錄」按鈕事件 (Admin only)
+      if (window.loginUser.role === 'admin') {
+        staffCardGrid.querySelectorAll('.staffDeleteBtn').forEach(btn => {
+          btn.onclick = function() {
+            if (!confirm('確定要刪除此任務紀錄？刪除後玩家將視為未接取此任務，可重新接取。')) return;
+            const userTaskId = this.dataset.id;
+            fetch(`${API_BASE}/api/user-tasks/${userTaskId}`, {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-username': window.loginUser.username
+              }
+            })
+            .then(res => res.json())
+            .then(data => {
+              if (data.success) {
+                alert('任務紀錄已刪除');
+                loadInProgressTasks(
+                  document.getElementById('searchTaskName').value,
+                  document.getElementById('searchUsername').value
+                );
+              } else {
+                alert(data.message || '刪除失敗');
+              }
+            });
+          };
+        });
+      }
     }
 
     function renderStaffPagination(totalPages) {
