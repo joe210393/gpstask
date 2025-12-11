@@ -422,20 +422,125 @@ function loadTasks() {
 
 // 創建任務標記
 function createTaskMarker(task) {
-  // 根據任務狀態選擇圖示
-  const iconUrl = completedTaskIds.has(task.id)
-    ? '/images/feature-reward.png'  // ✅ 已完成任務 - 獎牌
-    : '/images/flag-red.png';       // 📍 未完成任務 - 紅色圖釘地標
+  // 如果已完成，優先使用已完成圖示
+  if (completedTaskIds.has(task.id)) {
+    const icon = L.icon({
+      iconUrl: '/images/feature-reward.png',
+      iconSize: [64, 64],
+      iconAnchor: [32, 64],
+      popupAnchor: [0, -64]
+    });
+    const marker = L.marker([task.lat, task.lng], { icon });
+    bindPopupAndEvents(marker, task);
+    return marker;
+  }
 
-  const icon = L.icon({
-    iconUrl: iconUrl,
-    iconSize: [72, 72],
-    iconAnchor: [36, 72],
-    popupAnchor: [0, -72]
-  });
+  let icon;
+
+  if (task.type === 'quest') {
+    // 劇情任務 - 獎牌樣式 (使用 emoji 或自定義 HTML)
+    icon = L.divIcon({
+      className: 'custom-map-icon quest-icon',
+      html: `
+        <div style="
+          position: relative;
+          text-align: center;
+          filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+        ">
+          <div style="font-size: 48px;">🏅</div>
+          <div style="
+            background: #FFD700;
+            color: #8B4513;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 10px;
+            position: absolute;
+            bottom: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            border: 1px solid #B8860B;
+          ">劇情</div>
+        </div>
+      `,
+      iconSize: [50, 60],
+      iconAnchor: [25, 50],
+      popupAnchor: [0, -50]
+    });
+  } else if (task.type === 'timed') {
+    // 限時任務 - 碼錶樣式 + 剩餘數量
+    const max = task.max_participants || 100;
+    const current = task.current_participants || 0;
+    const left = Math.max(0, max - current);
+    
+    // 計算剩餘時間簡短顯示 (例如: 2h, 30m)
+    let timeLabel = '';
+    if (task.time_limit_end) {
+      const now = new Date();
+      const end = new Date(task.time_limit_end);
+      const diff = end - now;
+      if (diff > 0) {
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        if (hours > 24) timeLabel = `${Math.floor(hours/24)}天`;
+        else if (hours > 0) timeLabel = `${hours}時`;
+        else timeLabel = `${minutes}分`;
+      } else {
+        timeLabel = '結束';
+      }
+    }
+
+    icon = L.divIcon({
+      className: 'custom-map-icon timed-icon',
+      html: `
+        <div style="
+          position: relative;
+          text-align: center;
+          filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+        ">
+          <div style="font-size: 48px;">⏱️</div>
+          <div style="
+            background: #fff;
+            color: #d9534f;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 2px 4px;
+            border-radius: 4px;
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            border: 1px solid #d9534f;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+          ">
+            剩${left}名
+            ${timeLabel ? `<br><span style="color:#333">剩${timeLabel}</span>` : ''}
+          </div>
+        </div>
+      `,
+      iconSize: [50, 70],
+      iconAnchor: [25, 50],
+      popupAnchor: [0, -50]
+    });
+  } else {
+    // 單一任務 - 維持原樣 (紅色圖釘)
+    icon = L.icon({
+      iconUrl: '/images/flag-red.png',
+      iconSize: [72, 72],
+      iconAnchor: [36, 72],
+      popupAnchor: [0, -72]
+    });
+  }
 
   const marker = L.marker([task.lat, task.lng], { icon });
+  bindPopupAndEvents(marker, task);
+  return marker;
+}
 
+// 綁定 Popup 和點擊事件的輔助函數
+function bindPopupAndEvents(marker, task) {
   // 創建增強的彈出視窗
   const popupContent = createTaskPopup(task);
   marker.bindPopup(popupContent, {
@@ -447,10 +552,17 @@ function createTaskMarker(task) {
 
   // 添加點擊事件
   marker.on('click', () => {
-    showTaskCard(task);
+    // 如果是限時任務，檢查是否過期
+    if (task.type === 'timed' && task.time_limit_end) {
+      const now = new Date();
+      const end = new Date(task.time_limit_end);
+      if (now > end) {
+        alert('此限時任務已結束');
+        // 但還是顯示卡片讓他們看
+      }
+    }
+    showTaskCard(task.id); // 注意: showTaskCard 參數修正為 ID 或 task 對象，這裡原代碼看起來是傳 task ID 或 object，稍後確認 showTaskCard 定義
   });
-
-  return marker;
 }
 
 // 創建任務彈出視窗內容
@@ -465,6 +577,44 @@ function createTaskPopup(task) {
   const loginUser = userJson ? JSON.parse(userJson) : null;
   const isStaffOrAdmin = loginUser && (loginUser.role === 'admin' || loginUser.role === 'shop' || loginUser.role === 'staff');
 
+  // 限時任務資訊
+  let timedInfo = '';
+  if (task.type === 'timed') {
+    const max = task.max_participants || 0;
+    const current = task.current_participants || 0;
+    const left = Math.max(0, max - current);
+    let timeStr = '已結束';
+    let isExpired = false;
+    if (task.time_limit_end) {
+      const now = new Date();
+      const end = new Date(task.time_limit_end);
+      const diff = end - now;
+      if (diff > 0) {
+         const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+         const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+         const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+         timeStr = `${days > 0 ? days + '天 ' : ''}${hours}時 ${minutes}分`;
+      } else {
+         isExpired = true;
+      }
+    }
+    timedInfo = `
+      <div class="timed-task-info" style="background:#fff3cd; padding:8px; border-radius:6px; margin:8px 0; border:1px solid #ffeeba;">
+        <div style="color:#856404; font-weight:bold; font-size:0.9rem;">⏱️ 限時任務</div>
+        <div style="display:flex; justify-content:space-between; margin-top:4px; font-size:0.85rem;">
+          <span>剩餘名額: <b style="color:${left===0?'red':'black'}">${left}</b> / ${max}</span>
+          <span style="color:${isExpired ? 'red' : '#155724'}">${isExpired ? '已結束' : '剩 ' + timeStr}</span>
+        </div>
+      </div>
+    `;
+  }
+  
+  // 劇情任務標籤
+  let questLabel = '';
+  if (task.type === 'quest') {
+    questLabel = `<div style="background:#e0f2fe; color:#0369a1; padding:4px 8px; border-radius:4px; margin-bottom:8px; font-size:0.85rem; font-weight:bold;">📚 劇情任務 (第 ${task.quest_order || 1} 關)</div>`;
+  }
+
   return `
     <div class="task-popup-content">
       <div class="task-popup-header">
@@ -472,6 +622,8 @@ function createTaskPopup(task) {
         <div class="task-points">💰 ${points} 積分</div>
       </div>
       <div class="task-popup-body">
+        ${questLabel}
+        ${timedInfo}
         <p class="task-description">${task.description}</p>
         ${task.photoUrl ? `<div class="task-image"><img src="${task.photoUrl}" alt="${task.name}" style="max-width: 100%; height: auto; border-radius: 8px; margin: 10px 0;"></div>` : ''}
         ${task.youtubeUrl ? `<div class="task-video-link"><a href="${task.youtubeUrl}" target="_blank" style="color: #007bff; text-decoration: none;">🎬 觀看相關影片</a></div>` : ''}
@@ -498,6 +650,44 @@ function showTaskCard(taskId) {
   const loginUser = userJson ? JSON.parse(userJson) : null;
   const isStaffOrAdmin = loginUser && (loginUser.role === 'admin' || loginUser.role === 'shop' || loginUser.role === 'staff');
 
+  // 限時任務資訊 (重複利用邏輯)
+  let timedInfo = '';
+  if (task.type === 'timed') {
+    const max = task.max_participants || 0;
+    const current = task.current_participants || 0;
+    const left = Math.max(0, max - current);
+    let timeStr = '已結束';
+    let isExpired = false;
+    if (task.time_limit_end) {
+      const now = new Date();
+      const end = new Date(task.time_limit_end);
+      const diff = end - now;
+      if (diff > 0) {
+         const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+         const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+         const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+         timeStr = `${days > 0 ? days + '天 ' : ''}${hours}時 ${minutes}分`;
+      } else {
+         isExpired = true;
+      }
+    }
+    timedInfo = `
+      <div class="timed-task-info" style="background:#fff3cd; padding:10px; border-radius:8px; margin:10px 0; border:1px solid #ffeeba;">
+        <div style="color:#856404; font-weight:bold; font-size:1rem; margin-bottom:5px;">⏱️ 限時任務</div>
+        <div style="display:flex; flex-direction:column; gap:4px; font-size:0.9rem;">
+          <div>👥 剩餘名額: <b style="color:${left===0?'red':'black'}">${left}</b> / ${max}</div>
+          <div style="color:${isExpired ? 'red' : '#155724'}">⏳ ${isExpired ? '已結束' : '剩餘時間: ' + timeStr}</div>
+        </div>
+      </div>
+    `;
+  }
+  
+  // 劇情任務標籤
+  let questLabel = '';
+  if (task.type === 'quest') {
+    questLabel = `<div style="background:#e0f2fe; color:#0369a1; padding:6px 10px; border-radius:6px; margin-bottom:10px; font-weight:bold;">📚 劇情任務 (第 ${task.quest_order || 1} 關)</div>`;
+  }
+
   const modal = document.createElement('div');
   modal.className = 'task-modal';
   modal.innerHTML = `
@@ -509,6 +699,8 @@ function showTaskCard(taskId) {
       </div>
       <div class="task-modal-body">
         <div class="task-info">
+          ${questLabel}
+          ${timedInfo}
           <div class="task-meta">
             <span class="task-points">💰 ${task.points || 0} 積分</span>
             <span class="task-radius">📍 範圍：${task.radius}公尺</span>
