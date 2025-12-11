@@ -525,9 +525,24 @@
             while (delta > 180) delta -= 360;
 
             debug.innerText = `方位:${bearing.toFixed(0)}° 手機:${deviceHeading.toFixed(0)}° 差:${delta.toFixed(0)}°\nGPS: ${userLat.toFixed(5)}, ${userLng.toFixed(5)}`;
-            // ... 後續邏輯不變 ...
 
-            // === 視角磁滯鎖定 (Hysteresis) ===
+            // === 3. 距離判斷 ===
+            // 只有距離夠近 (例如 50m 內) 才顯示寶箱，否則強制顯示箭頭
+            const VISIBLE_DISTANCE = 50; 
+
+            // 如果太遠，強制顯示導航箭頭
+            if (dist > VISIBLE_DISTANCE) {
+                if (isObjectVisible) {
+                    isObjectVisible = false;
+                    chest.style.display = 'none';
+                }
+                arrow.style.display = 'block';
+                // 箭頭指向目標
+                arrow.style.transform = `rotate(${delta}deg) translate(0, -100px)`;
+                return; // 直接結束，不執行下方的視野判定
+            }
+
+            // === 2. 視角磁滯鎖定 (Hysteresis) ===
             // 如果已經看見，則放寬視野 (50度)；如果沒看見，則收緊視野 (30度)
             const fov = isObjectVisible ? 50 : 30; 
 
