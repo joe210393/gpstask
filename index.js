@@ -418,18 +418,54 @@ app.get('/api/tasks/admin', authenticateToken, requireRole('shop', 'admin'), asy
   }
 });
 
+// === 劇情任務 (Quest Chains) API ===
+
+// 取得所有劇情 (管理員/工作人員)
+app.get('/api/quest-chains', staffOrAdminAuth, async (req, res) => {
+  let conn;
+  try {
+    conn = await mysql.createConnection(dbConfig);
+    const [rows] = await conn.execute('SELECT * FROM quest_chains ORDER BY id DESC');
+    res.json({ success: true, questChains: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) await conn.end();
+  }
+});
+
+// 新增劇情
+app.post('/api/quest-chains', staffOrAdminAuth, async (req, res) => {
+  const { title, description, chain_points, badge_name, badge_image } = req.body;
+  if (!title) return res.status(400).json({ success: false, message: '缺少標題' });
+
+  let conn;
+  try {
+    conn = await mysql.createConnection(dbConfig);
+    await conn.execute(
+      'INSERT INTO quest_chains (title, description, chain_points, badge_name, badge_image) VALUES (?, ?, ?, ?, ?)',
+      [title, description, chain_points || 0, badge_name || null, badge_image || null]
+    );
+    res.json({ success: true, message: '劇情建立成功' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) await conn.end();
+  }
+});
+
 // 新增任務
 app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
-  const { name, lat, lng, radius, description, photoUrl, youtubeUrl, ar_image_url, points, task_type, options, correct_answer } = req.body;
-  console.log('[POST /api/tasks] Received:', {
-    name,
-    lat,
-    lng,
-    task_type,
-    optionsType: Array.isArray(options) ? 'array' : typeof options,
-    correct_answer,
-    ar_image_url
-  });
+  const { 
+    name, lat, lng, radius, description, photoUrl, youtubeUrl, ar_image_url, points, 
+    task_type, options, correct_answer,
+    // 新增參數
+    type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants
+  } = req.body;
+
+  console.log('[POST /api/tasks] Received:', req.body);
 
   if (!name || !lat || !lng || !radius || !description || !photoUrl) {
     return res.status(400).json({ success: false, message: '缺少參數' });
@@ -440,15 +476,32 @@ app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
     conn = await mysql.createConnection(dbConfig);
     const username = req.headers['x-username'];
     const pts = Number(points) || 0;
-    const type = ALLOWED_TASK_TYPES.includes(task_type) ? task_type : 'qa';
-    if (!ALLOWED_TASK_TYPES.includes(task_type)) {
-      console.warn(`[POST /api/tasks] 無效 task_type(${task_type})，已改為 qa`);
-    }
+    
+    // 檢查 task_type (問答/選擇/拍照)
+    const tType = ALLOWED_TASK_TYPES.includes(task_type) ? task_type : 'qa';
     const opts = options ? JSON.stringify(options) : null;
 
+    // 檢查 type (single/timed/quest)
+    const mainType = ['single', 'timed', 'quest'].includes(type) ? type : 'single';
+    
+    // 處理時間格式 (如果空字串轉為 null)
+    const tStart = time_limit_start || null;
+    const tEnd = time_limit_end || null;
+    const maxP = max_participants ? Number(max_participants) : null;
+    const qId = quest_chain_id ? Number(quest_chain_id) : null;
+    const qOrder = quest_order ? Number(quest_order) : null;
+
     await conn.execute(
-      'INSERT INTO tasks (name, lat, lng, radius, description, photoUrl, iconUrl, youtubeUrl, ar_image_url, points, created_by, task_type, options, correct_answer) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [name, lat, lng, radius, description, photoUrl, '/images/flag-red.png', youtubeUrl || null, ar_image_url || null, pts, username, type, opts, correct_answer || null]
+      `INSERT INTO tasks (
+        name, lat, lng, radius, description, photoUrl, iconUrl, youtubeUrl, ar_image_url, points, created_by, 
+        task_type, options, correct_answer,
+        type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        name, lat, lng, radius, description, photoUrl, '/images/flag-red.png', youtubeUrl || null, ar_image_url || null, pts, username, 
+        tType, opts, correct_answer || null,
+        mainType, qId, qOrder, tStart, tEnd, maxP
+      ]
     );
     res.json({ success: true, message: '新增成功' });
   } catch (err) {
@@ -621,10 +674,12 @@ app.get('/api/tasks/:id', async (req, res) => {
 // 編輯任務
 app.put('/api/tasks/:id', staffOrAdminAuth, async (req, res) => {
   const { id } = req.params;
-  console.log(`[PUT /api/tasks/${id}] 收到更新請求`);
-  console.log('Request Body:', req.body);
+  const { 
+    name, lat, lng, radius, description, photoUrl, youtubeUrl, ar_image_url, points, 
+    task_type, options, correct_answer,
+    type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants
+  } = req.body;
 
-  const { name, lat, lng, radius, description, photoUrl, youtubeUrl, ar_image_url, points, task_type, options, correct_answer } = req.body;
   if (!name || !lat || !lng || !radius || !description || !photoUrl) {
     return res.status(400).json({ success: false, message: '缺少參數' });
   }
@@ -662,15 +717,30 @@ app.put('/api/tasks/:id', staffOrAdminAuth, async (req, res) => {
     }
 
     const pts = Number(points) || 0;
-    const type = ALLOWED_TASK_TYPES.includes(task_type) ? task_type : 'qa';
-    if (!ALLOWED_TASK_TYPES.includes(task_type)) {
-      console.warn(`[PUT /api/tasks/${id}] 無效 task_type(${task_type})，已改為 qa`);
-    }
+    const tType = ALLOWED_TASK_TYPES.includes(task_type) ? task_type : 'qa';
     const opts = options ? JSON.stringify(options) : null;
 
+    // 檢查 type (single/timed/quest)
+    const mainType = ['single', 'timed', 'quest'].includes(type) ? type : 'single';
+    
+    const tStart = time_limit_start || null;
+    const tEnd = time_limit_end || null;
+    const maxP = max_participants ? Number(max_participants) : null;
+    const qId = quest_chain_id ? Number(quest_chain_id) : null;
+    const qOrder = quest_order ? Number(quest_order) : null;
+
     await conn.execute(
-      'UPDATE tasks SET name=?, lat=?, lng=?, radius=?, description=?, photoUrl=?, youtubeUrl=?, ar_image_url=?, points=?, task_type=?, options=?, correct_answer=? WHERE id=?',
-      [name, lat, lng, radius, description, photoUrl, youtubeUrl || null, ar_image_url || null, pts, type, opts, correct_answer || null, id]
+      `UPDATE tasks SET 
+        name=?, lat=?, lng=?, radius=?, description=?, photoUrl=?, youtubeUrl=?, ar_image_url=?, points=?, 
+        task_type=?, options=?, correct_answer=?,
+        type=?, quest_chain_id=?, quest_order=?, time_limit_start=?, time_limit_end=?, max_participants=?
+       WHERE id=?`,
+      [
+        name, lat, lng, radius, description, photoUrl, youtubeUrl || null, ar_image_url || null, pts, 
+        tType, opts, correct_answer || null, 
+        mainType, qId, qOrder, tStart, tEnd, maxP,
+        id
+      ]
     );
     res.json({ success: true, message: '更新成功' });
   } catch (err) {
