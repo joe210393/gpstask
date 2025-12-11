@@ -177,6 +177,12 @@ function loadTasks() {
         let typeText = '問答題';
         if (task.task_type === 'multiple_choice') { typeText = '選擇題'; }
         else if (task.task_type === 'photo') { typeText = '拍照任務'; }
+        else if (task.task_type === 'number') { typeText = '數字解謎'; }
+        else if (task.task_type === 'keyword') { typeText = '關鍵字解碼'; }
+        else if (task.task_type === 'location') { typeText = '地點打卡'; }
+        else if (task.task_type === 'number') { typeText = '數字解謎'; }
+        else if (task.task_type === 'keyword') { typeText = '關鍵字解碼'; }
+        else if (task.task_type === 'location') { typeText = '地點打卡'; }
 
         // 任務分類標籤 (單題/限時/劇情)
         let categoryTag = '';

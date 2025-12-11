@@ -23,6 +23,12 @@ const API_BASE = '';
       labels += `<span style="background:#d1fae5; color:#065f46; padding:2px 6px; border-radius:4px; font-size:0.8rem;">☑️ 選擇題</span>`;
     } else if (task.task_type === 'photo') {
       labels += `<span style="background:#fce7f3; color:#9d174d; padding:2px 6px; border-radius:4px; font-size:0.8rem;">📸 拍照</span>`;
+  } else if (task.task_type === 'number') {
+    labels += `<span style="background:#dbeafe; color:#1d4ed8; padding:2px 6px; border-radius:4px; font-size:0.8rem;">🔢 數字解謎</span>`;
+  } else if (task.task_type === 'keyword') {
+    labels += `<span style="background:#fef9c3; color:#92400e; padding:2px 6px; border-radius:4px; font-size:0.8rem;">🔑 關鍵字</span>`;
+  } else if (task.task_type === 'location') {
+    labels += `<span style="background:#cffafe; color:#0f766e; padding:2px 6px; border-radius:4px; font-size:0.8rem;">📍 打卡</span>`;
     } else {
       labels += `<span style="background:#e0e7ff; color:#3730a3; padding:2px 6px; border-radius:4px; font-size:0.8rem;">✍️ 問答</span>`;
     }
