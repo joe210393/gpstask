@@ -396,28 +396,85 @@ function updateUserMarkerRotation() {
   }
 }
 
+// 取得使用者劇情進度
+function fetchQuestProgress() {
+  const userJson = localStorage.getItem('user');
+  if (!userJson) return Promise.resolve({});
+  const loginUser = JSON.parse(userJson);
+  
+  return fetch(`${API_BASE}/api/user/quest-progress`, {
+    headers: { 'x-username': loginUser.username }
+  })
+  .then(res => res.json())
+  .then(data => data.success ? data.progress : {})
+  .catch(() => ({}));
+}
+
 // 載入任務並顯示在地圖上
-function loadTasks() {
-  fetch(`${API_BASE}/api/tasks`)
-    .then(res => res.json())
-    .then(data => {
-      if (!data.success) return;
+async function loadTasks() {
+  try {
+    const [tasksRes, progress] = await Promise.all([
+      fetch(`${API_BASE}/api/tasks`).then(r => r.json()),
+      fetchQuestProgress()
+    ]);
 
-      tasksList = data.tasks;
+    if (!tasksRes.success) return;
 
-      tasksList.forEach(task => {
-        // 創建任務標記
-        const marker = createTaskMarker(task);
-        task._marker = marker;
+    const allTasks = tasksRes.tasks;
 
-        // 如果有用戶位置，顯示距離
-        if (userLatLng && distanceDisplayEnabled) {
-          updateTaskDistance(task);
-        }
-      });
-
-      focusFromUrl();
+    // 過濾邏輯：劇情任務只顯示目前進度的關卡
+    tasksList = allTasks.filter(task => {
+      // 1. 如果不是劇情任務，直接顯示
+      if (task.type !== 'quest') return true;
+      
+      // 2. 如果是劇情任務，檢查 quest_order
+      // 注意：quest_chain_id 必須存在
+      if (!task.quest_chain_id) return true; // 資料異常時預設顯示
+      
+      const currentStep = progress[task.quest_chain_id] || 1;
+      return task.quest_order === currentStep;
     });
+
+    tasksList.forEach(task => {
+      // 創建任務標記
+      const marker = createTaskMarker(task);
+      task._marker = marker;
+
+      // 如果有用戶位置，顯示距離
+      if (userLatLng && distanceDisplayEnabled) {
+        updateTaskDistance(task);
+      }
+    });
+
+    focusFromUrl();
+  } catch (err) {
+    console.error('載入任務失敗:', err);
+  }
+}
+
+// 輔助函式：生成標籤 HTML
+function getTaskLabelsHtml(task) {
+  let labels = '';
+  
+  // 1. 任務類型標籤
+  if (task.type === 'quest') {
+    labels += `<span style="background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:4px; font-size:0.8rem; margin-right:4px;">📚 劇情</span>`;
+  } else if (task.type === 'timed') {
+    labels += `<span style="background:#fff3cd; color:#856404; padding:2px 6px; border-radius:4px; font-size:0.8rem; margin-right:4px;">⏱️ 限時</span>`;
+  } else {
+    labels += `<span style="background:#f3f4f6; color:#374151; padding:2px 6px; border-radius:4px; font-size:0.8rem; margin-right:4px;">📍 單一</span>`;
+  }
+
+  // 2. 回答類型標籤
+  if (task.task_type === 'multiple_choice') {
+    labels += `<span style="background:#d1fae5; color:#065f46; padding:2px 6px; border-radius:4px; font-size:0.8rem;">☑️ 選擇題</span>`;
+  } else if (task.task_type === 'photo') {
+    labels += `<span style="background:#fce7f3; color:#9d174d; padding:2px 6px; border-radius:4px; font-size:0.8rem;">📸 拍照</span>`;
+  } else {
+    labels += `<span style="background:#e0e7ff; color:#3730a3; padding:2px 6px; border-radius:4px; font-size:0.8rem;">✍️ 問答</span>`;
+  }
+  
+  return `<div style="margin-bottom:8px;">${labels}</div>`;
 }
 
 // 創建任務標記
@@ -619,6 +676,7 @@ function createTaskPopup(task) {
     <div class="task-popup-content">
       <div class="task-popup-header">
         <h4>${task.name}</h4>
+        ${getTaskLabelsHtml(task)}
         <div class="task-points">💰 ${points} 積分</div>
       </div>
       <div class="task-popup-body">
@@ -694,7 +752,10 @@ function showTaskCard(taskId) {
     <div class="task-modal-overlay" onclick="closeTaskModal()"></div>
     <div class="task-modal-content">
       <div class="task-modal-header">
-        <h3>${task.name}</h3>
+        <div style="flex:1;">
+          <h3>${task.name}</h3>
+          ${getTaskLabelsHtml(task)}
+        </div>
         <button onclick="closeTaskModal()" class="close-btn">&times;</button>
       </div>
       <div class="task-modal-body">

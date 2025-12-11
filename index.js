@@ -842,6 +842,40 @@ function getRank(started, finished) {
   return 'E';
 }
 
+// 查詢使用者在各劇情任務線的目前進度
+app.get('/api/user/quest-progress', async (req, res) => {
+  const username = req.headers['x-username'];
+  if (!username) return res.json({ success: true, progress: {} }); // 未登入，回傳空物件
+
+  let conn;
+  try {
+    conn = await mysql.createConnection(dbConfig);
+    
+    // 取得 user_id
+    const [users] = await conn.execute('SELECT id FROM users WHERE username = ?', [username]);
+    if (users.length === 0) return res.json({ success: true, progress: {} });
+    const userId = users[0].id;
+
+    // 查詢 user_quests 表
+    const [rows] = await conn.execute(
+      'SELECT quest_chain_id, current_step_order FROM user_quests WHERE user_id = ?',
+      [userId]
+    );
+
+    const progress = {};
+    rows.forEach(row => {
+      progress[row.quest_chain_id] = row.current_step_order;
+    });
+
+    res.json({ success: true, progress });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) await conn.end();
+  }
+});
+
 // 查詢所有（進行中＋完成）任務
 app.get('/api/user-tasks/all', async (req, res) => {
   const { username } = req.query;

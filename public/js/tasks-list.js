@@ -5,6 +5,31 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentFilter = 'incomplete'; // 預設僅顯示未完成
   // const API_BASE = 'http://localhost:3001'; // 本地開發環境 - 生產環境使用相對路徑
 const API_BASE = '';
+  let questProgress = {}; // 儲存劇情進度
+
+  function getTaskLabelsHtml(task) {
+    let labels = '';
+    // 1. 任務類型標籤
+    if (task.type === 'quest') {
+      labels += `<span style="background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:4px; font-size:0.8rem; margin-right:4px;">📚 劇情</span>`;
+    } else if (task.type === 'timed') {
+      labels += `<span style="background:#fff3cd; color:#856404; padding:2px 6px; border-radius:4px; font-size:0.8rem; margin-right:4px;">⏱️ 限時</span>`;
+    } else {
+      labels += `<span style="background:#f3f4f6; color:#374151; padding:2px 6px; border-radius:4px; font-size:0.8rem; margin-right:4px;">📍 單一</span>`;
+    }
+
+    // 2. 回答類型標籤
+    if (task.task_type === 'multiple_choice') {
+      labels += `<span style="background:#d1fae5; color:#065f46; padding:2px 6px; border-radius:4px; font-size:0.8rem;">☑️ 選擇題</span>`;
+    } else if (task.task_type === 'photo') {
+      labels += `<span style="background:#fce7f3; color:#9d174d; padding:2px 6px; border-radius:4px; font-size:0.8rem;">📸 拍照</span>`;
+    } else {
+      labels += `<span style="background:#e0e7ff; color:#3730a3; padding:2px 6px; border-radius:4px; font-size:0.8rem;">✍️ 問答</span>`;
+    }
+    
+    return `<div style="margin-bottom:8px;">${labels}</div>`;
+  }
+
   function render(tasks) {
     const listDiv = document.getElementById('tasksList');
     listDiv.innerHTML = '';
@@ -24,6 +49,7 @@ const API_BASE = '';
         <img src="${task.photoUrl}" class="card-img" alt="任務照片" data-imgbig="1" onerror="this.src='/images/mascot.png'">
         <div class="card-body">
           <div class="card-title">${task.name}</div>
+          ${getTaskLabelsHtml(task)}
           <div class="card-text">
             <div class="mb-2">
               <span class="text-primary" style="font-weight:600;">💰 ${task.points || 0} 積分</span>
@@ -120,11 +146,24 @@ const API_BASE = '';
       filterTasks();
     });
   }
-  fetch(`${API_BASE}/api/tasks`)
-    .then(res => res.json())
-    .then(data => {
-      if (!data.success) return;
-      const tasks = data.tasks;
+  
+  // 初始化載入
+  Promise.all([
+    fetch(`${API_BASE}/api/tasks`).then(r => r.json()),
+    loginUser ? fetch(`${API_BASE}/api/user/quest-progress`, { headers: { 'x-username': loginUser.username } }).then(r => r.json()) : Promise.resolve({progress:{}})
+  ]).then(([tasksData, progressData]) => {
+      if (!tasksData.success) return;
+      let tasks = tasksData.tasks;
+      questProgress = (progressData && progressData.progress) ? progressData.progress : {};
+
+      // 過濾：劇情任務只保留目前進度的關卡
+      tasks = tasks.filter(task => {
+        if (task.type !== 'quest') return true;
+        if (!task.quest_chain_id) return true;
+        const currentStep = questProgress[task.quest_chain_id] || 1;
+        return task.quest_order === currentStep;
+      });
+
       allTasks = [...tasks]; // 存儲所有任務數據
 
       if (loginUser && loginUser.username) {
@@ -141,6 +180,7 @@ const API_BASE = '';
         filterTasks(); // 使用篩選函數而不是直接渲染
       }
     });
+
   // modal 關閉功能
   const modalBg = document.getElementById('imgModalBg');
   const modalClose = document.getElementById('imgModalClose');
