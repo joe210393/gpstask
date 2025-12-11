@@ -583,10 +583,17 @@ app.post('/api/user-tasks', async (req, res) => {
   let conn;
   try {
     conn = await mysql.createConnection(dbConfig);
-    // 取得 user_id
-    const [users] = await conn.execute('SELECT id FROM users WHERE username = ?', [username]);
+    // 取得 user_id 與 role
+    const [users] = await conn.execute('SELECT id, role FROM users WHERE username = ?', [username]);
     if (users.length === 0) return res.status(400).json({ success: false, message: '找不到使用者' });
-    const userId = users[0].id;
+    
+    const user = users[0];
+    // 阻擋管理員或工作人員接取任務
+    if (user.role === 'admin' || user.role === 'shop' || user.role === 'staff') {
+      return res.status(403).json({ success: false, message: '管理員或工作人員無法接取任務' });
+    }
+
+    const userId = user.id;
     // 檢查是否已經有進行中
     const [inProgress] = await conn.execute('SELECT id FROM user_tasks WHERE user_id = ? AND task_id = ? AND status = "進行中"', [userId, task_id]);
     if (inProgress.length > 0) return res.json({ success: true, message: '已在進行中' });
@@ -597,6 +604,26 @@ app.post('/api/user-tasks', async (req, res) => {
 
     await conn.execute('INSERT INTO user_tasks (user_id, task_id, status) VALUES (?, ?, "進行中")', [userId, task_id]);
     res.json({ success: true, message: '已加入任務' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) await conn.end();
+  }
+});
+
+// 管理員刪除用戶任務紀錄 (重置任務狀態)
+app.delete('/api/user-tasks/:id', staffOrAdminAuth, async (req, res) => {
+  const { id } = req.params;
+  let conn;
+  try {
+    conn = await mysql.createConnection(dbConfig);
+    // 檢查該紀錄是否存在
+    const [rows] = await conn.execute('SELECT id FROM user_tasks WHERE id = ?', [id]);
+    if (rows.length === 0) return res.status(404).json({ success: false, message: '找不到該任務紀錄' });
+
+    await conn.execute('DELETE FROM user_tasks WHERE id = ?', [id]);
+    res.json({ success: true, message: '任務紀錄已刪除，玩家可重新接取' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
