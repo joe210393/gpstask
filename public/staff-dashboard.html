@@ -28,9 +28,64 @@
 
   <main>
     <section class="mb-4">
+      <!-- 劇情任務管理區塊 -->
+      <div class="form-container" style="margin-bottom: 2rem; background: #fdfdfd; border: 1px solid #e0e0e0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h2 style="margin: 0;">劇情任務線管理</h2>
+          <button id="btnCreateQuest" class="btn btn-secondary" style="font-size: 0.9rem;">+ 新增劇情</button>
+        </div>
+        <div id="questChainList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem;">
+          <!-- 劇情列表動態載入 -->
+          <div style="color: #888; font-size: 0.9rem;">載入中...</div>
+        </div>
+      </div>
+
       <div class="form-container">
         <h2 class="text-center mb-4">新增任務點</h2>
         <form id="addTaskForm" enctype="multipart/form-data">
+          <!-- ... -->
+          
+          <!-- 任務分類選擇 -->
+          <div class="form-group" style="background: #eef2f7; padding: 10px; border-radius: 6px;">
+            <label class="form-label" style="color: #2c3e50; font-weight: bold;">任務分類</label>
+            <select name="type" id="taskCategorySelect" class="form-select">
+              <option value="single">一般單題任務 (Single)</option>
+              <option value="timed">限時/限量任務 (Timed)</option>
+              <option value="quest">劇情連續任務 (Quest)</option>
+            </select>
+          </div>
+
+          <!-- 劇情任務專用欄位 -->
+          <div id="questFields" style="display:none; background:#f0f8ff; padding:15px; border-radius:6px; margin-bottom:15px; border:1px solid #bee5eb;">
+            <div class="form-group">
+              <label class="form-label">選擇所屬劇情</label>
+              <select name="quest_chain_id" id="questChainSelect" class="form-select">
+                <option value="">-- 請先建立劇情 --</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">劇情順序 (Step Order)</label>
+              <input class="form-input" type="number" name="quest_order" min="1" placeholder="例如：1 代表第一關" />
+              <small style="color: #666;">必須完成第 1 關才能解鎖第 2 關</small>
+            </div>
+          </div>
+
+          <!-- 限時任務專用欄位 -->
+          <div id="timedFields" style="display:none; background:#fff0f5; padding:15px; border-radius:6px; margin-bottom:15px; border:1px solid #f5c6cb;">
+            <div class="form-group">
+              <label class="form-label">開始時間</label>
+              <input class="form-input" type="datetime-local" name="time_limit_start" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">結束時間</label>
+              <input class="form-input" type="datetime-local" name="time_limit_end" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">名額限制 (Max Participants)</label>
+              <input class="form-input" type="number" name="max_participants" min="0" placeholder="0 或空值代表不限" />
+            </div>
+          </div>
+
           <div style="margin-bottom:15px;color:var(--text-secondary);font-size:0.9rem;background:#f3f4f6;padding:10px;border-radius:6px;">
             提示：經緯度請貼入十進位格式（如 24.678222, 121.760361），可用 Google Maps 右鍵複製座標。
           </div>
@@ -144,6 +199,46 @@
           <form id="editTaskForm">
             <input type="hidden" name="id" />
             
+            <!-- 任務分類選擇 (編輯) -->
+            <div class="form-group" style="background: #eef2f7; padding: 10px; border-radius: 6px;">
+              <label class="form-label" style="color: #2c3e50; font-weight: bold;">任務分類</label>
+              <select name="type" id="editTaskCategorySelect" class="form-select">
+                <option value="single">一般單題任務</option>
+                <option value="timed">限時/限量任務</option>
+                <option value="quest">劇情連續任務</option>
+              </select>
+            </div>
+
+            <!-- 劇情任務專用欄位 (編輯) -->
+            <div id="editQuestFields" style="display:none; background:#f0f8ff; padding:15px; border-radius:6px; margin-bottom:15px; border:1px solid #bee5eb;">
+              <div class="form-group">
+                <label class="form-label">選擇所屬劇情</label>
+                <select name="quest_chain_id" id="editQuestChainSelect" class="form-select">
+                  <option value="">-- 請選擇 --</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">劇情順序</label>
+                <input class="form-input" type="number" name="quest_order" min="1" />
+              </div>
+            </div>
+
+            <!-- 限時任務專用欄位 (編輯) -->
+            <div id="editTimedFields" style="display:none; background:#fff0f5; padding:15px; border-radius:6px; margin-bottom:15px; border:1px solid #f5c6cb;">
+              <div class="form-group">
+                <label class="form-label">開始時間</label>
+                <input class="form-input" type="datetime-local" name="time_limit_start" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">結束時間</label>
+                <input class="form-input" type="datetime-local" name="time_limit_end" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">名額限制</label>
+                <input class="form-input" type="number" name="max_participants" min="0" />
+              </div>
+            </div>
+
             <div class="form-group">
               <label class="form-label">任務名稱</label>
               <input class="form-input" type="text" name="name" required />
@@ -244,6 +339,41 @@
               <button type="button" id="cancelEditModal" class="btn btn-secondary w-100">取消</button>
             </div>
             <div id="editTaskMsg" class="mt-2 text-center text-danger"></div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="task-modal" id="questModal">
+      <div class="task-modal-overlay"></div>
+      <div class="task-modal-content">
+        <div class="task-modal-header">
+          <h3>新增劇情任務線</h3>
+          <button class="close-btn" id="closeQuestModal">&times;</button>
+        </div>
+        <div class="task-modal-body">
+          <form id="createQuestForm">
+            <div class="form-group">
+              <label class="form-label">劇情標題</label>
+              <input class="form-input" type="text" name="title" required placeholder="例如：樂樂園勇者試煉" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">劇情描述</label>
+              <textarea class="form-textarea" name="description" placeholder="描述這個劇情的背景故事..."></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">全破獎勵積分</label>
+              <input class="form-input" type="number" name="chain_points" min="0" value="100" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">全破獎章名稱</label>
+              <input class="form-input" type="text" name="badge_name" placeholder="例如：樂樂園勇者" />
+            </div>
+            <!-- 暫時不支援上傳獎章圖片，先用輸入網址或預設 -->
+            <div class="form-group">
+              <label class="form-label">獎章圖片 (選填)</label>
+              <input class="form-input" type="text" name="badge_image" placeholder="/images/badges/default.png" />
+            </div>
+            <button type="submit" class="btn btn-primary w-100">建立劇情</button>
           </form>
         </div>
       </div>

@@ -12,6 +12,109 @@ const loginUser = window.loginUser;
 // const API_BASE = 'http://localhost:3001'; // 本地開發環境 - 生產環境使用相對路徑
 const API_BASE = '';
 
+// 載入劇情列表
+function loadQuestChains() {
+  fetch(`${API_BASE}/api/quest-chains`, {
+    headers: { 'x-username': loginUser.username }
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (!data.success) return;
+    
+    // 更新任務表單的劇情下拉選單
+    const selects = [document.getElementById('questChainSelect'), document.getElementById('editQuestChainSelect')];
+    selects.forEach(sel => {
+      if (!sel) return;
+      sel.innerHTML = '<option value="">-- 請選擇 --</option>';
+      data.questChains.forEach(q => {
+        sel.innerHTML += `<option value="${q.id}">${q.title}</option>`;
+      });
+    });
+
+    // 更新劇情管理列表
+    const list = document.getElementById('questChainList');
+    if (list) {
+      list.innerHTML = '';
+      if (data.questChains.length === 0) {
+        list.innerHTML = '<div style="color:#888;">目前沒有劇情任務線</div>';
+      } else {
+        data.questChains.forEach(q => {
+          const div = document.createElement('div');
+          div.style.cssText = 'background:white; padding:15px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.05); border-left:4px solid #007bff;';
+          div.innerHTML = `
+            <div style="font-weight:bold; font-size:1.1rem; margin-bottom:5px;">${q.title}</div>
+            <div style="font-size:0.9rem; color:#666; margin-bottom:8px;">${q.description || '無描述'}</div>
+            <div style="font-size:0.85rem; color:#28a745;">🏆 全破獎勵: ${q.chain_points} 分</div>
+            ${q.badge_name ? `<div style="font-size:0.85rem; color:#e0a800;">🎖 獎章: ${q.badge_name}</div>` : ''}
+          `;
+          list.appendChild(div);
+        });
+      }
+    }
+  });
+}
+
+// 綁定新增劇情按鈕與 Modal
+const btnCreateQuest = document.getElementById('btnCreateQuest');
+const questModal = document.getElementById('questModal');
+const closeQuestModal = document.getElementById('closeQuestModal');
+
+if (btnCreateQuest && questModal) {
+  btnCreateQuest.onclick = () => questModal.classList.add('show');
+  closeQuestModal.onclick = () => questModal.classList.remove('show');
+}
+
+// 送出新增劇情表單
+const createQuestForm = document.getElementById('createQuestForm');
+if (createQuestForm) {
+  createQuestForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const form = this;
+    const title = form.title.value.trim();
+    const description = form.description.value.trim();
+    const chain_points = form.chain_points.value;
+    const badge_name = form.badge_name.value.trim();
+    const badge_image = form.badge_image.value.trim();
+
+    fetch(`${API_BASE}/api/quest-chains`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-username': loginUser.username },
+      body: JSON.stringify({ title, description, chain_points, badge_name, badge_image })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        alert('劇情建立成功！');
+        form.reset();
+        questModal.classList.remove('show');
+        loadQuestChains();
+      } else {
+        alert(data.message || '建立失敗');
+      }
+    });
+  });
+}
+
+// 初始化任務分類切換邏輯
+function setupCategoryToggle(selectId, questDivId, timedDivId) {
+  const select = document.getElementById(selectId);
+  const questDiv = document.getElementById(questDivId);
+  const timedDiv = document.getElementById(timedDivId);
+  
+  if (select && questDiv && timedDiv) {
+    const update = () => {
+      const val = select.value;
+      questDiv.style.display = (val === 'quest') ? 'block' : 'none';
+      timedDiv.style.display = (val === 'timed') ? 'block' : 'none';
+    };
+    select.addEventListener('change', update);
+    update(); // 初始化狀態
+  }
+}
+
+setupCategoryToggle('taskCategorySelect', 'questFields', 'timedFields');
+setupCategoryToggle('editTaskCategorySelect', 'editQuestFields', 'editTimedFields');
+
 // 初始化任務類型切換邏輯
 function setupTaskTypeToggle(selectId, divId) {
   const select = document.getElementById(selectId);
@@ -25,6 +128,8 @@ function setupTaskTypeToggle(selectId, divId) {
 
 setupTaskTypeToggle('taskTypeSelect', 'multipleChoiceOptions');
 setupTaskTypeToggle('editTaskTypeSelect', 'editMultipleChoiceOptions');
+
+loadQuestChains(); // 載入劇情列表
 
 // 讀取任務列表
 function loadTasks() {
@@ -114,6 +219,28 @@ function loadTasks() {
                 arPreview.style.display = 'none';
               }
               document.getElementById('editArImageInput').value = '';
+
+              // 設置任務分類 (Single/Timed/Quest)
+              const typeSelect = document.getElementById('editTaskCategorySelect');
+              typeSelect.value = t.type || 'single';
+              // 觸發 change 事件以更新欄位顯示
+              typeSelect.dispatchEvent(new Event('change'));
+
+              // 填入劇情任務欄位
+              if (t.type === 'quest') {
+                const qSelect = document.getElementById('editQuestChainSelect');
+                qSelect.value = t.quest_chain_id || '';
+                document.querySelector('#editTaskForm input[name="quest_order"]').value = t.quest_order || 1;
+              }
+
+              // 填入限時任務欄位
+              if (t.type === 'timed') {
+                // 轉換 ISO 時間字串為 datetime-local 格式 (YYYY-MM-DDTHH:mm)
+                const formatTime = (isoStr) => isoStr ? new Date(isoStr).toISOString().slice(0, 16) : '';
+                document.querySelector('#editTaskForm input[name="time_limit_start"]').value = formatTime(t.time_limit_start);
+                document.querySelector('#editTaskForm input[name="time_limit_end"]').value = formatTime(t.time_limit_end);
+                document.querySelector('#editTaskForm input[name="max_participants"]').value = t.max_participants || 0;
+              }
               
               // 設置任務類型與選項
               form.task_type.value = t.task_type || 'qa';
@@ -193,6 +320,14 @@ document.getElementById('addTaskForm').addEventListener('submit', async function
   const youtubeUrl = form.youtubeUrl.value.trim();
   const arImageFile = form.arImage?.files[0]; // 選填
   
+  // 處理任務分類與額外欄位
+  const type = form.type.value;
+  const quest_chain_id = form.quest_chain_id?.value || null;
+  const quest_order = form.quest_order?.value || null;
+  const time_limit_start = form.time_limit_start?.value || null;
+  const time_limit_end = form.time_limit_end?.value || null;
+  const max_participants = form.max_participants?.value || null;
+
   // 處理任務類型與選項
   const task_type = form.task_type.value;
   console.log('新增任務表單 - task_type:', task_type);
@@ -288,7 +423,11 @@ document.getElementById('addTaskForm').addEventListener('submit', async function
         'Content-Type': 'application/json',
         'x-username': loginUser.username
       },
-      body: JSON.stringify({ name, lat, lng, radius, points, description, photoUrl, youtubeUrl, ar_image_url: arImageUrl, task_type, options, correct_answer })
+      body: JSON.stringify({ 
+        name, lat, lng, radius, points, description, photoUrl, youtubeUrl, ar_image_url: arImageUrl, 
+        task_type, options, correct_answer,
+        type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants
+      })
     });
     const data = await res.json();
     if (data.success) {
@@ -334,6 +473,14 @@ document.getElementById('editTaskForm').addEventListener('submit', async functio
   let arImageUrl = form.ar_image_url.value.trim() || null;
   const editArImageFile = form.editArImage?.files[0]; // 選填
   
+  // 處理任務分類與額外欄位
+  const type = document.getElementById('editTaskCategorySelect').value;
+  const quest_chain_id = document.getElementById('editQuestChainSelect').value || null;
+  const quest_order = form.quest_order?.value || null;
+  const time_limit_start = form.time_limit_start?.value || null;
+  const time_limit_end = form.time_limit_end?.value || null;
+  const max_participants = form.max_participants?.value || null;
+
   // 處理任務類型與選項
   const task_type = form.task_type.value;
   console.log('正在提交編輯表單，任務類型:', task_type); // Debug Log
@@ -394,7 +541,11 @@ document.getElementById('editTaskForm').addEventListener('submit', async functio
     fetch(`${API_BASE}/api/tasks/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'x-username': loginUser.username },
-      body: JSON.stringify({ name, lat, lng, radius, points, description, photoUrl, youtubeUrl, ar_image_url: arImageUrl, task_type, options, correct_answer })
+      body: JSON.stringify({ 
+        name, lat, lng, radius, points, description, photoUrl, youtubeUrl, ar_image_url: arImageUrl, 
+        task_type, options, correct_answer,
+        type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants
+      })
     })
     .then(res => res.json())
     .then(data => {
