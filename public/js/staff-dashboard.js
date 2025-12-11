@@ -12,15 +12,23 @@ const loginUser = window.loginUser;
 // const API_BASE = 'http://localhost:3001'; // 本地開發環境 - 生產環境使用相對路徑
 const API_BASE = '';
 
+let globalQuestChainsMap = {}; // 用於快取劇情資訊
+
 // 載入劇情列表
 function loadQuestChains() {
-  fetch(`${API_BASE}/api/quest-chains`, {
+  return fetch(`${API_BASE}/api/quest-chains`, {
     headers: { 'x-username': loginUser.username }
   })
   .then(res => res.json())
   .then(data => {
     if (!data.success) return;
     
+    // 更新快取
+    globalQuestChainsMap = {};
+    data.questChains.forEach(q => {
+      globalQuestChainsMap[q.id] = q;
+    });
+
     // 更新任務表單的劇情下拉選單
     const selects = [document.getElementById('questChainSelect'), document.getElementById('editQuestChainSelect')];
     selects.forEach(sel => {
@@ -129,7 +137,10 @@ function setupTaskTypeToggle(selectId, divId) {
 setupTaskTypeToggle('taskTypeSelect', 'multipleChoiceOptions');
 setupTaskTypeToggle('editTaskTypeSelect', 'editMultipleChoiceOptions');
 
-loadQuestChains(); // 載入劇情列表
+// 確保先載入劇情，再載入任務
+loadQuestChains().then(() => {
+  loadTasks();
+});
 
 // 讀取任務列表
 function loadTasks() {
@@ -141,8 +152,7 @@ function loadTasks() {
       if (!data.success) return;
       const container = document.getElementById('allTasks');
       container.innerHTML = '';
-
-      // 顯示用戶角色信息
+      
       const userRole = data.userRole || loginUser.role;
       
       if (data.tasks.length === 0) {
@@ -150,28 +160,38 @@ function loadTasks() {
         return;
       }
 
-      data.tasks.forEach(task => {
-        const card = document.createElement('div');
-        card.className = 'card';
-
+      // 輔助函式：生成任務卡片 HTML
+      const createCardHtml = (task) => {
         // 創建者信息（只有管理員能看到）
         const creatorInfo = (userRole === 'admin' && task.created_by)
           ? `<div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.5rem;">👤 ${task.created_by}</div>`
           : '';
         
-        // 任務類型顯示
+        // 任務類型與標籤顯示
         let typeText = '問答題';
-        let typeColor = 'bg-gray-100 text-gray-800';
         if (task.task_type === 'multiple_choice') { typeText = '選擇題'; }
         else if (task.task_type === 'photo') { typeText = '拍照任務'; }
 
-        card.innerHTML = `
+        // 任務分類標籤 (單題/限時/劇情)
+        let categoryTag = '';
+        if (task.type === 'quest') {
+          categoryTag = `<span style="font-size:0.75rem; background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:4px; margin-right:4px;">📚 劇情 (第${task.quest_order}關)</span>`;
+        } else if (task.type === 'timed') {
+          categoryTag = `<span style="font-size:0.75rem; background:#fef3c7; color:#92400e; padding:2px 6px; border-radius:4px; margin-right:4px;">⏱ 限時</span>`;
+        } else {
+          categoryTag = `<span style="font-size:0.75rem; background:#f3f4f6; color:#374151; padding:2px 6px; border-radius:4px; margin-right:4px;">📝 單題</span>`;
+        }
+
+        return `
           <img src="${task.photoUrl}" class="card-img" alt="任務照片" style="height:160px;" onerror="this.src='/images/mascot.png'">
           <div class="card-body">
             ${creatorInfo}
-            <div class="card-title" style="font-size:1.1rem; display:flex; justify-content:space-between; align-items:start;">
-              <span>${task.name}</span>
-              <span style="font-size:0.8rem; background:#f3f4f6; padding:2px 8px; border-radius:12px; white-space:nowrap;">${typeText}</span>
+            <div class="card-title" style="display:flex; flex-direction:column; gap:4px; margin-bottom:8px;">
+              <div style="font-size:1.1rem; font-weight:bold;">${task.name}</div>
+              <div style="display:flex; flex-wrap:wrap; gap:4px;">
+                ${categoryTag}
+                <span style="font-size:0.75rem; background:#f3f4f6; padding:2px 6px; border-radius:4px;">${typeText}</span>
+              </div>
             </div>
             <div class="card-text">
               <div style="font-size:0.9rem; margin-bottom:4px;">📍 (${task.lat}, ${task.lng})</div>
@@ -187,12 +207,85 @@ function loadTasks() {
             </div>
           </div>
         `;
+      };
+
+      // 1. 分組任務
+      const otherTasks = [];
+      const questGroups = {}; // chainId -> tasks[]
+
+      data.tasks.forEach(task => {
+        if (task.type === 'quest' && task.quest_chain_id) {
+          if (!questGroups[task.quest_chain_id]) {
+            questGroups[task.quest_chain_id] = [];
+          }
+          questGroups[task.quest_chain_id].push(task);
+        } else {
+          otherTasks.push(task);
+        }
+      });
+
+      // 2. 渲染一般任務 (直接放在 Grid 中)
+      otherTasks.forEach(task => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = createCardHtml(task);
         container.appendChild(card);
       });
-      // 編輯按鈕
-      container.querySelectorAll('.editBtn').forEach(btn => {
-        btn.onclick = function() {
-          const id = this.dataset.id;
+
+      // 3. 渲染劇情任務群組
+      // 將群組按 ID 或標題排序
+      const sortedChainIds = Object.keys(questGroups).sort((a, b) => b - a); // 新的在上面?
+      
+      sortedChainIds.forEach(chainId => {
+        const tasks = questGroups[chainId];
+        // 依關卡順序排序
+        tasks.sort((a, b) => (a.quest_order || 0) - (b.quest_order || 0));
+        
+        const chainInfo = globalQuestChainsMap[chainId] || { title: `未知劇情 (ID: ${chainId})`, description: '' };
+        
+        const groupContainer = document.createElement('div');
+        groupContainer.style.gridColumn = '1 / -1'; // 佔滿 Grid 整行
+        groupContainer.style.marginTop = '10px';
+        groupContainer.style.marginBottom = '10px';
+        
+        const details = document.createElement('details');
+        details.innerHTML = `
+          <summary style="padding:12px 15px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; cursor:pointer; font-weight:bold; display:flex; justify-content:space-between; align-items:center; outline:none;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:1.2rem;">📚</span>
+              <div>
+                <div style="color:#0369a1;">${chainInfo.title}</div>
+                <div style="font-size:0.85rem; color:#64748b; font-weight:normal;">共 ${tasks.length} 個關卡 • 全破獎勵 ${chainInfo.chain_points || 0} 分</div>
+              </div>
+            </div>
+            <span style="font-size:0.85rem; color:#0ea5e9;">▼ 展開/收合</span>
+          </summary>
+          <div class="quest-tasks-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:20px; padding:20px; background:#f8fafc; border:1px solid #e2e8f0; border-top:none; border-radius:0 0 8px 8px;">
+            <!-- 任務卡片放這裡 -->
+          </div>
+        `;
+        
+        const grid = details.querySelector('.quest-tasks-grid');
+        tasks.forEach(task => {
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.style.background = 'white';
+          card.style.borderColor = '#e2e8f0';
+          card.innerHTML = createCardHtml(task);
+          grid.appendChild(card);
+        });
+        
+        groupContainer.appendChild(details);
+        container.appendChild(groupContainer);
+      });
+
+      // 綁定編輯按鈕事件 (使用事件委派，因為按鈕現在分布在不同層級)
+      container.addEventListener('click', function(e) {
+        const editBtn = e.target.closest('.editBtn');
+        const delBtn = e.target.closest('.delBtn');
+        
+        if (editBtn) {
+          const id = editBtn.dataset.id;
           fetch(`${API_BASE}/api/tasks/${id}`)
             .then(res => res.json())
             .then(data => {
@@ -284,13 +377,11 @@ function loadTasks() {
               // 開啟 Modal
               document.getElementById('editModal').classList.add('show');
             });
-        };
-      });
-      // 刪除按鈕
-      container.querySelectorAll('.delBtn').forEach(btn => {
-        btn.onclick = function() {
+        }
+        
+        if (delBtn) {
           if (!confirm('確定要刪除這個任務嗎？')) return;
-          const id = this.dataset.id;
+          const id = delBtn.dataset.id;
           fetch(`${API_BASE}/api/tasks/${id}`, { 
             method: 'DELETE',
             headers: { 'x-username': loginUser.username }
@@ -300,8 +391,9 @@ function loadTasks() {
               if (data.success) loadTasks();
               else alert(data.message || '刪除失敗');
             });
-        };
+        }
       });
+
     });
 }
 
