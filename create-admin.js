@@ -14,15 +14,26 @@ async function createDefaultAdmin() {
     const [rows] = await connection.execute('SELECT id FROM users WHERE username = ?', ['admin']);
     
     if (rows.length === 0) {
-      console.log('📦 建立預設 admin 帳號...');
+      console.log('📦 準備建立預設 admin 帳號...');
+      
+      // 從環境變數讀取初始密碼，如果沒有則生成隨機密碼
+      const initialPassword = process.env.INITIAL_ADMIN_PASSWORD || Math.random().toString(36).slice(-10);
+      
       // 密碼加密
-      const hashedPassword = await bcrypt.hash('admin', 10);
+      const hashedPassword = await bcrypt.hash(initialPassword, 10);
       
       await connection.execute(
         'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
         ['admin', hashedPassword, 'admin']
       );
-      console.log('✅ 預設 admin 帳號建立完成 (帳號: admin / 密碼: admin)');
+      
+      console.log('✅ 預設 admin 帳號建立完成');
+      console.log('   帳號: admin');
+      if (process.env.INITIAL_ADMIN_PASSWORD) {
+        console.log('   密碼: (已使用環境變數 INITIAL_ADMIN_PASSWORD 設定)');
+      } else {
+        console.log(`   密碼: ${initialPassword}  <-- 請記下此密碼並儘快登入修改！`);
+      }
     } else {
       console.log('ℹ️ admin 帳號已存在，跳過');
     }
