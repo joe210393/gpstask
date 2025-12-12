@@ -328,9 +328,9 @@
     // Header功能
     window.loginUser = JSON.parse(localStorage.getItem('loginUser') || 'null');
 
-    // 僅限管理員或工作人員使用
-    if (!window.loginUser || (window.loginUser.role !== 'admin' && window.loginUser.role !== 'shop')) {
-      alert('僅限管理員或工作人員使用');
+    // 僅限審核角色使用（admin/shop/staff）
+    if (!window.loginUser || (window.loginUser.role !== 'admin' && window.loginUser.role !== 'shop' && window.loginUser.role !== 'staff')) {
+      alert('僅限管理員/商店/工作人員使用');
       window.location.href = '/index.html';
     }
 
@@ -350,9 +350,13 @@
       } else if (window.loginUser.role === 'shop') {
         document.getElementById('navStaff').style.display = '';
         document.getElementById('navRedeem').style.display = '';
+      } else if (window.loginUser.role === 'staff') {
+        // staff：僅審核，不顯示新增任務/兌換管理
+        document.getElementById('navStaff').style.display = 'none';
+        document.getElementById('navRedeem').style.display = 'none';
       }
       // 工作人員與管理員不顯示任務列表
-      if (window.loginUser && (window.loginUser.role === 'shop' || window.loginUser.role === 'admin')) {
+      if (window.loginUser && (window.loginUser.role === 'shop' || window.loginUser.role === 'admin' || window.loginUser.role === 'staff')) {
         const navTasksList = document.getElementById('navTasksList');
         if (navTasksList) navTasksList.style.display = 'none';
         // navUserTasks is already hidden by default in this file and not shown by logic
@@ -368,6 +372,8 @@
           return `管理員：${loginUser.username}`;
         case 'shop':
           return `商店：${loginUser.username}`;
+        case 'staff':
+          return `工作人員：${loginUser.username}`;
         case 'user':
           return `用戶：${loginUser.username}`;
         default:
