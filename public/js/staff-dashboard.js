@@ -48,14 +48,47 @@ function loadQuestChains() {
       } else {
         data.questChains.forEach(q => {
           const div = document.createElement('div');
-          div.style.cssText = 'background:white; padding:15px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.05); border-left:4px solid #007bff;';
+          div.style.cssText = 'background:white; padding:15px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.05); border-left:4px solid #007bff; position: relative;';
           div.innerHTML = `
-            <div style="font-weight:bold; font-size:1.1rem; margin-bottom:5px;">${q.title}</div>
+            <div style="font-weight:bold; font-size:1.1rem; margin-bottom:5px; padding-right: 30px;">${q.title}</div>
             <div style="font-size:0.9rem; color:#666; margin-bottom:8px;">${q.description || '無描述'}</div>
             <div style="font-size:0.85rem; color:#28a745;">🏆 全破獎勵: ${q.chain_points} 分</div>
-            ${q.badge_name ? `<div style="font-size:0.85rem; color:#e0a800;">🎖 獎章: ${q.badge_name}</div>` : ''}
+            ${q.badge_name ? `
+              <div style="font-size:0.85rem; color:#e0a800; display:flex; align-items:center; gap:5px; margin-top:5px;">
+                🎖 獎章: ${q.badge_name}
+                ${q.badge_image ? `<img src="${q.badge_image}" style="width:20px; height:20px; object-fit:contain;">` : ''}
+              </div>` : ''}
+            
+            <button class="btn-delete-quest" data-id="${q.id}" style="position: absolute; top: 10px; right: 10px; background: none; border: none; color: #dc3545; cursor: pointer; font-size: 1.2rem; padding: 0;" title="刪除劇情">&times;</button>
           `;
           list.appendChild(div);
+        });
+
+        // 綁定刪除按鈕事件
+        document.querySelectorAll('.btn-delete-quest').forEach(btn => {
+          btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (!confirm('確定要刪除這個劇情嗎？\n注意：如果該劇情下還有任務，將無法刪除。')) return;
+            
+            const id = this.dataset.id;
+            fetch(`${API_BASE}/api/quest-chains/${id}`, {
+              method: 'DELETE',
+              headers: { 'x-username': loginUser.username }
+            })
+            .then(res => res.json())
+            .then(resData => {
+              if (resData.success) {
+                alert('刪除成功');
+                loadQuestChains();
+              } else {
+                alert(resData.message || '刪除失敗');
+              }
+            })
+            .catch(err => {
+              console.error(err);
+              alert('發生錯誤');
+            });
+          });
         });
       }
     }
@@ -66,6 +99,25 @@ function loadQuestChains() {
 const btnCreateQuest = document.getElementById('btnCreateQuest');
 const questModal = document.getElementById('questModal');
 const closeQuestModal = document.getElementById('closeQuestModal');
+
+// 圖片預覽邏輯
+const questBadgeInput = document.getElementById('questBadgeInput');
+const questBadgePreview = document.getElementById('questBadgePreview');
+if (questBadgeInput) {
+  questBadgeInput.addEventListener('change', function() {
+    const file = this.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        questBadgePreview.src = e.target.result;
+        questBadgePreview.style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    } else {
+      questBadgePreview.style.display = 'none';
+    }
+  });
+}
 
 if (btnCreateQuest && questModal) {
   btnCreateQuest.onclick = () => questModal.classList.add('show');
@@ -82,23 +134,38 @@ if (createQuestForm) {
     const description = form.description.value.trim();
     const chain_points = form.chain_points.value;
     const badge_name = form.badge_name.value.trim();
-    const badge_image = form.badge_image.value.trim();
+    const badgeImageFile = form.badge_image.files[0];
+
+    // 使用 FormData 上傳
+    const fd = new FormData();
+    fd.append('title', title);
+    fd.append('description', description);
+    fd.append('chain_points', chain_points);
+    fd.append('badge_name', badge_name);
+    if (badgeImageFile) {
+      fd.append('badge_image', badgeImageFile);
+    }
 
     fetch(`${API_BASE}/api/quest-chains`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-username': loginUser.username },
-      body: JSON.stringify({ title, description, chain_points, badge_name, badge_image })
+      headers: { 'x-username': loginUser.username },
+      body: fd // 不用設定 Content-Type，fetch 會自動設定 multipart/form-data
     })
     .then(res => res.json())
     .then(data => {
       if (data.success) {
         alert('劇情建立成功！');
         form.reset();
+        if (questBadgePreview) questBadgePreview.style.display = 'none';
         questModal.classList.remove('show');
         loadQuestChains();
       } else {
         alert(data.message || '建立失敗');
       }
+    })
+    .catch(err => {
+      console.error(err);
+      alert('發生錯誤');
     });
   });
 }

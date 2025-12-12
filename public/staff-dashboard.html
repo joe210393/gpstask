@@ -391,10 +391,12 @@
               <label class="form-label">全破獎章名稱</label>
               <input class="form-input" type="text" name="badge_name" placeholder="例如：樂樂園勇者" />
             </div>
-            <!-- 暫時不支援上傳獎章圖片，先用輸入網址或預設 -->
             <div class="form-group">
               <label class="form-label">獎章圖片 (選填)</label>
-              <input class="form-input" type="text" name="badge_image" placeholder="/images/badges/default.png" />
+              <input class="form-input" type="file" name="badge_image" accept="image/*" id="questBadgeInput" />
+              <div style="margin-top: 10px;">
+                <img id="questBadgePreview" src="" style="max-width: 100px; max-height: 100px; display: none; border-radius: 8px; border: 1px solid #ddd;" />
+              </div>
             </div>
             <button type="submit" class="btn btn-primary w-100">建立劇情</button>
           </form>

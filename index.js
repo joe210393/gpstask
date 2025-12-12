@@ -617,12 +617,21 @@ app.get('/api/quest-chains', staffOrAdminAuth, async (req, res) => {
   }
 });
 
-// 新增劇情
-app.post('/api/quest-chains', staffOrAdminAuth, async (req, res) => {
-  const { title, description, chain_points, badge_name, badge_image } = req.body;
+// 新增劇情 (支援圖片上傳)
+app.post('/api/quest-chains', staffOrAdminAuth, upload.single('badge_image'), async (req, res) => {
+  const { title, description, chain_points, badge_name } = req.body;
   if (!title) return res.status(400).json({ success: false, message: '缺少標題' });
 
   const creator = req.user?.username || req.headers['x-username'];
+  
+  // 處理上傳的圖片
+  let badge_image = null;
+  if (req.file) {
+    badge_image = '/images/' + req.file.filename;
+  } else if (req.body.badge_image_url) {
+     // 如果有提供 URL (兼容舊方式或直接輸入)
+     badge_image = req.body.badge_image_url;
+  }
 
   let conn;
   try {
@@ -632,6 +641,51 @@ app.post('/api/quest-chains', staffOrAdminAuth, async (req, res) => {
       [title, description, chain_points || 0, badge_name || null, badge_image || null, creator]
     );
     res.json({ success: true, message: '劇情建立成功' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) await conn.end();
+  }
+});
+
+// 刪除劇情
+app.delete('/api/quest-chains/:id', staffOrAdminAuth, async (req, res) => {
+  const { id } = req.params;
+  const username = req.user?.username || req.headers['x-username'];
+  const userRole = req.user?.role;
+
+  let conn;
+  try {
+    conn = await mysql.createConnection(dbConfig);
+    
+    // 1. 檢查權限與擁有者
+    const [quests] = await conn.execute('SELECT created_by FROM quest_chains WHERE id = ?', [id]);
+    if (quests.length === 0) {
+      return res.status(404).json({ success: false, message: '找不到此劇情' });
+    }
+    
+    // Admin 可以刪除所有；Shop 只能刪除自己的
+    if (userRole !== 'admin' && quests[0].created_by !== username) {
+      return res.status(403).json({ success: false, message: '無權限刪除此劇情' });
+    }
+
+    // 2. 檢查是否有任務關聯到此劇情
+    const [tasks] = await conn.execute('SELECT id FROM tasks WHERE quest_chain_id = ?', [id]);
+    if (tasks.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `無法刪除：此劇情尚有 ${tasks.length} 個任務關聯中。請先刪除或移除相關任務。` 
+      });
+    }
+
+    // 3. 執行刪除
+    // 先刪除用戶的劇情進度 (user_quests) - 雖然理論上沒有任務應該就沒有進度，但保險起見
+    await conn.execute('DELETE FROM user_quests WHERE quest_chain_id = ?', [id]);
+    // 刪除劇情
+    await conn.execute('DELETE FROM quest_chains WHERE id = ?', [id]);
+
+    res.json({ success: true, message: '劇情已刪除' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
