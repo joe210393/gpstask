@@ -563,12 +563,19 @@ app.get('/api/tasks/admin', authenticateToken, requireRole('shop', 'admin'), asy
 
 // === 劇情任務 (Quest Chains) API ===
 
-// 取得所有劇情 (管理員/工作人員)
+// 取得所有劇情 (admin / shop)
 app.get('/api/quest-chains', staffOrAdminAuth, async (req, res) => {
   let conn;
   try {
     conn = await mysql.createConnection(dbConfig);
-    const [rows] = await conn.execute('SELECT * FROM quest_chains ORDER BY id DESC');
+    const { username, role } = req.user || {};
+    // admin 看全部；shop 只看自己建立的劇情
+    const [rows] = await conn.execute(
+      role === 'admin'
+        ? 'SELECT * FROM quest_chains ORDER BY id DESC'
+        : 'SELECT * FROM quest_chains WHERE created_by = ? ORDER BY id DESC',
+      role === 'admin' ? [] : [username]
+    );
     res.json({ success: true, questChains: rows });
   } catch (err) {
     console.error(err);
@@ -583,12 +590,14 @@ app.post('/api/quest-chains', staffOrAdminAuth, async (req, res) => {
   const { title, description, chain_points, badge_name, badge_image } = req.body;
   if (!title) return res.status(400).json({ success: false, message: '缺少標題' });
 
+  const creator = req.user?.username || req.headers['x-username'];
+
   let conn;
   try {
     conn = await mysql.createConnection(dbConfig);
     await conn.execute(
-      'INSERT INTO quest_chains (title, description, chain_points, badge_name, badge_image) VALUES (?, ?, ?, ?, ?)',
-      [title, description, chain_points || 0, badge_name || null, badge_image || null]
+      'INSERT INTO quest_chains (title, description, chain_points, badge_name, badge_image, created_by) VALUES (?, ?, ?, ?, ?, ?)',
+      [title, description, chain_points || 0, badge_name || null, badge_image || null, creator]
     );
     res.json({ success: true, message: '劇情建立成功' });
   } catch (err) {
@@ -610,8 +619,32 @@ app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
 
   console.log('[POST /api/tasks] Received:', req.body);
 
+  const requester = req.user || {};
+  const requesterRole = requester.role;
+  const requesterName = requester.username;
+
   if (!name || !lat || !lng || !radius || !description || !photoUrl) {
     return res.status(400).json({ success: false, message: '缺少參數' });
+  }
+
+  // 商店新增任務：若指定 quest_chain_id，必須是自己建立的劇情
+  if (requesterRole === 'shop' && quest_chain_id) {
+    let connCheck;
+    try {
+      connCheck = await mysql.createConnection(dbConfig);
+      const [chains] = await connCheck.execute(
+        'SELECT id FROM quest_chains WHERE id = ? AND created_by = ?',
+        [quest_chain_id, requesterName]
+      );
+      if (chains.length === 0) {
+        return res.status(403).json({ success: false, message: '無權使用其他人建立的劇情' });
+      }
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ success: false, message: '伺服器錯誤' });
+    } finally {
+      if (connCheck) await connCheck.end();
+    }
   }
 
   let conn;
@@ -1088,6 +1121,8 @@ function staffOrAdminAuth(req, res, next) {
         if (rows.length === 0 || (rows[0].role !== 'shop' && rows[0].role !== 'admin')) {
           return res.status(403).json({ success: false, message: '無權限' });
         }
+        // 將角色附加到請求，方便後續判斷
+        req.user = { username, role: rows[0].role };
         next();
       })
       .catch(err => {
