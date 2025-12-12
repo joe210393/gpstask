@@ -335,7 +335,15 @@ app.post('/api/login', async (req, res) => {
       return res.status(400).json({ success: false, message: '角色錯誤' });
     }
   } catch (err) {
-    console.error(err);
+    console.error('登入 API 錯誤:', err);
+    // 如果是資料庫連接錯誤，返回更清楚的錯誤訊息
+    if (err.code === 'ER_ACCESS_DENIED_ERROR') {
+      console.error('資料庫連接失敗 - 請檢查環境變數設定');
+      return res.status(503).json({ 
+        success: false, 
+        message: '資料庫連接失敗，請聯繫管理員檢查伺服器設定' 
+      });
+    }
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
     if (conn) await conn.end();
