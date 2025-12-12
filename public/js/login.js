@@ -25,14 +25,19 @@ if (formUser) {
     const data = await res.json();
     if (data.success) {
       localStorage.setItem('loginUser', JSON.stringify(data.user));
-      window.location.href = '/index.html';
+      // staff 也走一般登入，但登入後導向審核頁
+      if (data.user && data.user.role === 'staff') {
+        window.location.href = '/user-tasks.html';
+      } else {
+        window.location.href = '/index.html';
+      }
     } else {
       document.getElementById('loginMsgUser').textContent = data.message || '登入失敗';
     }
   };
 }
 
-// 工作人員登入
+// 工作人員登入（僅 admin/shop）
 const formStaff = document.getElementById('loginFormStaff');
 if (formStaff) {
   formStaff.onsubmit = async function(e) {
@@ -43,13 +48,14 @@ if (formStaff) {
     const res = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password, role: 'shop' })
+      body: JSON.stringify({ username, password, role: 'staff_portal' })
     });
 
     const data = await res.json();
     if (data.success) {
       localStorage.setItem('loginUser', JSON.stringify(data.user));
-      window.location.href = '/index.html';
+      // admin/shop 登入後導向後台
+      window.location.href = '/staff-dashboard.html';
     } else {
       document.getElementById('loginMsgStaff').textContent = data.message || '登入失敗';
     }

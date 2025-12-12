@@ -224,6 +224,10 @@ const upload = multer({
   }
 });
 
+// 登入 API
+// - role=user：一般用戶登入（手機門號，不需密碼），同時允許 staff 也用此入口登入
+// - role=staff_portal：工作人員入口（帳號密碼），僅允許 admin/shop
+// - 兼容：role=shop/admin/staff（舊版工作人員入口）
 app.post('/api/login', async (req, res) => {
   const { username, password, role } = req.body;
   if (!username || !role) {
@@ -234,7 +238,10 @@ app.post('/api/login', async (req, res) => {
     conn = await mysql.createConnection(dbConfig);
     if (role === 'user') {
       // 手機門號登入 - 不需要密碼驗證
-      const [users] = await conn.execute('SELECT * FROM users WHERE username = ? AND role = ?', [username, 'user']);
+      const [users] = await conn.execute(
+        'SELECT * FROM users WHERE username = ? AND role IN (?, ?)',
+        [username, 'user', 'staff']
+      );
       if (users.length === 0) {
         return res.status(400).json({ success: false, message: '查無此用戶' });
       }
@@ -258,9 +265,13 @@ app.post('/api/login', async (req, res) => {
       };
 
       res.json({ success: true, user: userResponse });
-    } else if (role === 'staff' || role === 'shop' || role === 'admin') {
-      // 帳號密碼登入 - 支援舊的 'staff' 和新的 'shop' 角色
-      const [users] = await conn.execute('SELECT * FROM users WHERE username = ? AND role IN (?, ?, ?)', [username, 'staff', 'shop', 'admin']);
+    } else if (role === 'staff_portal' || role === 'shop' || role === 'admin' || role === 'staff') {
+      // 工作人員入口（帳號密碼）
+      // 新規則：僅允許 admin / shop 走此入口（staff 一律走一般用戶登入）
+      const [users] = await conn.execute(
+        'SELECT * FROM users WHERE username = ? AND role IN (?, ?)',
+        [username, 'shop', 'admin']
+      );
       if (users.length === 0) {
         return res.status(400).json({ success: false, message: '查無此帳號' });
       }
@@ -338,17 +349,13 @@ app.post('/api/register', async (req, res) => {
   if (!username || !role) {
     return res.status(400).json({ success: false, message: '缺少參數' });
   }
-  if (role === 'user') {
-    // 手機門號註冊，不需密碼
-    if (!/^09[0-9]{8}$/.test(username)) {
-      return res.status(400).json({ success: false, message: '請輸入正確的手機門號' });
-    }
-  } else if (role === 'staff' || role === 'admin') {
-    if (!password) {
-      return res.status(400).json({ success: false, message: '請填寫密碼' });
-    }
-  } else {
-    return res.status(400).json({ success: false, message: '角色錯誤' });
+  // 新規則：註冊僅允許一般用戶（手機門號）。staff 需由 admin/shop 指派；shop/admin 需由 admin 建立。
+  if (role !== 'user') {
+    return res.status(403).json({ success: false, message: '僅允許註冊一般用戶，工作人員/商店/管理員帳號請由管理員建立或指派' });
+  }
+  // 手機門號註冊，不需密碼
+  if (!/^09[0-9]{8}$/.test(username)) {
+    return res.status(400).json({ success: false, message: '請輸入正確的手機門號' });
   }
   let conn;
   try {
@@ -361,9 +368,150 @@ app.post('/api/register', async (req, res) => {
     // 寫入資料庫
     await conn.execute(
       'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
-      [username, password || null, role]
+      [username, null, 'user']
     );
     res.json({ success: true, message: '註冊成功' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) await conn.end();
+  }
+});
+
+// ===== 帳號/權限管理（新規則）=====
+
+// admin 建立 admin/shop 帳號（帳號密碼）
+app.post('/api/admin/accounts', authenticateToken, requireRole('admin'), async (req, res) => {
+  const { username, password, role } = req.body;
+  if (!username || !password || !role) {
+    return res.status(400).json({ success: false, message: '缺少參數' });
+  }
+  if (!['admin', 'shop'].includes(role)) {
+    return res.status(400).json({ success: false, message: '僅允許建立 admin 或 shop 帳號' });
+  }
+  let conn;
+  try {
+    conn = await mysql.createConnection(dbConfig);
+    const [exist] = await conn.execute('SELECT id FROM users WHERE username = ?', [username]);
+    if (exist.length > 0) return res.status(400).json({ success: false, message: '帳號已存在' });
+
+    const hashed = await bcrypt.hash(password, 10);
+    await conn.execute(
+      'INSERT INTO users (username, password, role, created_by) VALUES (?, ?, ?, ?)',
+      [username, hashed, role, req.user.username]
+    );
+    res.json({ success: true, message: '建立成功' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) await conn.end();
+  }
+});
+
+// admin/shop 指派 staff：指定人選需先註冊 user（手機門號）
+app.post('/api/staff/assign', authenticateToken, requireRole('admin', 'shop'), async (req, res) => {
+  const { username } = req.body;
+  if (!username) return res.status(400).json({ success: false, message: '缺少 username' });
+  let conn;
+  try {
+    conn = await mysql.createConnection(dbConfig);
+    const [rows] = await conn.execute('SELECT id, role FROM users WHERE username = ?', [username]);
+    if (rows.length === 0) return res.status(404).json({ success: false, message: '找不到使用者' });
+    const u = rows[0];
+    if (u.role === 'admin' || u.role === 'shop') return res.status(400).json({ success: false, message: '不可將 admin/shop 指派為 staff' });
+    // 允許 user -> staff、或 staff 重新綁定（由 admin）
+    if (u.role === 'staff' && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: '此帳號已是 staff，僅 admin 可重新指派' });
+    }
+    await conn.execute('UPDATE users SET role = ?, managed_by = ? WHERE id = ?', ['staff', req.user.username, u.id]);
+    res.json({ success: true, message: '已指派為 staff' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) await conn.end();
+  }
+});
+
+// admin/shop 撤銷 staff：staff 變回 user，即可接取任務
+app.post('/api/staff/revoke', authenticateToken, requireRole('admin', 'shop'), async (req, res) => {
+  const { username } = req.body;
+  if (!username) return res.status(400).json({ success: false, message: '缺少 username' });
+  let conn;
+  try {
+    conn = await mysql.createConnection(dbConfig);
+    const [rows] = await conn.execute('SELECT id, role, managed_by FROM users WHERE username = ?', [username]);
+    if (rows.length === 0) return res.status(404).json({ success: false, message: '找不到使用者' });
+    const u = rows[0];
+    if (u.role !== 'staff') return res.status(400).json({ success: false, message: '此帳號不是 staff' });
+    if (req.user.role === 'shop' && u.managed_by !== req.user.username) {
+      return res.status(403).json({ success: false, message: '無權限撤銷非本店 staff' });
+    }
+    await conn.execute('UPDATE users SET role = ?, managed_by = NULL WHERE id = ?', ['user', u.id]);
+    res.json({ success: true, message: '已撤銷 staff，恢復為一般用戶' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) await conn.end();
+  }
+});
+
+// admin/shop 修改自己的密碼（第一次登入後可改）
+app.post('/api/change-password', authenticateToken, requireRole('admin', 'shop'), async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  if (!oldPassword || !newPassword) return res.status(400).json({ success: false, message: '缺少參數' });
+  if (String(newPassword).length < 6) return res.status(400).json({ success: false, message: '新密碼至少 6 碼' });
+  let conn;
+  try {
+    conn = await mysql.createConnection(dbConfig);
+    const [rows] = await conn.execute('SELECT id, password FROM users WHERE username = ?', [req.user.username]);
+    if (rows.length === 0) return res.status(404).json({ success: false, message: '找不到使用者' });
+    const stored = rows[0].password;
+    const ok = stored && (stored.startsWith('$2a$') || stored.startsWith('$2b$')) && await bcrypt.compare(oldPassword, stored);
+    if (!ok) return res.status(400).json({ success: false, message: '舊密碼錯誤' });
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await conn.execute('UPDATE users SET password = ? WHERE id = ?', [hashed, rows[0].id]);
+    res.json({ success: true, message: '密碼已更新' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) await conn.end();
+  }
+});
+
+// shop 店家資訊（未來地圖顯示用）
+app.get('/api/shop/profile', authenticateToken, requireRole('shop', 'admin'), async (req, res) => {
+  let conn;
+  try {
+    conn = await mysql.createConnection(dbConfig);
+    const [rows] = await conn.execute(
+      'SELECT username, role, shop_name, shop_address, shop_description FROM users WHERE username = ?',
+      [req.user.username]
+    );
+    if (rows.length === 0) return res.status(404).json({ success: false, message: '找不到帳號' });
+    res.json({ success: true, profile: rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) await conn.end();
+  }
+});
+
+app.put('/api/shop/profile', authenticateToken, requireRole('shop', 'admin'), async (req, res) => {
+  const { shop_name, shop_address, shop_description } = req.body;
+  let conn;
+  try {
+    conn = await mysql.createConnection(dbConfig);
+    await conn.execute(
+      'UPDATE users SET shop_name = ?, shop_address = ?, shop_description = ? WHERE username = ?',
+      [shop_name || null, shop_address || null, shop_description || null, req.user.username]
+    );
+    res.json({ success: true, message: '店家資訊已更新' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
@@ -613,7 +761,7 @@ app.post('/api/user-tasks', async (req, res) => {
 });
 
 // 管理員刪除用戶任務紀錄 (重置任務狀態)
-app.delete('/api/user-tasks/:id', staffOrAdminAuth, async (req, res) => {
+app.delete('/api/user-tasks/:id', authenticateToken, requireRole('admin'), async (req, res) => {
   const { id } = req.params;
   let conn;
   try {
@@ -632,8 +780,8 @@ app.delete('/api/user-tasks/:id', staffOrAdminAuth, async (req, res) => {
   }
 });
 
-// 完成任務（需傳 username, task_id）
-app.post('/api/user-tasks/finish', async (req, res) => {
+// 完成任務（人工審核用，需 reviewer 權限）
+app.post('/api/user-tasks/finish', reviewerAuth, async (req, res) => {
   const { username, task_id } = req.body;
   if (!username || !task_id) return res.status(400).json({ success: false, message: '缺少參數' });
   let conn;
@@ -645,10 +793,21 @@ app.post('/api/user-tasks/finish', async (req, res) => {
     if (users.length === 0) return res.status(400).json({ success: false, message: '找不到使用者' });
     const userId = users[0].id;
 
-    // 取得任務資訊
-    const [tasks] = await conn.execute('SELECT name, points FROM tasks WHERE id = ?', [task_id]);
+    // 取得任務資訊 + 建立者（用於權限判斷）
+    const [tasks] = await conn.execute('SELECT name, points, created_by FROM tasks WHERE id = ?', [task_id]);
     if (tasks.length === 0) return res.status(400).json({ success: false, message: '找不到任務' });
     const task = tasks[0];
+
+    // 權限範圍判斷（admin 全部；shop 僅自己；staff 僅所屬 shop/admin）
+    if (req.user.role === 'shop') {
+      if (task.created_by !== req.user.username) {
+        return res.status(403).json({ success: false, message: '無權限審核非本店任務' });
+      }
+    } else if (req.user.role === 'staff') {
+      if (!req.user.managed_by || task.created_by !== req.user.managed_by) {
+        return res.status(403).json({ success: false, message: '無權限審核非所屬店家任務' });
+      }
+    }
 
     // 開始交易
     await conn.beginTransaction();
@@ -951,16 +1110,58 @@ function staffOrAdminAuth(req, res, next) {
   });
 }
 
+// ===== Reviewer 權限：staff / shop / admin 都可審核（新規則）=====
+function reviewerAuth(req, res, next) {
+  authenticateTokenCompat(req, res, async () => {
+    if (!req.user || !req.user.username) return res.status(401).json({ success: false, message: '未認證' });
+    try {
+      const conn = await mysql.createConnection(dbConfig);
+      const [rows] = await conn.execute('SELECT role, managed_by FROM users WHERE username = ?', [req.user.username]);
+      await conn.end();
+      if (rows.length === 0) return res.status(401).json({ success: false, message: '用戶不存在' });
+      const role = rows[0].role;
+      if (!['admin', 'shop', 'staff'].includes(role)) {
+        return res.status(403).json({ success: false, message: '無權限' });
+      }
+      // 強制以 DB 為準（避免 token 舊資料）
+      req.user.role = role;
+      req.user.managed_by = rows[0].managed_by || null;
+      return next();
+    } catch (e) {
+      console.error(e);
+      return res.status(500).json({ success: false, message: '伺服器錯誤' });
+    }
+  });
+}
+
 // ===== Staff 兌換任務獎勵 =====
-app.post('/api/user-tasks/:id/redeem', staffOrAdminAuth, async (req, res) => {
+app.post('/api/user-tasks/:id/redeem', reviewerAuth, async (req, res) => {
   const { id } = req.params;
-  const staffUser = req.headers['x-username'];
+  const staffUser = req.user.username;
   let conn;
   try {
     conn = await mysql.createConnection(dbConfig);
-    // 只能兌換已完成且未兌換的
-    const [rows] = await conn.execute('SELECT * FROM user_tasks WHERE id = ? AND status = "完成" AND redeemed = 0', [id]);
+    // 只能兌換已完成且未兌換的（同時做任務建立者權限範圍判斷）
+    const [rows] = await conn.execute(
+      `SELECT ut.*, t.created_by
+       FROM user_tasks ut
+       JOIN tasks t ON ut.task_id = t.id
+       WHERE ut.id = ? AND ut.status = "完成" AND ut.redeemed = 0`,
+      [id]
+    );
     if (rows.length === 0) return res.status(400).json({ success: false, message: '不可重複兌換或尚未完成' });
+
+    const rec = rows[0];
+    if (req.user.role === 'shop') {
+      if (rec.created_by !== req.user.username) {
+        return res.status(403).json({ success: false, message: '無權限核銷非本店任務' });
+      }
+    } else if (req.user.role === 'staff') {
+      if (!req.user.managed_by || rec.created_by !== req.user.managed_by) {
+        return res.status(403).json({ success: false, message: '無權限核銷非所屬店家任務' });
+      }
+    }
+
     await conn.execute('UPDATE user_tasks SET redeemed = 1, redeemed_at = NOW(), redeemed_by = ? WHERE id = ?', [staffUser, id]);
     res.json({ success: true, message: '已兌換' });
   } catch (err) {
@@ -972,24 +1173,14 @@ app.post('/api/user-tasks/:id/redeem', staffOrAdminAuth, async (req, res) => {
 });
 
 // ===== Staff 查詢所有進行中任務（可搜尋） =====
-app.get('/api/user-tasks/in-progress', staffOrAdminAuth, async (req, res) => {
+app.get('/api/user-tasks/in-progress', reviewerAuth, async (req, res) => {
   const { taskName, username } = req.query;
   let conn;
   try {
     conn = await mysql.createConnection(dbConfig);
-    const reqUsername = req.headers['x-username'];
-
-    // 獲取用戶角色
-    const [userRows] = await conn.execute(
-      'SELECT role FROM users WHERE username = ?',
-      [reqUsername]
-    );
-
-    if (userRows.length === 0) {
-      return res.status(401).json({ success: false, message: '用戶不存在' });
-    }
-
-    const userRole = userRows[0].role;
+    const userRole = req.user.role;
+    const reqUsername = req.user.username;
+    const reviewerOwner = (userRole === 'staff') ? (req.user.managed_by || null) : reqUsername;
     let sql = `SELECT ut.id as user_task_id, ut.user_id, ut.task_id, ut.status, ut.started_at, ut.finished_at, ut.redeemed, ut.redeemed_at, ut.redeemed_by, ut.answer, u.username, t.name as task_name, t.description, t.points, t.created_by as task_creator, t.task_type
       FROM user_tasks ut
       JOIN users u ON ut.user_id = u.id
@@ -997,10 +1188,15 @@ app.get('/api/user-tasks/in-progress', staffOrAdminAuth, async (req, res) => {
       WHERE ut.status = '進行中'`;
     const params = [];
 
-    if (userRole === 'staff') {
-      // 工作人員只能看到自己創建的任務的進行中記錄
+    if (userRole === 'shop') {
+      // 商店只能看到自己創建的任務
       sql += ' AND t.created_by = ?';
-      params.push(reqUsername);
+      params.push(reviewerOwner);
+    } else if (userRole === 'staff') {
+      // staff 只審核所屬 shop/admin 指派的任務
+      if (!reviewerOwner) return res.json({ success: true, tasks: [] });
+      sql += ' AND t.created_by = ?';
+      params.push(reviewerOwner);
     }
 
     if (taskName) {
@@ -1023,24 +1219,14 @@ app.get('/api/user-tasks/in-progress', staffOrAdminAuth, async (req, res) => {
 });
 
 // ===== Staff 查詢所有已完成但未兌換的任務（可搜尋） =====
-app.get('/api/user-tasks/to-redeem', staffOrAdminAuth, async (req, res) => {
+app.get('/api/user-tasks/to-redeem', reviewerAuth, async (req, res) => {
   const { taskName, username } = req.query;
   let conn;
   try {
     conn = await mysql.createConnection(dbConfig);
-    const reqUsername = req.headers['x-username'];
-
-    // 獲取用戶角色
-    const [userRows] = await conn.execute(
-      'SELECT role FROM users WHERE username = ?',
-      [reqUsername]
-    );
-
-    if (userRows.length === 0) {
-      return res.status(401).json({ success: false, message: '用戶不存在' });
-    }
-
-    const userRole = userRows[0].role;
+    const userRole = req.user.role;
+    const reqUsername = req.user.username;
+    const reviewerOwner = (userRole === 'staff') ? (req.user.managed_by || null) : reqUsername;
     let sql = `SELECT ut.id as user_task_id, ut.user_id, ut.task_id, ut.status, ut.started_at, ut.finished_at, ut.redeemed, ut.redeemed_at, ut.redeemed_by, u.username, t.name as task_name, t.description, t.points, t.created_by as task_creator, t.task_type
       FROM user_tasks ut
       JOIN users u ON ut.user_id = u.id
@@ -1048,10 +1234,13 @@ app.get('/api/user-tasks/to-redeem', staffOrAdminAuth, async (req, res) => {
       WHERE ut.status = '完成' AND ut.redeemed = 0`;
     const params = [];
 
-    if (userRole === 'staff') {
-      // 工作人員只能看到自己創建的任務的已完成記錄
+    if (userRole === 'shop') {
       sql += ' AND t.created_by = ?';
-      params.push(reqUsername);
+      params.push(reviewerOwner);
+    } else if (userRole === 'staff') {
+      if (!reviewerOwner) return res.json({ success: true, tasks: [] });
+      sql += ' AND t.created_by = ?';
+      params.push(reviewerOwner);
     }
 
     if (taskName) {

@@ -46,6 +46,13 @@ document.addEventListener('DOMContentLoaded', () => {
     hide(navStaff);
     hide(navRedeem);
     showReviewLinks(false);
+  } else if (loginUser.role === 'staff') {
+    // staff：只能審核，不顯示任務列表/用戶任務管理
+    hide(navTasksList);
+    hide(navUserTasks);
+    hide(navStaff);
+    hide(navRedeem);
+    showReviewLinks(true);
   } else {
     hide(navTasksList);
     hide(navUserTasks);

@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // const API_BASE = 'http://localhost:3001'; // 本地開發環境 - 生產環境使用相對路徑
   const API_BASE = '';
 
-  if (window.loginUser.role === 'shop' || window.loginUser.role === 'admin') {
+  if (window.loginUser.role === 'shop' || window.loginUser.role === 'admin' || window.loginUser.role === 'staff') {
     document.getElementById('staffReviewSection').style.display = '';
     document.getElementById('userProgressSection').style.display = 'none';
 
@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (qTask) params.push('taskName=' + encodeURIComponent(qTask));
       if (qUser) params.push('username=' + encodeURIComponent(qUser));
       if (params.length) url += '?' + params.join('&');
-      fetch(url, { headers: { 'x-username': window.loginUser.username } })
+      fetch(url)
         .then(res => res.json())
         .then(data => {
           staffTasks = data.success ? (data.tasks || []) : [];
@@ -105,7 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'x-username': window.loginUser.username
+              // JWT cookie 會自動帶上
             },
             body: JSON.stringify({ username: task.username, task_id: task.task_id })
           })
@@ -133,7 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
               method: 'DELETE',
               headers: {
                 'Content-Type': 'application/json',
-                'x-username': window.loginUser.username
+                // JWT cookie 會自動帶上
               }
             })
             .then(res => res.json())
