@@ -30,7 +30,12 @@ function getDbConfig() {
     if (dbUrl.includes('${') && dbUrl.includes('}')) {
       throw new Error('DATABASE_URL appears to contain unexpanded variable syntax (e.g., ${VAR}). Please check your Zeabur environment variable configuration.');
     }
-    const url = new URL(dbUrl);
+    let url;
+    try {
+      url = new URL(dbUrl);
+    } catch (err) {
+      throw new Error(`DATABASE_URL format error: ${err.message}. Please ensure the URL is properly formatted (e.g., mysql://user:password@host:port/database). If your password contains special characters like !, @, #, :, /, you may need to URL-encode them.`);
+    }
     if (url.protocol !== 'mysql:') {
       throw new Error('DATABASE_URL must start with mysql://');
     }
@@ -40,7 +45,14 @@ function getDbConfig() {
     const port = url.port ? Number(url.port) : 3306;
     const database = (url.pathname || '').replace(/^\//, '');
     if (!host || !user || !password || !database) {
-      throw new Error('DATABASE_URL missing required parts (host/user/password/database)');
+      console.error('DATABASE_URL 解析結果:', { host, user, password: password ? `[已設定，長度: ${password.length}]` : '[未設定]', database, port });
+      throw new Error('DATABASE_URL missing required parts (host/user/password/database). Please check your DATABASE_URL format.');
+    }
+    // 診斷：如果密碼長度異常短，可能是特殊字元被截斷
+    if (password.length < 10) {
+      console.warn(`⚠️  警告: 解析後的密碼長度僅 ${password.length} 個字元，可能包含特殊字元需要 URL 編碼。`);
+      console.warn('   如果連接失敗，請嘗試將密碼中的特殊字元進行 URL 編碼：');
+      console.warn('   ! → %21, @ → %40, # → %23, : → %3A, / → %2F');
     }
     return { host, user, password, database, port, charset: 'utf8mb4' };
   }
