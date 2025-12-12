@@ -31,11 +31,16 @@ function getDbConfig() {
       throw new Error('DATABASE_URL appears to contain unexpanded variable syntax (e.g., ${VAR}). Please check your Zeabur environment variable configuration.');
     }
     
+    // 診斷：顯示原始 URL（隱藏敏感資訊）
+    const urlPreview = dbUrl.length > 50 ? dbUrl.substring(0, 50) + '...' : dbUrl;
+    console.log('原始 DATABASE_URL 預覽:', urlPreview.replace(/:[^:@]+@/, ':****@'));
+    
     // 使用正則表達式手動解析 URL，避免 new URL() 對 URL 編碼密碼的處理問題
     const mysqlUrlRegex = /^mysql:\/\/([^:]+):([^@]+)@([^:\/]+):?(\d+)?\/(.+)$/;
     const match = dbUrl.match(mysqlUrlRegex);
     
     if (!match) {
+      console.error('正則表達式匹配失敗，嘗試使用 new URL() 作為備用方案');
       // 如果正則失敗，嘗試使用 new URL() 作為備用方案
       let url;
       try {
@@ -60,11 +65,23 @@ function getDbConfig() {
     }
     
     // 從正則匹配結果中提取各部分
+    console.log('正則匹配結果:');
+    console.log(`  - match[1] (user): ${match[1]}`);
+    console.log(`  - match[2] (password raw): ${match[2]}`);
+    console.log(`  - match[3] (host): ${match[3]}`);
+    console.log(`  - match[4] (port): ${match[4] || 'default 3306'}`);
+    console.log(`  - match[5] (database): ${match[5]}`);
+    
     const user = decodeURIComponent(match[1]);
-    const password = decodeURIComponent(match[2]); // 這裡會正確解碼 %21 為 !
+    const passwordRaw = match[2];
+    const password = decodeURIComponent(passwordRaw); // 這裡會正確解碼 %21 為 !
     const host = match[3];
     const port = match[4] ? Number(match[4]) : 3306;
     const database = decodeURIComponent(match[5]);
+    
+    console.log('解碼後:');
+    console.log(`  - passwordRaw 長度: ${passwordRaw.length}, 內容: ${passwordRaw.substring(0, 20)}...`);
+    console.log(`  - password 長度: ${password.length}`);
     
     // 診斷資訊：顯示解析結果（不顯示完整密碼）
     console.log('DATABASE_URL 解析結果:');
