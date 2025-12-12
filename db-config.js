@@ -44,15 +44,31 @@ function getDbConfig() {
     const host = url.hostname;
     const port = url.port ? Number(url.port) : 3306;
     const database = (url.pathname || '').replace(/^\//, '');
+    
+    // 診斷資訊：顯示解析結果（不顯示完整密碼）
+    console.log('DATABASE_URL 解析結果:');
+    console.log(`  - Host: ${host}`);
+    console.log(`  - Port: ${port}`);
+    console.log(`  - User: ${user}`);
+    console.log(`  - Database: ${database}`);
+    console.log(`  - Password: [已設定，長度: ${password.length}]`);
+    if (password.length > 0) {
+      // 只顯示前 5 個和後 3 個字元，中間用 * 代替
+      const preview = password.length > 8 
+        ? `${password.substring(0, 5)}${'*'.repeat(Math.min(password.length - 8, 10))}${password.substring(password.length - 3)}`
+        : '*'.repeat(password.length);
+      console.log(`  - Password 預覽: ${preview}`);
+    }
+    
     if (!host || !user || !password || !database) {
       console.error('DATABASE_URL 解析結果:', { host, user, password: password ? `[已設定，長度: ${password.length}]` : '[未設定]', database, port });
       throw new Error('DATABASE_URL missing required parts (host/user/password/database). Please check your DATABASE_URL format.');
     }
-    // 診斷：如果密碼長度異常短，可能是特殊字元被截斷
-    if (password.length < 10) {
-      console.warn(`⚠️  警告: 解析後的密碼長度僅 ${password.length} 個字元，可能包含特殊字元需要 URL 編碼。`);
-      console.warn('   如果連接失敗，請嘗試將密碼中的特殊字元進行 URL 編碼：');
-      console.warn('   ! → %21, @ → %40, # → %23, : → %3A, / → %2F');
+    
+    // 診斷：檢查密碼長度是否正確
+    if (password.length !== 24 && password.includes('YourSecurePassword')) {
+      console.warn(`⚠️  警告: 密碼長度為 ${password.length}，預期應為 24。可能包含未正確解碼的特殊字元。`);
+      console.warn('   請確認 DATABASE_URL 中的密碼是否正確進行了 URL 編碼。');
     }
     return { host, user, password, database, port, charset: 'utf8mb4' };
   }
