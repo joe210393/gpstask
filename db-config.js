@@ -65,15 +65,6 @@ function getDbConfig() {
     }
     
     // 從正則匹配結果中提取各部分
-    /*
-    console.log('正則匹配結果:');
-    console.log(`  - match[1] (user): ${match[1]}`);
-    console.log(`  - match[2] (password raw): ${match[2]}`);
-    console.log(`  - match[3] (host): ${match[3]}`);
-    console.log(`  - match[4] (port): ${match[4] || 'default 3306'}`);
-    console.log(`  - match[5] (database): ${match[5]}`);
-    */
-    
     const user = decodeURIComponent(match[1]);
     const passwordRaw = match[2];
     const password = decodeURIComponent(passwordRaw); // 這裡會正確解碼 %21 為 !
@@ -81,32 +72,10 @@ function getDbConfig() {
     const port = match[4] ? Number(match[4]) : 3306;
     const database = decodeURIComponent(match[5]);
     
-    /*
-    console.log('解碼後:');
-    console.log(`  - passwordRaw 長度: ${passwordRaw.length}, 內容: ${passwordRaw.substring(0, 20)}...`);
-    console.log(`  - password 長度: ${password.length}`);
-    */
-    
-    // 診斷資訊：顯示解析結果（不顯示完整密碼）
-    console.log('DATABASE_URL 解析結果:');
-    console.log(`  - Host: ${host}`);
-    console.log(`  - Port: ${port}`);
-    console.log(`  - User: ${user}`);
-    console.log(`  - Database: ${database}`);
-    console.log(`  - Password: [已設定，長度: ${password.length}]`);
-    /*
-    if (password.length > 0) {
-      // 只顯示前 5 個和後 3 個字元，中間用 * 代替
-      const preview = password.length > 8 
-        ? `${password.substring(0, 5)}${'*'.repeat(Math.min(password.length - 8, 10))}${password.substring(password.length - 3)}`
-        : '*'.repeat(password.length);
-      console.log(`  - Password 預覽: ${preview}`);
-    }
-    */
-    
     if (!host || !user || !password || !database) {
-      console.error('DATABASE_URL 解析結果:', { host, user, password: password ? `[已設定，長度: ${password.length}]` : '[未設定]', database, port });
-      throw new Error('DATABASE_URL missing required parts (host/user/password/database). Please check your DATABASE_URL format.');
+      // 避免輸出完整的敏感資訊
+      console.error('DATABASE_URL 解析失敗: 缺少必要欄位 (host/user/password/database)');
+      throw new Error('DATABASE_URL missing required parts. Please check your DATABASE_URL format.');
     }
     
     return { host, user, password, database, port, charset: 'utf8mb4' };
