@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const navTasksList = document.getElementById('navTasksList');
   const navUserTasks = document.getElementById('navUserTasks');
   const navStaff = document.getElementById('navStaff');
+  const navRoleMgmt = document.getElementById('navRoleMgmt');
   const navRedeem = document.getElementById('navRedeem');
   const reviewLinks = document.querySelectorAll('a[href="/user-tasks.html"]');
 
@@ -35,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     show(navTasksList);
     hide(navUserTasks);
     hide(navStaff);
+    hide(navRoleMgmt);
     hide(navRedeem);
     showReviewLinks(false);
     return;
@@ -44,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
     show(navTasksList);
     show(navUserTasks);
     hide(navStaff);
+    hide(navRoleMgmt);
     hide(navRedeem);
     showReviewLinks(false);
   } else if (loginUser.role === 'staff') {
@@ -51,12 +54,14 @@ document.addEventListener('DOMContentLoaded', () => {
     hide(navTasksList);
     hide(navUserTasks);
     hide(navStaff);
+    hide(navRoleMgmt);
     hide(navRedeem);
     showReviewLinks(true);
   } else {
     hide(navTasksList);
     hide(navUserTasks);
     show(navStaff);
+    show(navRoleMgmt);
     show(navRedeem);
     showReviewLinks(true);
   }
