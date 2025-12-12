@@ -202,6 +202,118 @@
         .btn-close { background: #6c757d; color: white; }
         .btn-reply { background: #28a745; color: white; box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4); }
 
+        /* 密碼鎖按鈕 */
+        #btn-open-lock {
+            position: fixed;
+            bottom: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #111827;
+            color: white;
+            padding: 12px 22px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 999px;
+            font-size: 15px;
+            font-weight: 800;
+            box-shadow: 0 8px 18px rgba(0,0,0,0.35);
+            pointer-events: auto;
+            cursor: pointer;
+            z-index: 2100;
+            display: none; /* 只有 number 題型才顯示 */
+        }
+
+        /* 密碼鎖 Overlay */
+        #lock-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.86);
+            display: none;
+            z-index: 3500;
+            pointer-events: auto;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+        }
+        #lock-overlay .lock-card {
+            width: min(520px, 92vw);
+            background: rgba(20,20,20,0.96);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 16px;
+            padding: 18px;
+            box-shadow: 0 18px 50px rgba(0,0,0,0.6);
+            color: white;
+        }
+        #lock-overlay .lock-title {
+            font-size: 18px;
+            font-weight: 900;
+            margin-bottom: 6px;
+        }
+        #lock-overlay .lock-subtitle {
+            color: rgba(255,255,255,0.75);
+            font-size: 13px;
+            line-height: 1.5;
+            margin-bottom: 14px;
+        }
+        #lock-overlay .wheels {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            align-items: center;
+            margin: 12px 0 16px;
+            flex-wrap: wrap;
+        }
+        .wheel {
+            width: 62px;
+            background: #0b1220;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 12px;
+            padding: 10px 8px;
+            text-align: center;
+        }
+        .wheel .btn-up, .wheel .btn-down {
+            width: 100%;
+            border: none;
+            background: rgba(255,255,255,0.08);
+            color: white;
+            border-radius: 8px;
+            padding: 8px 0;
+            font-weight: 900;
+            cursor: pointer;
+        }
+        .wheel .digit {
+            font-size: 28px;
+            font-weight: 900;
+            margin: 10px 0;
+            letter-spacing: 1px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 10px;
+            padding: 10px 0;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        #lock-overlay .lock-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 8px;
+        }
+        #lock-overlay .lock-actions button {
+            border: none;
+            border-radius: 10px;
+            padding: 12px 16px;
+            font-size: 15px;
+            font-weight: 900;
+            cursor: pointer;
+        }
+        #btn-lock-cancel { background: #6c757d; color: #fff; }
+        #btn-lock-submit { background: #2563eb; color: #fff; box-shadow: 0 6px 18px rgba(37,99,235,0.35); }
+        #lock-msg {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 13px;
+            color: rgba(255,255,255,0.8);
+            min-height: 18px;
+        }
+
         /* 只有圖片時，讓它居中 */
         #chest-obj.only-image .ar-content-row {
             justify-content: center;
@@ -282,6 +394,20 @@
         </div>
     </div>
 
+    <!-- 密碼鎖 Overlay（只給數字解謎使用） -->
+    <div id="lock-overlay">
+        <div class="lock-card">
+            <div class="lock-title">🔒 旋轉密碼鎖</div>
+            <div class="lock-subtitle">轉動數字輪盤後按「確定解鎖」。<br>提醒：需要完全正確，才能通關。</div>
+            <div class="wheels" id="lock-wheels"></div>
+            <div class="lock-actions">
+                <button id="btn-lock-cancel" type="button">關閉</button>
+                <button id="btn-lock-submit" type="button">確定解鎖</button>
+            </div>
+            <div id="lock-msg"></div>
+        </div>
+    </div>
+
     <div class="ui-layer">
         <!-- 啟動蓋板 -->
         <div id="start-overlay" style="position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:2000; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white; pointer-events:auto;">
@@ -297,6 +423,7 @@
             <div id="debug-info" style="font-size:0.8em; color:#ffeb3b; margin-top:5px;"></div>
         </div>
         <button id="btn-back" class="btn-back">🔙 返回填寫答案</button>
+        <button id="btn-open-lock" type="button">🔒 輸入密碼</button>
     </div>
 
     <script>
@@ -311,6 +438,10 @@
         let targetLat = parseFloat(urlParams.get('lat'));
         let targetLng = parseFloat(urlParams.get('lng'));
         const taskId = urlParams.get('taskId');
+        let currentTask = null;
+        let isNumberTask = false;
+        let lockDigits = 4;
+        let currentUserTaskId = null; // user_tasks.id
 
         // 載入任務詳情 (為了拿 YouTube 連結)
         if (taskId) {
@@ -319,6 +450,13 @@
                 .then(data => {
                     if (data.success && data.task) {
                         const task = data.task;
+                        currentTask = task;
+                        isNumberTask = (task.task_type === 'number');
+                        // 依答案長度決定位數（不暴露答案內容；若無則預設 4）
+                        if (typeof task.correct_answer === 'string') {
+                            const len = task.correct_answer.trim().length;
+                            if (len >= 2 && len <= 8) lockDigits = len;
+                        }
                         
                         // 更新座標 (以資料庫為準)
                         if (task.lat && task.lng) {
@@ -364,6 +502,17 @@
                         } else if (hasVideo) {
                             chestObj.className = 'only-video';
                         }
+
+                        // 若是數字解謎，顯示密碼鎖按鈕
+                        const btnOpenLock = document.getElementById('btn-open-lock');
+                        if (isNumberTask) {
+                            btnOpenLock.style.display = 'block';
+                            initLockWheels(lockDigits);
+                            // 預先抓一次 user_task_id
+                            fetchCurrentUserTaskId();
+                        } else {
+                            btnOpenLock.style.display = 'none';
+                        }
                     }
                 })
                 .catch(err => console.error("無法載入任務詳情:", err));
@@ -385,6 +534,12 @@
         const modalBody = document.getElementById('modal-body');
         const modalClose = document.getElementById('modal-close');
         const modalSubmit = document.getElementById('modal-submit');
+        const btnOpenLock = document.getElementById('btn-open-lock');
+        const lockOverlay = document.getElementById('lock-overlay');
+        const lockWheels = document.getElementById('lock-wheels');
+        const lockMsg = document.getElementById('lock-msg');
+        const btnLockCancel = document.getElementById('btn-lock-cancel');
+        const btnLockSubmit = document.getElementById('btn-lock-submit');
         
         let userLat = null, userLng = null;
         let deviceHeading = 0;
@@ -436,6 +591,150 @@
                 alert("測試模式：目標已找到！");
             }
         };
+
+        // ====== 密碼鎖邏輯（number 題型） ======
+        function getLoginUser() {
+            try {
+                const lu = JSON.parse(localStorage.getItem('loginUser') || 'null');
+                if (lu && lu.username) return lu;
+            } catch {}
+            try {
+                const u = JSON.parse(localStorage.getItem('user') || 'null');
+                if (u && u.username) return u;
+            } catch {}
+            return null;
+        }
+
+        async function fetchCurrentUserTaskId() {
+            if (!taskId) return null;
+            const loginUser = getLoginUser();
+            if (!loginUser || !loginUser.username) return null;
+            try {
+                const res = await fetch(`${API_BASE}/api/user-tasks?username=${encodeURIComponent(loginUser.username)}`);
+                const data = await res.json();
+                if (!data.success || !Array.isArray(data.tasks)) return null;
+                const t = data.tasks.find(x => String(x.id) === String(taskId));
+                if (!t) return null;
+                currentUserTaskId = t.user_task_id;
+                return currentUserTaskId;
+            } catch (e) {
+                console.error('fetchCurrentUserTaskId error', e);
+                return null;
+            }
+        }
+
+        function initLockWheels(digits = 4) {
+            if (!lockWheels) return;
+            lockWheels.innerHTML = '';
+            for (let i = 0; i < digits; i++) {
+                const wheel = document.createElement('div');
+                wheel.className = 'wheel';
+                wheel.dataset.value = '0';
+                wheel.innerHTML = `
+                    <button class="btn-up" type="button">▲</button>
+                    <div class="digit">0</div>
+                    <button class="btn-down" type="button">▼</button>
+                `;
+                const digitEl = wheel.querySelector('.digit');
+                const btnUp = wheel.querySelector('.btn-up');
+                const btnDown = wheel.querySelector('.btn-down');
+                const setVal = (v) => {
+                    const nv = (v + 10) % 10;
+                    wheel.dataset.value = String(nv);
+                    digitEl.textContent = String(nv);
+                };
+                btnUp.onclick = () => setVal(Number(wheel.dataset.value) + 1);
+                btnDown.onclick = () => setVal(Number(wheel.dataset.value) - 1);
+
+                // 觸控/滑動：上下滑動改變數字（簡易旋轉感）
+                let startY = null;
+                wheel.addEventListener('pointerdown', (ev) => {
+                    startY = ev.clientY;
+                    wheel.setPointerCapture(ev.pointerId);
+                });
+                wheel.addEventListener('pointermove', (ev) => {
+                    if (startY == null) return;
+                    const dy = ev.clientY - startY;
+                    if (Math.abs(dy) > 18) {
+                        setVal(Number(wheel.dataset.value) + (dy < 0 ? 1 : -1));
+                        startY = ev.clientY;
+                    }
+                });
+                wheel.addEventListener('pointerup', () => { startY = null; });
+                wheel.addEventListener('pointercancel', () => { startY = null; });
+
+                lockWheels.appendChild(wheel);
+            }
+        }
+
+        function getLockCode() {
+            const wheels = Array.from(lockWheels.querySelectorAll('.wheel'));
+            return wheels.map(w => w.dataset.value || '0').join('');
+        }
+
+        async function submitLockCode() {
+            lockMsg.style.color = 'rgba(255,255,255,0.85)';
+            lockMsg.textContent = '驗證中...';
+            btnLockSubmit.disabled = true;
+            btnLockCancel.disabled = true;
+
+            const code = getLockCode();
+            const userTaskId = currentUserTaskId || await fetchCurrentUserTaskId();
+            if (!userTaskId) {
+                lockMsg.style.color = '#fca5a5';
+                lockMsg.textContent = '找不到進行中的任務紀錄，請先回到題目頁按「開始任務」後再進入 AR。';
+                btnLockSubmit.disabled = false;
+                btnLockCancel.disabled = false;
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/api/user-tasks/${userTaskId}/answer`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ answer: code })
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    lockMsg.style.color = '#fca5a5';
+                    lockMsg.textContent = data.message || '驗證失敗';
+                } else if (data.isCompleted) {
+                    lockMsg.style.color = '#86efac';
+                    lockMsg.textContent = '答對了！任務完成，返回題目頁...';
+                    setTimeout(() => {
+                        window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
+                    }, 900);
+                    return;
+                } else {
+                    lockMsg.style.color = '#fde68a';
+                    lockMsg.textContent = data.message || '答案不正確，請再試一次';
+                }
+            } catch (e) {
+                console.error(e);
+                lockMsg.style.color = '#fca5a5';
+                lockMsg.textContent = '連線失敗，請稍後再試';
+            } finally {
+                btnLockSubmit.disabled = false;
+                btnLockCancel.disabled = false;
+            }
+        }
+
+        btnOpenLock.onclick = async () => {
+            if (!isNumberTask) return;
+            if (lockWheels && !lockWheels.children.length) initLockWheels(lockDigits || 4);
+            lockMsg.textContent = '';
+            lockOverlay.style.display = 'flex';
+            fetchCurrentUserTaskId();
+        };
+        btnLockCancel.onclick = () => {
+            lockOverlay.style.display = 'none';
+            lockMsg.textContent = '';
+        };
+        btnLockSubmit.onclick = submitLockCode;
+        lockOverlay.addEventListener('click', (e) => {
+            if (e.target === lockOverlay) btnLockCancel.click();
+        });
+
         startBtn.onclick = async () => {
             // 1. 請求感測器權限 (iOS 13+)
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
