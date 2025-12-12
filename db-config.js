@@ -14,7 +14,12 @@ function requireEnv(name) {
   if (v === undefined || v === null || String(v).trim() === '') {
     throw new Error(`Missing required environment variable: ${name}`);
   }
-  return String(v);
+  const value = String(v);
+  // 檢查是否包含未展開的變數語法（例如 ${VAR}）
+  if (value.includes('${') && value.includes('}')) {
+    throw new Error(`Environment variable ${name} appears to contain unexpanded variable syntax (e.g., \${VAR}). Please check your Zeabur environment variable configuration. Current value: ${value.substring(0, 20)}...`);
+  }
+  return value;
 }
 
 function getDbConfig() {
@@ -42,11 +47,16 @@ function getDbConfig() {
   if (!password || String(password).trim() === '') {
     throw new Error('Missing required environment variable: MYSQL_ROOT_PASSWORD (or MYSQL_PASSWORD)');
   }
+  const passwordStr = String(password);
+  // 檢查密碼是否包含未展開的變數語法
+  if (passwordStr.includes('${') && passwordStr.includes('}')) {
+    throw new Error(`MYSQL_ROOT_PASSWORD/MYSQL_PASSWORD appears to contain unexpanded variable syntax (e.g., \${PASSWORD}). Please check your Zeabur environment variable configuration.`);
+  }
   const port = process.env.MYSQL_PORT ? Number(process.env.MYSQL_PORT) : 3306;
   if (Number.isNaN(port) || port <= 0) {
     throw new Error('MYSQL_PORT must be a valid number');
   }
-  return { host, user, password: String(password), database, port, charset: 'utf8mb4' };
+  return { host, user, password: passwordStr, database, port, charset: 'utf8mb4' };
 }
 
 module.exports = { getDbConfig };
