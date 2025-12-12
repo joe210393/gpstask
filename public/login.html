@@ -73,55 +73,12 @@
   </footer>
   <script src="/js/login.js"></script>
   <script>
-    // Header功能
-    const loginUser = JSON.parse(localStorage.getItem('loginUser') || 'null');
-
-    if (loginUser) {
-        const userInfoSpan = document.getElementById('loginUserInfo');
-        userInfoSpan.style.display = 'inline-block';
-        userInfoSpan.textContent = getUserDisplayName(loginUser);
-        
-        const logoutBtn = document.getElementById('logoutBtn');
-        logoutBtn.style.display = 'inline-block';
-        logoutBtn.onclick = function() {
-            localStorage.removeItem('loginUser');
-            window.location.href = '/login.html';
-        };
-
-        // 根據權限顯示導航鏈接
-        if (loginUser.role === 'admin') {
-            document.getElementById('navStaff').style.display = '';
-            document.getElementById('navRedeem').style.display = '';
-        } else if (loginUser.role === 'shop') {
-            document.getElementById('navStaff').style.display = '';
-            document.getElementById('navRedeem').style.display = '';
-        }
-        if (loginUser.role === 'user') {
-            document.getElementById('navUserTasks').style.display = '';
-        }
-        
-        // 隱藏任務列表對工作人員
-        if (loginUser.role === 'shop' || loginUser.role === 'admin') {
-            const navTasksList = document.getElementById('navTasksList');
-            if (navTasksList) navTasksList.style.display = 'none';
-        }
-    }
-
-    function getUserDisplayName(loginUser) {
-        switch(loginUser.role) {
-            case 'admin': return `管理員：${loginUser.username}`;
-            case 'shop': return `商店：${loginUser.username}`;
-            case 'user': return `用戶：${loginUser.username}`;
-            default: return loginUser.username;
-        }
-    }
-
+    // Header（僅處理漢堡選單；權限顯示統一交給 nav-access.js）
     document.getElementById('hamburgerBtn').onclick = function() {
-        document.getElementById('headerContent').classList.toggle('open');
+      document.getElementById('headerContent').classList.toggle('open');
     };
-    
-    document.querySelectorAll('.main-nav a').forEach(a => {
-        a.onclick = () => document.getElementById('headerContent').classList.remove('open');
+    document.querySelectorAll('.main-nav a, .main-nav button').forEach(el => {
+      el.addEventListener('click', () => document.getElementById('headerContent').classList.remove('open'));
     });
   </script>
   <script src="/js/nav-access.js"></script>

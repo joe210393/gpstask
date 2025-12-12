@@ -30,6 +30,29 @@ if (formUser) {
   };
 }
 
+// 已登入就不要停在登入頁（避免使用者誤以為 header 顯示異常）
+(() => {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('force') === '1') return;
+    const loginUser = JSON.parse(localStorage.getItem('loginUser') || 'null');
+    if (!loginUser || !loginUser.role) return;
+
+    if (loginUser.role === 'admin' || loginUser.role === 'shop') {
+      window.location.replace('/staff-dashboard.html');
+      return;
+    }
+    if (loginUser.role === 'staff') {
+      window.location.replace('/user-tasks.html');
+      return;
+    }
+    // user
+    window.location.replace('/index.html');
+  } catch (e) {
+    // ignore
+  }
+})();
+
 // 工作人員登入（僅 admin/shop）
 const formStaff = document.getElementById('loginFormStaff');
 if (formStaff) {
