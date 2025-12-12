@@ -803,10 +803,6 @@ app.post('/api/user-tasks/finish', reviewerAuth, async (req, res) => {
       if (task.created_by !== req.user.username) {
         return res.status(403).json({ success: false, message: '無權限審核非本店任務' });
       }
-    } else if (req.user.role === 'staff') {
-      if (!req.user.managed_by || task.created_by !== req.user.managed_by) {
-        return res.status(403).json({ success: false, message: '無權限審核非所屬店家任務' });
-      }
     }
 
     // 開始交易
@@ -1156,10 +1152,6 @@ app.post('/api/user-tasks/:id/redeem', reviewerAuth, async (req, res) => {
       if (rec.created_by !== req.user.username) {
         return res.status(403).json({ success: false, message: '無權限核銷非本店任務' });
       }
-    } else if (req.user.role === 'staff') {
-      if (!req.user.managed_by || rec.created_by !== req.user.managed_by) {
-        return res.status(403).json({ success: false, message: '無權限核銷非所屬店家任務' });
-      }
     }
 
     await conn.execute('UPDATE user_tasks SET redeemed = 1, redeemed_at = NOW(), redeemed_by = ? WHERE id = ?', [staffUser, id]);
@@ -1180,7 +1172,7 @@ app.get('/api/user-tasks/in-progress', reviewerAuth, async (req, res) => {
     conn = await mysql.createConnection(dbConfig);
     const userRole = req.user.role;
     const reqUsername = req.user.username;
-    const reviewerOwner = (userRole === 'staff') ? (req.user.managed_by || null) : reqUsername;
+    const reviewerOwner = reqUsername;
     let sql = `SELECT ut.id as user_task_id, ut.user_id, ut.task_id, ut.status, ut.started_at, ut.finished_at, ut.redeemed, ut.redeemed_at, ut.redeemed_by, ut.answer, u.username, t.name as task_name, t.description, t.points, t.created_by as task_creator, t.task_type
       FROM user_tasks ut
       JOIN users u ON ut.user_id = u.id
@@ -1190,11 +1182,6 @@ app.get('/api/user-tasks/in-progress', reviewerAuth, async (req, res) => {
 
     if (userRole === 'shop') {
       // 商店只能看到自己創建的任務
-      sql += ' AND t.created_by = ?';
-      params.push(reviewerOwner);
-    } else if (userRole === 'staff') {
-      // staff 只審核所屬 shop/admin 指派的任務
-      if (!reviewerOwner) return res.json({ success: true, tasks: [] });
       sql += ' AND t.created_by = ?';
       params.push(reviewerOwner);
     }
@@ -1226,7 +1213,7 @@ app.get('/api/user-tasks/to-redeem', reviewerAuth, async (req, res) => {
     conn = await mysql.createConnection(dbConfig);
     const userRole = req.user.role;
     const reqUsername = req.user.username;
-    const reviewerOwner = (userRole === 'staff') ? (req.user.managed_by || null) : reqUsername;
+    const reviewerOwner = reqUsername;
     let sql = `SELECT ut.id as user_task_id, ut.user_id, ut.task_id, ut.status, ut.started_at, ut.finished_at, ut.redeemed, ut.redeemed_at, ut.redeemed_by, u.username, t.name as task_name, t.description, t.points, t.created_by as task_creator, t.task_type
       FROM user_tasks ut
       JOIN users u ON ut.user_id = u.id
@@ -1235,10 +1222,6 @@ app.get('/api/user-tasks/to-redeem', reviewerAuth, async (req, res) => {
     const params = [];
 
     if (userRole === 'shop') {
-      sql += ' AND t.created_by = ?';
-      params.push(reviewerOwner);
-    } else if (userRole === 'staff') {
-      if (!reviewerOwner) return res.json({ success: true, tasks: [] });
       sql += ' AND t.created_by = ?';
       params.push(reviewerOwner);
     }
