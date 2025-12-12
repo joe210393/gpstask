@@ -114,7 +114,7 @@ async function testDatabaseConnection() {
       if (dbConfig.password) {
         const pwdPreview = dbConfig.password.substring(0, 30);
         if (pwdPreview.includes('${') || pwdPreview.includes('$')) {
-          console.error(`   ⚠️  發現問題: 密碼開頭包含 "$" 或 "${" 字元，可能是未展開的變數！`);
+          console.error('   ⚠️  發現問題: 密碼開頭包含 "$" 或 "${" 字元，可能是未展開的變數！');
         }
       }
     }
