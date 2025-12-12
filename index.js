@@ -799,11 +799,7 @@ app.post('/api/user-tasks/finish', reviewerAuth, async (req, res) => {
     const task = tasks[0];
 
     // 權限範圍判斷（admin 全部；shop 僅自己；staff 僅所屬 shop/admin）
-    if (req.user.role === 'shop') {
-      if (task.created_by !== req.user.username) {
-        return res.status(403).json({ success: false, message: '無權限審核非本店任務' });
-      }
-    }
+    // 新規則：shop 也可審核全部任務（不限制 created_by）
 
     // 開始交易
     await conn.beginTransaction();
@@ -1147,12 +1143,7 @@ app.post('/api/user-tasks/:id/redeem', reviewerAuth, async (req, res) => {
     );
     if (rows.length === 0) return res.status(400).json({ success: false, message: '不可重複兌換或尚未完成' });
 
-    const rec = rows[0];
-    if (req.user.role === 'shop') {
-      if (rec.created_by !== req.user.username) {
-        return res.status(403).json({ success: false, message: '無權限核銷非本店任務' });
-      }
-    }
+    // 新規則：shop 也可核銷全部任務（不限制 created_by）
 
     await conn.execute('UPDATE user_tasks SET redeemed = 1, redeemed_at = NOW(), redeemed_by = ? WHERE id = ?', [staffUser, id]);
     res.json({ success: true, message: '已兌換' });
@@ -1180,11 +1171,7 @@ app.get('/api/user-tasks/in-progress', reviewerAuth, async (req, res) => {
       WHERE ut.status = '進行中'`;
     const params = [];
 
-    if (userRole === 'shop') {
-      // 商店只能看到自己創建的任務
-      sql += ' AND t.created_by = ?';
-      params.push(reviewerOwner);
-    }
+    // 新規則：shop 也可審核全部任務（不再限制 created_by）
 
     if (taskName) {
       sql += ' AND t.name LIKE ?';
@@ -1221,10 +1208,7 @@ app.get('/api/user-tasks/to-redeem', reviewerAuth, async (req, res) => {
       WHERE ut.status = '完成' AND ut.redeemed = 0`;
     const params = [];
 
-    if (userRole === 'shop') {
-      sql += ' AND t.created_by = ?';
-      params.push(reviewerOwner);
-    }
+    // 新規則：shop 也可審核全部任務（不再限制 created_by）
 
     if (taskName) {
       sql += ' AND t.name LIKE ?';
