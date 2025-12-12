@@ -14,6 +14,7 @@ async function migrate() {
     await connection.query(`
       CREATE TABLE IF NOT EXISTS quest_chains (
         id INT AUTO_INCREMENT PRIMARY KEY,
+        created_by VARCHAR(50) NOT NULL DEFAULT 'admin' COMMENT '建立者帳號',
         title VARCHAR(100) NOT NULL,
         description TEXT,
         chain_points INT DEFAULT 0 COMMENT '全破獎勵積分',
@@ -23,6 +24,14 @@ async function migrate() {
       )
     `);
     console.log('✅ quest_chains 表格準備就緒');
+    
+    // 如果表已存在但沒有 created_by 欄位，則新增
+    const [cols] = await connection.query("SHOW COLUMNS FROM quest_chains LIKE 'created_by'");
+    if (cols.length === 0) {
+      console.log('🛠 為現有的 quest_chains 表格新增 created_by 欄位...');
+      await connection.query("ALTER TABLE quest_chains ADD COLUMN created_by VARCHAR(50) NOT NULL DEFAULT 'admin' AFTER id");
+      console.log('✅ created_by 欄位新增完成');
+    }
 
     // 2. 修改 tasks 表格 (加入任務類型與限制)
     console.log('🛠 正在修改 tasks 表格...');
