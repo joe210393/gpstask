@@ -1,13 +1,8 @@
 const bcrypt = require('bcryptjs');
 const mysql = require('mysql2/promise');
+const { getDbConfig } = require('./db-config');
 
-const dbConfig = {
-  host: 'localhost',
-  user: 'root',
-  password: '',
-  database: 'gps_task',
-  port: 3306
-};
+const dbConfig = getDbConfig();
 
 async function testPassword() {
   let conn;

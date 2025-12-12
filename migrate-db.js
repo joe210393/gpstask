@@ -1,12 +1,7 @@
 const mysql = require('mysql2/promise');
+const { getDbConfig } = require('./db-config');
 
-const dbConfig = {
-  host: '150.109.72.98',
-  user: 'root',
-  password: '9Ff2TP786Wx4gIyh0Q5GSEc1bBa3mRrw',
-  database: 'gps_task',
-  port: 30170
-};
+const dbConfig = getDbConfig();
 
 async function migrate() {
   let conn;

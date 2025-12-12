@@ -470,8 +470,14 @@ function getTaskLabelsHtml(task) {
     labels += `<span style="background:#d1fae5; color:#065f46; padding:2px 6px; border-radius:4px; font-size:0.8rem;">☑️ 選擇題</span>`;
   } else if (task.task_type === 'photo') {
     labels += `<span style="background:#fce7f3; color:#9d174d; padding:2px 6px; border-radius:4px; font-size:0.8rem;">📸 拍照</span>`;
+  } else if (task.task_type === 'number') {
+    labels += `<span style="background:#e0e7ff; color:#3730a3; padding:2px 6px; border-radius:4px; font-size:0.8rem;">🔢 數字解謎</span>`;
+  } else if (task.task_type === 'keyword') {
+    labels += `<span style="background:#ede9fe; color:#5b21b6; padding:2px 6px; border-radius:4px; font-size:0.8rem;">🔑 關鍵字</span>`;
+  } else if (task.task_type === 'location') {
+    labels += `<span style="background:#ecfccb; color:#3f6212; padding:2px 6px; border-radius:4px; font-size:0.8rem;">📍 打卡</span>`;
   } else {
-    labels += `<span style="background:#e0e7ff; color:#3730a3; padding:2px 6px; border-radius:4px; font-size:0.8rem;">✍️ 問答</span>`;
+    labels += `<span style="background:#f3f4f6; color:#374151; padding:2px 6px; border-radius:4px; font-size:0.8rem;">✍️ 問答</span>`;
   }
   
   return `<div style="margin-bottom:8px;">${labels}</div>`;

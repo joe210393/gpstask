@@ -1,13 +1,7 @@
 const mysql = require('mysql2/promise');
+const { getDbConfig } = require('./db-config');
 
-const dbConfig = {
-  host: process.env.MYSQL_HOST || 'hkg1.clusters.zeabur.com',
-  user: process.env.MYSQL_USERNAME || 'root',
-  password: process.env.MYSQL_ROOT_PASSWORD || '5N29BnfD0RbMw4Wd6y1iVPEgUI783voa',
-  database: process.env.MYSQL_DATABASE || 'zeabur',
-  port: process.env.MYSQL_PORT || 32121,
-  charset: 'utf8mb4'
-};
+const dbConfig = getDbConfig();
 
 async function migrate() {
   let connection;

@@ -1,10 +1,3 @@
-const USERS = [
-  { username: 'user1', password: 'user123', role: 'user' },
-  { username: 'user2', password: 'user456', role: 'user' },
-  { username: 'staff1', password: 'staff123', role: 'shop' },
-  { username: 'staff2', password: 'staff456', role: 'shop' }
-];
-
 // const API_BASE = 'http://localhost:3001'; // 本地開發環境 - 生產環境使用相對路徑
 
 // 一般用戶登入

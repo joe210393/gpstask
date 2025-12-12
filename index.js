@@ -7,6 +7,7 @@ const cookieParser = require('cookie-parser');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { getDbConfig } = require('./db-config');
 
 // JWT 設定
 const JWT_SECRET = process.env.JWT_SECRET || 'gps-task-secret-key-change-in-production';
@@ -65,14 +66,8 @@ app.use((req, res, next) => {
   next();
 });
 
-const dbConfig = {
-  host: process.env.MYSQL_HOST || 'hkg1.clusters.zeabur.com', // Zeabur MySQL host
-  user: process.env.MYSQL_USERNAME || 'root',
-  password: process.env.MYSQL_ROOT_PASSWORD || '5N29BnfD0RbMw4Wd6y1iVPEgUI783voa', // Zeabur MySQL password
-  database: process.env.MYSQL_DATABASE || 'zeabur',
-  port: process.env.MYSQL_PORT || 32121, // Zeabur MySQL port
-  charset: 'utf8mb4' // 設置字符集為 UTF-8，避免中文亂碼
-};
+// IMPORTANT: DB config must come from env vars only. No hardcoded defaults.
+const dbConfig = getDbConfig();
 
 const ALLOWED_TASK_TYPES = ['qa', 'multiple_choice', 'photo', 'number', 'keyword', 'location'];
 

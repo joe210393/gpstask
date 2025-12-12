@@ -1,13 +1,8 @@
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
+const { getDbConfig } = require('./db-config');
 
-const dbConfig = {
-  host: 'localhost',
-  user: 'root',
-  password: '',
-  database: 'gps_task',
-  port: 3306
-};
+const dbConfig = getDbConfig();
 
 async function hashPlaintextPasswords() {
   let conn;

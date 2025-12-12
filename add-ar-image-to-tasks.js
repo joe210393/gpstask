@@ -1,13 +1,7 @@
-require('dotenv').config();
 const mysql = require('mysql2/promise');
+const { getDbConfig } = require('./db-config');
 
-const dbConfig = {
-  host: process.env.MYSQL_HOST || 'localhost',
-  user: process.env.MYSQL_USERNAME || 'root',
-  password: process.env.MYSQL_ROOT_PASSWORD || '',
-  database: process.env.MYSQL_DATABASE || 'gps_task_db',
-  port: process.env.MYSQL_PORT || 3306
-};
+const dbConfig = getDbConfig();
 
 async function addArImageColumn() {
   let connection;
