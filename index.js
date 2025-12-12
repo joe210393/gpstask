@@ -89,12 +89,36 @@ async function testDatabaseConnection() {
   let conn;
   try {
     console.log('🔄 測試資料庫連接...');
+    // 診斷資訊：檢查配置（不顯示敏感資訊）
+    console.log('   連接資訊:');
+    console.log(`   - Host: ${dbConfig.host}`);
+    console.log(`   - Port: ${dbConfig.port}`);
+    console.log(`   - User: ${dbConfig.user}`);
+    console.log(`   - Database: ${dbConfig.database}`);
+    console.log(`   - Password: ${dbConfig.password ? (dbConfig.password.length > 0 ? `[已設定，長度: ${dbConfig.password.length}]` : '[空字串]') : '[未設定]'}`);
+    // 檢查密碼是否包含未展開的變數
+    if (dbConfig.password && (dbConfig.password.includes('${') || dbConfig.password.includes('$'))) {
+      console.error('   ⚠️  警告: 密碼可能包含未展開的變數語法！');
+      console.error(`   密碼前 20 個字元: ${dbConfig.password.substring(0, 20)}...`);
+    }
     conn = await mysql.createConnection(dbConfig);
     console.log('✅ 資料庫連接成功');
     return true;
   } catch (error) {
     console.error('❌ 資料庫連接失敗:', error.message);
-    console.error('   錯誤詳情:', error);
+    if (error.code === 'ER_ACCESS_DENIED_ERROR') {
+      console.error('   診斷: 這通常是因為：');
+      console.error('   1. 密碼不正確');
+      console.error('   2. 環境變數包含未展開的變數語法（如 ${PASSWORD}）');
+      console.error('   3. 用戶權限不足');
+      if (dbConfig.password) {
+        const pwdPreview = dbConfig.password.substring(0, 30);
+        if (pwdPreview.includes('${') || pwdPreview.includes('$')) {
+          console.error(`   ⚠️  發現問題: 密碼開頭包含 "$" 或 "${" 字元，可能是未展開的變數！`);
+        }
+      }
+    }
+    console.error('   錯誤詳情:', error.message);
     return false;
   } finally {
     if (conn) await conn.end();
