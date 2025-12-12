@@ -28,6 +28,102 @@
 
   <main>
     <section class="mb-4">
+      <!-- 權限/帳號管理 -->
+      <div class="form-container" id="roleManagementSection" style="margin-bottom: 2rem; background: #fff; border: 1px solid #e0e0e0;">
+        <h2 style="margin-top:0;">權限 / 帳號管理</h2>
+        <div style="color:#666; font-size:0.9rem; margin-bottom:1rem;">
+          admin 可建立 shop/admin、指派/撤銷 staff；shop 可指派/撤銷 staff；staff 由一般用戶登入進入審核頁。
+        </div>
+
+        <!-- admin：建立 shop/admin -->
+        <div id="adminCreateAccountBox" style="display:none; padding:12px; border:1px solid #e5e7eb; border-radius:10px; margin-bottom:14px; background:#f8fafc;">
+          <div style="font-weight:800; margin-bottom:10px;">建立商店/管理員帳號（admin 專用）</div>
+          <form id="createAccountForm" style="display:grid; gap:10px;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">建立角色</label>
+              <select class="form-select" name="role" required>
+                <option value="shop">shop（商店）</option>
+                <option value="admin">admin（管理員）</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">帳號</label>
+              <input class="form-input" type="text" name="username" required placeholder="例如：shop_abc / admin2" />
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">初始密碼</label>
+              <input class="form-input" type="password" name="password" required placeholder="至少 6 碼" />
+            </div>
+            <button type="submit" class="btn btn-primary">建立帳號</button>
+            <div id="createAccountMsg" class="text-center" style="min-height:24px;"></div>
+          </form>
+        </div>
+
+        <!-- admin/shop：指派 staff -->
+        <div style="padding:12px; border:1px solid #e5e7eb; border-radius:10px; margin-bottom:14px; background:#fff;">
+          <div style="font-weight:800; margin-bottom:10px;">指派 / 撤銷 staff</div>
+          <div style="color:#666; font-size:0.85rem; margin-bottom:10px;">
+            指派條件：人選必須先在前台用手機門號註冊成 user，才可被指派為 staff。撤銷後會恢復為 user，可重新接任務。
+          </div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+            <form id="assignStaffForm" style="display:grid; gap:10px;">
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">指派 staff（輸入手機門號）</label>
+                <input class="form-input" type="text" name="username" required maxlength="10" placeholder="09xxxxxxxx" />
+              </div>
+              <button type="submit" class="btn btn-secondary">指派為 staff</button>
+              <div id="assignStaffMsg" class="text-center" style="min-height:24px;"></div>
+            </form>
+            <form id="revokeStaffForm" style="display:grid; gap:10px;">
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">撤銷 staff（輸入手機門號）</label>
+                <input class="form-input" type="text" name="username" required maxlength="10" placeholder="09xxxxxxxx" />
+              </div>
+              <button type="submit" class="btn btn-danger">撤銷 staff</button>
+              <div id="revokeStaffMsg" class="text-center" style="min-height:24px;"></div>
+            </form>
+          </div>
+        </div>
+
+        <!-- admin/shop：修改自己的密碼 -->
+        <div style="padding:12px; border:1px solid #e5e7eb; border-radius:10px; margin-bottom:14px; background:#fff;">
+          <div style="font-weight:800; margin-bottom:10px;">修改我的密碼（admin/shop）</div>
+          <form id="changePasswordForm" style="display:grid; gap:10px; max-width:520px;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">舊密碼</label>
+              <input class="form-input" type="password" name="oldPassword" required />
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">新密碼</label>
+              <input class="form-input" type="password" name="newPassword" required minlength="6" placeholder="至少 6 碼" />
+            </div>
+            <button type="submit" class="btn btn-primary">更新密碼</button>
+            <div id="changePasswordMsg" class="text-center" style="min-height:24px;"></div>
+          </form>
+        </div>
+
+        <!-- shop：店家資訊 -->
+        <div id="shopProfileBox" style="display:none; padding:12px; border:1px solid #e5e7eb; border-radius:10px; background:#fff;">
+          <div style="font-weight:800; margin-bottom:10px;">店家資訊（shop）</div>
+          <form id="shopProfileForm" style="display:grid; gap:10px; max-width:700px;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">店家名稱</label>
+              <input class="form-input" type="text" name="shop_name" placeholder="例如：XX咖啡" />
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">店家地址</label>
+              <input class="form-input" type="text" name="shop_address" placeholder="例如：台北市..." />
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">店家介紹</label>
+              <textarea class="form-textarea" name="shop_description" placeholder="簡短描述店家特色..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">儲存店家資訊</button>
+            <div id="shopProfileMsg" class="text-center" style="min-height:24px;"></div>
+          </form>
+        </div>
+      </div>
+
       <!-- 劇情任務管理區塊 -->
       <div class="form-container" style="margin-bottom: 2rem; background: #fdfdfd; border: 1px solid #e0e0e0;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
