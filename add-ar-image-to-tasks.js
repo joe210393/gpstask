@@ -1,6 +1,16 @@
 const mysql = require('mysql2/promise');
 const { getDbConfig } = require('./db-config');
 
+function ensureExplicitRun() {
+  if (process.env.RUN_DB_SCRIPT !== '1') {
+    console.error('❌ 安全保護：此腳本需要明確允許才可執行。請先設定環境變數 RUN_DB_SCRIPT=1');
+    console.error('   （避免在正式環境或 CI/CD 被誤跑）');
+    process.exit(1);
+  }
+}
+
+ensureExplicitRun();
+
 const dbConfig = getDbConfig();
 
 async function addArImageColumn() {
