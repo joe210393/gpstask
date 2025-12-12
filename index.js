@@ -1847,17 +1847,24 @@ app.get(/^\/(?!api\/).*/, (req, res, next) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// 除錯：輸出環境變數（僅開發環境）
-if (process.env.NODE_ENV !== 'production') {
-  console.log('=== 環境變數檢查 ===');
-  console.log('MYSQL_HOST:', process.env.MYSQL_HOST);
-  console.log('MYSQL_PORT:', process.env.MYSQL_PORT);
-  console.log('MYSQL_USERNAME:', process.env.MYSQL_USERNAME);
-  console.log('MYSQL_DATABASE:', process.env.MYSQL_DATABASE);
+// 輸出環境變數檢查（用於診斷）
+console.log('=== 環境變數檢查 ===');
+if (process.env.DATABASE_URL) {
+  const dbUrl = process.env.DATABASE_URL;
+  // 只顯示前 30 個字元，隱藏敏感資訊
+  const displayUrl = dbUrl.length > 30 ? dbUrl.substring(0, 30) + '...' : dbUrl;
+  console.log('DATABASE_URL:', displayUrl, '[已設定 - 將優先使用]');
+} else {
+  console.log('DATABASE_URL:', '[未設定]');
+  console.log('MYSQL_HOST:', process.env.MYSQL_HOST || '[未設定]');
+  console.log('MYSQL_PORT:', process.env.MYSQL_PORT || '[未設定]');
+  console.log('MYSQL_USERNAME:', process.env.MYSQL_USERNAME || '[未設定]');
+  console.log('MYSQL_DATABASE:', process.env.MYSQL_DATABASE || '[未設定]');
   console.log('MYSQL_ROOT_PASSWORD:', process.env.MYSQL_ROOT_PASSWORD ? '[已設定]' : '[未設定]');
-  console.log('ALLOWED_ORIGINS:', process.env.ALLOWED_ORIGINS);
-  console.log('==================');
+  console.log('MYSQL_PASSWORD:', process.env.MYSQL_PASSWORD ? '[已設定]' : '[未設定]');
 }
+console.log('ALLOWED_ORIGINS:', process.env.ALLOWED_ORIGINS || '[未設定]');
+console.log('==================');
 
 // 啟動時測試資料庫連接
 (async () => {

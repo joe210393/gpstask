@@ -25,7 +25,12 @@ function requireEnv(name) {
 function getDbConfig() {
   // Prefer DATABASE_URL if provided (common pattern in many PaaS)
   if (process.env.DATABASE_URL) {
-    const url = new URL(process.env.DATABASE_URL);
+    const dbUrl = String(process.env.DATABASE_URL);
+    // 檢查是否包含未展開的變數語法
+    if (dbUrl.includes('${') && dbUrl.includes('}')) {
+      throw new Error('DATABASE_URL appears to contain unexpanded variable syntax (e.g., ${VAR}). Please check your Zeabur environment variable configuration.');
+    }
+    const url = new URL(dbUrl);
     if (url.protocol !== 'mysql:') {
       throw new Error('DATABASE_URL must start with mysql://');
     }
