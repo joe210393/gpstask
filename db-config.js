@@ -16,8 +16,9 @@ function requireEnv(name) {
   }
   const value = String(v);
   // 檢查是否包含未展開的變數語法（例如 ${VAR}）
-  if (value.includes('${') && value.includes('}')) {
-    throw new Error(`Environment variable ${name} appears to contain unexpanded variable syntax (e.g., \${VAR}). Please check your Zeabur environment variable configuration. Current value: ${value.substring(0, 20)}...`);
+  // 放寬檢查：只在明確看起來像未展開變數時才報錯，避免誤判包含 $ 或 {} 的合法密碼
+  if (value.startsWith('${') && value.endsWith('}')) {
+    throw new Error(`Environment variable ${name} appears to contain unexpanded variable syntax (e.g., \${VAR}). Please check your Zeabur environment variable configuration.`);
   }
   return value;
 }
@@ -27,7 +28,7 @@ function getDbConfig() {
   if (process.env.DATABASE_URL) {
     const dbUrl = String(process.env.DATABASE_URL);
     // 檢查是否包含未展開的變數語法
-    if (dbUrl.includes('${') && dbUrl.includes('}')) {
+    if (dbUrl.startsWith('${') && dbUrl.endsWith('}')) {
       throw new Error('DATABASE_URL appears to contain unexpanded variable syntax (e.g., ${VAR}). Please check your Zeabur environment variable configuration.');
     }
     
@@ -90,7 +91,7 @@ function getDbConfig() {
   }
   const passwordStr = String(password);
   // 檢查密碼是否包含未展開的變數語法
-  if (passwordStr.includes('${') && passwordStr.includes('}')) {
+  if (passwordStr.startsWith('${') && passwordStr.endsWith('}')) {
     throw new Error(`MYSQL_ROOT_PASSWORD/MYSQL_PASSWORD appears to contain unexpanded variable syntax (e.g., \${PASSWORD}). Please check your Zeabur environment variable configuration.`);
   }
   const port = process.env.MYSQL_PORT ? Number(process.env.MYSQL_PORT) : 3306;
