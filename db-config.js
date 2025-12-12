@@ -30,20 +30,41 @@ function getDbConfig() {
     if (dbUrl.includes('${') && dbUrl.includes('}')) {
       throw new Error('DATABASE_URL appears to contain unexpanded variable syntax (e.g., ${VAR}). Please check your Zeabur environment variable configuration.');
     }
-    let url;
-    try {
-      url = new URL(dbUrl);
-    } catch (err) {
-      throw new Error(`DATABASE_URL format error: ${err.message}. Please ensure the URL is properly formatted (e.g., mysql://user:password@host:port/database). If your password contains special characters like !, @, #, :, /, you may need to URL-encode them.`);
+    
+    // 使用正則表達式手動解析 URL，避免 new URL() 對 URL 編碼密碼的處理問題
+    const mysqlUrlRegex = /^mysql:\/\/([^:]+):([^@]+)@([^:\/]+):?(\d+)?\/(.+)$/;
+    const match = dbUrl.match(mysqlUrlRegex);
+    
+    if (!match) {
+      // 如果正則失敗，嘗試使用 new URL() 作為備用方案
+      let url;
+      try {
+        url = new URL(dbUrl);
+        if (url.protocol !== 'mysql:') {
+          throw new Error('DATABASE_URL must start with mysql://');
+        }
+        const user = decodeURIComponent(url.username || '');
+        const password = decodeURIComponent(url.password || '');
+        const host = url.hostname;
+        const port = url.port ? Number(url.port) : 3306;
+        const database = (url.pathname || '').replace(/^\//, '');
+        
+        if (!host || !user || !password || !database) {
+          throw new Error('DATABASE_URL missing required parts (host/user/password/database)');
+        }
+        
+        return { host, user, password, database, port, charset: 'utf8mb4' };
+      } catch (err) {
+        throw new Error(`DATABASE_URL format error: ${err.message}. Please ensure the URL is properly formatted (e.g., mysql://user:password@host:port/database). If your password contains special characters like !, @, #, :, /, you may need to URL-encode them.`);
+      }
     }
-    if (url.protocol !== 'mysql:') {
-      throw new Error('DATABASE_URL must start with mysql://');
-    }
-    const user = decodeURIComponent(url.username || '');
-    const password = decodeURIComponent(url.password || '');
-    const host = url.hostname;
-    const port = url.port ? Number(url.port) : 3306;
-    const database = (url.pathname || '').replace(/^\//, '');
+    
+    // 從正則匹配結果中提取各部分
+    const user = decodeURIComponent(match[1]);
+    const password = decodeURIComponent(match[2]); // 這裡會正確解碼 %21 為 !
+    const host = match[3];
+    const port = match[4] ? Number(match[4]) : 3306;
+    const database = decodeURIComponent(match[5]);
     
     // 診斷資訊：顯示解析結果（不顯示完整密碼）
     console.log('DATABASE_URL 解析結果:');
@@ -65,11 +86,6 @@ function getDbConfig() {
       throw new Error('DATABASE_URL missing required parts (host/user/password/database). Please check your DATABASE_URL format.');
     }
     
-    // 診斷：檢查密碼長度是否正確
-    if (password.length !== 24 && password.includes('YourSecurePassword')) {
-      console.warn(`⚠️  警告: 密碼長度為 ${password.length}，預期應為 24。可能包含未正確解碼的特殊字元。`);
-      console.warn('   請確認 DATABASE_URL 中的密碼是否正確進行了 URL 編碼。');
-    }
     return { host, user, password, database, port, charset: 'utf8mb4' };
   }
 
