@@ -38,7 +38,46 @@ initDashboard();
 function initDashboard() {
   bindFilters();
   loadPoints();
+  loadInventory();
   loadTasks();
+}
+
+async function loadInventory() {
+  const inventoryListEl = document.getElementById('inventoryList');
+  if (!inventoryListEl) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/user/inventory`, {
+      headers: { 'x-username': dashboardUser.username }
+    });
+    const data = await res.json();
+    inventoryListEl.innerHTML = '';
+
+    if (!data.success || !data.inventory || data.inventory.length === 0) {
+      inventoryListEl.innerHTML = '<div style="color:#888; grid-column:1/-1;">目前沒有任何道具</div>';
+      return;
+    }
+
+    data.inventory.forEach(item => {
+      const itemCard = document.createElement('div');
+      itemCard.style.cssText = 'background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 10px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05);';
+      
+      const imgHtml = item.image_url 
+        ? `<img src="${item.image_url}" style="width: 50px; height: 50px; object-fit: contain; margin-bottom: 5px;">`
+        : `<div style="font-size: 2rem; margin-bottom: 5px;">🎒</div>`;
+
+      itemCard.innerHTML = `
+        ${imgHtml}
+        <div style="font-weight: bold; font-size: 0.9rem; margin-bottom: 2px;">${item.name}</div>
+        <div style="font-size: 0.8rem; color: #666;">x${item.quantity}</div>
+      `;
+      inventoryListEl.appendChild(itemCard);
+    });
+
+  } catch (err) {
+    console.error('載入背包失敗', err);
+    inventoryListEl.innerHTML = '<div style="color:red;">載入失敗</div>';
+  }
 }
 
 function bindFilters() {
