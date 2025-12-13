@@ -1362,10 +1362,10 @@ function getRank(started, finished) {
   return 'E';
 }
 
-// 查詢使用者在各劇情任務線的目前進度
+// 查詢使用者在各劇情任務線的目前進度 (具備自我修復功能)
 app.get('/api/user/quest-progress', async (req, res) => {
   const username = req.headers['x-username'];
-  if (!username) return res.json({ success: true, progress: {} }); // 未登入，回傳空物件
+  if (!username) return res.json({ success: true, progress: {} }); 
 
   let conn;
   try {
@@ -1376,18 +1376,62 @@ app.get('/api/user/quest-progress', async (req, res) => {
     if (users.length === 0) return res.json({ success: true, progress: {} });
     const userId = users[0].id;
 
-    // 查詢 user_quests 表
-    const [rows] = await conn.execute(
+    // 1. 查詢 user_quests 表 (目前的記錄)
+    const [questRows] = await conn.execute(
       'SELECT quest_chain_id, current_step_order FROM user_quests WHERE user_id = ?',
       [userId]
     );
-
-    const progress = {};
-    rows.forEach(row => {
-      progress[row.quest_chain_id] = row.current_step_order;
+    const currentProgress = {};
+    questRows.forEach(row => {
+      currentProgress[row.quest_chain_id] = row.current_step_order;
     });
 
-    res.json({ success: true, progress });
+    // 2. 自我修復邏輯：檢查 user_tasks 中實際完成的任務
+    // 找出每個劇情線中，使用者已完成的最大 quest_order
+    const [completedRows] = await conn.execute(`
+      SELECT t.quest_chain_id, MAX(t.quest_order) as max_completed_order
+      FROM user_tasks ut
+      JOIN tasks t ON ut.task_id = t.id
+      WHERE ut.user_id = ? AND ut.status = '完成' AND t.quest_chain_id IS NOT NULL
+      GROUP BY t.quest_chain_id
+    `, [userId]);
+
+    const updates = [];
+
+    // 比對並修復
+    for (const row of completedRows) {
+      const chainId = row.quest_chain_id;
+      const maxCompleted = row.max_completed_order;
+      // 理論上，如果完成了第 N 關，當前進度應該是 N + 1
+      const correctNextStep = maxCompleted + 1;
+
+      if (!currentProgress[chainId]) {
+        // 情況 A: user_quests 沒記錄，但有完成的任務 -> 補插入
+        updates.push(
+          conn.execute(
+            'INSERT INTO user_quests (user_id, quest_chain_id, current_step_order) VALUES (?, ?, ?)',
+            [userId, chainId, correctNextStep]
+          )
+        );
+        currentProgress[chainId] = correctNextStep;
+      } else if (currentProgress[chainId] < correctNextStep) {
+        // 情況 B: 記錄落後 (例如記錄是 1，但已經完成了第 1 關，應該要是 2) -> 更新
+        updates.push(
+          conn.execute(
+            'UPDATE user_quests SET current_step_order = ? WHERE user_id = ? AND quest_chain_id = ?',
+            [correctNextStep, userId, chainId]
+          )
+        );
+        currentProgress[chainId] = correctNextStep;
+      }
+    }
+
+    if (updates.length > 0) {
+      await Promise.all(updates);
+      console.log(`已自動修復使用者 ${username} 的 ${updates.length} 條劇情進度`);
+    }
+
+    res.json({ success: true, progress: currentProgress });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });

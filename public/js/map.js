@@ -964,6 +964,22 @@ function watchPosition() {
     pos => {
       const { latitude, longitude, accuracy } = pos.coords;
       
+      // === GPS 精度過濾 ===
+      // 如果精度太差 (> 60m)，忽略這次更新 (除非是第一次定位)
+      if (accuracy > 60 && lastUserLat !== 0) {
+        // 更新一下精度圈，讓使用者知道目前訊號不穩
+        if (userAccuracyCircle) {
+          userAccuracyCircle.setRadius(accuracy);
+          userAccuracyCircle.setStyle({ color: '#ffc107', fillColor: '#ffc107' }); // 黃色警告
+        }
+        return; 
+      }
+
+      // 如果精度回來了，改回藍色
+      if (userAccuracyCircle) {
+        userAccuracyCircle.setStyle({ color: '#007bff', fillColor: '#007bff' });
+      }
+      
       // === 防抖動處理 ===
       // 計算與上一次位置的距離
       const moveDist = haversineDistance(lastUserLat, lastUserLng, latitude, longitude);
