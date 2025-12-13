@@ -808,6 +808,48 @@ app.delete('/api/items/:id', staffOrAdminAuth, async (req, res) => {
   }
 });
 
+// 管理員發放道具給玩家
+app.post('/api/admin/grant-item', staffOrAdminAuth, async (req, res) => {
+  const { username, item_id, quantity } = req.body;
+  if (!username || !item_id) return res.status(400).json({ success: false, message: '缺少必要參數' });
+  const qty = parseInt(quantity) || 1;
+
+  let conn;
+  try {
+    conn = await mysql.createConnection(dbConfig);
+    
+    // 檢查玩家是否存在
+    const [users] = await conn.execute('SELECT id FROM users WHERE username = ?', [username]);
+    if (users.length === 0) return res.status(404).json({ success: false, message: '找不到此玩家帳號' });
+    const userId = users[0].id;
+
+    // 檢查道具是否存在
+    const [items] = await conn.execute('SELECT id, name FROM items WHERE id = ?', [item_id]);
+    if (items.length === 0) return res.status(404).json({ success: false, message: '找不到此道具' });
+    const itemName = items[0].name;
+
+    // 發放道具 (檢查是否已有，有則更新數量，無則新增)
+    const [inventory] = await conn.execute(
+      'SELECT id FROM user_inventory WHERE user_id = ? AND item_id = ?', 
+      [userId, item_id]
+    );
+
+    if (inventory.length > 0) {
+      await conn.execute('UPDATE user_inventory SET quantity = quantity + ? WHERE id = ?', [qty, inventory[0].id]);
+    } else {
+      await conn.execute('INSERT INTO user_inventory (user_id, item_id, quantity) VALUES (?, ?, ?)', [userId, item_id, qty]);
+    }
+
+    res.json({ success: true, message: `已成功發放 ${qty} 個【${itemName}】給 ${username}` });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) await conn.end();
+  }
+});
+
 // 取得使用者背包
 app.get('/api/user/inventory', async (req, res) => {
   const username = req.headers['x-username'];

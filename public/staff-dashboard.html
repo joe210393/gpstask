@@ -483,7 +483,7 @@
       </div>
     </div>
 
-    <!-- 道具 Modal -->
+    <!-- 道具 Modal (新增) -->
     <div class="task-modal" id="itemModal">
       <div class="task-modal-overlay"></div>
       <div class="task-modal-content">
@@ -509,6 +509,69 @@
               </div>
             </div>
             <button type="submit" class="btn btn-primary w-100">建立道具</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- 道具 Modal (編輯) -->
+    <div class="task-modal" id="editItemModal">
+      <div class="task-modal-overlay"></div>
+      <div class="task-modal-content">
+        <div class="task-modal-header">
+          <h3>編輯道具</h3>
+          <button class="close-btn" id="closeEditItemModal">&times;</button>
+        </div>
+        <div class="task-modal-body">
+          <form id="editItemForm">
+            <input type="hidden" name="id" />
+            <div class="form-group">
+              <label class="form-label">道具名稱</label>
+              <input class="form-input" type="text" name="name" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">道具描述</label>
+              <textarea class="form-textarea" name="description"></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">道具圖片</label>
+              <input class="form-input" type="text" name="image_url" placeholder="圖片網址..." />
+              <div style="margin: 5px 0; font-size: 0.9rem; color: #666;">或上傳新圖片：</div>
+              <input class="form-input" type="file" name="new_image" accept="image/*" id="editItemImageInput" />
+              <div style="margin-top: 10px;">
+                <img id="editItemImagePreview" src="" style="max-width: 100px; max-height: 100px; border-radius: 8px; border: 1px solid #ddd; display:none;" />
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">儲存變更</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- 發放道具 Modal -->
+    <div class="task-modal" id="grantItemModal">
+      <div class="task-modal-overlay"></div>
+      <div class="task-modal-content">
+        <div class="task-modal-header">
+          <h3>發放道具</h3>
+          <button class="close-btn" id="closeGrantItemModal">&times;</button>
+        </div>
+        <div class="task-modal-body">
+          <form id="grantItemForm">
+            <input type="hidden" name="item_id" />
+            <div class="form-group" style="background:#fffcf5; padding:10px; border-radius:6px; border:1px solid #ffeeba; margin-bottom:15px;">
+              <label class="form-label" style="color:#856404;">發放項目</label>
+              <div id="grantItemName" style="font-weight:bold; font-size:1.1rem;"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">玩家帳號 (手機號碼)</label>
+              <input class="form-input" type="text" name="username" required placeholder="例如：0912345678" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">數量</label>
+              <input class="form-input" type="number" name="quantity" min="1" value="1" required />
+            </div>
+            <button type="submit" class="btn btn-success w-100">確認發放</button>
           </form>
         </div>
       </div>

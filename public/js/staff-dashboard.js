@@ -252,38 +252,189 @@ function loadItems() {
                 ${item.image_url ? `<img src="${item.image_url}" style="width:30px; height:30px; object-fit:contain;">` : '<span style="font-size:1.5rem;">🎒</span>'}
                 <div style="font-weight:bold; font-size:1rem;">${item.name}</div>
               </div>
-              <div style="font-size:0.85rem; color:#666;">${item.description || '無描述'}</div>
-              <button class="btn-delete-item" data-id="${item.id}" style="position: absolute; top: 5px; right: 5px; background: none; border: none; color: #dc3545; cursor: pointer;" title="刪除道具">&times;</button>
+              <div style="font-size:0.85rem; color:#666; margin-bottom:8px;">${item.description || '無描述'}</div>
+              <div style="display:flex; gap:5px; justify-content:flex-end;">
+                  <button class="btn-grant-item" data-id="${item.id}" style="padding:2px 8px; font-size:0.8rem; border-radius:4px; background:#28a745; color:white; border:none; cursor:pointer;" title="發放給玩家">🎁 發放</button>
+                  <button class="btn-edit-item" data-id="${item.id}" style="padding:2px 8px; font-size:0.8rem; border-radius:4px; background:#007bff; color:white; border:none; cursor:pointer;" title="編輯道具">✏️</button>
+                  <button class="btn-delete-item" data-id="${item.id}" style="padding:2px 8px; font-size:0.8rem; border-radius:4px; background:#dc3545; color:white; border:none; cursor:pointer;" title="刪除道具">🗑️</button>
+              </div>
             `;
             list.appendChild(div);
           }
         });
 
-        // 綁定刪除道具按鈕
-        document.querySelectorAll('.btn-delete-item').forEach(btn => {
-          btn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            if (!confirm('確定要刪除這個道具嗎？\n注意：如果該道具被任務引用，將無法刪除。')) return;
-            fetch(`${API_BASE}/api/items/${this.dataset.id}`, {
-              method: 'DELETE',
-              headers: { 'x-username': loginUser.username }
-            })
-            .then(res => res.json())
-            .then(resData => {
-              if (resData.success) {
-                alert('道具已刪除');
-                loadItems();
-              } else {
-                alert(resData.message || '刪除失敗');
-              }
-            });
-          });
-        });
+        // 綁定道具按鈕事件
+        setupItemButtons();
       }
     });
 }
 
-// 道具 Modal 邏輯
+function setupItemButtons() {
+  // 刪除道具
+  document.querySelectorAll('.btn-delete-item').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (!confirm('確定要刪除這個道具嗎？\n注意：如果該道具被任務引用，將無法刪除。')) return;
+      fetch(`${API_BASE}/api/items/${this.dataset.id}`, {
+        method: 'DELETE',
+        headers: { 'x-username': loginUser.username }
+      })
+      .then(res => res.json())
+      .then(resData => {
+        if (resData.success) {
+          alert('道具已刪除');
+          loadItems();
+        } else {
+          alert(resData.message || '刪除失敗');
+        }
+      });
+    });
+  });
+
+  // 編輯道具
+  const editItemModal = document.getElementById('editItemModal');
+  const editItemForm = document.getElementById('editItemForm');
+  const closeEditItemModal = document.getElementById('closeEditItemModal');
+  const editItemImageInput = document.getElementById('editItemImageInput');
+  const editItemImagePreview = document.getElementById('editItemImagePreview');
+
+  if (editItemModal) {
+    if (closeEditItemModal) closeEditItemModal.onclick = () => editItemModal.classList.remove('show');
+    
+    // 預覽圖片
+    if (editItemImageInput) {
+      editItemImageInput.onchange = function() {
+        const file = this.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = e => {
+            editItemImagePreview.src = e.target.result;
+            editItemImagePreview.style.display = 'block';
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+    }
+
+    // 開啟編輯 Modal
+    document.querySelectorAll('.btn-edit-item').forEach(btn => {
+      btn.onclick = function() {
+        const id = this.dataset.id;
+        const item = globalItemsMap[id];
+        if (!item) return;
+
+        editItemForm.id.value = item.id;
+        editItemForm.name.value = item.name;
+        editItemForm.description.value = item.description || '';
+        editItemForm.image_url.value = item.image_url || '';
+        editItemImageInput.value = ''; // 清空檔案選擇
+        
+        if (item.image_url) {
+          editItemImagePreview.src = item.image_url;
+          editItemImagePreview.style.display = 'block';
+        } else {
+          editItemImagePreview.style.display = 'none';
+        }
+
+        editItemModal.classList.add('show');
+      };
+    });
+
+    // 提交編輯
+    if (editItemForm) {
+      // 避免重複綁定 listener，先移除舊的 (雖然這裡是動態綁定按鈕，但 form 是靜態的，所以還好)
+      // 但為了安全，我們可以檢查是否已綁定，或者簡單地讓它覆蓋
+      editItemForm.onsubmit = function(e) {
+        e.preventDefault();
+        const id = this.id.value;
+        const fd = new FormData();
+        fd.append('name', this.name.value.trim());
+        fd.append('description', this.description.value.trim());
+        
+        // 優先使用上傳的圖片
+        if (this.new_image.files[0]) {
+          fd.append('image', this.new_image.files[0]);
+        } else {
+          fd.append('image_url', this.image_url.value.trim());
+        }
+
+        fetch(`${API_BASE}/api/items/${id}`, {
+          method: 'PUT',
+          headers: { 'x-username': loginUser.username },
+          body: fd
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            alert('道具更新成功');
+            editItemModal.classList.remove('show');
+            loadItems();
+          } else {
+            alert(data.message || '更新失敗');
+          }
+        });
+      };
+    }
+  }
+
+  // 發放道具
+  const grantItemModal = document.getElementById('grantItemModal');
+  const grantItemForm = document.getElementById('grantItemForm');
+  const closeGrantItemModal = document.getElementById('closeGrantItemModal');
+  const grantItemName = document.getElementById('grantItemName');
+
+  if (grantItemModal) {
+    if (closeGrantItemModal) closeGrantItemModal.onclick = () => grantItemModal.classList.remove('show');
+
+    // 開啟發放 Modal
+    document.querySelectorAll('.btn-grant-item').forEach(btn => {
+      btn.onclick = function() {
+        const id = this.dataset.id;
+        const item = globalItemsMap[id];
+        if (!item) return;
+
+        grantItemForm.reset();
+        grantItemForm.item_id.value = item.id;
+        grantItemForm.quantity.value = 1;
+        grantItemName.textContent = item.name;
+        
+        grantItemModal.classList.add('show');
+      };
+    });
+
+    // 提交發放
+    if (grantItemForm) {
+      grantItemForm.onsubmit = function(e) {
+        e.preventDefault();
+        const itemId = this.item_id.value;
+        const username = this.username.value.trim();
+        const quantity = this.quantity.value;
+
+        if (!username) return alert('請輸入玩家帳號');
+
+        fetch(`${API_BASE}/api/admin/grant-item`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-username': loginUser.username 
+          },
+          body: JSON.stringify({ username, item_id: itemId, quantity })
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            alert(data.message);
+            grantItemModal.classList.remove('show');
+          } else {
+            alert(data.message || '發放失敗');
+          }
+        });
+      };
+    }
+  }
+}
+
+// 道具 Modal 邏輯 (新增)
 const btnCreateItem = document.getElementById('btnCreateItem');
 const itemModal = document.getElementById('itemModal');
 const closeItemModal = document.getElementById('closeItemModal');
