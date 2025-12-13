@@ -957,10 +957,12 @@ function startGeolocation() {
   );
 }
 
+let userAccuracyCircle; // GPS 精度圓圈
+
 function watchPosition() {
   navigator.geolocation.watchPosition(
     pos => {
-      const { latitude, longitude } = pos.coords;
+      const { latitude, longitude, accuracy } = pos.coords;
       
       // === 防抖動處理 ===
       // 計算與上一次位置的距離
@@ -982,13 +984,34 @@ function watchPosition() {
                 iconAnchor: [32, 32]
               })
             }).addTo(map);
+
+            // 添加精度圓圈
+            userAccuracyCircle = L.circle([latitude, longitude], {
+              radius: accuracy || 10, // 精度半徑 (公尺)
+              color: '#007bff',
+              weight: 1,
+              opacity: 0.5,
+              fillColor: '#007bff',
+              fillOpacity: 0.1
+            }).addTo(map);
+
             // 首次設置用戶位置時，將地圖中心點設置為用戶位置
             map.setView([latitude, longitude], map.getZoom());
           } else {
             userMarker.setLatLng([latitude, longitude]);
-            // 注意：我們不再每次都強制 setView，這樣用戶拖動地圖時不會一直被拉回去
-            // 只有當偏離太遠時才拉回 (可選)
-            // map.setView([latitude, longitude], map.getZoom()); 
+            
+            // 更新精度圓圈
+            if (userAccuracyCircle) {
+              userAccuracyCircle.setLatLng([latitude, longitude]);
+              userAccuracyCircle.setRadius(accuracy || 10);
+            }
+
+            // 強制拉回視角：如果使用者跑出畫面太遠 (>300m)，自動拉回來
+            const mapCenter = map.getCenter();
+            const distFromCenter = haversineDistance(mapCenter.lat, mapCenter.lng, latitude, longitude);
+            if (distFromCenter > 0.3) { // 300公尺
+                map.setView([latitude, longitude], map.getZoom());
+            }
           }
 
           // 啟用距離顯示並更新所有任務距離
@@ -1007,8 +1030,6 @@ function watchPosition() {
       }
       
       // 無論有沒有大幅移動，只要定位成功就檢查一次 proximity
-      // 解決"原地不動剛好在範圍內卻不跳出提示"的問題
-      // 為了避免過於頻繁觸發，我們可以加一個簡單的限制，或者讓 checkProximity 內部去處理重複觸發
       if (Math.abs(latitude - lastUserLat) > 0.00001 || Math.abs(longitude - lastUserLng) > 0.00001) {
          // 微小移動也檢查
          checkProximity(latitude, longitude);
