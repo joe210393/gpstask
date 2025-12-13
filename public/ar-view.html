@@ -942,7 +942,7 @@
                     err => {
                         status.innerText = "GPS 錯誤: " + err.message;
                     },
-                    { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+                    { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 }
                 );
             }
 
