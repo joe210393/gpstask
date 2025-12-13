@@ -189,6 +189,11 @@
             options = typeof t.options === 'string' ? JSON.parse(t.options) : t.options;
           }
 
+          let rewardItemHtml = '';
+          if (t.reward_item_name) {
+            rewardItemHtml = `<div style="margin-top:5px; color:#28a745; font-weight:bold; font-size:0.9rem;">🎁 完成獎勵：${t.reward_item_name}</div>`;
+          }
+
           taskDetailEl.innerHTML = `
             <h2>${t.name}</h2>
             <div class="task-meta-grid">
@@ -197,6 +202,7 @@
               <span>🎯 半徑：${t.radius} 公尺</span>
               <span>💰 積分：${t.points || 0}</span>
             </div>
+            ${rewardItemHtml}
             <div style="margin-bottom:18px; color:var(--text-secondary); line-height:1.6;">${t.description}</div>
             <img src="${t.photoUrl}" alt="任務照片" class="task-detail-img" onerror="this.src='/images/mascot.png'">
             <!-- YouTube 影片已移至 AR 模式，此處不再顯示 -->

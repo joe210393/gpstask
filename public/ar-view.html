@@ -671,7 +671,11 @@
                     });
                     const data = await res.json();
                     if (data.success && data.isCompleted) {
-                        alert(`🎉 打卡成功！\n${data.message}`);
+                        let msg = `🎉 打卡成功！\n${data.message}`;
+                        if (data.earnedItemName) {
+                            msg += `\n\n🎁 獲得道具：【${data.earnedItemName}】\n請至「個人主頁 > 我的背包」查看。`;
+                        }
+                        alert(msg);
                         window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
                     } else {
                         alert(data.message || '打卡失敗');
@@ -857,10 +861,16 @@
                     lockMsg.textContent = data.message || '驗證失敗';
                 } else if (data.isCompleted) {
                     lockMsg.style.color = '#86efac';
-                    lockMsg.textContent = '答對了！任務完成，返回題目頁...';
+                    let msg = '答對了！任務完成，返回題目頁...';
+                    if (data.earnedItemName) {
+                        msg = `答對了！\n🎁 獲得道具：${data.earnedItemName}`;
+                    }
+                    lockMsg.textContent = msg;
+                    if (data.earnedItemName) alert(`恭喜獲得道具：${data.earnedItemName}`);
+                    
                     setTimeout(() => {
                         window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
-                    }, 900);
+                    }, 1500);
                     return;
                 } else {
                     lockMsg.style.color = '#fde68a';

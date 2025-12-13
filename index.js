@@ -1080,9 +1080,11 @@ app.post('/api/user-tasks/finish', reviewerAuth, async (req, res) => {
       }
 
       // 發放獎勵道具 (檢查任務是否有 reward_item_id)
-      const [taskDetails] = await conn.execute('SELECT reward_item_id FROM tasks WHERE id = ?', [task_id]);
+      let earnedItemName = null;
+      const [taskDetails] = await conn.execute('SELECT reward_item_id, i.name as item_name FROM tasks t LEFT JOIN items i ON t.reward_item_id = i.id WHERE t.id = ?', [task_id]);
       if (taskDetails.length > 0 && taskDetails[0].reward_item_id) {
         const rewardItemId = taskDetails[0].reward_item_id;
+        earnedItemName = taskDetails[0].item_name;
         // 檢查背包是否已有此道具
         const [inventory] = await conn.execute(
           'SELECT id, quantity FROM user_inventory WHERE user_id = ? AND item_id = ?',
@@ -1098,7 +1100,12 @@ app.post('/api/user-tasks/finish', reviewerAuth, async (req, res) => {
       }
 
       await conn.commit();
-      res.json({ success: true, message: `已完成任務，獲得 ${task.points} 積分！` });
+      
+      let msg = `已完成任務，獲得 ${task.points} 積分！`;
+      if (earnedItemName) {
+        msg += ` 並獲得道具：${earnedItemName}`;
+      }
+      res.json({ success: true, message: msg });
 
     } catch (err) {
       await conn.rollback();
@@ -1587,9 +1594,11 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
          }
 
          // 發放獎勵道具
-         const [taskDetails] = await conn.execute('SELECT reward_item_id FROM tasks WHERE id = ?', [userTask.task_id]);
+         let earnedItemName = null;
+         const [taskDetails] = await conn.execute('SELECT reward_item_id, i.name as item_name FROM tasks t LEFT JOIN items i ON t.reward_item_id = i.id WHERE t.id = ?', [userTask.task_id]);
          if (taskDetails.length > 0 && taskDetails[0].reward_item_id) {
            const rewardItemId = taskDetails[0].reward_item_id;
+           earnedItemName = taskDetails[0].item_name;
            const [inventory] = await conn.execute(
              'SELECT id, quantity FROM user_inventory WHERE user_id = ? AND item_id = ?',
              [userTask.user_id, rewardItemId]
@@ -1602,16 +1611,17 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
          }
 
          await conn.commit();
-       } catch (e) {
-         await conn.rollback();
-         throw e;
-       }
+         
+         // 更新回傳訊息
+         if (earnedItemName) {
+            message += ` 並獲得道具：${earnedItemName}！`;
+         }
     } else {
        // 只更新答案，狀態不變（保持進行中）
        await conn.execute('UPDATE user_tasks SET answer = ? WHERE id = ?', [answer, id]);
     }
 
-    res.json({ success: true, message, isCompleted });
+    res.json({ success: true, message, isCompleted, earnedItemName });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
