@@ -567,6 +567,8 @@
                                 name: task.required_item_name,
                                 image: task.required_item_image
                             };
+                            console.log('[AR] 任務需要道具:', requiredItem);
+                            
                             // 檢查背包
                             const loginUser = getLoginUser();
                             if (loginUser) {
@@ -575,24 +577,44 @@
                                         headers: { 'x-username': loginUser.username }
                                     });
                                     const invData = await invRes.json();
+                                    console.log('[AR] 背包資料:', invData);
                                     if (invData.success) {
-                                        hasRequiredItem = invData.inventory.some(i => i.item_id === task.required_item_id);
+                                        hasRequiredItem = invData.inventory.some(i => {
+                                            const match = i.item_id === task.required_item_id;
+                                            console.log(`[AR] 檢查道具 ${i.item_id} === ${task.required_item_id}:`, match);
+                                            return match;
+                                        });
+                                        console.log('[AR] 是否擁有道具:', hasRequiredItem);
+                                        
                                         // 如果有道具，設置道具使用介面
                                         if (hasRequiredItem) {
                                             const itemUseImage = document.getElementById('item-use-image');
                                             const itemUseName = document.getElementById('item-use-name');
-                                            if (itemUseImage && requiredItem.image) {
-                                                itemUseImage.src = requiredItem.image;
+                                            if (itemUseImage) {
+                                                if (requiredItem.image) {
+                                                    itemUseImage.src = requiredItem.image;
+                                                    itemUseImage.style.display = 'block';
+                                                    console.log('[AR] 設置道具圖片:', requiredItem.image);
+                                                } else {
+                                                    itemUseImage.style.display = 'none';
+                                                    console.log('[AR] 道具沒有圖片，隱藏圖片元素');
+                                                }
                                             }
                                             if (itemUseName) {
-                                                itemUseName.textContent = requiredItem.name;
+                                                itemUseName.textContent = requiredItem.name || '未知道具';
+                                                console.log('[AR] 設置道具名稱:', requiredItem.name);
                                             }
+                                            console.log('[AR] 道具使用介面已準備就緒');
                                         }
                                     }
                                 } catch (e) {
-                                    console.error('檢查背包失敗', e);
+                                    console.error('[AR] 檢查背包失敗', e);
                                 }
+                            } else {
+                                console.warn('[AR] 無法取得登入用戶資訊');
                             }
+                        } else {
+                            console.log('[AR] 此任務不需要道具');
                         }
 
                         isNumberTask = (task.task_type === 'number');
@@ -1078,20 +1100,24 @@
                         chest.style.display = 'none';
                         lockedObj.style.display = 'none';
                         itemUseObj.style.display = 'none';
+                        console.log('[updateAR] 顯示打卡地標');
                     } else if (requiredItem) {
                         // 有道具需求
+                        console.log('[updateAR] 需要道具，hasRequiredItem:', hasRequiredItem, 'requiredItem:', requiredItem);
                         if (hasRequiredItem) {
                             // 有道具：顯示道具使用介面
                             itemUseObj.style.display = 'block';
                             lockedObj.style.display = 'none';
                             chest.style.display = 'none';
                             locationObj.style.display = 'none';
+                            console.log('[updateAR] 顯示道具使用介面');
                         } else {
                             // 沒有道具：顯示問號
                             lockedObj.style.display = 'block';
                             itemUseObj.style.display = 'none';
                             chest.style.display = 'none';
                             locationObj.style.display = 'none';
+                            console.log('[updateAR] 顯示鎖定狀態（沒有道具）');
                         }
                     } else {
                         // 一般任務或已解鎖：顯示內容
@@ -1099,6 +1125,7 @@
                         itemUseObj.style.display = 'none';
                         locationObj.style.display = 'none';
                         chest.style.display = 'block';
+                        console.log('[updateAR] 顯示 AR 內容');
                     }
                 }
 
