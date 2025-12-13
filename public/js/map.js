@@ -398,16 +398,28 @@ function updateUserMarkerRotation() {
 
 // 取得使用者劇情進度
 function fetchQuestProgress() {
-  const userJson = localStorage.getItem('user');
+  const userJson = localStorage.getItem('loginUser');
   if (!userJson) return Promise.resolve({});
-  const loginUser = JSON.parse(userJson);
-  
-  return fetch(`${API_BASE}/api/user/quest-progress`, {
-    headers: { 'x-username': loginUser.username }
-  })
-  .then(res => res.json())
-  .then(data => data.success ? data.progress : {})
-  .catch(() => ({}));
+  try {
+    const loginUser = JSON.parse(userJson);
+    if (!loginUser || !loginUser.username) return Promise.resolve({});
+    
+    return fetch(`${API_BASE}/api/user/quest-progress`, {
+      headers: { 'x-username': loginUser.username }
+    })
+    .then(res => res.json())
+    .then(data => {
+      console.log('[fetchQuestProgress] 獲取的進度:', data);
+      return data.success ? data.progress : {};
+    })
+    .catch(err => {
+      console.error('[fetchQuestProgress] 錯誤:', err);
+      return {};
+    });
+  } catch (e) {
+    console.error('[fetchQuestProgress] 解析錯誤:', e);
+    return Promise.resolve({});
+  }
 }
 
 // 載入任務並顯示在地圖上
@@ -421,6 +433,8 @@ async function loadTasks() {
     if (!tasksRes.success) return;
 
     const allTasks = tasksRes.tasks;
+    console.log('[loadTasks] 獲取的進度:', progress);
+    console.log('[loadTasks] 所有任務數量:', allTasks.length);
 
     // 過濾邏輯：劇情任務只顯示目前進度的關卡
     tasksList = allTasks.filter(task => {
@@ -429,11 +443,18 @@ async function loadTasks() {
       
       // 2. 如果是劇情任務，檢查 quest_order
       // 注意：quest_chain_id 必須存在
-      if (!task.quest_chain_id) return true; // 資料異常時預設顯示
+      if (!task.quest_chain_id) {
+        console.warn('[loadTasks] 任務', task.id, '是劇情任務但沒有 quest_chain_id');
+        return true; // 資料異常時預設顯示
+      }
       
       const currentStep = progress[task.quest_chain_id] || 1;
-      return task.quest_order === currentStep;
+      const shouldShow = task.quest_order === currentStep;
+      console.log(`[loadTasks] 任務 ${task.id} (劇情 ${task.quest_chain_id}, 關卡 ${task.quest_order}): 當前進度=${currentStep}, 是否顯示=${shouldShow}`);
+      return shouldShow;
     });
+
+    console.log('[loadTasks] 過濾後的任務數量:', tasksList.length);
 
     tasksList.forEach(task => {
       // 創建任務標記
