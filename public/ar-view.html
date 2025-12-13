@@ -108,6 +108,40 @@
             font-weight: bold;
         }
 
+        /* 打卡地標物件 */
+        #location-obj {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 200px; height: 200px;
+            margin-left: -100px; margin-top: -100px;
+            transform-style: preserve-3d;
+            display: none;
+            cursor: pointer;
+            pointer-events: auto;
+            text-align: center;
+            color: #ff3b30;
+            animation: bounce 2s infinite;
+        }
+        #location-icon {
+            font-size: 100px;
+            filter: drop-shadow(0 10px 10px rgba(0,0,0,0.5));
+        }
+        #location-label {
+            background: rgba(255, 59, 48, 0.9);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            display: inline-block;
+            margin-top: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-30px); }
+        }
+
         /* 寶箱物件容器 */
         #chest-obj {
             position: absolute;
@@ -395,6 +429,12 @@
             <div id="locked-text">點擊查看線索</div>
         </div>
 
+        <!-- 打卡地標物件 -->
+        <div id="location-obj">
+            <div id="location-icon">📍</div>
+            <div id="location-label">點擊打卡</div>
+        </div>
+
         <!-- 容器：可能是圖片、影片，或兩者都有 -->
         <div id="chest-obj">
             <div class="ar-content-row">
@@ -472,6 +512,7 @@
         const taskId = urlParams.get('taskId');
         let currentTask = null;
         let isNumberTask = false;
+        let isLocationTask = false;
         let lockDigits = 4;
         let currentUserTaskId = null; // user_tasks.id
         let requiredItem = null; // 任務需要的道具資訊
@@ -511,6 +552,11 @@
                         }
 
                         isNumberTask = (task.task_type === 'number');
+                        isLocationTask = (task.task_type === 'location');
+                        
+                        // 如果是打卡任務，預先抓 user_task_id
+                        if (isLocationTask) fetchCurrentUserTaskId();
+
                         // 依答案長度決定位數（不暴露答案內容；若無則預設 4）
                         if (typeof task.correct_answer === 'string') {
                             const len = task.correct_answer.trim().length;
@@ -585,6 +631,7 @@
         // 3. 感測器與 AR 邏輯
         const chest = document.getElementById('chest-obj');
         const lockedObj = document.getElementById('locked-obj');
+        const locationObj = document.getElementById('location-obj');
         const arrow = document.getElementById('guide-arrow');
         const debug = document.getElementById('debug-info');
         const status = document.getElementById('status');
@@ -606,6 +653,35 @@
         let lastHeading = 0; // 平滑化用：上一次的角度
         let smoothedHeading = 0; // 平滑化用：計算後的角度
         let isObjectVisible = false; // 磁滯鎖定用：目前物體是否可見
+
+        // 點擊打卡地標
+        locationObj.onclick = async () => {
+            if (!currentUserTaskId) currentUserTaskId = await fetchCurrentUserTaskId();
+            if (!currentUserTaskId) {
+                alert('找不到進行中的任務紀錄');
+                return;
+            }
+
+            if (confirm('📍 確定要在此處打卡嗎？')) {
+                try {
+                    const res = await fetch(`${API_BASE}/api/user-tasks/${currentUserTaskId}/answer`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ answer: 'checked_in' }) // 內容不重要，後端只看類型
+                    });
+                    const data = await res.json();
+                    if (data.success && data.isCompleted) {
+                        alert(`🎉 打卡成功！\n${data.message}`);
+                        window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
+                    } else {
+                        alert(data.message || '打卡失敗');
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert('連線錯誤');
+                }
+            }
+        };
 
         // 點擊鎖定物件：檢查道具
         document.getElementById('locked-obj').onclick = () => {
@@ -916,6 +992,7 @@
                     isObjectVisible = false;
                     chest.style.display = 'none';
                     lockedObj.style.display = 'none';
+                    locationObj.style.display = 'none';
                 }
                 arrow.style.display = 'block';
                 // 箭頭指向目標
@@ -933,14 +1010,21 @@
                     isObjectVisible = true;
                     arrow.style.display = 'none';
                     
-                    // 根據是否有道具需求來決定顯示哪個物件
-                    if (requiredItem) {
-                        // 還沒解鎖，顯示問號
+                    // 根據任務類型決定顯示哪個物件
+                    if (isLocationTask) {
+                        // 地理圍欄任務：顯示打卡地標
+                        locationObj.style.display = 'block';
+                        chest.style.display = 'none';
+                        lockedObj.style.display = 'none';
+                    } else if (requiredItem) {
+                        // 有道具需求且未解鎖：顯示問號
                         lockedObj.style.display = 'block';
                         chest.style.display = 'none';
+                        locationObj.style.display = 'none';
                     } else {
-                        // 已解鎖或無需求，顯示內容
+                        // 一般任務或已解鎖：顯示內容
                         lockedObj.style.display = 'none';
+                        locationObj.style.display = 'none';
                         chest.style.display = 'block';
                     }
                 }
@@ -955,6 +1039,7 @@
                 const transformStyle = `translate(${xOffset}px, 0) scale(${scale})`;
                 chest.style.transform = transformStyle;
                 lockedObj.style.transform = transformStyle;
+                locationObj.style.transform = transformStyle;
 
             } else {
                 // 離開視野
@@ -962,6 +1047,7 @@
                     isObjectVisible = false;
                     chest.style.display = 'none';
                     lockedObj.style.display = 'none';
+                    locationObj.style.display = 'none';
                     arrow.style.display = 'block';
                 }
                 

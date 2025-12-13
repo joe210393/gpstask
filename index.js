@@ -1557,8 +1557,13 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
     let message = '答案已儲存';
 
     // 2. 檢查是否為自動驗證題型且答案正確
-    if (['multiple_choice', 'number', 'keyword'].includes(userTask.task_type)) {
-      if (userTask.correct_answer && answer.trim().toLowerCase() === userTask.correct_answer.trim().toLowerCase()) {
+    if (['multiple_choice', 'number', 'keyword', 'location'].includes(userTask.task_type)) {
+      if (userTask.task_type === 'location') {
+        // 地理圍欄任務：只要前端送出請求，且距離檢核通過（前端已做），後端即視為完成
+        // 這裡可以選擇性地再做一次後端經緯度檢核，但為了流暢度，暫時信任前端的打卡動作
+        isCompleted = true;
+        message = '📍 打卡成功！';
+      } else if (userTask.correct_answer && answer.trim().toLowerCase() === userTask.correct_answer.trim().toLowerCase()) {
         isCompleted = true;
         message = '答對了！任務完成！';
       } else {
