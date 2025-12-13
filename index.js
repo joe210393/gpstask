@@ -1626,6 +1626,7 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
 
     let isCompleted = false;
     let message = '答案已儲存';
+    let earnedItemName = null; // 移到外層宣告
 
     // 2. 檢查是否為自動驗證題型且答案正確
     if (['multiple_choice', 'number', 'keyword', 'location'].includes(userTask.task_type)) {
@@ -1658,7 +1659,6 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
          }
 
          // 發放獎勵道具
-         let earnedItemName = null;
          const [taskDetails] = await conn.execute('SELECT reward_item_id, i.name as item_name FROM tasks t LEFT JOIN items i ON t.reward_item_id = i.id WHERE t.id = ?', [userTask.task_id]);
          if (taskDetails.length > 0 && taskDetails[0].reward_item_id) {
            const rewardItemId = taskDetails[0].reward_item_id;
