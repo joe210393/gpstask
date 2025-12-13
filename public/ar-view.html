@@ -108,6 +108,29 @@
             font-weight: bold;
         }
 
+        /* 道具使用介面 */
+        #item-use-obj {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 250px;
+            margin-left: -125px; margin-top: -150px;
+            transform-style: preserve-3d;
+            display: none;
+            cursor: pointer;
+            pointer-events: auto;
+            text-align: center;
+            animation: float 3s ease-in-out infinite;
+        }
+        #item-use-image {
+            transition: transform 0.2s;
+        }
+        #item-use-image:hover {
+            transform: scale(1.1);
+        }
+        #item-use-image:active {
+            transform: scale(0.95);
+        }
+
         /* 打卡地標物件 */
         #location-obj {
             position: absolute;
@@ -423,10 +446,20 @@
     <video id="camera-feed" autoplay playsinline muted></video>
 
     <div id="ar-world">
-        <!-- 鎖定狀態物件 -->
+        <!-- 鎖定狀態物件 (沒有道具時顯示) -->
         <div id="locked-obj">
             <div id="locked-icon">❓</div>
             <div id="locked-text">點擊查看線索</div>
+        </div>
+
+        <!-- 道具使用介面 (有道具但未使用時顯示) -->
+        <div id="item-use-obj" style="display:none;">
+            <div style="text-align:center; color:white; text-shadow:0 2px 4px rgba(0,0,0,0.8);">
+                <div style="font-size:18px; font-weight:bold; margin-bottom:10px;">🎒 使用道具</div>
+                <img id="item-use-image" src="" alt="道具圖片" style="width:150px; height:150px; object-fit:contain; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.5); cursor:pointer; margin-bottom:10px;" />
+                <div id="item-use-name" style="font-size:16px; font-weight:bold; margin-bottom:8px;"></div>
+                <div style="font-size:14px; color:#ffeb3b;">點擊道具圖片使用</div>
+            </div>
         </div>
 
         <!-- 打卡地標物件 -->
@@ -544,6 +577,17 @@
                                     const invData = await invRes.json();
                                     if (invData.success) {
                                         hasRequiredItem = invData.inventory.some(i => i.item_id === task.required_item_id);
+                                        // 如果有道具，設置道具使用介面
+                                        if (hasRequiredItem) {
+                                            const itemUseImage = document.getElementById('item-use-image');
+                                            const itemUseName = document.getElementById('item-use-name');
+                                            if (itemUseImage && requiredItem.image) {
+                                                itemUseImage.src = requiredItem.image;
+                                            }
+                                            if (itemUseName) {
+                                                itemUseName.textContent = requiredItem.name;
+                                            }
+                                        }
                                     }
                                 } catch (e) {
                                     console.error('檢查背包失敗', e);
@@ -631,6 +675,7 @@
         // 3. 感測器與 AR 邏輯
         const chest = document.getElementById('chest-obj');
         const lockedObj = document.getElementById('locked-obj');
+        const itemUseObj = document.getElementById('item-use-obj');
         const locationObj = document.getElementById('location-obj');
         const arrow = document.getElementById('guide-arrow');
         const debug = document.getElementById('debug-info');
@@ -687,26 +732,31 @@
             }
         };
 
-        // 點擊鎖定物件：檢查道具
+        // 點擊鎖定物件：沒有道具時顯示提示
         document.getElementById('locked-obj').onclick = () => {
-            if (!requiredItem) return; // 理論上不會發生
-
-            if (hasRequiredItem) {
-                // 有道具，解鎖
-                alert(`🎒 使用了【${requiredItem.name}】！\n謎題已解開！`);
-                lockedObj.style.display = 'none';
-                chest.style.display = 'block';
-                // 這裡可以選擇是否要將「已解鎖」狀態存回後端，
-                // 但為了簡化，目前僅做前端顯示切換（反正重點是解題拿積分）
-                // 若下次進來還是會檢查一次背包，只要道具還在就沒問題
-                
-                // 將狀態設為 null，避免 updateAR 再次將其隱藏
-                requiredItem = null; 
-            } else {
-                // 沒道具，提示
-                alert(`🔒 這裡似乎藏著什麼...\n\n需要道具：【${requiredItem.name}】\n請先去尋找道具再來吧！`);
-            }
+            if (!requiredItem) return;
+            alert(`🔒 這裡似乎藏著什麼...\n\n需要道具：【${requiredItem.name}】\n請先去尋找道具再來吧！`);
         };
+
+        // 點擊道具使用介面：使用道具並顯示 AR 內容
+        const itemUseImage = document.getElementById('item-use-image');
+        itemUseObj.onclick = () => {
+            if (!requiredItem || !hasRequiredItem) return;
+            // 使用道具，顯示提示
+            alert(`🎒 使用了【${requiredItem.name}】！\n謎題已解開！`);
+            // 隱藏道具使用介面，顯示 AR 內容
+            itemUseObj.style.display = 'none';
+            chest.style.display = 'block';
+            // 將 requiredItem 設為 null，避免 updateAR 再次顯示道具使用介面
+            requiredItem = null;
+        };
+        // 也可以點擊道具圖片本身
+        if (itemUseImage) {
+            itemUseImage.onclick = (e) => {
+                e.stopPropagation(); // 防止觸發父元素點擊
+                itemUseObj.click();
+            };
+        }
 
         // 點擊事件：開啟放大檢視
         document.getElementById('chest-obj').onclick = () => {
@@ -1002,6 +1052,7 @@
                     isObjectVisible = false;
                     chest.style.display = 'none';
                     lockedObj.style.display = 'none';
+                    itemUseObj.style.display = 'none';
                     locationObj.style.display = 'none';
                 }
                 arrow.style.display = 'block';
@@ -1026,14 +1077,26 @@
                         locationObj.style.display = 'block';
                         chest.style.display = 'none';
                         lockedObj.style.display = 'none';
+                        itemUseObj.style.display = 'none';
                     } else if (requiredItem) {
-                        // 有道具需求且未解鎖：顯示問號
-                        lockedObj.style.display = 'block';
-                        chest.style.display = 'none';
-                        locationObj.style.display = 'none';
+                        // 有道具需求
+                        if (hasRequiredItem) {
+                            // 有道具：顯示道具使用介面
+                            itemUseObj.style.display = 'block';
+                            lockedObj.style.display = 'none';
+                            chest.style.display = 'none';
+                            locationObj.style.display = 'none';
+                        } else {
+                            // 沒有道具：顯示問號
+                            lockedObj.style.display = 'block';
+                            itemUseObj.style.display = 'none';
+                            chest.style.display = 'none';
+                            locationObj.style.display = 'none';
+                        }
                     } else {
                         // 一般任務或已解鎖：顯示內容
                         lockedObj.style.display = 'none';
+                        itemUseObj.style.display = 'none';
                         locationObj.style.display = 'none';
                         chest.style.display = 'block';
                     }
@@ -1049,6 +1112,7 @@
                 const transformStyle = `translate(${xOffset}px, 0) scale(${scale})`;
                 chest.style.transform = transformStyle;
                 lockedObj.style.transform = transformStyle;
+                itemUseObj.style.transform = transformStyle;
                 locationObj.style.transform = transformStyle;
 
             } else {
@@ -1057,6 +1121,7 @@
                     isObjectVisible = false;
                     chest.style.display = 'none';
                     lockedObj.style.display = 'none';
+                    itemUseObj.style.display = 'none';
                     locationObj.style.display = 'none';
                     arrow.style.display = 'block';
                 }

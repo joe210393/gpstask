@@ -886,7 +886,9 @@ app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
     // 新增參數
     type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants,
     // 道具參數
-    required_item_id, reward_item_id
+    required_item_id, reward_item_id,
+    // 劇情結局關卡
+    is_final_step
   } = req.body;
 
   console.log('[POST /api/tasks] Received:', req.body);
@@ -941,19 +943,20 @@ app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
     
     const reqItemId = required_item_id ? Number(required_item_id) : null;
     const rewItemId = reward_item_id ? Number(reward_item_id) : null;
+    const isFinal = is_final_step === true || is_final_step === 'true' || is_final_step === 1;
 
     await conn.execute(
       `INSERT INTO tasks (
         name, lat, lng, radius, description, photoUrl, iconUrl, youtubeUrl, ar_image_url, points, created_by, 
         task_type, options, correct_answer,
         type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants,
-        required_item_id, reward_item_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        required_item_id, reward_item_id, is_final_step
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         name, lat, lng, radius, description, photoUrl, '/images/flag-red.png', youtubeUrl || null, ar_image_url || null, pts, username, 
         tType, opts, correct_answer || null,
         mainType, qId, qOrder, tStart, tEnd, maxP,
-        reqItemId, rewItemId
+        reqItemId, rewItemId, isFinal
       ]
     );
     res.json({ success: true, message: '新增成功' });
@@ -1219,7 +1222,9 @@ app.put('/api/tasks/:id', staffOrAdminAuth, async (req, res) => {
     task_type, options, correct_answer,
     type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants,
     // 道具參數
-    required_item_id, reward_item_id
+    required_item_id, reward_item_id,
+    // 劇情結局關卡
+    is_final_step
   } = req.body;
 
   if (!name || !lat || !lng || !radius || !description || !photoUrl) {
@@ -1273,19 +1278,20 @@ app.put('/api/tasks/:id', staffOrAdminAuth, async (req, res) => {
     
     const reqItemId = required_item_id ? Number(required_item_id) : null;
     const rewItemId = reward_item_id ? Number(reward_item_id) : null;
+    const isFinal = is_final_step === true || is_final_step === 'true' || is_final_step === 1;
 
     await conn.execute(
       `UPDATE tasks SET 
         name=?, lat=?, lng=?, radius=?, description=?, photoUrl=?, youtubeUrl=?, ar_image_url=?, points=?, 
         task_type=?, options=?, correct_answer=?,
         type=?, quest_chain_id=?, quest_order=?, time_limit_start=?, time_limit_end=?, max_participants=?,
-        required_item_id=?, reward_item_id=?
+        required_item_id=?, reward_item_id=?, is_final_step=?
        WHERE id=?`,
       [
         name, lat, lng, radius, description, photoUrl, youtubeUrl || null, ar_image_url || null, pts, 
         tType, opts, correct_answer || null, 
         mainType, qId, qOrder, tStart, tEnd, maxP,
-        reqItemId, rewItemId,
+        reqItemId, rewItemId, isFinal,
         id
       ]
     );

@@ -688,6 +688,11 @@ function loadTasks() {
                 const qSelect = document.getElementById('editQuestChainSelect');
                 qSelect.value = t.quest_chain_id || '';
                 document.querySelector('#editTaskForm input[name="quest_order"]').value = t.quest_order || 1;
+                // 設置結局關卡 checkbox
+                const isFinalCheckbox = document.getElementById('editIsFinalStep');
+                if (isFinalCheckbox) {
+                  isFinalCheckbox.checked = t.is_final_step === true || t.is_final_step === 1;
+                }
               }
 
               // 填入限時任務欄位
@@ -798,6 +803,8 @@ document.getElementById('addTaskForm').addEventListener('submit', async function
   const time_limit_start = form.time_limit_start?.value || null;
   const time_limit_end = form.time_limit_end?.value || null;
   const max_participants = form.max_participants?.value || null;
+  // 劇情結局關卡
+  const is_final_step = form.is_final_step?.checked || false;
   // 道具欄位
   const required_item_id = form.required_item_id?.value || null;
   const reward_item_id = form.reward_item_id?.value || null;
@@ -906,7 +913,8 @@ document.getElementById('addTaskForm').addEventListener('submit', async function
       body: JSON.stringify({ 
         name, lat, lng, radius, points, description, photoUrl, youtubeUrl, ar_image_url: arImageUrl, 
         task_type, options, correct_answer,
-        type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants
+        type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants,
+        is_final_step, required_item_id, reward_item_id
       })
     });
     const data = await res.json();
@@ -960,6 +968,8 @@ document.getElementById('editTaskForm').addEventListener('submit', async functio
   const time_limit_start = form.time_limit_start?.value || null;
   const time_limit_end = form.time_limit_end?.value || null;
   const max_participants = form.max_participants?.value || null;
+  // 劇情結局關卡
+  const is_final_step = document.getElementById('editIsFinalStep')?.checked || false;
   // 道具欄位
   const required_item_id = document.getElementById('editRequiredItemSelect').value || null;
   const reward_item_id = document.getElementById('editRewardItemSelect').value || null;
@@ -1034,7 +1044,8 @@ document.getElementById('editTaskForm').addEventListener('submit', async functio
       body: JSON.stringify({ 
         name, lat, lng, radius, points, description, photoUrl, youtubeUrl, ar_image_url: arImageUrl, 
         task_type, options, correct_answer,
-        type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants
+        type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants,
+        is_final_step, required_item_id, reward_item_id
       })
     })
     .then(res => res.json())

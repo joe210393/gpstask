@@ -77,6 +77,13 @@
                 <input class="form-input" type="number" name="quest_order" min="1" placeholder="例如：1 代表第一關" />
                 <small style="color: #666;">必須完成第 1 關才能解鎖第 2 關</small>
               </div>
+              <div class="form-group">
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                  <input type="checkbox" name="is_final_step" value="1" style="width:18px; height:18px; cursor:pointer;" />
+                  <span style="font-weight:bold; color:#d97706;">🏆 標記為結局關卡</span>
+                </label>
+                <small style="color: #666; display:block; margin-top:4px;">勾選後，此關卡將被標記為劇情任務的結局，完成後可獲得劇情獎勵</small>
+              </div>
             </div>
 
             <!-- 限時任務專用欄位 -->
@@ -291,6 +298,13 @@
               <div class="form-group">
                 <label class="form-label">劇情順序</label>
                 <input class="form-input" type="number" name="quest_order" min="1" />
+              </div>
+              <div class="form-group">
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                  <input type="checkbox" name="is_final_step" id="editIsFinalStep" value="1" style="width:18px; height:18px; cursor:pointer;" />
+                  <span style="font-weight:bold; color:#d97706;">🏆 標記為結局關卡</span>
+                </label>
+                <small style="color: #666; display:block; margin-top:4px;">勾選後，此關卡將被標記為劇情任務的結局，完成後可獲得劇情獎勵</small>
               </div>
             </div>
 
