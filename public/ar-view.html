@@ -53,6 +53,31 @@
             pointer-events: auto;
         }
 
+        /* 非阻塞式提示訊息 */
+        #toast-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 16px;
+            text-align: center;
+            z-index: 5000;
+            display: none;
+            pointer-events: none;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            font-size: 16px;
+            font-weight: bold;
+            max-width: 80%;
+            animation: toastFadeIn 0.3s ease-out;
+        }
+        @keyframes toastFadeIn {
+            from { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+            to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+
         .btn-back {
             position: fixed;
             bottom: 30px;
@@ -531,6 +556,9 @@
         <button id="btn-open-lock" type="button">🔒 輸入密碼</button>
     </div>
 
+    <!-- 非阻塞式提示訊息 -->
+    <div id="toast-message"></div>
+
     <script>
         const API_BASE = ''; // 本地用空字串
         const video = document.getElementById('camera-feed');
@@ -721,6 +749,17 @@
         let smoothedHeading = 0; // 平滑化用：計算後的角度
         let isObjectVisible = false; // 磁滯鎖定用：目前物體是否可見
 
+        // 非阻塞式提示訊息函數
+        function showToast(message, duration = 2000) {
+            const toast = document.getElementById('toast-message');
+            if (!toast) return;
+            toast.textContent = message;
+            toast.style.display = 'block';
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, duration);
+        }
+
         // 點擊打卡地標
         locationObj.onclick = async () => {
             if (!currentUserTaskId) currentUserTaskId = await fetchCurrentUserTaskId();
@@ -757,15 +796,15 @@
         // 點擊鎖定物件：沒有道具時顯示提示
         document.getElementById('locked-obj').onclick = () => {
             if (!requiredItem) return;
-            alert(`🔒 這裡似乎藏著什麼...\n\n需要道具：【${requiredItem.name}】\n請先去尋找道具再來吧！`);
+            showToast(`🔒 需要道具：【${requiredItem.name}】\n請先去尋找道具再來吧！`, 3000);
         };
 
         // 點擊道具使用介面：使用道具並顯示 AR 內容
         const itemUseImage = document.getElementById('item-use-image');
         itemUseObj.onclick = () => {
             if (!requiredItem || !hasRequiredItem) return;
-            // 使用道具，顯示提示
-            alert(`🎒 使用了【${requiredItem.name}】！\n謎題已解開！`);
+            // 使用道具，顯示非阻塞式提示（不會中斷相機）
+            showToast(`🎒 使用了【${requiredItem.name}】！\n謎題已解開！`, 2500);
             // 隱藏道具使用介面，顯示 AR 內容
             itemUseObj.style.display = 'none';
             chest.style.display = 'block';
