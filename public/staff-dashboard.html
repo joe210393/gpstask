@@ -29,6 +29,18 @@
 
   <main>
     <section class="mb-4">
+      <!-- 道具管理區塊 -->
+      <div class="form-container" style="margin-bottom: 2rem; background: #fffcf5; border: 1px solid #ffeeba;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h2 style="margin: 0; color: #856404;">🎒 道具管理</h2>
+          <button id="btnCreateItem" class="btn btn-secondary" style="font-size: 0.9rem; background: #ffc107; border-color: #ffc107; color: #212529;">+ 新增道具</button>
+        </div>
+        <div id="itemList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem;">
+          <!-- 道具列表動態載入 -->
+          <div style="color: #888; font-size: 0.9rem;">載入中...</div>
+        </div>
+      </div>
+
       <!-- 劇情任務管理區塊 -->
       <div class="form-container" style="margin-bottom: 2rem; background: #fdfdfd; border: 1px solid #e0e0e0;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
@@ -169,6 +181,27 @@
           <div class="form-group">
             <label class="form-label">任務說明</label>
             <textarea name="description" class="form-textarea" required style="height:100px;"></textarea>
+          </div>
+
+          <!-- 道具關聯設定 -->
+          <div class="form-group" style="background:#fdfdfe; border:1px solid #eaeaea; padding:10px; border-radius:6px;">
+            <label class="form-label" style="color:#555;">道具關聯設定 (選填)</label>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+              <div>
+                <label class="form-label" style="font-size:0.85rem;">🔒 解鎖所需道具</label>
+                <select name="required_item_id" class="form-select item-select">
+                  <option value="">-- 無 --</option>
+                </select>
+                <small style="color:#999; font-size:0.8rem;">玩家必須持有此道具才能進行任務</small>
+              </div>
+              <div>
+                <label class="form-label" style="font-size:0.85rem;">🎁 完成獎勵道具</label>
+                <select name="reward_item_id" class="form-select item-select">
+                  <option value="">-- 無 --</option>
+                </select>
+                <small style="color:#999; font-size:0.8rem;">任務完成後自動發放</small>
+              </div>
+            </div>
           </div>
           
           <div class="form-group">
@@ -330,6 +363,25 @@
               <label class="form-label">任務說明</label>
               <textarea name="description" class="form-textarea" required style="height:100px;"></textarea>
             </div>
+
+            <!-- 道具關聯設定 (編輯) -->
+            <div class="form-group" style="background:#fdfdfe; border:1px solid #eaeaea; padding:10px; border-radius:6px;">
+              <label class="form-label" style="color:#555;">道具關聯設定 (選填)</label>
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                <div>
+                  <label class="form-label" style="font-size:0.85rem;">🔒 解鎖所需道具</label>
+                  <select name="required_item_id" id="editRequiredItemSelect" class="form-select item-select">
+                    <option value="">-- 無 --</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="form-label" style="font-size:0.85rem;">🎁 完成獎勵道具</label>
+                  <select name="reward_item_id" id="editRewardItemSelect" class="form-select item-select">
+                    <option value="">-- 無 --</option>
+                  </select>
+                </div>
+              </div>
+            </div>
             
             <div class="form-group">
               <label class="form-label">任務照片網址</label>
@@ -375,6 +427,7 @@
         </div>
         <div class="task-modal-body">
           <form id="createQuestForm">
+            <!-- ... existing fields ... -->
             <div class="form-group">
               <label class="form-label">劇情標題</label>
               <input class="form-input" type="text" name="title" required placeholder="例如：樂樂園勇者試煉" />
@@ -399,6 +452,37 @@
               </div>
             </div>
             <button type="submit" class="btn btn-primary w-100">建立劇情</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- 道具 Modal -->
+    <div class="task-modal" id="itemModal">
+      <div class="task-modal-overlay"></div>
+      <div class="task-modal-content">
+        <div class="task-modal-header">
+          <h3>新增道具</h3>
+          <button class="close-btn" id="closeItemModal">&times;</button>
+        </div>
+        <div class="task-modal-body">
+          <form id="createItemForm">
+            <div class="form-group">
+              <label class="form-label">道具名稱</label>
+              <input class="form-input" type="text" name="name" required placeholder="例如：古老鑰匙" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">道具描述</label>
+              <textarea class="form-textarea" name="description" placeholder="描述這個道具的用途..."></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">道具圖片</label>
+              <input class="form-input" type="file" name="image" accept="image/*" id="itemImageInput" />
+              <div style="margin-top: 10px;">
+                <img id="itemImagePreview" src="" style="max-width: 100px; max-height: 100px; display: none; border-radius: 8px; border: 1px solid #ddd;" />
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">建立道具</button>
           </form>
         </div>
       </div>

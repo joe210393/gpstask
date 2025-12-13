@@ -553,7 +553,16 @@ app.get('/api/tasks', async (req, res) => {
   let conn;
   try {
     conn = await mysql.createConnection(dbConfig);
-    const [rows] = await conn.execute('SELECT * FROM tasks WHERE 1=1 ORDER BY id DESC');
+    // Join items 表格以獲取道具名稱
+    const [rows] = await conn.execute(`
+      SELECT t.*, 
+             i_req.name as required_item_name, i_req.image_url as required_item_image,
+             i_rew.name as reward_item_name, i_rew.image_url as reward_item_image
+      FROM tasks t
+      LEFT JOIN items i_req ON t.required_item_id = i_req.id
+      LEFT JOIN items i_rew ON t.reward_item_id = i_rew.id
+      WHERE 1=1 ORDER BY t.id DESC
+    `);
     res.json({ success: true, tasks: rows });
   } catch (err) {
     console.error(err);
@@ -694,13 +703,148 @@ app.delete('/api/quest-chains/:id', staffOrAdminAuth, async (req, res) => {
   }
 });
 
+// ===== 道具系統 (Item System) API =====
+
+// 取得所有道具
+app.get('/api/items', async (req, res) => {
+  let conn;
+  try {
+    conn = await mysql.createConnection(dbConfig);
+    const [rows] = await conn.execute('SELECT * FROM items ORDER BY id DESC');
+    res.json({ success: true, items: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) await conn.end();
+  }
+});
+
+// 新增道具 (Admin/Shop)
+app.post('/api/items', staffOrAdminAuth, upload.single('image'), async (req, res) => {
+  const { name, description } = req.body;
+  if (!name) return res.status(400).json({ success: false, message: '缺少道具名稱' });
+
+  let image_url = null;
+  if (req.file) {
+    image_url = '/images/' + req.file.filename;
+  } else if (req.body.image_url) {
+    image_url = req.body.image_url;
+  }
+
+  let conn;
+  try {
+    conn = await mysql.createConnection(dbConfig);
+    await conn.execute(
+      'INSERT INTO items (name, description, image_url) VALUES (?, ?, ?)',
+      [name, description || '', image_url]
+    );
+    res.json({ success: true, message: '道具新增成功' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) await conn.end();
+  }
+});
+
+// 編輯道具
+app.put('/api/items/:id', staffOrAdminAuth, upload.single('image'), async (req, res) => {
+  const { id } = req.params;
+  const { name, description } = req.body;
+  if (!name) return res.status(400).json({ success: false, message: '缺少道具名稱' });
+
+  let conn;
+  try {
+    conn = await mysql.createConnection(dbConfig);
+    
+    // 如果有上傳新圖片就更新，否則保留原圖
+    let sql, params;
+    if (req.file) {
+      const image_url = '/images/' + req.file.filename;
+      sql = 'UPDATE items SET name = ?, description = ?, image_url = ? WHERE id = ?';
+      params = [name, description || '', image_url, id];
+    } else if (req.body.image_url) {
+      sql = 'UPDATE items SET name = ?, description = ?, image_url = ? WHERE id = ?';
+      params = [name, description || '', req.body.image_url, id];
+    } else {
+      sql = 'UPDATE items SET name = ?, description = ? WHERE id = ?';
+      params = [name, description || '', id];
+    }
+
+    await conn.execute(sql, params);
+    res.json({ success: true, message: '道具更新成功' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) await conn.end();
+  }
+});
+
+// 刪除道具
+app.delete('/api/items/:id', staffOrAdminAuth, async (req, res) => {
+  const { id } = req.params;
+  let conn;
+  try {
+    conn = await mysql.createConnection(dbConfig);
+    
+    // 檢查是否有任務使用了此道具
+    const [tasks] = await conn.execute(
+      'SELECT id FROM tasks WHERE required_item_id = ? OR reward_item_id = ?',
+      [id, id]
+    );
+    if (tasks.length > 0) {
+      return res.status(400).json({ success: false, message: '此道具被任務引用中，無法刪除' });
+    }
+
+    await conn.execute('DELETE FROM items WHERE id = ?', [id]);
+    res.json({ success: true, message: '道具已刪除' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) await conn.end();
+  }
+});
+
+// 取得使用者背包
+app.get('/api/user/inventory', async (req, res) => {
+  const username = req.headers['x-username'];
+  if (!username) return res.status(400).json({ success: false, message: '未登入' });
+
+  let conn;
+  try {
+    conn = await mysql.createConnection(dbConfig);
+    const [users] = await conn.execute('SELECT id FROM users WHERE username = ?', [username]);
+    if (users.length === 0) return res.json({ success: true, inventory: [] });
+    const userId = users[0].id;
+
+    const [rows] = await conn.execute(`
+      SELECT ui.*, i.name, i.description, i.image_url 
+      FROM user_inventory ui
+      JOIN items i ON ui.item_id = i.id
+      WHERE ui.user_id = ?
+    `, [userId]);
+    
+    res.json({ success: true, inventory: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) await conn.end();
+  }
+});
+
 // 新增任務
 app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
   const { 
     name, lat, lng, radius, description, photoUrl, youtubeUrl, ar_image_url, points, 
     task_type, options, correct_answer,
     // 新增參數
-    type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants
+    type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants,
+    // 道具參數
+    required_item_id, reward_item_id
   } = req.body;
 
   console.log('[POST /api/tasks] Received:', req.body);
@@ -752,17 +896,22 @@ app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
     const maxP = max_participants ? Number(max_participants) : null;
     const qId = quest_chain_id ? Number(quest_chain_id) : null;
     const qOrder = quest_order ? Number(quest_order) : null;
+    
+    const reqItemId = required_item_id ? Number(required_item_id) : null;
+    const rewItemId = reward_item_id ? Number(reward_item_id) : null;
 
     await conn.execute(
       `INSERT INTO tasks (
         name, lat, lng, radius, description, photoUrl, iconUrl, youtubeUrl, ar_image_url, points, created_by, 
         task_type, options, correct_answer,
-        type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants,
+        required_item_id, reward_item_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         name, lat, lng, radius, description, photoUrl, '/images/flag-red.png', youtubeUrl || null, ar_image_url || null, pts, username, 
         tType, opts, correct_answer || null,
-        mainType, qId, qOrder, tStart, tEnd, maxP
+        mainType, qId, qOrder, tStart, tEnd, maxP,
+        reqItemId, rewItemId
       ]
     );
     res.json({ success: true, message: '新增成功' });
@@ -930,6 +1079,24 @@ app.post('/api/user-tasks/finish', reviewerAuth, async (req, res) => {
         );
       }
 
+      // 發放獎勵道具 (檢查任務是否有 reward_item_id)
+      const [taskDetails] = await conn.execute('SELECT reward_item_id FROM tasks WHERE id = ?', [task_id]);
+      if (taskDetails.length > 0 && taskDetails[0].reward_item_id) {
+        const rewardItemId = taskDetails[0].reward_item_id;
+        // 檢查背包是否已有此道具
+        const [inventory] = await conn.execute(
+          'SELECT id, quantity FROM user_inventory WHERE user_id = ? AND item_id = ?',
+          [userId, rewardItemId]
+        );
+        if (inventory.length > 0) {
+          // 已有，數量+1
+          await conn.execute('UPDATE user_inventory SET quantity = quantity + 1 WHERE id = ?', [inventory[0].id]);
+        } else {
+          // 沒有，新增
+          await conn.execute('INSERT INTO user_inventory (user_id, item_id, quantity) VALUES (?, ?, 1)', [userId, rewardItemId]);
+        }
+      }
+
       await conn.commit();
       res.json({ success: true, message: `已完成任務，獲得 ${task.points} 積分！` });
 
@@ -952,7 +1119,17 @@ app.get('/api/tasks/:id', async (req, res) => {
   let conn;
   try {
     conn = await mysql.createConnection(dbConfig);
-    const [rows] = await conn.execute('SELECT * FROM tasks WHERE id = ?', [id]);
+    // Join items 表格以獲取道具名稱
+    const [rows] = await conn.execute(`
+      SELECT t.*, 
+             i_req.name as required_item_name, i_req.image_url as required_item_image,
+             i_rew.name as reward_item_name, i_rew.image_url as reward_item_image
+      FROM tasks t
+      LEFT JOIN items i_req ON t.required_item_id = i_req.id
+      LEFT JOIN items i_rew ON t.reward_item_id = i_rew.id
+      WHERE t.id = ?
+    `, [id]);
+    
     if (rows.length === 0) return res.status(404).json({ success: false, message: '找不到任務' });
     res.json({ success: true, task: rows[0] });
   } catch (err) {
@@ -969,7 +1146,9 @@ app.put('/api/tasks/:id', staffOrAdminAuth, async (req, res) => {
   const { 
     name, lat, lng, radius, description, photoUrl, youtubeUrl, ar_image_url, points, 
     task_type, options, correct_answer,
-    type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants
+    type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants,
+    // 道具參數
+    required_item_id, reward_item_id
   } = req.body;
 
   if (!name || !lat || !lng || !radius || !description || !photoUrl) {
@@ -1020,17 +1199,22 @@ app.put('/api/tasks/:id', staffOrAdminAuth, async (req, res) => {
     const maxP = max_participants ? Number(max_participants) : null;
     const qId = quest_chain_id ? Number(quest_chain_id) : null;
     const qOrder = quest_order ? Number(quest_order) : null;
+    
+    const reqItemId = required_item_id ? Number(required_item_id) : null;
+    const rewItemId = reward_item_id ? Number(reward_item_id) : null;
 
     await conn.execute(
       `UPDATE tasks SET 
         name=?, lat=?, lng=?, radius=?, description=?, photoUrl=?, youtubeUrl=?, ar_image_url=?, points=?, 
         task_type=?, options=?, correct_answer=?,
-        type=?, quest_chain_id=?, quest_order=?, time_limit_start=?, time_limit_end=?, max_participants=?
+        type=?, quest_chain_id=?, quest_order=?, time_limit_start=?, time_limit_end=?, max_participants=?,
+        required_item_id=?, reward_item_id=?
        WHERE id=?`,
       [
         name, lat, lng, radius, description, photoUrl, youtubeUrl || null, ar_image_url || null, pts, 
         tType, opts, correct_answer || null, 
         mainType, qId, qOrder, tStart, tEnd, maxP,
+        reqItemId, rewItemId,
         id
       ]
     );
@@ -1396,6 +1580,22 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
               [userTask.user_id, 'earned', userTask.points, `完成任務: ${userTask.task_name}`, 'task_completion', userTask.task_id]
             );
          }
+
+         // 發放獎勵道具
+         const [taskDetails] = await conn.execute('SELECT reward_item_id FROM tasks WHERE id = ?', [userTask.task_id]);
+         if (taskDetails.length > 0 && taskDetails[0].reward_item_id) {
+           const rewardItemId = taskDetails[0].reward_item_id;
+           const [inventory] = await conn.execute(
+             'SELECT id, quantity FROM user_inventory WHERE user_id = ? AND item_id = ?',
+             [userTask.user_id, rewardItemId]
+           );
+           if (inventory.length > 0) {
+             await conn.execute('UPDATE user_inventory SET quantity = quantity + 1 WHERE id = ?', [inventory[0].id]);
+           } else {
+             await conn.execute('INSERT INTO user_inventory (user_id, item_id, quantity) VALUES (?, ?, 1)', [userTask.user_id, rewardItemId]);
+           }
+         }
+
          await conn.commit();
        } catch (e) {
          await conn.rollback();

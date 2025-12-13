@@ -210,10 +210,138 @@ function setupTaskTypeToggle(selectId, divId, standardAnswerDivId) {
 setupTaskTypeToggle('taskTypeSelect', 'multipleChoiceOptions', 'standardAnswerBlock');
 setupTaskTypeToggle('editTaskTypeSelect', 'editMultipleChoiceOptions', 'editStandardAnswerBlock');
 
-// 確保先載入劇情，再載入任務
-loadQuestChains().then(() => {
+// 確保先載入劇情和道具，再載入任務
+Promise.all([loadQuestChains(), loadItems()]).then(() => {
   loadTasks();
 });
+
+// === 道具管理邏輯 ===
+let globalItemsMap = {};
+
+function loadItems() {
+  return fetch(`${API_BASE}/api/items`)
+    .then(res => res.json())
+    .then(data => {
+      if (!data.success) return;
+      globalItemsMap = {};
+      const list = document.getElementById('itemList');
+      const selects = document.querySelectorAll('.item-select'); // 任務表單中的下拉選單
+      
+      if (list) list.innerHTML = '';
+      
+      // 更新下拉選單
+      selects.forEach(sel => {
+        const currentVal = sel.value; // 保留目前選擇
+        sel.innerHTML = '<option value="">-- 無 --</option>';
+        data.items.forEach(item => {
+          sel.innerHTML += `<option value="${item.id}">${item.name}</option>`;
+        });
+        sel.value = currentVal;
+      });
+
+      if (data.items.length === 0) {
+        if (list) list.innerHTML = '<div style="color:#888;">目前沒有道具</div>';
+      } else {
+        data.items.forEach(item => {
+          globalItemsMap[item.id] = item;
+          if (list) {
+            const div = document.createElement('div');
+            div.style.cssText = 'background:white; padding:10px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.05); border-left:4px solid #ffc107; position: relative;';
+            div.innerHTML = `
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:5px;">
+                ${item.image_url ? `<img src="${item.image_url}" style="width:30px; height:30px; object-fit:contain;">` : '<span style="font-size:1.5rem;">🎒</span>'}
+                <div style="font-weight:bold; font-size:1rem;">${item.name}</div>
+              </div>
+              <div style="font-size:0.85rem; color:#666;">${item.description || '無描述'}</div>
+              <button class="btn-delete-item" data-id="${item.id}" style="position: absolute; top: 5px; right: 5px; background: none; border: none; color: #dc3545; cursor: pointer;" title="刪除道具">&times;</button>
+            `;
+            list.appendChild(div);
+          }
+        });
+
+        // 綁定刪除道具按鈕
+        document.querySelectorAll('.btn-delete-item').forEach(btn => {
+          btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (!confirm('確定要刪除這個道具嗎？\n注意：如果該道具被任務引用，將無法刪除。')) return;
+            fetch(`${API_BASE}/api/items/${this.dataset.id}`, {
+              method: 'DELETE',
+              headers: { 'x-username': loginUser.username }
+            })
+            .then(res => res.json())
+            .then(resData => {
+              if (resData.success) {
+                alert('道具已刪除');
+                loadItems();
+              } else {
+                alert(resData.message || '刪除失敗');
+              }
+            });
+          });
+        });
+      }
+    });
+}
+
+// 道具 Modal 邏輯
+const btnCreateItem = document.getElementById('btnCreateItem');
+const itemModal = document.getElementById('itemModal');
+const closeItemModal = document.getElementById('closeItemModal');
+const itemImageInput = document.getElementById('itemImageInput');
+const itemImagePreview = document.getElementById('itemImagePreview');
+
+if (btnCreateItem && itemModal) {
+  btnCreateItem.onclick = () => itemModal.classList.add('show');
+  closeItemModal.onclick = () => itemModal.classList.remove('show');
+}
+
+if (itemImageInput) {
+  itemImageInput.addEventListener('change', function() {
+    const file = this.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        itemImagePreview.src = e.target.result;
+        itemImagePreview.style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    } else {
+      itemImagePreview.style.display = 'none';
+    }
+  });
+}
+
+const createItemForm = document.getElementById('createItemForm');
+if (createItemForm) {
+  createItemForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const form = this;
+    const fd = new FormData();
+    fd.append('name', form.name.value.trim());
+    fd.append('description', form.description.value.trim());
+    if (form.image.files[0]) {
+      fd.append('image', form.image.files[0]);
+    }
+
+    fetch(`${API_BASE}/api/items`, {
+      method: 'POST',
+      headers: { 'x-username': loginUser.username },
+      body: fd
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        alert('道具新增成功');
+        form.reset();
+        itemImagePreview.style.display = 'none';
+        itemModal.classList.remove('show');
+        loadItems();
+      } else {
+        alert(data.message || '新增失敗');
+      }
+    });
+  });
+}
 
 // 讀取任務列表
 function loadTasks() {
@@ -261,6 +389,11 @@ function loadTasks() {
           categoryTag = `<span style="font-size:0.75rem; background:#f3f4f6; color:#374151; padding:2px 6px; border-radius:4px; margin-right:4px;">📝 單題</span>`;
         }
 
+        // 道具標籤
+        let itemTag = '';
+        if (task.required_item_id) itemTag += `<span style="font-size:0.75rem; background:#ffebee; color:#dc3545; padding:2px 6px; border-radius:4px;">🔒 需道具</span> `;
+        if (task.reward_item_id) itemTag += `<span style="font-size:0.75rem; background:#e8f5e9; color:#28a745; padding:2px 6px; border-radius:4px;">🎁 獎勵道具</span>`;
+
         return `
           <img src="${task.photoUrl}" class="card-img" alt="任務照片" style="height:160px;" onerror="this.src='/images/mascot.png'">
           <div class="card-body">
@@ -270,6 +403,7 @@ function loadTasks() {
               <div style="display:flex; flex-wrap:wrap; gap:4px;">
                 ${categoryTag}
                 <span style="font-size:0.75rem; background:#f3f4f6; padding:2px 6px; border-radius:4px;">${typeText}</span>
+                ${itemTag}
               </div>
             </div>
             <div class="card-text">
@@ -414,6 +548,10 @@ function loadTasks() {
                 document.querySelector('#editTaskForm input[name="max_participants"]').value = t.max_participants || 0;
               }
               
+              // 填入道具欄位
+              document.getElementById('editRequiredItemSelect').value = t.required_item_id || '';
+              document.getElementById('editRewardItemSelect').value = t.reward_item_id || '';
+
               // 設置任務類型與選項
               form.task_type.value = t.task_type || 'qa';
               const editOptionsDiv = document.getElementById('editMultipleChoiceOptions');
@@ -509,6 +647,9 @@ document.getElementById('addTaskForm').addEventListener('submit', async function
   const time_limit_start = form.time_limit_start?.value || null;
   const time_limit_end = form.time_limit_end?.value || null;
   const max_participants = form.max_participants?.value || null;
+  // 道具欄位
+  const required_item_id = form.required_item_id?.value || null;
+  const reward_item_id = form.reward_item_id?.value || null;
 
   // 處理任務類型與選項
   const task_type = form.task_type.value;
@@ -668,6 +809,9 @@ document.getElementById('editTaskForm').addEventListener('submit', async functio
   const time_limit_start = form.time_limit_start?.value || null;
   const time_limit_end = form.time_limit_end?.value || null;
   const max_participants = form.max_participants?.value || null;
+  // 道具欄位
+  const required_item_id = document.getElementById('editRequiredItemSelect').value || null;
+  const reward_item_id = document.getElementById('editRewardItemSelect').value || null;
 
   // 處理任務類型與選項
   const task_type = form.task_type.value;

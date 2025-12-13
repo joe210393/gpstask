@@ -82,6 +82,32 @@
             overflow: hidden;
         }
 
+        /* 鎖定狀態物件 (問號/鎖頭) */
+        #locked-obj {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 200px; height: 200px;
+            margin-left: -100px; margin-top: -100px;
+            transform-style: preserve-3d;
+            display: none;
+            cursor: pointer;
+            pointer-events: auto;
+            text-align: center;
+            color: white;
+            animation: float 3s ease-in-out infinite;
+        }
+        #locked-icon {
+            font-size: 100px;
+            text-shadow: 0 0 20px rgba(255, 255, 0, 0.8);
+        }
+        #locked-text {
+            background: rgba(0,0,0,0.6);
+            padding: 5px 10px;
+            border-radius: 10px;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
         /* 寶箱物件容器 */
         #chest-obj {
             position: absolute;
@@ -363,6 +389,12 @@
     <video id="camera-feed" autoplay playsinline muted></video>
 
     <div id="ar-world">
+        <!-- 鎖定狀態物件 -->
+        <div id="locked-obj">
+            <div id="locked-icon">❓</div>
+            <div id="locked-text">點擊查看線索</div>
+        </div>
+
         <!-- 容器：可能是圖片、影片，或兩者都有 -->
         <div id="chest-obj">
             <div class="ar-content-row">
@@ -442,15 +474,42 @@
         let isNumberTask = false;
         let lockDigits = 4;
         let currentUserTaskId = null; // user_tasks.id
+        let requiredItem = null; // 任務需要的道具資訊
+        let hasRequiredItem = false; // 玩家是否擁有該道具
 
         // 載入任務詳情 (為了拿 YouTube 連結)
         if (taskId) {
             fetch(`${API_BASE}/api/tasks/${taskId}`)
                 .then(res => res.json())
-                .then(data => {
+                .then(async data => {
                     if (data.success && data.task) {
                         const task = data.task;
                         currentTask = task;
+                        
+                        // 檢查道具需求
+                        if (task.required_item_id) {
+                            requiredItem = {
+                                id: task.required_item_id,
+                                name: task.required_item_name,
+                                image: task.required_item_image
+                            };
+                            // 檢查背包
+                            const loginUser = getLoginUser();
+                            if (loginUser) {
+                                try {
+                                    const invRes = await fetch(`${API_BASE}/api/user/inventory`, {
+                                        headers: { 'x-username': loginUser.username }
+                                    });
+                                    const invData = await invRes.json();
+                                    if (invData.success) {
+                                        hasRequiredItem = invData.inventory.some(i => i.item_id === task.required_item_id);
+                                    }
+                                } catch (e) {
+                                    console.error('檢查背包失敗', e);
+                                }
+                            }
+                        }
+
                         isNumberTask = (task.task_type === 'number');
                         // 依答案長度決定位數（不暴露答案內容；若無則預設 4）
                         if (typeof task.correct_answer === 'string') {
@@ -525,6 +584,7 @@
 
         // 3. 感測器與 AR 邏輯
         const chest = document.getElementById('chest-obj');
+        const lockedObj = document.getElementById('locked-obj');
         const arrow = document.getElementById('guide-arrow');
         const debug = document.getElementById('debug-info');
         const status = document.getElementById('status');
@@ -546,6 +606,27 @@
         let lastHeading = 0; // 平滑化用：上一次的角度
         let smoothedHeading = 0; // 平滑化用：計算後的角度
         let isObjectVisible = false; // 磁滯鎖定用：目前物體是否可見
+
+        // 點擊鎖定物件：檢查道具
+        document.getElementById('locked-obj').onclick = () => {
+            if (!requiredItem) return; // 理論上不會發生
+
+            if (hasRequiredItem) {
+                // 有道具，解鎖
+                alert(`🎒 使用了【${requiredItem.name}】！\n謎題已解開！`);
+                lockedObj.style.display = 'none';
+                chest.style.display = 'block';
+                // 這裡可以選擇是否要將「已解鎖」狀態存回後端，
+                // 但為了簡化，目前僅做前端顯示切換（反正重點是解題拿積分）
+                // 若下次進來還是會檢查一次背包，只要道具還在就沒問題
+                
+                // 將狀態設為 null，避免 updateAR 再次將其隱藏
+                requiredItem = null; 
+            } else {
+                // 沒道具，提示
+                alert(`🔒 這裡似乎藏著什麼...\n\n需要道具：【${requiredItem.name}】\n請先去尋找道具再來吧！`);
+            }
+        };
 
         // 點擊事件：開啟放大檢視
         document.getElementById('chest-obj').onclick = () => {
@@ -834,6 +915,7 @@
                 if (isObjectVisible) {
                     isObjectVisible = false;
                     chest.style.display = 'none';
+                    lockedObj.style.display = 'none';
                 }
                 arrow.style.display = 'block';
                 // 箭頭指向目標
@@ -850,7 +932,17 @@
                 if (!isObjectVisible) {
                     isObjectVisible = true;
                     arrow.style.display = 'none';
-                    chest.style.display = 'block';
+                    
+                    // 根據是否有道具需求來決定顯示哪個物件
+                    if (requiredItem) {
+                        // 還沒解鎖，顯示問號
+                        lockedObj.style.display = 'block';
+                        chest.style.display = 'none';
+                    } else {
+                        // 已解鎖或無需求，顯示內容
+                        lockedObj.style.display = 'none';
+                        chest.style.display = 'block';
+                    }
                 }
 
                 const screenWidth = window.innerWidth;
@@ -860,13 +952,16 @@
                 let scale = 1.2 - (Math.min(dist, 50) / 60); 
                 if (scale < 0.4) scale = 0.4;
 
-                chest.style.transform = `translate(${xOffset}px, 0) scale(${scale})`;
+                const transformStyle = `translate(${xOffset}px, 0) scale(${scale})`;
+                chest.style.transform = transformStyle;
+                lockedObj.style.transform = transformStyle;
 
             } else {
                 // 離開視野
                 if (isObjectVisible) {
                     isObjectVisible = false;
                     chest.style.display = 'none';
+                    lockedObj.style.display = 'none';
                     arrow.style.display = 'block';
                 }
                 

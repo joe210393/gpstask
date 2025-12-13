@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "node init-db.js; node migrate-ar-image.js; node migrate-task-system.js; node migrate-task-type.js; node migrate-user-roles.js; node migrate-quest-chain-owner.js; node index.js",
+    "start": "node init-db.js; node migrate-ar-image.js; node migrate-task-system.js; node migrate-task-type.js; node migrate-user-roles.js; node migrate-quest-chain-owner.js; node migrate-item-system.js; node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
