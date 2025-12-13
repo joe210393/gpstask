@@ -1005,6 +1005,14 @@ function watchPosition() {
           // 檢查任務 proximity
           checkProximity(latitude, longitude);
       }
+      
+      // 無論有沒有大幅移動，只要定位成功就檢查一次 proximity
+      // 解決"原地不動剛好在範圍內卻不跳出提示"的問題
+      // 為了避免過於頻繁觸發，我們可以加一個簡單的限制，或者讓 checkProximity 內部去處理重複觸發
+      if (Math.abs(latitude - lastUserLat) > 0.00001 || Math.abs(longitude - lastUserLng) > 0.00001) {
+         // 微小移動也檢查
+         checkProximity(latitude, longitude);
+      }
     },
     err => handleGeoError(err),
     { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 }
@@ -1026,13 +1034,15 @@ function handleGeoError(err) {
 function checkProximity(userLat, userLng) {
   tasksList.forEach(task => {
     if (triggeredTasks.has(task.id) || isTaskCompleted(task.id)) return;
-    // 簡單緯度/經度差過濾
-    if (Math.abs(userLat-task.lat)*111000 > task.radius+100) return;
-    if (Math.abs(userLng-task.lng)*90000 > task.radius+100) return;
+    // 檢查任務 proximity
+    // 移除簡易過濾，因為經緯度換算距離在不同緯度有差異，且可能過濾掉邊界情況
+    // 直接用 haversineDistance 計算最準確，反正任務數量通常不多
+    if (triggeredTasks.has(task.id) || isTaskCompleted(task.id)) return;
+    
     const dist = haversineDistance(userLat, userLng, task.lat, task.lng);
-    if (dist <= task.radius) {
+    if (dist * 1000 <= task.radius) { // 轉換為公尺
       triggeredTasks.add(task.id);
-      showTaskModal(task, () => { window.location.href = task.pageUrl; });
+      showTaskModal(task, () => { window.location.href = `/task-detail.html?id=${task.id}`; });
     }
   });
 }
