@@ -57,7 +57,7 @@ async function migrate() {
 
   } catch (err) {
     console.error('❌ Migration 失敗:', err);
-    process.exit(1);
+    // process.exit(1); // 移除這行，允許後續腳本繼續執行
   } finally {
     if (conn) await conn.end();
   }

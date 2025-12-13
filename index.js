@@ -1658,6 +1658,10 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
          if (earnedItemName) {
             message += ` 並獲得道具：${earnedItemName}！`;
          }
+       } catch (err) {
+         await conn.rollback();
+         throw err;
+       }
     } else {
        // 只更新答案，狀態不變（保持進行中）
        await conn.execute('UPDATE user_tasks SET answer = ? WHERE id = ?', [answer, id]);
