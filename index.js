@@ -1099,7 +1099,7 @@ app.post('/api/user-tasks/finish', reviewerAuth, async (req, res) => {
     const userId = users[0].id;
 
     // 取得任務資訊 + 建立者（用於權限判斷）
-    const [tasks] = await conn.execute('SELECT name, points, created_by FROM tasks WHERE id = ?', [task_id]);
+    const [tasks] = await conn.execute('SELECT name, points, created_by, quest_chain_id, quest_order FROM tasks WHERE id = ?', [task_id]);
     if (tasks.length === 0) return res.status(400).json({ success: false, message: '找不到任務' });
     const task = tasks[0];
 
@@ -1138,6 +1138,28 @@ app.post('/api/user-tasks/finish', reviewerAuth, async (req, res) => {
         } else {
           // 沒有，新增
           await conn.execute('INSERT INTO user_inventory (user_id, item_id, quantity) VALUES (?, ?, 1)', [userId, rewardItemId]);
+        }
+      }
+
+      // 更新劇情任務進度
+      if (task.quest_chain_id && task.quest_order) {
+        const [userQuests] = await conn.execute(
+          'SELECT id, current_step_order FROM user_quests WHERE user_id = ? AND quest_chain_id = ?',
+          [userId, task.quest_chain_id]
+        );
+
+        if (userQuests.length > 0) {
+          if (userQuests[0].current_step_order === task.quest_order) {
+            await conn.execute(
+              'UPDATE user_quests SET current_step_order = current_step_order + 1 WHERE id = ?',
+              [userQuests[0].id]
+            );
+          }
+        } else {
+          await conn.execute(
+            'INSERT INTO user_quests (user_id, quest_chain_id, current_step_order) VALUES (?, ?, ?)',
+            [userId, task.quest_chain_id, task.quest_order + 1]
+          );
         }
       }
 
@@ -1589,7 +1611,7 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
 
     // 1. 取得任務資訊
     const [rows] = await conn.execute(`
-      SELECT ut.*, t.task_type, t.correct_answer, t.points, t.name as task_name, ut.user_id, ut.task_id
+      SELECT ut.*, t.task_type, t.correct_answer, t.points, t.name as task_name, ut.user_id, ut.task_id, t.quest_chain_id, t.quest_order
       FROM user_tasks ut
       JOIN tasks t ON ut.task_id = t.id
       WHERE ut.id = ?
@@ -1649,6 +1671,32 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
              await conn.execute('UPDATE user_inventory SET quantity = quantity + 1 WHERE id = ?', [inventory[0].id]);
            } else {
              await conn.execute('INSERT INTO user_inventory (user_id, item_id, quantity) VALUES (?, ?, 1)', [userTask.user_id, rewardItemId]);
+           }
+         }
+
+         // 更新劇情任務進度
+         if (userTask.quest_chain_id && userTask.quest_order) {
+           const [userQuests] = await conn.execute(
+             'SELECT id, current_step_order FROM user_quests WHERE user_id = ? AND quest_chain_id = ?',
+             [userTask.user_id, userTask.quest_chain_id]
+           );
+
+           if (userQuests.length > 0) {
+             // 已經有進度，且完成的是當前步驟 -> 進度+1
+             // 這裡假設 quest_order 是循序漸進的 (1, 2, 3...)
+             if (userQuests[0].current_step_order === userTask.quest_order) {
+               await conn.execute(
+                 'UPDATE user_quests SET current_step_order = current_step_order + 1 WHERE id = ?',
+                 [userQuests[0].id]
+               );
+             }
+           } else {
+             // 還沒有進度記錄（理論上如果是第一關應該要有，但如果是手動亂接的可能沒有）
+             // 插入下一關 (當前關卡 + 1)
+             await conn.execute(
+               'INSERT INTO user_quests (user_id, quest_chain_id, current_step_order) VALUES (?, ?, ?)',
+               [userTask.user_id, userTask.quest_chain_id, userTask.quest_order + 1]
+             );
            }
          }
 
