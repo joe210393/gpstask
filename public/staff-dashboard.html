@@ -6,6 +6,26 @@
   <title>新增任務（工作人員）| GPS 觸發任務系統</title>
   <link rel="stylesheet" href="/css/style.css" />
   <link rel="icon" type="image/png" href="/images/mascot.png" />
+  <style>
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 900px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+      /* 手機版讓新增任務排在最上面 */
+      .dashboard-grid > .left-col {
+        order: 1;
+      }
+      .dashboard-grid > .right-col {
+        order: 2;
+      }
+    }
+  </style>
 </head>
 <body>
   <header id="mainHeader">
@@ -28,204 +48,210 @@
   </header>
 
   <main>
-    <section class="mb-4">
-      <!-- 道具管理區塊 -->
-      <div class="form-container" style="margin-bottom: 2rem; background: #fffcf5; border: 1px solid #ffeeba;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-          <h2 style="margin: 0; color: #856404;">🎒 道具管理</h2>
-          <button id="btnCreateItem" class="btn btn-secondary" style="font-size: 0.9rem; background: #ffc107; border-color: #ffc107; color: #212529;">+ 新增道具</button>
-        </div>
-        <div id="itemList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem;">
-          <!-- 道具列表動態載入 -->
-          <div style="color: #888; font-size: 0.9rem;">載入中...</div>
-        </div>
-      </div>
-
-      <!-- 劇情任務管理區塊 -->
-      <div class="form-container" style="margin-bottom: 2rem; background: #fdfdfd; border: 1px solid #e0e0e0;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-          <h2 style="margin: 0;">劇情任務線管理</h2>
-          <button id="btnCreateQuest" class="btn btn-secondary" style="font-size: 0.9rem;">+ 新增劇情</button>
-        </div>
-        <div id="questChainList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem;">
-          <!-- 劇情列表動態載入 -->
-          <div style="color: #888; font-size: 0.9rem;">載入中...</div>
-        </div>
-      </div>
-
-      <div class="form-container">
-        <h2 class="text-center mb-4">新增任務點</h2>
-        <form id="addTaskForm" enctype="multipart/form-data">
-          <!-- ... -->
-          
-          <!-- 任務分類選擇 -->
-          <div class="form-group" style="background: #eef2f7; padding: 10px; border-radius: 6px;">
-            <label class="form-label" style="color: #2c3e50; font-weight: bold;">任務分類</label>
-            <select name="type" id="taskCategorySelect" class="form-select">
-              <option value="single">一般單題任務 (Single)</option>
-              <option value="timed">限時/限量任務 (Timed)</option>
-              <option value="quest">劇情連續任務 (Quest)</option>
-            </select>
-          </div>
-
-          <!-- 劇情任務專用欄位 -->
-          <div id="questFields" style="display:none; background:#f0f8ff; padding:15px; border-radius:6px; margin-bottom:15px; border:1px solid #bee5eb;">
-            <div class="form-group">
-              <label class="form-label">選擇所屬劇情</label>
-              <select name="quest_chain_id" id="questChainSelect" class="form-select">
-                <option value="">-- 請先建立劇情 --</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">劇情順序 (Step Order)</label>
-              <input class="form-input" type="number" name="quest_order" min="1" placeholder="例如：1 代表第一關" />
-              <small style="color: #666;">必須完成第 1 關才能解鎖第 2 關</small>
-            </div>
-          </div>
-
-          <!-- 限時任務專用欄位 -->
-          <div id="timedFields" style="display:none; background:#fff0f5; padding:15px; border-radius:6px; margin-bottom:15px; border:1px solid #f5c6cb;">
-            <div class="form-group">
-              <label class="form-label">開始時間</label>
-              <input class="form-input" type="datetime-local" name="time_limit_start" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">結束時間</label>
-              <input class="form-input" type="datetime-local" name="time_limit_end" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">名額限制 (Max Participants)</label>
-              <input class="form-input" type="number" name="max_participants" min="0" placeholder="0 或空值代表不限" />
-            </div>
-          </div>
-
-          <div style="margin-bottom:15px;color:var(--text-secondary);font-size:0.9rem;background:#f3f4f6;padding:10px;border-radius:6px;">
-            提示：經緯度請貼入十進位格式（如 24.678222, 121.760361），可用 Google Maps 右鍵複製座標。
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label">任務名稱</label>
-            <input class="form-input" type="text" name="name" required />
-          </div>
-          
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-            <div class="form-group">
-              <label class="form-label">緯度</label>
-              <input class="form-input" type="number" name="lat" step="any" required />
-            </div>
-            <div class="form-group">
-              <label class="form-label">經度</label>
-              <input class="form-input" type="number" name="lng" step="any" required />
-            </div>
-          </div>
-          
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-            <div class="form-group">
-              <label class="form-label">觸發半徑（公尺）</label>
-              <input class="form-input" type="number" name="radius" required />
-            </div>
-            <div class="form-group">
-              <label class="form-label">積分</label>
-              <input class="form-input" type="number" name="points" min="0" step="1" value="0" required />
-            </div>
-          </div>
-          
-            <div class="form-group">
-              <label class="form-label">任務類型</label>
-              <select name="task_type" id="taskTypeSelect" class="form-select">
-                <option value="qa">問答題 (人工審核)</option>
-                <option value="multiple_choice">選擇題 (自動驗證)</option>
-                <option value="photo">拍照/上傳照片 (人工審核)</option>
-                <option value="number">數字解謎 (自動驗證)</option>
-                <option value="keyword">關鍵字解碼 (自動驗證)</option>
-                <option value="location">地理圍欄打卡 (自動驗證)</option>
+    <div class="dashboard-grid mb-4">
+      <!-- 左欄：新增任務 -->
+      <div class="left-col">
+        <div class="form-container" style="height: 100%;">
+          <h2 class="text-center mb-4">新增任務點</h2>
+          <form id="addTaskForm" enctype="multipart/form-data">
+            <!-- 任務分類選擇 -->
+            <div class="form-group" style="background: #eef2f7; padding: 10px; border-radius: 6px;">
+              <label class="form-label" style="color: #2c3e50; font-weight: bold;">任務分類</label>
+              <select name="type" id="taskCategorySelect" class="form-select">
+                <option value="single">一般單題任務 (Single)</option>
+                <option value="timed">限時/限量任務 (Timed)</option>
+                <option value="quest">劇情連續任務 (Quest)</option>
               </select>
             </div>
 
-            <div id="multipleChoiceOptions" style="display:none;background:#f9f9f9;padding:15px;border-radius:8px;margin-bottom:20px;border:1px solid #eee;">
+            <!-- 劇情任務專用欄位 -->
+            <div id="questFields" style="display:none; background:#f0f8ff; padding:15px; border-radius:6px; margin-bottom:15px; border:1px solid #bee5eb;">
               <div class="form-group">
-                 <label class="form-label">選項 A</label>
-                 <input class="form-input" type="text" name="optionA" />
-              </div>
-              <div class="form-group">
-                 <label class="form-label">選項 B</label>
-                 <input class="form-input" type="text" name="optionB" />
-              </div>
-              <div class="form-group">
-                 <label class="form-label">選項 C</label>
-                 <input class="form-input" type="text" name="optionC" />
-              </div>
-              <div class="form-group">
-                 <label class="form-label">選項 D</label>
-                 <input class="form-input" type="text" name="optionD" />
-              </div>
-              <div class="form-group">
-                <label class="form-label">正確答案</label>
-                <select name="correct_answer_select" class="form-select">
-                  <option value="A">選項 A</option>
-                  <option value="B">選項 B</option>
-                  <option value="C">選項 C</option>
-                  <option value="D">選項 D</option>
+                <label class="form-label">選擇所屬劇情</label>
+                <select name="quest_chain_id" id="questChainSelect" class="form-select">
+                  <option value="">-- 請先建立劇情 --</option>
                 </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">劇情順序 (Step Order)</label>
+                <input class="form-input" type="number" name="quest_order" min="1" placeholder="例如：1 代表第一關" />
+                <small style="color: #666;">必須完成第 1 關才能解鎖第 2 關</small>
               </div>
             </div>
 
-            <div id="standardAnswerBlock" style="display:none;background:#f0f8ff;padding:15px;border-radius:8px;margin-bottom:20px;border:1px solid #cce5ff;">
+            <!-- 限時任務專用欄位 -->
+            <div id="timedFields" style="display:none; background:#fff0f5; padding:15px; border-radius:6px; margin-bottom:15px; border:1px solid #f5c6cb;">
               <div class="form-group">
-                <label class="form-label">標準答案</label>
-                <input class="form-input" type="text" name="correct_answer_text" placeholder="請輸入正確的數字或關鍵字" />
-                <small style="color:var(--text-secondary);display:block;margin-top:4px;">系統將精確比對此答案 (不分大小寫)</small>
+                <label class="form-label">開始時間</label>
+                <input class="form-input" type="datetime-local" name="time_limit_start" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">結束時間</label>
+                <input class="form-input" type="datetime-local" name="time_limit_end" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">名額限制 (Max Participants)</label>
+                <input class="form-input" type="number" name="max_participants" min="0" placeholder="0 或空值代表不限" />
               </div>
             </div>
-          
-          <div class="form-group">
-            <label class="form-label">任務說明</label>
-            <textarea name="description" class="form-textarea" required style="height:100px;"></textarea>
-          </div>
 
-          <!-- 道具關聯設定 -->
-          <div class="form-group" style="background:#fdfdfe; border:1px solid #eaeaea; padding:10px; border-radius:6px;">
-            <label class="form-label" style="color:#555;">道具關聯設定 (選填)</label>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-              <div>
-                <label class="form-label" style="font-size:0.85rem;">🔒 解鎖所需道具</label>
-                <select name="required_item_id" class="form-select item-select">
-                  <option value="">-- 無 --</option>
-                </select>
-                <small style="color:#999; font-size:0.8rem;">玩家必須持有此道具才能進行任務</small>
+            <div style="margin-bottom:15px;color:var(--text-secondary);font-size:0.9rem;background:#f3f4f6;padding:10px;border-radius:6px;">
+              提示：經緯度請貼入十進位格式（如 24.678222, 121.760361），可用 Google Maps 右鍵複製座標。
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">任務名稱</label>
+              <input class="form-input" type="text" name="name" required />
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+              <div class="form-group">
+                <label class="form-label">緯度</label>
+                <input class="form-input" type="number" name="lat" step="any" required />
               </div>
-              <div>
-                <label class="form-label" style="font-size:0.85rem;">🎁 完成獎勵道具</label>
-                <select name="reward_item_id" class="form-select item-select">
-                  <option value="">-- 無 --</option>
-                </select>
-                <small style="color:#999; font-size:0.8rem;">任務完成後自動發放</small>
+              <div class="form-group">
+                <label class="form-label">經度</label>
+                <input class="form-input" type="number" name="lng" step="any" required />
               </div>
             </div>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label">任務照片</label>
-            <input class="form-input" type="file" name="photo" accept="image/*" required />
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label">YouTube 影片連結</label>
-            <input class="form-input" type="text" name="youtubeUrl" placeholder="https://www.youtube.com/watch?v=..." />
-            <small style="color:var(--text-secondary);font-size:0.85rem;">此影片會在 AR 模式中顯示</small>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label">AR 專用圖片（選填）</label>
-            <input class="form-input" type="file" name="arImage" accept="image/*" />
-            <small style="color:var(--text-secondary);font-size:0.85rem;">此圖片會在 AR 模式中顯示，與任務封面圖分開</small>
-          </div>
-          
-          <button type="submit" class="btn btn-primary w-100">新增任務</button>
-          <div id="addTaskMsg" class="mt-2 text-center text-danger" style="min-height: 24px;"></div>
-        </form>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+              <div class="form-group">
+                <label class="form-label">觸發半徑（公尺）</label>
+                <input class="form-input" type="number" name="radius" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label">積分</label>
+                <input class="form-input" type="number" name="points" min="0" step="1" value="0" required />
+              </div>
+            </div>
+            
+              <div class="form-group">
+                <label class="form-label">任務類型</label>
+                <select name="task_type" id="taskTypeSelect" class="form-select">
+                  <option value="qa">問答題 (人工審核)</option>
+                  <option value="multiple_choice">選擇題 (自動驗證)</option>
+                  <option value="photo">拍照/上傳照片 (人工審核)</option>
+                  <option value="number">數字解謎 (自動驗證)</option>
+                  <option value="keyword">關鍵字解碼 (自動驗證)</option>
+                  <option value="location">地理圍欄打卡 (自動驗證)</option>
+                </select>
+              </div>
+
+              <div id="multipleChoiceOptions" style="display:none;background:#f9f9f9;padding:15px;border-radius:8px;margin-bottom:20px;border:1px solid #eee;">
+                <div class="form-group">
+                   <label class="form-label">選項 A</label>
+                   <input class="form-input" type="text" name="optionA" />
+                </div>
+                <div class="form-group">
+                   <label class="form-label">選項 B</label>
+                   <input class="form-input" type="text" name="optionB" />
+                </div>
+                <div class="form-group">
+                   <label class="form-label">選項 C</label>
+                   <input class="form-input" type="text" name="optionC" />
+                </div>
+                <div class="form-group">
+                   <label class="form-label">選項 D</label>
+                   <input class="form-input" type="text" name="optionD" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">正確答案</label>
+                  <select name="correct_answer_select" class="form-select">
+                    <option value="A">選項 A</option>
+                    <option value="B">選項 B</option>
+                    <option value="C">選項 C</option>
+                    <option value="D">選項 D</option>
+                  </select>
+                </div>
+              </div>
+
+              <div id="standardAnswerBlock" style="display:none;background:#f0f8ff;padding:15px;border-radius:8px;margin-bottom:20px;border:1px solid #cce5ff;">
+                <div class="form-group">
+                  <label class="form-label">標準答案</label>
+                  <input class="form-input" type="text" name="correct_answer_text" placeholder="請輸入正確的數字或關鍵字" />
+                  <small style="color:var(--text-secondary);display:block;margin-top:4px;">系統將精確比對此答案 (不分大小寫)</small>
+                </div>
+              </div>
+            
+            <div class="form-group">
+              <label class="form-label">任務說明</label>
+              <textarea name="description" class="form-textarea" required style="height:100px;"></textarea>
+            </div>
+
+            <!-- 道具關聯設定 -->
+            <div class="form-group" style="background:#fdfdfe; border:1px solid #eaeaea; padding:10px; border-radius:6px;">
+              <label class="form-label" style="color:#555;">道具關聯設定 (選填)</label>
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                <div>
+                  <label class="form-label" style="font-size:0.85rem;">🔒 解鎖所需道具</label>
+                  <select name="required_item_id" class="form-select item-select">
+                    <option value="">-- 無 --</option>
+                  </select>
+                  <small style="color:#999; font-size:0.8rem;">玩家必須持有此道具才能進行任務</small>
+                </div>
+                <div>
+                  <label class="form-label" style="font-size:0.85rem;">🎁 完成獎勵道具</label>
+                  <select name="reward_item_id" class="form-select item-select">
+                    <option value="">-- 無 --</option>
+                  </select>
+                  <small style="color:#999; font-size:0.8rem;">任務完成後自動發放</small>
+                </div>
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">任務照片</label>
+              <input class="form-input" type="file" name="photo" accept="image/*" required />
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">YouTube 影片連結</label>
+              <input class="form-input" type="text" name="youtubeUrl" placeholder="https://www.youtube.com/watch?v=..." />
+              <small style="color:var(--text-secondary);font-size:0.85rem;">此影片會在 AR 模式中顯示</small>
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">AR 專用圖片（選填）</label>
+              <input class="form-input" type="file" name="arImage" accept="image/*" />
+              <small style="color:var(--text-secondary);font-size:0.85rem;">此圖片會在 AR 模式中顯示，與任務封面圖分開</small>
+            </div>
+            
+            <button type="submit" class="btn btn-primary w-100">新增任務</button>
+            <div id="addTaskMsg" class="mt-2 text-center text-danger" style="min-height: 24px;"></div>
+          </form>
+        </div>
       </div>
-    </section>
+
+      <!-- 右欄：道具 + 劇情 -->
+      <div class="right-col" style="display: flex; flex-direction: column; gap: 20px;">
+        
+        <!-- 道具管理區塊 -->
+        <div class="form-container" style="background: #fffcf5; border: 1px solid #ffeeba;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2 style="margin: 0; color: #856404;">🎒 道具管理</h2>
+            <button id="btnCreateItem" class="btn btn-secondary" style="font-size: 0.9rem; background: #ffc107; border-color: #ffc107; color: #212529;">+ 新增道具</button>
+          </div>
+          <div id="itemList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem;">
+            <!-- 道具列表動態載入 -->
+            <div style="color: #888; font-size: 0.9rem;">載入中...</div>
+          </div>
+        </div>
+
+        <!-- 劇情任務管理區塊 -->
+        <div class="form-container" style="background: #fdfdfd; border: 1px solid #e0e0e0;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2 style="margin: 0;">劇情任務線管理</h2>
+            <button id="btnCreateQuest" class="btn btn-secondary" style="font-size: 0.9rem;">+ 新增劇情</button>
+          </div>
+          <div id="questChainList" style="display: grid; grid-template-columns: 1fr; gap: 1rem;">
+            <!-- 劇情列表動態載入 -->
+            <div style="color: #888; font-size: 0.9rem;">載入中...</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
 
     <section class="task-list">
       <h2 class="text-center mb-4">所有任務</h2>
