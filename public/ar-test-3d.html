@@ -157,6 +157,12 @@
         const scaleVal = document.getElementById('scale-val');
         const heightVal = document.getElementById('height-val');
 
+        // 全局錯誤捕捉：將錯誤顯示在畫面上，方便手機除錯
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+            showToast('⚠️ 錯誤: ' + msg, 5000);
+            return false;
+        };
+
         // 模型載入狀態監聽
         model.addEventListener('model-loaded', () => {
             showToast('✅ 3D 模型載入成功！');
@@ -211,94 +217,119 @@
         });
         
         // 強制放置在鏡頭前方 (不使用 GPS)
-        forceShowBtn.addEventListener('click', () => {
-            showToast('正在強制將模型移至眼前...', 1000);
-            
-            // 移除 GPS 屬性，改為純 3D 座標
-            model.removeAttribute('gps-entity-place');
-            model.removeAttribute('look-at'); // 暫時移除 look-at 以避免旋轉問題
-            
-            // 取得相機
-            const camera = document.querySelector('a-camera');
-            
-            // 將模型「掛」在相機下面，成為子物件，這樣它就會跟著鏡頭跑
-            // 但 A-Frame 動態 reparenting 比較麻煩，我們直接設定在世界座標
-            
-            // 簡單暴力法：將模型設定在 (0, 0, -5)，也就是世界原點前方 5 米
-            // 但因為 gps-camera 會移動 camera，所以我們需要把模型掛在 camera 裡面
-            
-            // 重新將 model 加入到 camera 內部
-            if (model.parentNode !== camera) {
-                model.parentNode.removeChild(model);
-                camera.appendChild(model);
+        forceShowBtn.addEventListener('click', (e) => {
+            // 防止事件冒泡或被攔截
+            e.preventDefault();
+            e.stopPropagation();
+
+            try {
+                showToast('✅ 按鈕點擊確認！處理中...', 1000);
+                
+                // 移除 GPS 屬性，改為純 3D 座標
+                model.removeAttribute('gps-entity-place');
+                model.removeAttribute('look-at'); // 暫時移除 look-at 以避免旋轉問題
+                
+                // 取得相機
+                const camera = document.querySelector('a-camera');
+                
+                if (!camera) {
+                    throw new Error('找不到相機元件 (a-camera)');
+                }
+                
+                // 將模型「掛」在相機下面，成為子物件，這樣它就會跟著鏡頭跑
+                // 但 A-Frame 動態 reparenting 比較麻煩，我們直接設定在世界座標
+                
+                // 簡單暴力法：將模型設定在 (0, 0, -5)，也就是世界原點前方 5 米
+                // 但因為 gps-camera 會移動 camera，所以我們需要把模型掛在 camera 裡面
+                
+                // 重新將 model 加入到 camera 內部
+                if (model.parentNode !== camera) {
+                    model.parentNode.removeChild(model);
+                    camera.appendChild(model);
+                }
+                
+                // 設定在相機前方 2 米，高度稍微低一點
+                // 注意：掛在 camera 下面後，座標系是相對於 camera 的
+                model.setAttribute('position', '0 -1 -2');
+                model.setAttribute('scale', '0.5 0.5 0.5'); // 在眼前的話要小一點
+                
+                // 旋轉一下讓他面對鏡頭
+                // 因為是子物件，180度應該是背對，0度是正對？這取決於模型原始方向
+                // CesiumMan 原始方向通常是 Z+，所以可能需要轉 180
+                model.setAttribute('rotation', '0 180 0');
+                
+                infoDiv.innerText = "模式: 強制眼前 (無 GPS)";
+                distDisplay.innerText = "距離: N/A";
+                
+                showToast('模型已固定在鏡頭前方！\n請看畫面正中央');
+            } catch (err) {
+                console.error(err);
+                showToast('按鈕執行錯誤: ' + err.message);
             }
-            
-            // 設定在相機前方 2 米，高度稍微低一點
-            model.setAttribute('position', '0 -1 -2');
-            model.setAttribute('scale', '0.5 0.5 0.5'); // 在眼前的話要小一點
-            
-            // 旋轉一下讓他面對鏡頭
-            model.setAttribute('rotation', '0 180 0');
-            
-            infoDiv.innerText = "模式: 強制眼前 (無 GPS)";
-            distDisplay.innerText = "距離: N/A";
-            
-            showToast('模型已固定在鏡頭前方！\n請看畫面正中央');
         });
 
         // 按下按鈕時，將模型放置在使用者當前位置的"稍微前面一點"
-        setLocBtn.addEventListener('click', () => {
-            // 如果之前被移入 camera，要移出來回到 scene
-            const scene = document.querySelector('a-scene');
-            const camera = document.querySelector('a-camera');
-            if (model.parentNode === camera) {
-                model.parentNode.removeChild(model);
-                scene.appendChild(model);
-                model.setAttribute('look-at', '[gps-camera]');
-            }
+        setLocBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
 
-            if (navigator.geolocation) {
-                showToast('正在獲取 GPS...', 1000);
-                navigator.geolocation.getCurrentPosition((position) => {
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
-                    const acc = position.coords.accuracy;
-                    
-                    gpsAccDisplay.innerText = `精度: ${acc.toFixed(0)}m`;
-                    
-                    // 嘗試放置在多個方位，增加被看到的機率
-                    // 預設放在北方 1.5 公尺
-                    // 0.00001 度約等於 1.1 公尺
-                    const newLat = lat + 0.000015; 
-                    const newLng = lng;
+            try {
+                // 如果之前被移入 camera，要移出來回到 scene
+                const scene = document.querySelector('a-scene');
+                const camera = document.querySelector('a-camera');
+                
+                if (model.parentNode === camera) {
+                    model.parentNode.removeChild(model);
+                    scene.appendChild(model);
+                    model.setAttribute('look-at', '[gps-camera]');
+                }
 
-                    console.log(`Setting model to: ${newLat}, ${newLng}`);
-                    
-                    // 設定模型的 GPS 座標
-                    model.setAttribute('gps-entity-place', `latitude: ${newLat}; longitude: ${newLng};`);
-                    
-                    // 重置高度和大小，避免設定跑掉
-                    model.setAttribute('scale', '2 2 2');
-                    scaleSlider.value = 2;
-                    scaleVal.textContent = '2';
-                    
-                    model.object3D.position.y = 0;
-                    heightSlider.value = 0;
-                    heightVal.textContent = '0';
-                    
-                    infoDiv.innerText = "模式: GPS 定位";
+                if (navigator.geolocation) {
+                    showToast('正在獲取 GPS...', 1000);
+                    navigator.geolocation.getCurrentPosition((position) => {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        const acc = position.coords.accuracy;
+                        
+                        gpsAccDisplay.innerText = `精度: ${acc.toFixed(0)}m`;
+                        
+                        // 嘗試放置在多個方位，增加被看到的機率
+                        // 預設放在北方 1.5 公尺
+                        // 0.00001 度約等於 1.1 公尺
+                        const newLat = lat + 0.000015; 
+                        const newLng = lng;
 
-                    showToast(`模型已放置在北方約 1.5 公尺處！\n精度: ${acc.toFixed(0)}m\nLat: ${newLat.toFixed(6)}\nLng: ${newLng.toFixed(6)}`);
+                        console.log(`Setting model to: ${newLat}, ${newLng}`);
+                        
+                        // 設定模型的 GPS 座標
+                        model.setAttribute('gps-entity-place', `latitude: ${newLat}; longitude: ${newLng};`);
+                        
+                        // 重置高度和大小，避免設定跑掉
+                        model.setAttribute('scale', '2 2 2');
+                        scaleSlider.value = 2;
+                        scaleVal.textContent = '2';
+                        
+                        model.object3D.position.y = 0;
+                        heightSlider.value = 0;
+                        heightVal.textContent = '0';
+                        
+                        infoDiv.innerText = "模式: GPS 定位";
 
-                }, (err) => {
-                    showToast('無法獲取 GPS: ' + err.message);
-                }, {
-                    enableHighAccuracy: true,
-                    timeout: 5000,
-                    maximumAge: 0
-                });
-            } else {
-                showToast('瀏覽器不支援 Geolocation');
+                        showToast(`模型已放置在北方約 1.5 公尺處！\n精度: ${acc.toFixed(0)}m\nLat: ${newLat.toFixed(6)}\nLng: ${newLng.toFixed(6)}`);
+
+                    }, (err) => {
+                        showToast('無法獲取 GPS: ' + err.message);
+                    }, {
+                        enableHighAccuracy: true,
+                        timeout: 5000,
+                        maximumAge: 0
+                    });
+                } else {
+                    showToast('瀏覽器不支援 Geolocation');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('按鈕執行錯誤: ' + err.message);
             }
         });
 
