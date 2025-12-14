@@ -379,7 +379,55 @@
             if (requiredItem && !hasRequiredItem) { showToast(`🔒 需要道具：【${requiredItem.name}】`, 3000); return; }
             const modalBody = document.getElementById('modal-body');
             const arModal = document.getElementById('ar-modal');
+            const modalSubmitBtn = document.getElementById('modal-submit');
+            
             modalBody.innerHTML = '';
+            
+            // 根據任務類型設定按鈕文字
+            if (task.task_type === 'location') {
+                modalSubmitBtn.textContent = '📍 確認打卡';
+                modalSubmitBtn.onclick = async () => {
+                    // 直接觸發打卡 API
+                    modalSubmitBtn.disabled = true;
+                    modalSubmitBtn.textContent = '打卡中...';
+                    
+                    if (!currentUserTaskId) currentUserTaskId = await fetchCurrentUserTaskId();
+                    if (!currentUserTaskId) { 
+                        alert('找不到進行中的任務紀錄'); 
+                        modalSubmitBtn.disabled = false;
+                        modalSubmitBtn.textContent = '📍 確認打卡';
+                        return; 
+                    }
+
+                    try {
+                        const res = await fetch(`${API_BASE}/api/user-tasks/${currentUserTaskId}/answer`, { 
+                            method: 'PATCH', 
+                            headers: { 'Content-Type': 'application/json' }, 
+                            body: JSON.stringify({ answer: 'checked_in' }) 
+                        });
+                        const data = await res.json();
+                        if (data.success && data.isCompleted) {
+                            let msg = `🎉 打卡成功！\n${data.message}`;
+                            if (data.earnedItemName) msg += `\n\n🎁 獲得道具：【${data.earnedItemName}】`;
+                            alert(msg); 
+                            window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
+                        } else { 
+                            alert(data.message || '打卡失敗'); 
+                            modalSubmitBtn.disabled = false;
+                            modalSubmitBtn.textContent = '📍 確認打卡';
+                        }
+                    } catch (e) { 
+                        console.error(e); 
+                        alert('連線錯誤'); 
+                        modalSubmitBtn.disabled = false;
+                        modalSubmitBtn.textContent = '📍 確認打卡';
+                    }
+                };
+            } else {
+                modalSubmitBtn.textContent = '✍️ 點擊回覆問題';
+                modalSubmitBtn.onclick = () => { if (taskId) window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`; else alert("測試模式：目標已找到！"); };
+            }
+
             if (is3DMode) {
                 const img = document.createElement('img');
                 img.src = task.ar_image_url || task.photoUrl || '/images/mascot.png';
