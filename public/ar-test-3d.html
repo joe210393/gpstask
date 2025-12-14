@@ -197,8 +197,8 @@
                     
                     // 為了測試，我們不完全放在原點，稍微偏移一點點 (例如北方 0.0001 度，約 10 公尺)
                     // 這樣才看得到，不會在腳底下
-                    // 0.0001 度約等於 11 公尺
-                    const newLat = lat + 0.0001; 
+                    // 0.00001 度約等於 1.1 公尺
+                    const newLat = lat + 0.00001; 
                     const newLng = lng;
 
                     console.log(`Setting model to: ${newLat}, ${newLng}`);
@@ -206,7 +206,7 @@
                     // 設定模型的 GPS 座標
                     model.setAttribute('gps-entity-place', `latitude: ${newLat}; longitude: ${newLng};`);
                     
-                    showToast(`模型已放置在您北方約 10 公尺處！\nLat: ${newLat.toFixed(6)}\nLng: ${newLng.toFixed(6)}`);
+                    showToast(`模型已放置在您北方約 1 公尺處！\nLat: ${newLat.toFixed(6)}\nLng: ${newLng.toFixed(6)}`);
 
                 }, (err) => {
                     showToast('無法獲取 GPS: ' + err.message);
