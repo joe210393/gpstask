@@ -76,11 +76,15 @@
             visible="false"> 
         </a-entity>
 
-        <!-- 方位指示 (點擊後才設定位置) -->
-        <a-text id="dir-n" value="N" color="#ff4444" scale="10 10 10" align="center" visible="false" look-at="[gps-camera]"></a-text>
-        <a-text id="dir-s" value="S" color="#4444ff" scale="10 10 10" align="center" visible="false" look-at="[gps-camera]"></a-text>
-        <a-text id="dir-e" value="E" color="#44ff44" scale="10 10 10" align="center" visible="false" look-at="[gps-camera]"></a-text>
-        <a-text id="dir-w" value="W" color="#ffff44" scale="10 10 10" align="center" visible="false" look-at="[gps-camera]"></a-text>
+        <!-- 改用立體柱子當路標，確保各個角度都看得到 -->
+        <!-- 北 (紅) -->
+        <a-cylinder id="dir-n" color="#ff0000" height="2" radius="0.1" position="0 1 0" visible="false"></a-cylinder>
+        <!-- 南 (藍) -->
+        <a-cylinder id="dir-s" color="#0000ff" height="2" radius="0.1" position="0 1 0" visible="false"></a-cylinder>
+        <!-- 東 (綠) -->
+        <a-cylinder id="dir-e" color="#00ff00" height="2" radius="0.1" position="0 1 0" visible="false"></a-cylinder>
+        <!-- 西 (黃) -->
+        <a-cylinder id="dir-w" color="#ffff00" height="2" radius="0.1" position="0 1 0" visible="false"></a-cylinder>
 
     </a-scene>
 
@@ -136,39 +140,41 @@
 
             statusLog.innerText = "📍 計算位置中...";
 
-            // 1. 確保模型從相機中移除（如果之前黏在相機上）
+            // 1. 確保模型從相機中移除
             if (arModel.object3D.parent !== arModel.sceneEl.object3D) {
                 arModel.sceneEl.object3D.add(arModel.object3D);
             }
 
             // 2. 計算座標
-            // 2公尺緯度差約 0.000018度，取 0.00002
-            // 5公尺方位指示約 0.00005度
-            const latDiff2m = 0.00002;
-            const diff5m = 0.00005;
+            // 2公尺約 0.00002度
+            // 3公尺約 0.00003度 (路標)
+            const diff2m = 0.00002;
+            const diff3m = 0.00003;
 
             const lat = currentCoords.latitude;
             const lng = currentCoords.longitude;
 
             // 3. 設定模型位置 (北方 2m)
-            arModel.setAttribute('gps-entity-place', `latitude: ${lat + latDiff2m}; longitude: ${lng};`);
+            // position="0 0 0" 確保它在該 GPS 點的地面
+            arModel.setAttribute('gps-entity-place', `latitude: ${lat + diff2m}; longitude: ${lng};`);
             arModel.setAttribute('position', '0 0 0');
             arModel.setAttribute('scale', '3 3 3'); 
             arModel.setAttribute('visible', 'true');
 
-            // 4. 設定方位指示 (5m 處)
-            setGpsPos(dirN, lat + diff5m, lng); // 北
-            setGpsPos(dirS, lat - diff5m, lng); // 南
-            setGpsPos(dirE, lat, lng + diff5m); // 東 (經度增加)
-            setGpsPos(dirW, lat, lng - diff5m); // 西 (經度減少)
+            // 4. 設定方位柱子 (3m 處)
+            setGpsPos(dirN, lat + diff3m, lng); // 北 (紅)
+            setGpsPos(dirS, lat - diff3m, lng); // 南 (藍)
+            setGpsPos(dirE, lat, lng + diff3m); // 東 (綠)
+            setGpsPos(dirW, lat, lng - diff3m); // 西 (黃)
 
             // 5. 更新 UI
-            statusLog.innerText = `📍 模型已置於北方 2m`;
+            statusLog.innerText = `📍 模型在紅柱(北)前方`;
             placeBtn.innerText = "🔄 重置位置";
         });
 
         function setGpsPos(el, lat, lng) {
             el.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lng};`);
+            el.setAttribute('position', '0 1 0'); // 離地 1 米，懸浮以免被遮擋
             el.setAttribute('visible', 'true');
         }
     </script>
