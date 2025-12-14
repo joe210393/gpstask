@@ -8,6 +8,8 @@
     <script src='https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js'></script>
     <!-- 加入 A-Frame Extras 讓模型動畫可以播放 -->
     <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
+    <!-- 加入 look-at 套件，讓文字永遠面向使用者 -->
+    <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
 
     <style>
         body { margin: 0; overflow: hidden; }
@@ -62,15 +64,10 @@
             <a-asset-item id="animated-model" src="/models/result.glb"></a-asset-item>
         </a-assets>
 
-        <!-- 四方巨柱 (初始隱藏) -->
-        <!-- 改用超巨大尺寸：高度 100，半徑 5 -->
-        <a-cylinder id="col-n" color="red" height="100" radius="5" visible="false" look-at="[gps-camera]"></a-cylinder>
-        <a-cylinder id="col-e" color="green" height="100" radius="5" visible="false" look-at="[gps-camera]"></a-cylinder>
-        <a-cylinder id="col-s" color="blue" height="100" radius="5" visible="false" look-at="[gps-camera]"></a-cylinder>
-        <a-cylinder id="col-w" color="yellow" height="100" radius="5" visible="false" look-at="[gps-camera]"></a-cylinder>
+        <!-- 四方巨柱 (移除) -->
         
-        <!-- 中心點標記 -->
-        <a-box id="col-center" color="white" scale="2 2 2" visible="false"></a-box>
+        <!-- 中心點標記 (保留，方便確認腳下) -->
+        <a-box id="col-center" color="white" scale="1 1 1" visible="false"></a-box>
 
         <!-- 使用者的 3D 模型 -->
         <a-entity 
@@ -89,7 +86,7 @@
         const spawnBtn = document.getElementById('spawn-btn');
         let currentPos = null;
 
-        // 監聽 GPS 更新
+        // 監聽 GPS 更新 (顯示精度)
         window.addEventListener('gps-camera-update-position', (e) => {
             currentPos = e.detail.position;
             const acc = e.detail.position.accuracy || 0;
@@ -114,28 +111,16 @@
             const lat = currentPos.latitude;
             const lng = currentPos.longitude;
 
-            // 距離拉近一點點：10 公尺 (約 0.00009 度)
-            // 因為太遠可能被切掉，太近可能飄走，折衷一下
-            const offset = 0.00009; 
+            // 設定距離：30 公尺 (約 0.00027 度)
+            const offset = 0.00027; 
 
-            // 北柱 (紅)
-            placeObject('col-n', lat + offset, lng, '北方 (紅)');
-            
-            // 模型放在北柱旁邊
+            // 模型放在北方 30m
             const modelEl = document.getElementById('ar-model');
             modelEl.setAttribute('gps-entity-place', `latitude: ${lat + offset}; longitude: ${lng};`);
-            // Y=20 讓它浮在空中，避免被埋在地下
-            modelEl.setAttribute('position', '5 20 0'); 
+            
+            // Y=0 放回地面 (因為夠大，應該看得到)
+            modelEl.setAttribute('position', '0 0 0'); 
             modelEl.setAttribute('visible', 'true');
-
-            // 南柱 (藍)
-            placeObject('col-s', lat - offset, lng, '南方 (藍)');
-            
-            // 東柱 (綠)
-            placeObject('col-e', lat, lng + offset, '東方 (綠)');
-            
-            // 西柱 (黃)
-            placeObject('col-w', lat, lng - offset, '西方 (黃)');
 
             // 中心點
             const centerEl = document.getElementById('col-center');
@@ -144,19 +129,11 @@
             centerEl.setAttribute('visible', 'true');
 
             spawnBtn.style.display = 'none';
-            debugText.innerHTML += "<br>✅ 已生成 (高度抬升 + 尺寸放大)";
+            debugText.innerHTML += "<br>✅ 巨大模型已放置在北方 30m";
         });
 
         function placeObject(id, lat, lng, label) {
-            const el = document.getElementById(id);
-            el.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lng};`);
-            
-            // 強制抬升 50 公尺！
-            // 如果之前在腳下，這次應該會浮現在眼前或頭頂
-            el.setAttribute('position', '0 50 0'); 
-            
-            el.setAttribute('visible', 'true');
-            console.log(`Placed ${label} at ${lat}, ${lng}`);
+            // 移除柱子相關邏輯
         }
     </script>
 </body>
