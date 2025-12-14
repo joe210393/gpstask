@@ -57,6 +57,10 @@ app.use(express.json({ charset: 'utf-8' }));
 app.use('/images', express.static(UPLOAD_DIR));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// 明確設定 .glb 和 .gltf 的 MIME type，避免模型載入失敗
+express.static.mime.define({'model/gltf-binary': ['glb']});
+express.static.mime.define({'model/gltf+json': ['gltf']});
+
 // 設置響應字符集
 app.use((req, res, next) => {
   // 對於 API 路由，設置正確的字符集
