@@ -50,6 +50,26 @@
             z-index: 9999;
             pointer-events: none;
         }
+        .toast-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            z-index: 10000;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            font-size: 16px;
+            max-width: 80%;
+        }
+        .toast-message.show {
+            opacity: 1;
+        }
     </style>
 </head>
 
@@ -129,6 +149,27 @@
         const scaleVal = document.getElementById('scale-val');
         const heightVal = document.getElementById('height-val');
 
+        function showToast(message, duration = 3000) {
+            const toast = document.createElement('div');
+            toast.className = 'toast-message';
+            toast.innerText = message;
+            document.body.appendChild(toast);
+            
+            // Trigger reflow
+            void toast.offsetWidth;
+            
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    if (document.body.contains(toast)) {
+                        document.body.removeChild(toast);
+                    }
+                }, 300);
+            }, duration);
+        }
+
         // 調整大小
         scaleSlider.addEventListener('input', (e) => {
             const val = e.target.value;
@@ -149,6 +190,7 @@
         // 按下按鈕時，將模型放置在使用者當前位置的"稍微前面一點"
         setLocBtn.addEventListener('click', () => {
             if (navigator.geolocation) {
+                showToast('正在獲取 GPS 位置...', 1000);
                 navigator.geolocation.getCurrentPosition((position) => {
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
@@ -164,17 +206,17 @@
                     // 設定模型的 GPS 座標
                     model.setAttribute('gps-entity-place', `latitude: ${newLat}; longitude: ${newLng};`);
                     
-                    alert(`模型已放置在您北方約 10 公尺處！\nLat: ${newLat.toFixed(6)}\nLng: ${newLng.toFixed(6)}`);
+                    showToast(`模型已放置在您北方約 10 公尺處！\nLat: ${newLat.toFixed(6)}\nLng: ${newLng.toFixed(6)}`);
 
                 }, (err) => {
-                    alert('無法獲取 GPS: ' + err.message);
+                    showToast('無法獲取 GPS: ' + err.message);
                 }, {
                     enableHighAccuracy: true,
                     timeout: 5000,
                     maximumAge: 0
                 });
             } else {
-                alert('瀏覽器不支援 Geolocation');
+                showToast('瀏覽器不支援 Geolocation');
             }
         });
 
