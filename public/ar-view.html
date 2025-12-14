@@ -210,19 +210,36 @@
                     
                     <a-entity 
                         id="ar-model-entity"
-                        gltf-model="#animated-model-asset"
-                        animation-mixer
-                        scale="${scale} ${scale} ${scale}" 
-                        position="0 2 0"
+                        gps-entity-place=""
                         visible="false"
                         look-at="[gps-camera]"
-                        cursor-listener> 
+                        cursor-listener>
+                        
+                        <!-- 3D Model -->
+                        <a-entity 
+                            gltf-model="#animated-model-asset"
+                            animation-mixer
+                            scale="${scale} ${scale} ${scale}" 
+                            position="0 0 0">
+                        </a-entity>
+
+                        <!-- Label to help finding the object -->
+                        <a-text 
+                            value="🔻 HERE 🔻" 
+                            align="center" 
+                            color="#FFFF00" 
+                            position="0 ${scale * 1.5 + 1} 0" 
+                            scale="5 5 5"
+                            look-at="[gps-camera]">
+                        </a-text>
                     </a-entity>
+                    
+                    <!-- Click Zone -->
                     <a-box 
                         id="ar-model-click-zone" 
                         visible="false" 
-                        material="opacity: 0; transparent: true"
-                        position="0 0 0" 
+                        material="opacity: 0.1; transparent: true; color: yellow;"
+                        position="0 1 0" 
                         scale="2 2 2"
                         gps-entity-place="">
                     </a-box>
@@ -515,7 +532,7 @@
                     stream.getTracks().forEach(track => track.stop());
                     status.innerText = '啟動 3D 引擎...';
                     if (window.currentTask && window.currentTask.ar_model_url) {
-                        const scale = window.currentTask.ar_model_scale || 0.5;
+                        const scale = window.currentTask.ar_model_scale || 3.0;
                         init3DScene(window.currentTask.ar_model_url, scale);
                     } else { alert("錯誤：找不到 3D 模型設定"); }
                 } else {
