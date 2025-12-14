@@ -75,6 +75,24 @@
         .toast-message.show {
             opacity: 1;
         }
+        
+        /* === 關鍵修正：強制 3D 畫布在相機畫面之上 === */
+        .a-canvas {
+            z-index: 500 !important; /* 3D 畫布 */
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+        }
+        #arjs-video {
+            z-index: 100 !important; /* 相機畫面 */
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            display: block !important;
+        }
+        body {
+            background-color: transparent !important; /* 確保背景透明 */
+        }
     </style>
 </head>
 
