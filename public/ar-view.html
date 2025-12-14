@@ -265,7 +265,7 @@
                         gpsLocked = true;
                     }
                 });
-            }, 1000); 
+            }, 100); 
         }
         // 2. 取得任務資訊
         const urlParams = new URLSearchParams(window.location.search);
@@ -290,10 +290,8 @@
                         window.currentTask = task; 
                         if (task.ar_model_url) {
                             is3DMode = true;
-                            console.log('🚀 切換至 3D 模型模式 (等待啟動):', task.ar_model_url);
-                            arWorld.style.display = 'none';
-                            video.style.display = 'none';
-                            aframeContainer.style.display = 'block';
+                            console.log('🚀 偵測到 3D 任務，準備進入 3D 模式');
+                            // 不要在這裡先隱藏 video，等到真正按下開始後再切換
                         } else {
                             console.log('🖼️ 使用 CSS AR 模式');
                             is3DMode = false;
@@ -503,6 +501,11 @@
             .then(stream => { 
                 console.log("✅ 相機權限已取得");
                 if (is3DMode) {
+                    // 這裡才切換 UI
+                    arWorld.style.display = 'none';
+                    video.style.display = 'none';
+                    aframeContainer.style.display = 'block';
+
                     stream.getTracks().forEach(track => track.stop());
                     status.innerText = '啟動 3D 引擎...';
                     if (window.currentTask && window.currentTask.ar_model_url) {
