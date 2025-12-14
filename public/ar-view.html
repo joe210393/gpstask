@@ -395,49 +395,83 @@
                 
                 // 初始化旋轉模式切換
                 window.toggleRotationMode = function() {
+                    // 檢查模型是否已初始化
+                    if (!modelEntity || !modelEntity.getAttribute('visible')) {
+                        showToast('⏳ 請等待模型載入完成', 2000);
+                        return;
+                    }
+                    
                     window.rotationMode = !window.rotationMode;
                     const btn = document.getElementById('btn-rotation-mode');
                     const label = document.querySelector('#ar-model-label');
                     const hint = document.querySelector('#ar-model-hint');
-                    const innerModel = document.querySelector('#ar-model-inner');
                     
                     if (window.rotationMode) {
                         // 切換到旋轉模式：固定在相機前方
                         if (modelEntity) {
+                            // 先確保模型可見
+                            modelEntity.setAttribute('visible', 'true');
+                            
+                            // 移除 GPS 相關屬性
                             modelEntity.removeAttribute('gps-entity-place');
                             modelEntity.removeAttribute('look-at');
+                            
                             // 將模型作為相機的子元素，固定在相機前方
                             const camera = document.querySelector('a-camera');
                             if (camera) {
-                                // 先移除舊的位置
-                                modelEntity.removeAttribute('position');
-                                // 設置相對於相機的位置
+                                // 先將模型從場景移除（如果已經在場景中）
+                                const scene = document.querySelector('a-scene');
+                                if (scene && modelEntity.parentNode === scene) {
+                                    scene.removeChild(modelEntity);
+                                }
+                                
+                                // 設置相對於相機的位置（相機坐標系：Y 向上，Z 向前）
                                 modelEntity.setAttribute('position', '0 0 -2');
+                                modelEntity.setAttribute('rotation', '0 0 0'); // 重置旋轉
+                                
                                 // 將模型附加到相機
                                 camera.appendChild(modelEntity);
+                                
+                                // 確保內部模型可見
+                                if (innerModel) {
+                                    innerModel.setAttribute('visible', 'true');
+                                }
+                                
+                                // 強制更新
+                                setTimeout(() => {
+                                    modelEntity.setAttribute('visible', 'true');
+                                    if (innerModel) innerModel.setAttribute('visible', 'true');
+                                    console.log('✅ 模型已切換到旋轉模式');
+                                }, 100);
                             } else {
-                                modelEntity.setAttribute('position', '0 1.6 -2'); // 相機高度約 1.6 米
+                                // 如果找不到相機，使用場景坐標
+                                modelEntity.setAttribute('position', '0 1.6 -2');
+                                modelEntity.setAttribute('rotation', '0 0 0');
                             }
-                            modelEntity.setAttribute('visible', 'true');
-                            modelEntity.setAttribute('rotation', '0 0 0'); // 重置旋轉
                         }
                         if (clickZone) {
+                            clickZone.setAttribute('visible', 'true');
                             clickZone.removeAttribute('gps-entity-place');
                             const camera = document.querySelector('a-camera');
                             if (camera) {
-                                clickZone.removeAttribute('position');
+                                const scene = document.querySelector('a-scene');
+                                if (scene && clickZone.parentNode === scene) {
+                                    scene.removeChild(clickZone);
+                                }
                                 clickZone.setAttribute('position', '0 0 -2');
                                 camera.appendChild(clickZone);
                             }
-                            clickZone.setAttribute('visible', 'true');
                         }
                         if (label) {
-                            label.removeAttribute('look-at');
+                            // 在旋轉模式下，標籤應該面向相機（但使用相機引用而不是 gps-camera）
+                            label.setAttribute('look-at', '[camera]');
                             label.setAttribute('value', '🔄 拖動旋轉');
+                            label.setAttribute('visible', 'true');
                         }
                         if (hint) {
-                            hint.removeAttribute('look-at');
+                            hint.setAttribute('look-at', '[camera]');
                             hint.setAttribute('value', '旋轉模式：可拖動查看');
+                            hint.setAttribute('visible', 'true');
                         }
                         if (btn) btn.textContent = '📍 GPS 模式';
                         if (btn) btn.style.background = '#ffc107';
@@ -447,24 +481,57 @@
                         const scene = document.querySelector('a-scene');
                         if (modelEntity && targetLat && targetLng && scene) {
                             // 將模型從相機移除，放回場景
+                            const camera = document.querySelector('a-camera');
+                            if (camera && modelEntity.parentNode === camera) {
+                                camera.removeChild(modelEntity);
+                            }
+                            
+                            // 確保模型在場景中
+                            if (modelEntity.parentNode !== scene) {
+                                scene.appendChild(modelEntity);
+                            }
+                            
+                            // 移除固定位置，恢復 GPS 定位
                             modelEntity.removeAttribute('position');
-                            scene.appendChild(modelEntity);
                             modelEntity.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
                             modelEntity.setAttribute('look-at', '[gps-camera]');
                             modelEntity.setAttribute('rotation', '0 0 0'); // 重置旋轉
+                            modelEntity.setAttribute('visible', 'true');
+                            
+                            // 確保內部模型可見
+                            const innerModel = document.querySelector('#ar-model-inner');
+                            if (innerModel) {
+                                innerModel.setAttribute('visible', 'true');
+                            }
+                            
+                            // 強制更新
+                            setTimeout(() => {
+                                modelEntity.setAttribute('visible', 'true');
+                                if (innerModel) innerModel.setAttribute('visible', 'true');
+                                console.log('✅ 模型已切換回 GPS 模式');
+                            }, 100);
                         }
                         if (clickZone && targetLat && targetLng && scene) {
+                            const camera = document.querySelector('a-camera');
+                            if (camera && clickZone.parentNode === camera) {
+                                camera.removeChild(clickZone);
+                            }
+                            if (clickZone.parentNode !== scene) {
+                                scene.appendChild(clickZone);
+                            }
                             clickZone.removeAttribute('position');
-                            scene.appendChild(clickZone);
                             clickZone.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
+                            clickZone.setAttribute('visible', 'true');
                         }
                         if (label) {
                             label.setAttribute('look-at', '[gps-camera]');
                             label.setAttribute('value', '🔻 HERE 🔻');
+                            label.setAttribute('visible', 'true');
                         }
                         if (hint) {
                             hint.setAttribute('look-at', '[gps-camera]');
                             hint.setAttribute('value', '點擊查看詳情');
+                            hint.setAttribute('visible', 'true');
                         }
                         if (btn) btn.textContent = '🔄 旋轉模式';
                         if (btn) btn.style.background = '#28a745';
