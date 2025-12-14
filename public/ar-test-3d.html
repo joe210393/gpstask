@@ -3,15 +3,13 @@
 <head>
     <meta charset='utf-8'>
     <meta http-equiv='X-UA-Compatible' content='IE=edge'>
-    <title>GPS AR 3D Test</title>
-    <!-- A-Frame -->
+    <title>GPS AR 3D Fixed</title>
+    <!-- A-Frame 1.4.0 -->
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-    <!-- AR.js for A-Frame -->
+    <!-- AR.js for A-Frame (NFT build works well for location too) -->
     <script src='https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js'></script>
     <!-- A-Frame Extras (for animation-mixer) -->
     <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
-    <!-- Look-at component (optional, makes model face user) -->
-    <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
 
     <style>
         .debug-ui {
@@ -19,7 +17,7 @@
             bottom: 20px;
             left: 0;
             width: 100%;
-            z-index: 99999; /* 提高 z-index 確保在最上層 */
+            z-index: 99999;
             background: rgba(0, 0, 0, 0.7);
             color: white;
             padding: 10px;
@@ -27,349 +25,122 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
-            pointer-events: auto; /* 確保可以接收點擊事件 */
-        }
-        .debug-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
             pointer-events: auto;
         }
         button {
-            padding: 10px 15px; /* 加大按鈕點擊區域 */
+            padding: 15px;
             background: #007bff;
             color: white;
             border: none;
             border-radius: 4px;
-            font-size: 14px;
-            z-index: 100000; /* 按鈕層級再高一點 */
-            position: relative; /* 確保 z-index 生效 */
-        }
-        #info {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            background: rgba(0, 0, 0, 0.5);
-            color: #0f0;
-            padding: 5px;
-            z-index: 9999;
-            pointer-events: none;
-        }
-        .toast-message {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 15px 25px;
-            border-radius: 8px;
-            z-index: 10000;
-            text-align: center;
-            opacity: 0;
-            transition: opacity 0.3s;
-            pointer-events: none;
             font-size: 16px;
-            max-width: 80%;
         }
-        .toast-message.show {
-            opacity: 1;
-        }
-        
-        /* === 關鍵修正：強制 3D 畫布在相機畫面之上 === */
-        .a-canvas {
-            z-index: 999 !important; /* 確保比 video 高 */
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            background-color: transparent !important; /* 確保畫布背景透明 */
-        }
-        #arjs-video {
-            z-index: 1 !important; /* 確保比 canvas 低 */
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            display: block !important;
-        }
-        body {
-            background-color: transparent !important;
-            margin: 0;
-            overflow: hidden;
-        }
+        /* 移除強制覆蓋 .a-canvas 的 CSS，讓 AR.js 自動處理 */
     </style>
 </head>
 
 <body style='margin: 0; overflow: hidden;'>
     
-    <div id="info">GPS AR 3D 測試模式 (v2.0 RedBox)</div>
-
     <div class="debug-ui">
-        <div class="debug-row">
-            <span>Scale (大小): <span id="scale-val">0.5</span></span>
-            <input type="range" id="scale-slider" min="0.1" max="50" step="0.1" value="0.5">
-        </div>
-        <div class="debug-row">
-            <span>Height (高度): <span id="height-val">0</span></span>
-            <input type="range" id="height-slider" min="-10" max="10" step="0.5" value="0">
-        </div>
-        <div class="debug-row">
-            <button id="set-loc-btn">📍 GPS 放置 (北方)</button>
-            <button id="force-show-btn" style="background: #28a745;">👁️ 強制眼前 (無 GPS)</button>
-        </div>
-        <div class="debug-row">
-            <span id="dist-val">距離: ? m</span>
-            <span id="gps-acc">精度: ?</span>
-        </div>
-        <div class="debug-row">
-            <span>模擬 GPS: </span>
-            <button onclick="simulateMove(0.0001, 0)">北移</button>
-            <button onclick="simulateMove(-0.0001, 0)">南移</button>
-        </div>
+        <div>GPS AR 修復版 (v3.0)</div>
+        <button id="force-show-btn" style="background: #28a745;">👁️ 強制顯示 (眼前)</button>
+        <div id="status-log">等待操作...</div>
     </div>
 
     <!-- 
-        vr-mode-ui="enabled: false": 關閉右下角的 VR 眼鏡按鈕
-        arjs: 設定 AR.js 參數
-        renderer: 設定 alpha: true 確保背景透明，logarithmicDepthBuffer 解決深度問題
+        renderer: 
+        - logarithmicDepthBuffer: 解決深度閃爍
+        - colorManagement: 確保 GLTF 顏色正確
+        arjs: 
+        - sourceType: webcam
+        - debugUIEnabled: false
+        - videoTexture: false (預設 false，顯式移除避免問題)
     -->
     <a-scene 
         vr-mode-ui="enabled: false"
         embedded
-        arjs='sourceType: webcam; videoTexture: true; debugUIEnabled: false;'
-        renderer="logarithmicDepthBuffer: true; alpha: true; antialias: true; colorManagement: true;">
+        arjs='sourceType: webcam; debugUIEnabled: false;'
+        renderer="logarithmicDepthBuffer: true; colorManagement: true;">
 
-        <!-- 預載資源：改用本地檔案 -->
+        <!-- 增加環境光和方向光，避免模型全黑 -->
+        <a-light type="ambient" color="#ffffff" intensity="1.5"></a-light>
+        <a-light type="directional" position="1 1 1" intensity="1"></a-light>
+
         <a-assets>
             <a-asset-item id="animated-model" src="/models/CesiumMan.glb"></a-asset-item>
         </a-assets>
 
-        <!-- 
-            gps-camera: 處理 GPS 定位
-            rotation-reader: 處理羅盤方向
-            minDistance: 最小顯示距離
-            maxDistance: 最大顯示距離
-        -->
+        <!-- GPS Camera -->
         <a-camera gps-camera rotation-reader></a-camera>
 
-        <!-- 
-            3D 實體 
-            gps-entity-place: 設定經緯度 (會在 JS 中動態設定)
-            gltf-model: 指定模型
-            animation-mixer: 播放動畫
-            look-at: 讓模型永遠面向鏡頭
+        <!-- 3D 模型
+             初始 visible=false，透過按鈕觸發顯示
+             移除 gps-entity-place，先測試純顯示
         -->
-        
-        <!-- 一個紅色的參考方塊，用來確認渲染引擎是否正常運作 -->
-        <a-box id="ref-box" position="0 0 -3" scale="0.5 0.5 0.5" color="red" visible="false"></a-box>
-
         <a-entity 
             id="ar-model"
             gltf-model="#animated-model"
             animation-mixer
-            scale="5 5 5"
-            look-at="[gps-camera]"
-            position="0 0 0">
+            scale="2 2 2"
+            position="0 0 0"
+            visible="false"> 
         </a-entity>
 
     </a-scene>
 
     <script>
-        const forceShowBtn = document.getElementById('force-show-btn');
-        const setLocBtn = document.getElementById('set-loc-btn');
-        const distDisplay = document.getElementById('dist-val');
-        const gpsAccDisplay = document.getElementById('gps-acc');
-        const infoDiv = document.getElementById('info');
-        
-        // UI Controls
-        const scaleSlider = document.getElementById('scale-slider');
-        const heightSlider = document.getElementById('height-slider');
-        const scaleVal = document.getElementById('scale-val');
-        const heightVal = document.getElementById('height-val');
-
-        // 全局錯誤捕捉
-        window.onerror = function(msg, url, lineNo, columnNo, error) {
-            // 忽略一些不影響運作的警告
-            if (msg.includes('Script error')) return false;
-            showToast('⚠️ 錯誤: ' + msg, 5000);
-            return false;
-        };
-        
-        // 確保模型元素存在
         const arModel = document.getElementById('ar-model');
+        const statusLog = document.getElementById('status-log');
+        const forceBtn = document.getElementById('force-show-btn');
 
-        // 模型載入狀態監聽
+        // 1. 監聽模型是否真的載入
         arModel.addEventListener('model-loaded', () => {
-            showToast('✅ 3D 模型載入成功！');
-            infoDiv.innerText += ' | 模型 OK';
-            infoDiv.style.color = '#0f0';
-            arModel.setAttribute('scale', '2 2 2');
-            scaleSlider.value = 2;
-            scaleVal.textContent = '2';
+            console.log("Model Loaded!");
+            statusLog.innerText = "✅ 模型已載入 (記憶體中)";
+            statusLog.style.color = "#0f0";
         });
 
         arModel.addEventListener('model-error', (e) => {
-            console.error('Model failed to load:', e);
-            showToast('❌ 3D 模型載入失敗！請檢查網路。', 5000);
-            infoDiv.innerText += ' | 模型失敗';
-            infoDiv.style.color = '#f00';
+            console.error("Model Error:", e);
+            statusLog.innerText = "❌ 模型載入失敗 (請檢查 Network)";
+            statusLog.style.color = "red";
         });
 
-        function showToast(message, duration = 3000) {
-            const toast = document.createElement('div');
-            toast.className = 'toast-message';
-            toast.innerText = message;
-            document.body.appendChild(toast);
-            void toast.offsetWidth;
-            toast.classList.add('show');
-            setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => {
-                    if (document.body.contains(toast)) document.body.removeChild(toast);
-                }, 300);
-            }, duration);
-        }
-
-        // 調整大小
-        scaleSlider.addEventListener('input', (e) => {
-            const m = document.getElementById('ar-model'); // 重新獲取
-            const val = e.target.value;
-            m.setAttribute('scale', `${val} ${val} ${val}`);
-            scaleVal.textContent = val;
-        });
-
-        // 調整高度 (Y軸)
-        heightSlider.addEventListener('input', (e) => {
-            const m = document.getElementById('ar-model'); // 重新獲取
-            const val = e.target.value;
-            m.object3D.position.y = parseFloat(val);
-            heightVal.textContent = val;
-        });
-        
-        // 強制放置在鏡頭前方 (不使用 GPS)
-        forceShowBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-
+        // 2. 強制顯示按鈕 (除錯核心功能)
+        forceBtn.addEventListener('click', (e) => {
+            e.preventDefault(); // 防止觸控穿透
+            
+            statusLog.innerText = "處理中...";
+            
             try {
-                showToast('✅ 按鈕點擊確認！處理中...', 1000);
-                
-                const m = document.getElementById('ar-model');
-                const box = document.getElementById('ref-box'); // 獲取紅色方塊
-                
-                // 顯示紅色參考方塊
-                if (box) {
-                    box.setAttribute('visible', 'true');
-                    // 將方塊也掛到相機下
-                    const camera = document.querySelector('a-camera');
-                    if (box.parentNode !== camera) {
-                        box.parentNode.removeChild(box);
-                        camera.appendChild(box);
-                    }
-                    box.setAttribute('position', '0 0.5 -2'); // 在上方一點
-                }
-                
-                // 移除 GPS 屬性，改為純 3D 座標
-                m.removeAttribute('gps-entity-place');
-                m.removeAttribute('look-at');
-                
-                const camera = document.querySelector('a-camera');
-                if (!camera) throw new Error('找不到相機元件 (a-camera)');
-                
-                if (m.parentNode !== camera) {
-                    m.parentNode.removeChild(m);
-                    camera.appendChild(m);
-                }
-                
-                // 放大模型！
-                m.setAttribute('scale', '5 5 5'); 
-                m.setAttribute('position', '0 -1 -3'); // 往前 3 米，往下 1 米
-                m.setAttribute('rotation', '0 180 0');
-                
-                // 同步更新 UI
-                scaleSlider.value = 5;
-                scaleVal.textContent = '5';
-                
-                infoDiv.innerText = "模式: 強制眼前 (無 GPS)";
-                distDisplay.innerText = "距離: N/A";
-                
-                showToast('模型已固定！\n請看畫面中央 (上方應有紅色方塊)');
-            } catch (err) {
-                console.error(err);
-                showToast('按鈕執行錯誤: ' + err.message);
-            }
-        });
-
-        // 按下按鈕時，將模型放置在使用者當前位置的"稍微前面一點"
-        setLocBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-
-            try {
-                const m = document.getElementById('ar-model'); // 重新獲取
-                const scene = document.querySelector('a-scene');
                 const camera = document.querySelector('a-camera');
                 
-                if (m.parentNode === camera) {
-                    m.parentNode.removeChild(m);
-                    scene.appendChild(m);
-                    m.setAttribute('look-at', '[gps-camera]');
+                // 將模型掛載到相機底下 (HUD模式)，確保一定看得到
+                // 移除原本的父層級關係 (從 scene 移到 camera)
+                if(arModel.parentNode && arModel.parentNode !== camera) {
+                    arModel.parentNode.removeChild(arModel);
+                    camera.appendChild(arModel);
                 }
 
-                if (navigator.geolocation) {
-                    showToast('正在獲取 GPS...', 1000);
-                    navigator.geolocation.getCurrentPosition((position) => {
-                        const lat = position.coords.latitude;
-                        const lng = position.coords.longitude;
-                        const acc = position.coords.accuracy;
-                        
-                        gpsAccDisplay.innerText = `精度: ${acc.toFixed(0)}m`;
-                        
-                        const newLat = lat + 0.000015; 
-                        const newLng = lng;
+                // 設定為可見，並放置在鏡頭前方 3 米處
+                arModel.setAttribute('visible', 'true');
+                // HUD 模式下，座標是相對相機的
+                // 0 -1 -3: 相機正下方 1 米，前方 3 米
+                arModel.setAttribute('position', '0 -1 -3'); 
+                arModel.setAttribute('scale', '3 3 3');
+                
+                // 確保旋轉歸零 (或者面向鏡頭，視模型而定)
+                arModel.setAttribute('rotation', '0 180 0');
 
-                        console.log(`Setting model to: ${newLat}, ${newLng}`);
-                        
-                        m.setAttribute('gps-entity-place', `latitude: ${newLat}; longitude: ${newLng};`);
-                        m.setAttribute('scale', '2 2 2');
-                        scaleSlider.value = 2;
-                        scaleVal.textContent = '2';
-                        
-                        m.object3D.position.y = 0;
-                        heightSlider.value = 0;
-                        heightVal.textContent = '0';
-                        
-                        infoDiv.innerText = "模式: GPS 定位";
+                // 移除 GPS 屬性，避免它飛走
+                arModel.removeAttribute('gps-entity-place');
 
-                        showToast(`模型已放置在北方約 1.5 公尺處！\n精度: ${acc.toFixed(0)}m\nLat: ${newLat.toFixed(6)}\nLng: ${newLng.toFixed(6)}`);
-
-                    }, (err) => {
-                        showToast('無法獲取 GPS: ' + err.message);
-                    }, {
-                        enableHighAccuracy: true,
-                        timeout: 5000,
-                        maximumAge: 0
-                    });
-                } else {
-                    showToast('瀏覽器不支援 Geolocation');
-                }
-            } catch (err) {
-                console.error(err);
-                showToast('按鈕執行錯誤: ' + err.message);
+                statusLog.innerText = "👁️ 強制顯示模式: 鏡頭前方";
+            } catch(err) {
+                statusLog.innerText = "❌ 錯誤: " + err.message;
+                statusLog.style.color = "red";
             }
         });
-
-        // 監聽距離事件 (AR.js 特有事件)
-        arModel.addEventListener('gps-entity-place-update-positon', (event) => {
-            if(event.detail.distance) {
-                distDisplay.textContent = `距離: ${event.detail.distance.toFixed(1)} m`;
-            }
-        });
-        
-        // 模擬移動 (測試用)
-        window.simulateMove = function(dLat, dLng) {
-            console.log('Simulate move not fully implemented via JS buttons yet, rely on real GPS');
-        };
-
     </script>
 </body>
 </html>
