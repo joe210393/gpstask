@@ -307,6 +307,8 @@
         let currentUserTaskId = null;
         let requiredItem = null;
         let hasRequiredItem = false;
+        let arSteps = []; // 多步驟 AR 提示陣列
+        let currentArStep = 0; // 當前步驟索引
         if (taskId) {
             fetch(`${API_BASE}/api/tasks/${taskId}`)
                 .then(res => res.json())
@@ -314,11 +316,29 @@
                     if (data.success && data.task) {
                         const task = data.task;
                         currentTask = task;
-                        window.currentTask = task; 
-                        if (task.ar_model_url) {
+                        window.currentTask = task;
+                        
+                        // 解析 AR 多步驟順序
+                        arSteps = [];
+                        const steps = [];
+                        if (task.ar_order_model && task.ar_model_url) {
+                            steps.push({ type: '3d', order: task.ar_order_model, url: task.ar_model_url, scale: task.ar_model_scale || 3.0 });
+                        }
+                        if (task.ar_order_image && task.ar_image_url) {
+                            steps.push({ type: 'image', order: task.ar_order_image, url: task.ar_image_url });
+                        }
+                        if (task.ar_order_youtube && task.youtubeUrl) {
+                            steps.push({ type: 'youtube', order: task.ar_order_youtube, url: task.youtubeUrl });
+                        }
+                        arSteps = steps.sort((a, b) => a.order - b.order);
+                        currentArStep = 0;
+                        console.log('📋 AR 步驟:', arSteps);
+                        
+                        // 判斷是否使用 3D 模式（第一步是 3D 模型）
+                        const firstStep = arSteps.length > 0 && arSteps[0].type === '3d';
+                        if (firstStep) {
                             is3DMode = true;
                             console.log('🚀 偵測到 3D 任務，準備進入 3D 模式');
-                            // 不要在這裡先隱藏 video，等到真正按下開始後再切換
                         } else {
                             console.log('🖼️ 使用 CSS AR 模式');
                             is3DMode = false;
@@ -353,6 +373,7 @@
                         }
                         
                         if (task.lat && task.lng) { targetLat = task.lat; targetLng = task.lng; }
+                        
                         const btnOpenLock = document.getElementById('btn-open-lock');
                         if (isNumberTask) {
                             btnOpenLock.style.display = 'block';
@@ -369,22 +390,48 @@
             const chestObj = document.getElementById('chest-obj');
             const chestImg = document.getElementById('chest-img');
             const videoFrame = document.getElementById('video-frame');
+            
+            // 只顯示第一步（如果第一步不是 3D 模型）
+            const firstStep = arSteps.length > 0 ? arSteps[0] : null;
             let hasImage = false, hasVideo = false;
-            if (task.ar_image_url) { chestImg.src = task.ar_image_url; chestImg.style.display = 'block'; hasImage = true; }
-            if (task.youtubeUrl) {
-                const ytId = extractYouTubeId(task.youtubeUrl);
-                if (ytId) {
-                    videoFrame.style.display = 'block';
-                    document.getElementById('yt-player').src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0&controls=1&playsinline=1`;
-                    hasVideo = true;
+            
+            if (firstStep && firstStep.type !== '3d') {
+                if (firstStep.type === 'image') {
+                    chestImg.src = firstStep.url;
+                    chestImg.style.display = 'block';
+                    hasImage = true;
+                } else if (firstStep.type === 'youtube') {
+                    const ytId = extractYouTubeId(firstStep.url);
+                    if (ytId) {
+                        videoFrame.style.display = 'block';
+                        document.getElementById('yt-player').src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0&controls=1&playsinline=1`;
+                        hasVideo = true;
+                    }
                 }
+            } else if (!firstStep) {
+                // 沒有步驟設定，使用舊邏輯（向後兼容）
+                if (task.ar_image_url) { chestImg.src = task.ar_image_url; chestImg.style.display = 'block'; hasImage = true; }
+                if (task.youtubeUrl) {
+                    const ytId = extractYouTubeId(task.youtubeUrl);
+                    if (ytId) {
+                        videoFrame.style.display = 'block';
+                        document.getElementById('yt-player').src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0&controls=1&playsinline=1`;
+                        hasVideo = true;
+                    }
+                }
+                if (!hasImage && !hasVideo) { chestImg.src = '/images/mascot.png'; chestImg.style.display = 'block'; hasImage = true; }
             }
-            if (!hasImage && !hasVideo) { chestImg.src = '/images/mascot.png'; chestImg.style.display = 'block'; hasImage = true; }
+            
             if (hasImage && hasVideo) chestObj.className = 'has-both';
             else if (hasImage) chestObj.className = 'only-image';
             else if (hasVideo) chestObj.className = 'only-video';
+            else { chestObj.style.display = 'none'; }
         }
         function showArModal(task) {
+            const modalBody = document.getElementById('modal-body');
+            const arModal = document.getElementById('ar-modal');
+            const modalSubmitBtn = document.getElementById('modal-submit');
+            
             // 1. 檢查是否需要道具且尚未解鎖
             if (requiredItem) {
                 if (!hasRequiredItem) { 
@@ -393,18 +440,12 @@
                 }
                 
                 // 有道具，顯示「使用道具」確認視窗
-                const modalBody = document.getElementById('modal-body');
-                const arModal = document.getElementById('ar-modal');
-                const modalSubmitBtn = document.getElementById('modal-submit');
-                
                 modalBody.innerHTML = '';
                 
-                // 標題
                 const title = document.createElement('div');
                 title.innerHTML = `<div style="font-size:1.2rem; font-weight:bold; color:white; margin-bottom:10px;">🎒 使用道具解鎖</div>`;
                 modalBody.appendChild(title);
 
-                // 道具展示 (3D 或 圖片)
                 if (requiredItem.model) {
                      const mv = document.createElement('model-viewer');
                      mv.src = requiredItem.model;
@@ -430,20 +471,74 @@
                 modalSubmitBtn.onclick = () => {
                      showToast(`🎒 使用了【${requiredItem.name}】！`, 2000);
                      requiredItem = null; // 標記為已使用
-                     showArModal(task); // 重新呼叫以顯示任務內容
+                     currentArStep = 0; // 重置步驟
+                     showArModal(task); // 重新呼叫以顯示第一步驟
                 };
                 
                 arModal.style.display = 'flex';
                 return;
             }
 
-            const modalBody = document.getElementById('modal-body');
-            const arModal = document.getElementById('ar-modal');
-            const modalSubmitBtn = document.getElementById('modal-submit');
-            
+            // 2. 顯示 AR 多步驟提示
             modalBody.innerHTML = '';
             
-            // 根據任務類型設定按鈕文字
+            // 如果還有步驟未顯示
+            if (currentArStep < arSteps.length) {
+                const step = arSteps[currentArStep];
+                const stepNum = currentArStep + 1;
+                const totalSteps = arSteps.length;
+                
+                const title = document.createElement('div');
+                title.innerHTML = `<div style="font-size:1rem; color:#ccc; margin-bottom:10px;">提示 ${stepNum}/${totalSteps}</div>`;
+                modalBody.appendChild(title);
+                
+                if (step.type === '3d') {
+                    // 3D 模型顯示（在 AR 中已顯示，這裡只顯示提示）
+                    const hint = document.createElement('div');
+                    hint.innerHTML = `<div style="font-size:1.1rem; color:white; margin-bottom:15px;">🧊 查看 3D 模型提示</div>`;
+                    modalBody.appendChild(hint);
+                } else if (step.type === 'image') {
+                    const img = document.createElement('img');
+                    img.src = step.url;
+                    img.style.maxWidth = '100%';
+                    img.style.maxHeight = '50vh';
+                    img.style.borderRadius = '8px';
+                    modalBody.appendChild(img);
+                } else if (step.type === 'youtube') {
+                    const ytId = extractYouTubeId(step.url);
+                    if (ytId) {
+                        const iframe = document.createElement('iframe');
+                        iframe.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0&controls=1&playsinline=1`;
+                        iframe.style.width = '100%';
+                        iframe.style.height = '200px';
+                        iframe.style.border = 'none';
+                        modalBody.appendChild(iframe);
+                    }
+                }
+                
+                modalSubmitBtn.textContent = stepNum < totalSteps ? '➡️ 下一步' : '✍️ 前往答題';
+                modalSubmitBtn.onclick = () => {
+                    currentArStep++;
+                    if (currentArStep < arSteps.length) {
+                        showArModal(task); // 顯示下一步
+                    } else {
+                        // 所有步驟完成，前往答題
+                        arModal.style.display = 'none';
+                        if (task.task_type === 'location') {
+                            // 地點任務直接完成
+                            locationObj.click();
+                        } else {
+                            // 其他任務前往答題頁面
+                            window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
+                        }
+                    }
+                };
+                
+                arModal.style.display = 'flex';
+                return;
+            }
+            
+            // 3. 所有步驟完成，根據任務類型處理
             if (task.task_type === 'location') {
                 modalSubmitBtn.textContent = '📍 確認打卡';
                 modalSubmitBtn.onclick = async () => {
@@ -699,7 +794,12 @@
 
                     stream.getTracks().forEach(track => track.stop());
                     status.innerText = '啟動 3D 引擎...';
-                    if (window.currentTask && window.currentTask.ar_model_url) {
+                    // 使用第一步的 3D 模型（如果第一步是 3D）
+                    const firstStep = arSteps.length > 0 && arSteps[0].type === '3d' ? arSteps[0] : null;
+                    if (firstStep) {
+                        init3DScene(firstStep.url, firstStep.scale);
+                    } else if (window.currentTask && window.currentTask.ar_model_url) {
+                        // 向後兼容：如果沒有步驟設定，使用舊邏輯
                         const scale = window.currentTask.ar_model_scale || 3.0;
                         init3DScene(window.currentTask.ar_model_url, scale);
                     } else { alert("錯誤：找不到 3D 模型設定"); }

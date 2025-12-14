@@ -976,8 +976,9 @@ app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
     required_item_id, reward_item_id,
     // 劇情結局關卡
     is_final_step,
-    // AR 模型 ID
-    ar_model_id
+    // AR 模型 ID 與 順序
+    ar_model_id,
+    ar_order_model, ar_order_image, ar_order_youtube
   } = req.body;
 
   console.log('[POST /api/tasks] Received:', req.body);
@@ -1034,19 +1035,25 @@ app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
     const rewItemId = reward_item_id ? Number(reward_item_id) : null;
     const isFinal = is_final_step === true || is_final_step === 'true' || is_final_step === 1;
     const arModelId = ar_model_id ? Number(ar_model_id) : null;
+    
+    const orderModel = ar_order_model ? Number(ar_order_model) : null;
+    const orderImage = ar_order_image ? Number(ar_order_image) : null;
+    const orderYoutube = ar_order_youtube ? Number(ar_order_youtube) : null;
 
     await conn.execute(
       `INSERT INTO tasks (
         name, lat, lng, radius, description, photoUrl, iconUrl, youtubeUrl, ar_image_url, points, created_by, 
         task_type, options, correct_answer,
         type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants,
-        required_item_id, reward_item_id, is_final_step, ar_model_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        required_item_id, reward_item_id, is_final_step, ar_model_id,
+        ar_order_model, ar_order_image, ar_order_youtube
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         name, lat, lng, radius, description, photoUrl, '/images/flag-red.png', youtubeUrl || null, ar_image_url || null, pts, username, 
         tType, opts, correct_answer || null,
         mainType, qId, qOrder, tStart, tEnd, maxP,
-        reqItemId, rewItemId, isFinal, arModelId
+        reqItemId, rewItemId, isFinal, arModelId,
+        orderModel, orderImage, orderYoutube
       ]
     );
     res.json({ success: true, message: '新增成功' });
@@ -1317,8 +1324,9 @@ app.put('/api/tasks/:id', staffOrAdminAuth, async (req, res) => {
     required_item_id, reward_item_id,
     // 劇情結局關卡
     is_final_step,
-    // AR 模型 ID
-    ar_model_id
+    // AR 模型 ID 與 順序
+    ar_model_id,
+    ar_order_model, ar_order_image, ar_order_youtube
   } = req.body;
 
   if (!name || !lat || !lng || !radius || !description || !photoUrl) {
@@ -1374,19 +1382,25 @@ app.put('/api/tasks/:id', staffOrAdminAuth, async (req, res) => {
     const rewItemId = reward_item_id ? Number(reward_item_id) : null;
     const isFinal = is_final_step === true || is_final_step === 'true' || is_final_step === 1;
     const arModelId = ar_model_id ? Number(ar_model_id) : null;
+    
+    const orderModel = ar_order_model ? Number(ar_order_model) : null;
+    const orderImage = ar_order_image ? Number(ar_order_image) : null;
+    const orderYoutube = ar_order_youtube ? Number(ar_order_youtube) : null;
 
     await conn.execute(
       `UPDATE tasks SET 
         name=?, lat=?, lng=?, radius=?, description=?, photoUrl=?, youtubeUrl=?, ar_image_url=?, points=?, 
         task_type=?, options=?, correct_answer=?,
         type=?, quest_chain_id=?, quest_order=?, time_limit_start=?, time_limit_end=?, max_participants=?,
-        required_item_id=?, reward_item_id=?, is_final_step=?, ar_model_id=?
+        required_item_id=?, reward_item_id=?, is_final_step=?, ar_model_id=?,
+        ar_order_model=?, ar_order_image=?, ar_order_youtube=?
        WHERE id=?`,
       [
         name, lat, lng, radius, description, photoUrl, youtubeUrl || null, ar_image_url || null, pts, 
         tType, opts, correct_answer || null, 
         mainType, qId, qOrder, tStart, tEnd, maxP,
         reqItemId, rewItemId, isFinal, arModelId,
+        orderModel, orderImage, orderYoutube,
         id
       ]
     );
@@ -2442,6 +2456,19 @@ console.log('==================');
             await conn.execute("ALTER TABLE items ADD COLUMN model_url VARCHAR(512) DEFAULT NULL");
             console.log('✅ 資料庫遷移: items 表已新增 model_url');
         }
+
+        // 4. 新增 AR 順序欄位 (tasks 表)
+        const arOrderCols = ['ar_order_model', 'ar_order_image', 'ar_order_youtube'];
+        for (const col of arOrderCols) {
+            const [check] = await conn.execute(`SHOW COLUMNS FROM tasks LIKE '${col}'`);
+            if (check.length === 0) {
+                await conn.execute(`ALTER TABLE tasks ADD COLUMN ${col} INT DEFAULT NULL`);
+                console.log(`✅ 資料庫遷移: tasks 表已新增 ${col}`);
+            }
+        }
+        
+        await conn.end();
+        console.log('✅ AR 多步驟系統資料庫結構檢查完成');
         
         await conn.end();
         console.log('✅ AR 系統資料庫結構檢查完成');
