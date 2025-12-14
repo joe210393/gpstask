@@ -181,6 +181,7 @@
         <div class="info-box"><div id="status">等待啟動...</div><div id="debug-info" style="font-size:0.8em; color:#ffeb3b; margin-top:5px;"></div></div>
         <button id="btn-back" class="btn-back">🔙 返回填寫答案</button>
         <button id="btn-open-lock" type="button">🔒 輸入密碼</button>
+        <button id="btn-rotation-mode" type="button" style="position:fixed; bottom:90px; right:20px; background:#28a745; color:white; padding:12px 20px; border:none; border-radius:50px; font-size:14px; font-weight:bold; box-shadow:0 4px 10px rgba(0,0,0,0.3); pointer-events:auto; cursor:pointer; z-index:20; display:none;">🔄 旋轉模式</button>
     </div>
     <div id="toast-message"></div>
     <script>
@@ -192,7 +193,82 @@
         const status = document.getElementById('status');
         
         let is3DMode = false;
-        let gpsLocked = false; 
+        let gpsLocked = false;
+        window.rotationMode = false; // 旋轉模式開關（全局變量，供組件使用）
+        
+        // === 自定義旋轉控制組件 ===
+        AFRAME.registerComponent('rotation-control', {
+            init: function() {
+                this.isDragging = false;
+                this.lastTouchX = 0;
+                this.lastTouchY = 0;
+                this.rotationX = 0;
+                this.rotationY = 0;
+                
+                // 觸摸開始
+                this.onTouchStart = (e) => {
+                    if (!window.rotationMode) return;
+                    this.isDragging = true;
+                    const touch = e.touches ? e.touches[0] : e;
+                    this.lastTouchX = touch.clientX || touch.pageX;
+                    this.lastTouchY = touch.clientY || touch.pageY;
+                    e.preventDefault();
+                    e.stopPropagation();
+                };
+                
+                // 觸摸移動
+                this.onTouchMove = (e) => {
+                    if (!this.isDragging || !window.rotationMode) return;
+                    const touch = e.touches ? e.touches[0] : e;
+                    const currentX = touch.clientX || touch.pageX;
+                    const currentY = touch.clientY || touch.pageY;
+                    const deltaX = currentX - this.lastTouchX;
+                    const deltaY = currentY - this.lastTouchY;
+                    
+                    // 旋轉模型
+                    this.rotationY += deltaX * 0.5; // 水平旋轉
+                    this.rotationX -= deltaY * 0.5; // 垂直旋轉
+                    this.rotationX = Math.max(-90, Math.min(90, this.rotationX)); // 限制垂直角度
+                    
+                    this.el.setAttribute('rotation', `${this.rotationX} ${this.rotationY} 0`);
+                    
+                    this.lastTouchX = currentX;
+                    this.lastTouchY = currentY;
+                    e.preventDefault();
+                    e.stopPropagation();
+                };
+                
+                // 觸摸結束
+                this.onTouchEnd = (e) => {
+                    this.isDragging = false;
+                    e.preventDefault();
+                    e.stopPropagation();
+                };
+                
+                // 綁定事件到場景容器（確保能捕獲所有觸摸事件）
+                const scene = this.el.sceneEl;
+                if (scene) {
+                    scene.addEventListener('mousedown', this.onTouchStart);
+                    scene.addEventListener('touchstart', this.onTouchStart, { passive: false });
+                    scene.addEventListener('mousemove', this.onTouchMove);
+                    scene.addEventListener('touchmove', this.onTouchMove, { passive: false });
+                    scene.addEventListener('mouseup', this.onTouchEnd);
+                    scene.addEventListener('touchend', this.onTouchEnd);
+                }
+            },
+            remove: function() {
+                const scene = this.el.sceneEl;
+                if (scene) {
+                    scene.removeEventListener('mousedown', this.onTouchStart);
+                    scene.removeEventListener('touchstart', this.onTouchStart);
+                    scene.removeEventListener('mousemove', this.onTouchMove);
+                    scene.removeEventListener('touchmove', this.onTouchMove);
+                    scene.removeEventListener('mouseup', this.onTouchEnd);
+                    scene.removeEventListener('touchend', this.onTouchEnd);
+                }
+            }
+        });
+        
         // === 動態建立 3D 場景 ===
         function init3DScene(modelUrl, scale = 1) {
             const container = document.getElementById('aframe-scene-container');
@@ -216,11 +292,12 @@
                         id="ar-model-entity"
                         gps-entity-place=""
                         visible="false"
-                        look-at="[gps-camera]"
+                        rotation-control
                         cursor-listener>
                         
                         <!-- 3D Model -->
                         <a-entity 
+                            id="ar-model-inner"
                             gltf-model="#animated-model-asset"
                             animation-mixer
                             scale="${scale} ${scale} ${scale}" 
@@ -229,6 +306,7 @@
 
                         <!-- Label to help finding the object -->
                         <a-text 
+                            id="ar-model-label"
                             value="🔻 HERE 🔻" 
                             align="center" 
                             color="#FFFF00" 
@@ -239,6 +317,7 @@
                         
                         <!-- Hint: Click to view -->
                         <a-text 
+                            id="ar-model-hint"
                             value="點擊查看詳情" 
                             align="center" 
                             color="#FFFFFF" 
@@ -298,7 +377,7 @@
                         document.getElementById('debug-info').innerText = `目標方位: ${bearing.toFixed(0)}°`;
                     }
 
-                    if (!gpsLocked) {
+                    if (!gpsLocked && !window.rotationMode) {
                         if(modelEntity && targetLat && targetLng) {
                             modelEntity.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
                             modelEntity.setAttribute('visible', 'true');
@@ -313,6 +392,92 @@
                         gpsLocked = true;
                     }
                 });
+                
+                // 初始化旋轉模式切換
+                window.toggleRotationMode = function() {
+                    window.rotationMode = !window.rotationMode;
+                    const btn = document.getElementById('btn-rotation-mode');
+                    const label = document.querySelector('#ar-model-label');
+                    const hint = document.querySelector('#ar-model-hint');
+                    const innerModel = document.querySelector('#ar-model-inner');
+                    
+                    if (window.rotationMode) {
+                        // 切換到旋轉模式：固定在相機前方
+                        if (modelEntity) {
+                            modelEntity.removeAttribute('gps-entity-place');
+                            modelEntity.removeAttribute('look-at');
+                            // 將模型作為相機的子元素，固定在相機前方
+                            const camera = document.querySelector('a-camera');
+                            if (camera) {
+                                // 先移除舊的位置
+                                modelEntity.removeAttribute('position');
+                                // 設置相對於相機的位置
+                                modelEntity.setAttribute('position', '0 0 -2');
+                                // 將模型附加到相機
+                                camera.appendChild(modelEntity);
+                            } else {
+                                modelEntity.setAttribute('position', '0 1.6 -2'); // 相機高度約 1.6 米
+                            }
+                            modelEntity.setAttribute('visible', 'true');
+                            modelEntity.setAttribute('rotation', '0 0 0'); // 重置旋轉
+                        }
+                        if (clickZone) {
+                            clickZone.removeAttribute('gps-entity-place');
+                            const camera = document.querySelector('a-camera');
+                            if (camera) {
+                                clickZone.removeAttribute('position');
+                                clickZone.setAttribute('position', '0 0 -2');
+                                camera.appendChild(clickZone);
+                            }
+                            clickZone.setAttribute('visible', 'true');
+                        }
+                        if (label) {
+                            label.removeAttribute('look-at');
+                            label.setAttribute('value', '🔄 拖動旋轉');
+                        }
+                        if (hint) {
+                            hint.removeAttribute('look-at');
+                            hint.setAttribute('value', '旋轉模式：可拖動查看');
+                        }
+                        if (btn) btn.textContent = '📍 GPS 模式';
+                        if (btn) btn.style.background = '#ffc107';
+                        showToast('🔄 已切換到旋轉模式，可拖動查看模型', 2000);
+                    } else {
+                        // 切換回 GPS 模式
+                        const scene = document.querySelector('a-scene');
+                        if (modelEntity && targetLat && targetLng && scene) {
+                            // 將模型從相機移除，放回場景
+                            modelEntity.removeAttribute('position');
+                            scene.appendChild(modelEntity);
+                            modelEntity.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
+                            modelEntity.setAttribute('look-at', '[gps-camera]');
+                            modelEntity.setAttribute('rotation', '0 0 0'); // 重置旋轉
+                        }
+                        if (clickZone && targetLat && targetLng && scene) {
+                            clickZone.removeAttribute('position');
+                            scene.appendChild(clickZone);
+                            clickZone.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
+                        }
+                        if (label) {
+                            label.setAttribute('look-at', '[gps-camera]');
+                            label.setAttribute('value', '🔻 HERE 🔻');
+                        }
+                        if (hint) {
+                            hint.setAttribute('look-at', '[gps-camera]');
+                            hint.setAttribute('value', '點擊查看詳情');
+                        }
+                        if (btn) btn.textContent = '🔄 旋轉模式';
+                        if (btn) btn.style.background = '#28a745';
+                        showToast('📍 已切換到 GPS 模式', 2000);
+                    }
+                };
+                
+                // 綁定按鈕事件
+                const btnRotation = document.getElementById('btn-rotation-mode');
+                if (btnRotation) {
+                    btnRotation.onclick = window.toggleRotationMode;
+                    btnRotation.style.display = 'block';
+                }
             }, 100); 
         }
         // 2. 取得任務資訊
@@ -840,7 +1005,18 @@
                         const scale = window.currentTask.ar_model_scale || 3.0;
                         init3DScene(window.currentTask.ar_model_url, scale);
                     } else { alert("錯誤：找不到 3D 模型設定"); }
+                    
+                    // 顯示旋轉模式按鈕
+                    const btnRotation = document.getElementById('btn-rotation-mode');
+                    if (btnRotation) {
+                        btnRotation.style.display = 'block';
+                    }
                 } else {
+                    // 隱藏旋轉模式按鈕（非 3D 模式）
+                    const btnRotation = document.getElementById('btn-rotation-mode');
+                    if (btnRotation) {
+                        btnRotation.style.display = 'none';
+                    }
                     status.innerText = '啟動相機畫面...';
                     video.srcObject = stream;
                     video.onloadedmetadata = () => { video.play(); };
