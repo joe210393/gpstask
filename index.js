@@ -55,11 +55,21 @@ app.use(express.json({ charset: 'utf-8' }));
 // 優先從 UPLOAD_DIR 提供圖片服務，這對於掛載的 Volume 很重要
 // 當請求 /images/xxx.jpg 時，會先去 UPLOAD_DIR 找
 app.use('/images', express.static(UPLOAD_DIR));
-app.use(express.static(path.join(__dirname, 'public')));
 
-// 明確設定 .glb 和 .gltf 的 MIME type，避免模型載入失敗
-express.static.mime.define({'model/gltf-binary': ['glb']});
-express.static.mime.define({'model/gltf+json': ['gltf']});
+// 設定靜態檔案服務，並強制為 .glb/.gltf 設定正確的 MIME type
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, filePath) => {
+    if (path.extname(filePath) === '.glb') {
+      res.setHeader('Content-Type', 'model/gltf-binary');
+    } else if (path.extname(filePath) === '.gltf') {
+      res.setHeader('Content-Type', 'model/gltf+json');
+    }
+  }
+}));
+
+// 移除錯誤的 mime.define
+// express.static.mime.define({'model/gltf-binary': ['glb']});
+// express.static.mime.define({'model/gltf+json': ['gltf']});
 
 // 設置響應字符集
 app.use((req, res, next) => {
