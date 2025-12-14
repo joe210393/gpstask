@@ -3,15 +3,18 @@
 <head>
     <meta charset='utf-8'>
     <meta http-equiv='X-UA-Compatible' content='IE=edge'>
-    <title>GPS AR Test v3.1</title>
+    <title>GPS AR 3D Showcase</title>
     <!-- A-Frame 1.4.0 -->
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <!-- AR.js for A-Frame (NFT build works well for location too) -->
     <script src='https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js'></script>
     <!-- A-Frame Extras (for animation-mixer) -->
     <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
+    <!-- 加入 look-at 套件，讓文字永遠面向使用者 -->
+    <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
 
     <style>
+        body { margin: 0; overflow: hidden; }
         .debug-ui {
             position: fixed; bottom: 20px; left: 0; width: 100%; z-index: 99999;
             background: transparent; 
@@ -35,7 +38,7 @@
     
     <div class="debug-ui">
         <div id="status-log" class="status-badge">📡 等待 GPS 定位...</div>
-        <button id="place-btn" class="status-badge" style="margin-top: 10px; background: rgba(0,200,100,0.8); pointer-events: auto; display: none;">📍 在前方 5 公尺放置</button>
+        <button id="place-btn" class="status-badge" style="margin-top: 10px; background: rgba(0,200,100,0.8); pointer-events: auto; display: none;">📍 在北方 2 公尺放置 (並顯示方位)</button>
     </div>
 
     <!-- 
@@ -73,13 +76,24 @@
             visible="false"> 
         </a-entity>
 
+        <!-- 方位指示 (點擊後才設定位置) -->
+        <a-text id="dir-n" value="N" color="#ff4444" scale="10 10 10" align="center" visible="false" look-at="[gps-camera]"></a-text>
+        <a-text id="dir-s" value="S" color="#4444ff" scale="10 10 10" align="center" visible="false" look-at="[gps-camera]"></a-text>
+        <a-text id="dir-e" value="E" color="#44ff44" scale="10 10 10" align="center" visible="false" look-at="[gps-camera]"></a-text>
+        <a-text id="dir-w" value="W" color="#ffff44" scale="10 10 10" align="center" visible="false" look-at="[gps-camera]"></a-text>
+
     </a-scene>
 
     <script>
         const arModel = document.getElementById('ar-model');
         const statusLog = document.getElementById('status-log');
         const placeBtn = document.getElementById('place-btn');
-        const camera = document.querySelector('a-camera');
+        
+        // 方位元素
+        const dirN = document.getElementById('dir-n');
+        const dirS = document.getElementById('dir-s');
+        const dirE = document.getElementById('dir-e');
+        const dirW = document.getElementById('dir-w');
 
         let currentCoords = null;
         let modelLoaded = false;
@@ -123,31 +137,40 @@
             statusLog.innerText = "📍 計算位置中...";
 
             // 1. 確保模型從相機中移除（如果之前黏在相機上）
-            // 這次我們不掛在相機上，而是用真實 GPS
             if (arModel.object3D.parent !== arModel.sceneEl.object3D) {
                 arModel.sceneEl.object3D.add(arModel.object3D);
             }
 
-            // 2. 計算北方 0.00005 度 (約 5-6 公尺)
-            // 經度不變，緯度增加
-            const latitude = currentCoords.latitude + 0.00005;
-            const longitude = currentCoords.longitude;
+            // 2. 計算座標
+            // 2公尺緯度差約 0.000018度，取 0.00002
+            // 5公尺方位指示約 0.00005度
+            const latDiff2m = 0.00002;
+            const diff5m = 0.00005;
 
-            // 3. 設定 GPS 屬性
-            arModel.setAttribute('gps-entity-place', `latitude: ${latitude}; longitude: ${longitude};`);
-            
-            // 4. 設定可見與位置歸零 (相對於 GPS 錨點)
+            const lat = currentCoords.latitude;
+            const lng = currentCoords.longitude;
+
+            // 3. 設定模型位置 (北方 2m)
+            arModel.setAttribute('gps-entity-place', `latitude: ${lat + latDiff2m}; longitude: ${lng};`);
             arModel.setAttribute('position', '0 0 0');
             arModel.setAttribute('scale', '3 3 3'); 
             arModel.setAttribute('visible', 'true');
 
+            // 4. 設定方位指示 (5m 處)
+            setGpsPos(dirN, lat + diff5m, lng); // 北
+            setGpsPos(dirS, lat - diff5m, lng); // 南
+            setGpsPos(dirE, lat, lng + diff5m); // 東 (經度增加)
+            setGpsPos(dirW, lat, lng - diff5m); // 西 (經度減少)
+
             // 5. 更新 UI
-            statusLog.innerText = `📍 已放置於北方 5m 處`;
-            placeBtn.innerText = "🔄 重置到新位置";
-            
-            // 為了除錯，印出座標
-            console.log(`Placed at Lat: ${latitude}, Lng: ${longitude}`);
+            statusLog.innerText = `📍 模型已置於北方 2m`;
+            placeBtn.innerText = "🔄 重置位置";
         });
+
+        function setGpsPos(el, lat, lng) {
+            el.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lng};`);
+            el.setAttribute('visible', 'true');
+        }
     </script>
 </body>
 </html>
