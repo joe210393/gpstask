@@ -34,8 +34,8 @@
 <body style='margin: 0; overflow: hidden;'>
     
     <div class="debug-ui">
-        <div id="status-log" class="status-badge">正在載入 3D 模型...</div>
-        <button id="reset-btn" class="status-badge" style="margin-top: 10px; background: rgba(0,100,255,0.6); pointer-events: auto;">🔄 重置位置</button>
+        <div id="status-log" class="status-badge">📡 等待 GPS 定位...</div>
+        <button id="place-btn" class="status-badge" style="margin-top: 10px; background: rgba(0,200,100,0.8); pointer-events: auto; display: none;">📍 在前方 5 公尺放置</button>
     </div>
 
     <!-- 
@@ -45,30 +45,31 @@
         arjs: 
         - sourceType: webcam
         - debugUIEnabled: false
+        - videoTexture: true (嘗試優化效能，若有問題可移除)
     -->
     <a-scene 
         vr-mode-ui="enabled: false"
         embedded
-        arjs='sourceType: webcam; debugUIEnabled: false;'
+        arjs='sourceType: webcam; debugUIEnabled: false; videoTexture: true;'
         renderer="logarithmicDepthBuffer: true; colorManagement: true;">
 
         <a-light type="ambient" color="#ffffff" intensity="1.5"></a-light>
         <a-light type="directional" position="1 1 1" intensity="1"></a-light>
 
         <a-assets>
-            <!-- 改用使用者的自定義模型 -->
             <a-asset-item id="animated-model" src="/models/result.glb"></a-asset-item>
         </a-assets>
 
-        <a-camera gps-camera rotation-reader></a-camera>
+        <!-- minDistance: 0 確保再近也能看到，maxDistance: 100 限制顯示範圍 -->
+        <a-camera gps-camera="minDistance: 0; maxDistance: 100;" rotation-reader></a-camera>
 
-        <!-- 初始不可見，透過按鈕觸發 -->
+        <!-- 初始無 gps-entity-place，等待按鈕觸發設定 -->
         <a-entity 
             id="ar-model"
             gltf-model="#animated-model"
             animation-mixer
             scale="3 3 3"
-            position="0 0 -5"
+            position="0 0 0"
             visible="false"> 
         </a-entity>
 
@@ -77,53 +78,35 @@
     <script>
         const arModel = document.getElementById('ar-model');
         const statusLog = document.getElementById('status-log');
-        const resetBtn = document.getElementById('reset-btn');
+        const placeBtn = document.getElementById('place-btn');
+        const camera = document.querySelector('a-camera');
 
-        // 核心顯示邏輯
-        function showModelInFront() {
-            try {
-                const camera = document.querySelector('a-camera');
-                if (!camera || !camera.object3D) {
-                    throw new Error("相機尚未準備好");
-                }
+        let currentCoords = null;
+        let modelLoaded = false;
 
-                // 移除 GPS 屬性
-                arModel.removeAttribute('gps-entity-place');
-
-                // 掛載到相機
-                if (arModel.object3D.parent) arModel.object3D.parent.remove(arModel.object3D);
-                camera.object3D.add(arModel.object3D);
-
-                // 設定位置：正前方 2 米，稍微低一點 (-0.5)
-                arModel.object3D.position.set(0, -0.5, -2); 
-                arModel.object3D.scale.set(3, 3, 3); // 放大 3 倍
-                arModel.object3D.rotation.set(0, 0, 0); 
-                
-                arModel.setAttribute('visible', 'true');
-                
-                statusLog.innerText = "✅ 3D 模型已顯示";
-                statusLog.style.color = "#fff";
+        // 監聽 GPS 更新
+        window.addEventListener('gps-camera-update-position', (e) => {
+            if (!currentCoords) {
+                // 第一次抓到 GPS
+                statusLog.innerText = "✅ GPS 已鎖定";
                 statusLog.style.backgroundColor = "rgba(40, 167, 69, 0.8)";
-                
-                // 3秒後隱藏狀態文字
-                setTimeout(() => {
-                    statusLog.style.opacity = '0';
-                }, 3000);
-            } catch (err) {
-                console.error(err);
-                statusLog.innerText = "⚠️ 重試中...";
-                // 如果失敗，1秒後再試
-                setTimeout(showModelInFront, 1000);
+                if (modelLoaded) {
+                    placeBtn.style.display = 'block';
+                }
             }
-        }
+            currentCoords = e.detail.position;
+        });
 
-        // 1. 監聽模型加載並自動顯示
+        // 監聽模型載入
         arModel.addEventListener('model-loaded', () => {
             console.log("Model Loaded!");
-            statusLog.innerText = "⏳ 模型載入完成，等待相機...";
-            
-            // 延遲 2 秒再顯示，確保 AR.js 相機已啟動
-            setTimeout(showModelInFront, 2000);
+            modelLoaded = true;
+            if (currentCoords) {
+                placeBtn.style.display = 'block';
+                statusLog.innerText = "🚀 準備就緒，請點擊放置";
+            } else {
+                statusLog.innerText = "⏳ 模型 OK，等待 GPS...";
+            }
         });
 
         arModel.addEventListener('model-error', (e) => {
@@ -132,12 +115,38 @@
             statusLog.style.backgroundColor = "rgba(255, 0, 0, 0.6)";
         });
 
-        // 2. 手動重置按鈕
-        resetBtn.addEventListener('click', (e) => {
+        // 放置按鈕邏輯
+        placeBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            statusLog.style.opacity = '1';
-            statusLog.innerText = "🔄 重新定位中...";
-            showModelInFront();
+            if (!currentCoords) return;
+
+            statusLog.innerText = "📍 計算位置中...";
+
+            // 1. 確保模型從相機中移除（如果之前黏在相機上）
+            // 這次我們不掛在相機上，而是用真實 GPS
+            if (arModel.object3D.parent !== arModel.sceneEl.object3D) {
+                arModel.sceneEl.object3D.add(arModel.object3D);
+            }
+
+            // 2. 計算北方 0.00005 度 (約 5-6 公尺)
+            // 經度不變，緯度增加
+            const latitude = currentCoords.latitude + 0.00005;
+            const longitude = currentCoords.longitude;
+
+            // 3. 設定 GPS 屬性
+            arModel.setAttribute('gps-entity-place', `latitude: ${latitude}; longitude: ${longitude};`);
+            
+            // 4. 設定可見與位置歸零 (相對於 GPS 錨點)
+            arModel.setAttribute('position', '0 0 0');
+            arModel.setAttribute('scale', '3 3 3'); 
+            arModel.setAttribute('visible', 'true');
+
+            // 5. 更新 UI
+            statusLog.innerText = `📍 已放置於北方 5m 處`;
+            placeBtn.innerText = "🔄 重置到新位置";
+            
+            // 為了除錯，印出座標
+            console.log(`Placed at Lat: ${latitude}, Lng: ${longitude}`);
         });
     </script>
 </body>
