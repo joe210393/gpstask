@@ -38,7 +38,8 @@
     
     <div class="debug-ui">
         <div id="status-log" class="status-badge">📡 等待 GPS 定位...</div>
-        <button id="place-btn" class="status-badge" style="margin-top: 10px; background: rgba(0,200,100,0.8); pointer-events: auto; display: none;">📍 在北方 2 公尺放置 (並顯示方位)</button>
+        <div id="dist-log" class="status-badge" style="display:none; color: yellow;">📏 尚未放置</div>
+        <button id="place-btn" class="status-badge" style="margin-top: 10px; background: rgba(0,200,100,0.8); pointer-events: auto; display: none;">📍 在北方 2 公尺放置</button>
     </div>
 
     <!-- 
@@ -48,7 +49,7 @@
         arjs: 
         - sourceType: webcam
         - debugUIEnabled: false
-        - videoTexture: true (嘗試優化效能，若有問題可移除)
+        - videoTexture: true
     -->
     <a-scene 
         vr-mode-ui="enabled: false"
@@ -64,9 +65,9 @@
         </a-assets>
 
         <!-- minDistance: 0 確保再近也能看到，maxDistance: 100 限制顯示範圍 -->
-        <a-camera gps-camera="minDistance: 0; maxDistance: 100;" rotation-reader></a-camera>
+        <a-camera gps-camera="minDistance: 0; maxDistance: 1000;" rotation-reader></a-camera>
 
-        <!-- 初始無 gps-entity-place，等待按鈕觸發設定 -->
+        <!-- 3D 模型 -->
         <a-entity 
             id="ar-model"
             gltf-model="#animated-model"
@@ -76,22 +77,24 @@
             visible="false"> 
         </a-entity>
 
-        <!-- 改用立體柱子當路標，確保各個角度都看得到 -->
-        <!-- 北 (紅) -->
-        <a-cylinder id="dir-n" color="#ff0000" height="2" radius="0.1" position="0 1 0" visible="false"></a-cylinder>
+        <!-- 改用巨大立體柱子當路標，確保各個角度都看得到 -->
+        <!-- 北 (紅) - 半徑加大到 0.5，高度 5 -->
+        <a-cylinder id="dir-n" color="#ff0000" height="5" radius="0.5" position="0 2.5 0" visible="false"></a-cylinder>
         <!-- 南 (藍) -->
-        <a-cylinder id="dir-s" color="#0000ff" height="2" radius="0.1" position="0 1 0" visible="false"></a-cylinder>
+        <a-cylinder id="dir-s" color="#0000ff" height="5" radius="0.5" position="0 2.5 0" visible="false"></a-cylinder>
         <!-- 東 (綠) -->
-        <a-cylinder id="dir-e" color="#00ff00" height="2" radius="0.1" position="0 1 0" visible="false"></a-cylinder>
+        <a-cylinder id="dir-e" color="#00ff00" height="5" radius="0.5" position="0 2.5 0" visible="false"></a-cylinder>
         <!-- 西 (黃) -->
-        <a-cylinder id="dir-w" color="#ffff00" height="2" radius="0.1" position="0 1 0" visible="false"></a-cylinder>
+        <a-cylinder id="dir-w" color="#ffff00" height="5" radius="0.5" position="0 2.5 0" visible="false"></a-cylinder>
 
     </a-scene>
 
     <script>
         const arModel = document.getElementById('ar-model');
         const statusLog = document.getElementById('status-log');
+        const distLog = document.getElementById('dist-log');
         const placeBtn = document.getElementById('place-btn');
+        const camera = document.querySelector('a-camera');
         
         // 方位元素
         const dirN = document.getElementById('dir-n');
@@ -101,18 +104,37 @@
 
         let currentCoords = null;
         let modelLoaded = false;
+        let placed = false;
 
         // 監聽 GPS 更新
         window.addEventListener('gps-camera-update-position', (e) => {
-            if (!currentCoords) {
-                // 第一次抓到 GPS
+            currentCoords = e.detail.position;
+            
+            if (!placeBtn.style.display || placeBtn.style.display === 'none') {
                 statusLog.innerText = "✅ GPS 已鎖定";
                 statusLog.style.backgroundColor = "rgba(40, 167, 69, 0.8)";
                 if (modelLoaded) {
                     placeBtn.style.display = 'block';
                 }
             }
-            currentCoords = e.detail.position;
+
+            // 如果已經放置，計算與北方柱子的距離
+            if (placed && dirN.getAttribute('gps-entity-place')) {
+                const dist = dirN.getAttribute('distance'); // AR.js 自動計算的距離
+                const camPos = camera.object3D.position;
+                const nPos = dirN.object3D.position;
+                
+                // 簡單除錯距離
+                if (dist) {
+                    distLog.innerText = `📏 距離北方紅柱: ${Math.round(dist)}m`;
+                } else {
+                    // 手動計算大概距離 (僅供參考)
+                    const dx = camPos.x - nPos.x;
+                    const dz = camPos.z - nPos.z;
+                    const manualDist = Math.sqrt(dx*dx + dz*dz);
+                    distLog.innerText = `📏 距離北方紅柱(3D): ${manualDist.toFixed(1)}m`;
+                }
+            }
         });
 
         // 監聽模型載入
@@ -127,18 +149,14 @@
             }
         });
 
-        arModel.addEventListener('model-error', (e) => {
-            console.error("Model Error:", e);
-            statusLog.innerText = "❌ 模型載入失敗";
-            statusLog.style.backgroundColor = "rgba(255, 0, 0, 0.6)";
-        });
-
         // 放置按鈕邏輯
         placeBtn.addEventListener('click', (e) => {
             e.preventDefault();
             if (!currentCoords) return;
 
             statusLog.innerText = "📍 計算位置中...";
+            distLog.style.display = 'block';
+            placed = true;
 
             // 1. 確保模型從相機中移除
             if (arModel.object3D.parent !== arModel.sceneEl.object3D) {
@@ -146,18 +164,17 @@
             }
 
             // 2. 計算座標
-            // 2公尺約 0.00002度
-            // 3公尺約 0.00003度 (路標)
-            const diff2m = 0.00002;
-            const diff3m = 0.00003;
+            // 2公尺緯度差約 0.000018度
+            // 3公尺方位指示約 0.000027度
+            const diff2m = 0.000018;
+            const diff3m = 0.000027;
 
             const lat = currentCoords.latitude;
             const lng = currentCoords.longitude;
 
             // 3. 設定模型位置 (北方 2m)
-            // position="0 0 0" 確保它在該 GPS 點的地面
             arModel.setAttribute('gps-entity-place', `latitude: ${lat + diff2m}; longitude: ${lng};`);
-            arModel.setAttribute('position', '0 0 0');
+            arModel.setAttribute('position', '0 0 0'); // 地面
             arModel.setAttribute('scale', '3 3 3'); 
             arModel.setAttribute('visible', 'true');
 
@@ -168,13 +185,13 @@
             setGpsPos(dirW, lat, lng - diff3m); // 西 (黃)
 
             // 5. 更新 UI
-            statusLog.innerText = `📍 模型在紅柱(北)前方`;
+            statusLog.innerText = `📍 路標已放置 (半徑0.5m 高5m)`;
             placeBtn.innerText = "🔄 重置位置";
         });
 
         function setGpsPos(el, lat, lng) {
             el.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lng};`);
-            el.setAttribute('position', '0 1 0'); // 離地 1 米，懸浮以免被遮擋
+            el.setAttribute('position', '0 2.5 0'); // 中心點在 2.5m (高度的一半)，確保立在地面上
             el.setAttribute('visible', 'true');
         }
     </script>
