@@ -78,20 +78,23 @@
         
         /* === 關鍵修正：強制 3D 畫布在相機畫面之上 === */
         .a-canvas {
-            z-index: 500 !important; /* 3D 畫布 */
+            z-index: 999 !important; /* 確保比 video 高 */
             position: absolute !important;
             top: 0 !important;
             left: 0 !important;
+            background-color: transparent !important; /* 確保畫布背景透明 */
         }
         #arjs-video {
-            z-index: 100 !important; /* 相機畫面 */
+            z-index: 1 !important; /* 確保比 canvas 低 */
             position: absolute !important;
             top: 0 !important;
             left: 0 !important;
             display: block !important;
         }
         body {
-            background-color: transparent !important; /* 確保背景透明 */
+            background-color: transparent !important;
+            margin: 0;
+            overflow: hidden;
         }
     </style>
 </head>
@@ -126,13 +129,14 @@
 
     <!-- 
         vr-mode-ui="enabled: false": 關閉右下角的 VR 眼鏡按鈕
-        arjs: 設定 AR.js 參數，sourceType: webcam 開啟相機
+        arjs: 設定 AR.js 參數
+        renderer: 設定 alpha: true 確保背景透明，logarithmicDepthBuffer 解決深度問題
     -->
     <a-scene 
         vr-mode-ui="enabled: false"
         embedded
         arjs='sourceType: webcam; videoTexture: true; debugUIEnabled: false;'
-        renderer="logarithmicDepthBuffer: true;">
+        renderer="logarithmicDepthBuffer: true; alpha: true; antialias: true; colorManagement: true;">
 
         <!-- 預載資源：改用本地檔案 -->
         <a-assets>
