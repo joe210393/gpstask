@@ -236,6 +236,17 @@
                             scale="5 5 5"
                             look-at="[gps-camera]">
                         </a-text>
+                        
+                        <!-- Hint: Click to view -->
+                        <a-text 
+                            value="點擊查看詳情" 
+                            align="center" 
+                            color="#FFFFFF" 
+                            position="0 ${scale * 1.5 + 2.5} 0" 
+                            scale="3 3 3"
+                            look-at="[gps-camera]"
+                            background-color="rgba(0,0,0,0.6)">
+                        </a-text>
                     </a-entity>
                     
                     <!-- Click Zone -->
@@ -255,7 +266,17 @@
                 
                 const clickHandler = () => {
                     console.log("3D Model Clicked!");
-                    if(window.currentTask) showArModal(window.currentTask);
+                    if(window.currentTask) {
+                        // 如果當前步驟是 3D 模型，直接顯示可互動檢視
+                        const currentStep = arSteps.length > 0 && currentArStep < arSteps.length ? arSteps[currentArStep] : null;
+                        if (currentStep && currentStep.type === '3d') {
+                            // 直接顯示當前步驟（會包含可互動的 model-viewer）
+                            showArModal(window.currentTask);
+                        } else {
+                            // 否則顯示完整的步驟流程
+                            showArModal(window.currentTask);
+                        }
+                    }
                 };
                 // 綁定點擊事件
                 if(modelEntity) {
@@ -450,12 +471,13 @@
                      const mv = document.createElement('model-viewer');
                      mv.src = requiredItem.model;
                      mv.style.width = '100%';
-                     mv.style.height = '250px';
+                     mv.style.height = '400px';
                      mv.style.backgroundColor = 'rgba(0,0,0,0.2)';
                      mv.style.borderRadius = '8px';
                      mv.setAttribute('auto-rotate', '');
                      mv.setAttribute('camera-controls', '');
-                     mv.setAttribute('disable-zoom', '');
+                     mv.setAttribute('disable-zoom', 'false'); // 允許縮放
+                     mv.setAttribute('shadow-intensity', '1');
                      modalBody.appendChild(mv);
                 } else {
                      const img = document.createElement('img');
@@ -493,10 +515,24 @@
                 modalBody.appendChild(title);
                 
                 if (step.type === '3d') {
-                    // 3D 模型顯示（在 AR 中已顯示，這裡只顯示提示）
+                    // 3D 模型顯示（可互動檢視）
                     const hint = document.createElement('div');
-                    hint.innerHTML = `<div style="font-size:1.1rem; color:white; margin-bottom:15px;">🧊 查看 3D 模型提示</div>`;
+                    hint.innerHTML = `<div style="font-size:1.1rem; color:white; margin-bottom:15px;">🧊 3D 模型提示（可旋轉查看）</div>`;
                     modalBody.appendChild(hint);
+                    
+                    const mv = document.createElement('model-viewer');
+                    mv.src = step.url;
+                    mv.style.width = '100%';
+                    mv.style.height = '400px';
+                    mv.style.backgroundColor = 'rgba(0,0,0,0.3)';
+                    mv.style.borderRadius = '12px';
+                    mv.style.marginTop = '10px';
+                    mv.setAttribute('auto-rotate', '');
+                    mv.setAttribute('camera-controls', '');
+                    mv.setAttribute('disable-zoom', 'false'); // 允許縮放
+                    mv.setAttribute('shadow-intensity', '1');
+                    mv.setAttribute('exposure', '1.2');
+                    modalBody.appendChild(mv);
                 } else if (step.type === 'image') {
                     const img = document.createElement('img');
                     img.src = step.url;
@@ -629,13 +665,14 @@
                 const mv = document.createElement('model-viewer');
                 mv.src = itemModel;
                 mv.style.width = '100%';
-                mv.style.height = '250px';
+                mv.style.height = '400px';
                 mv.style.backgroundColor = 'rgba(255,255,255,0.1)';
                 mv.style.borderRadius = '12px';
                 mv.setAttribute('auto-rotate', '');
                 mv.setAttribute('camera-controls', '');
-                mv.setAttribute('disable-zoom', '');
+                mv.setAttribute('disable-zoom', 'false'); // 允許縮放
                 mv.setAttribute('shadow-intensity', '1');
+                mv.setAttribute('exposure', '1.2');
                 modalBody.appendChild(mv);
             } else if (itemImage) {
                 const img = document.createElement('img');
