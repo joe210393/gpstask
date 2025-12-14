@@ -4,10 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>AR 尋找線索</title>
-    <!-- A-Frame & AR.js Libraries -->
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <script src='https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js'></script>
     <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
+    <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
     <style>
         body { margin: 0; overflow: hidden; background: black; font-family: sans-serif; }
         
@@ -18,27 +18,45 @@
             object-fit: cover;
             z-index: 1;
         }
-
-        /* A-Frame 3D 場景容器 */
         #aframe-scene-container {
             position: fixed;
             top: 0; left: 0;
             width: 100%; height: 100%;
-            z-index: 2; /* 在 camera-feed 上方 */
-            display: none; /* 預設隱藏，只在 3D 模式顯示 */
+            z-index: 2;
+            display: none;
         }
         
-        /* 隱藏 A-Frame 自帶的 VR 按鈕 */
         .a-enter-vr { display: none; }
-
         .ui-layer {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            z-index: 10;
-            pointer-events: none;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10; pointer-events: none;
         }
-
+        /* Modal 樣式修正：允許內部捲動 */
+        #ar-modal .modal-content {
+            background: rgba(30,30,30,0.95);
+            border-radius: 16px;
+            padding: 20px;
+            max-width: 90vw;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+            border: 1px solid #444;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            overflow-y: auto; /* 關鍵修正：讓內容太長時可以捲動 */
+        }
+        /* 密碼鎖樣式修正 */
+        .wheel {
+            width: 62px;
+            background: #0b1220;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 12px;
+            padding: 10px 8px;
+            text-align: center;
+            touch-action: none; /* 關鍵修正：解決「滑不動」的問題，禁止瀏覽器攔截滑動 */
+        }
+        /* 其他原有樣式保留 */
         #start-sensor-btn {
             position: fixed;
             top: 50%; left: 50%;
@@ -53,559 +71,139 @@
             border-radius: 50px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
             pointer-events: auto;
-            display: none; /* 預設隱藏，需要時才顯示 */
-        }
-
-        .info-box {
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.6);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 20px;
-            text-align: center;
-            pointer-events: auto;
-        }
-
-        /* 非阻塞式提示訊息 */
-        #toast-message {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.85);
-            color: white;
-            padding: 20px 30px;
-            border-radius: 16px;
-            text-align: center;
-            z-index: 5000;
             display: none;
-            pointer-events: none;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-            font-size: 16px;
-            font-weight: bold;
-            max-width: 80%;
+        }
+        .info-box {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.6); color: white; padding: 10px 20px;
+            border-radius: 20px; text-align: center; pointer-events: auto;
+        }
+        #toast-message {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.85); color: white; padding: 20px 30px;
+            border-radius: 16px; text-align: center; z-index: 5000; display: none;
+            pointer-events: none; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            font-size: 16px; font-weight: bold; max-width: 80%;
             animation: toastFadeIn 0.3s ease-out;
         }
         @keyframes toastFadeIn {
             from { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
             to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
         }
-
         .btn-back {
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #007bff;
-            color: white;
-            padding: 12px 30px;
-            border: none;
-            border-radius: 50px;
-            font-size: 16px;
-            font-weight: bold;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            pointer-events: auto;
-            cursor: pointer;
-            z-index: 20;
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: #007bff; color: white; padding: 12px 30px;
+            border: none; border-radius: 50px; font-size: 16px; font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3); pointer-events: auto; cursor: pointer; z-index: 20;
         }
-
-        /* 虛擬世界層 */
         #ar-world {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            z-index: 5;
-            perspective: 800px;
-            pointer-events: none;
-            overflow: hidden;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 5; perspective: 800px; pointer-events: none; overflow: hidden;
         }
-
-        /* 鎖定狀態物件 (問號/鎖頭) */
-        #locked-obj {
-            position: absolute;
-            top: 50%; left: 50%;
-            width: 200px; height: 200px;
-            margin-left: -100px; margin-top: -100px;
-            transform-style: preserve-3d;
-            display: none;
-            cursor: pointer;
-            pointer-events: auto;
-            text-align: center;
-            color: white;
-            animation: float 3s ease-in-out infinite;
-        }
-        #locked-icon {
-            font-size: 100px;
-            text-shadow: 0 0 20px rgba(255, 255, 0, 0.8);
-        }
-        #locked-text {
-            background: rgba(0,0,0,0.6);
-            padding: 5px 10px;
-            border-radius: 10px;
-            margin-top: 10px;
-            font-weight: bold;
-        }
-
-        /* 道具使用介面 */
-        #item-use-obj {
-            position: absolute;
-            top: 50%; left: 50%;
-            width: 250px;
-            margin-left: -125px; margin-top: -150px;
-            transform-style: preserve-3d;
-            display: none;
-            cursor: pointer;
-            pointer-events: auto;
-            text-align: center;
-            animation: float 3s ease-in-out infinite;
-        }
-        #item-use-image {
-            transition: transform 0.2s;
-        }
-        #item-use-image:hover {
-            transform: scale(1.1);
-        }
-        #item-use-image:active {
-            transform: scale(0.95);
-        }
-
-        /* 打卡地標物件 */
-        #location-obj {
-            position: absolute;
-            top: 50%; left: 50%;
-            width: 200px; height: 200px;
-            margin-left: -100px; margin-top: -100px;
-            transform-style: preserve-3d;
-            display: none;
-            cursor: pointer;
-            pointer-events: auto;
-            text-align: center;
-            color: #ff3b30;
-            animation: bounce 2s infinite;
-        }
-        #location-icon {
-            font-size: 100px;
-            filter: drop-shadow(0 10px 10px rgba(0,0,0,0.5));
-        }
-        #location-label {
-            background: rgba(255, 59, 48, 0.9);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: bold;
-            display: inline-block;
-            margin-top: 10px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        }
-
-        @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-30px); }
-        }
-
-        /* 寶箱物件容器 */
-        #chest-obj {
-            position: absolute;
-            top: 50%; left: 50%;
-            width: 350px;
-            margin-left: -175px; margin-top: -100px;
-            transform-style: preserve-3d;
-            display: none;
-            cursor: pointer;
-            pointer-events: auto;
+        #locked-obj, #item-use-obj, #location-obj, #chest-obj {
+            position: absolute; top: 50%; left: 50%; display: none; cursor: pointer; pointer-events: auto;
         }
         
-        /* AR 內容容器（圖片和影片並排） */
-        .ar-content-row {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        /* 預設寶箱圖片 */
-        #chest-img {
-            width: 150px; height: 150px;
-            object-fit: contain;
-            filter: drop-shadow(0 10px 10px rgba(0,0,0,0.5));
-            animation: float 3s ease-in-out infinite;
-        }
-
-        /* YouTube 影片框 - 電視外觀 */
-        #video-frame {
-            width: 240px; height: 160px;
-            background: #000;
-            border: 12px solid #222; /* 電視黑邊框 */
-            border-bottom-width: 25px; /* 下巴加厚 */
-            border-radius: 8px;
-            box-shadow: 
-                0 0 0 2px #444, /* 細微反光邊緣 */
-                0 10px 20px rgba(0,0,0,0.6), /* 懸浮陰影 */
-                inset 0 0 20px rgba(0,0,0,0.8); /* 螢幕內凹感 */
-            display: none;
-            animation: float 3s ease-in-out infinite;
-            position: relative;
-        }
-
-        /* 電視品牌 Logo 模擬 */
-        #video-frame::after {
-            content: 'GPS TASK';
-            position: absolute;
-            bottom: -20px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: #555;
-            font-size: 8px;
-            font-weight: bold;
-            letter-spacing: 1px;
-            pointer-events: none;
-        }
-
-        /* 電視電源燈 */
-        #video-frame::before {
-            content: '';
-            position: absolute;
-            bottom: -16px;
-            right: 15px;
-            width: 4px; height: 4px;
-            background: #0f0;
-            border-radius: 50%;
-            box-shadow: 0 0 4px #0f0;
-            pointer-events: none;
-        }
-
-        /* 放大檢視 Modal */
+        #locked-obj { width: 200px; height: 200px; margin-left: -100px; margin-top: -100px; text-align: center; color: white; animation: float 3s infinite; }
+        #locked-icon { font-size: 100px; text-shadow: 0 0 20px rgba(255, 255, 0, 0.8); }
+        #locked-text { background: rgba(0,0,0,0.6); padding: 5px 10px; border-radius: 10px; margin-top: 10px; font-weight: bold; }
         #ar-modal {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.85);
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 3000;
-            padding: 20px;
+            position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: none;
+            flex-direction: column; align-items: center; justify-content: center; z-index: 3000; padding: 20px;
         }
-        #ar-modal .modal-content {
-            background: rgba(30,30,30,0.95);
-            border-radius: 16px;
-            padding: 20px;
-            max-width: 90vw;
-            max-height: 85vh;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            align-items: center;
-            border: 1px solid #444;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-        #ar-modal img, #ar-modal iframe {
-            max-width: 100%;
-            max-height: 50vh;
-            border-radius: 8px;
-        }
-        #ar-modal .modal-actions {
-            display: flex;
-            gap: 15px;
-            width: 100%;
-            justify-content: center;
-        }
-        #ar-modal button {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: transform 0.1s;
-        }
-        #ar-modal button:active { transform: scale(0.95); }
+        #ar-modal img, #ar-modal iframe { max-width: 100%; max-height: 50vh; border-radius: 8px; }
+        #ar-modal .modal-actions { display: flex; gap: 15px; width: 100%; justify-content: center; }
+        #ar-modal button { padding: 12px 24px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
         .btn-close { background: #6c757d; color: white; }
-        .btn-reply { background: #28a745; color: white; box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4); }
-
-        /* 密碼鎖按鈕 */
+        .btn-reply { background: #28a745; color: white; }
         #btn-open-lock {
-            position: fixed;
-            bottom: 90px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #111827;
-            color: white;
-            padding: 12px 22px;
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 999px;
-            font-size: 15px;
-            font-weight: 800;
-            box-shadow: 0 8px 18px rgba(0,0,0,0.35);
-            pointer-events: auto;
-            cursor: pointer;
-            z-index: 2100;
-            display: none; /* 只有 number 題型才顯示 */
+            position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+            background: #111827; color: white; padding: 12px 22px;
+            border: 1px solid rgba(255,255,255,0.2); border-radius: 999px;
+            font-size: 15px; font-weight: 800; pointer-events: auto; cursor: pointer; z-index: 2100; display: none;
         }
-
-        /* 密碼鎖 Overlay */
         #lock-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.86);
-            display: none;
-            z-index: 3500;
-            pointer-events: auto;
-            align-items: center;
-            justify-content: center;
-            padding: 18px;
+            position: fixed; inset: 0; background: rgba(0,0,0,0.86); display: none;
+            z-index: 3500; pointer-events: auto; align-items: center; justify-content: center; padding: 18px;
         }
-        #lock-overlay .lock-card {
-            width: min(520px, 92vw);
-            background: rgba(20,20,20,0.96);
-            border: 1px solid rgba(255,255,255,0.12);
-            border-radius: 16px;
-            padding: 18px;
-            box-shadow: 0 18px 50px rgba(0,0,0,0.6);
-            color: white;
-        }
-        #lock-overlay .lock-title {
-            font-size: 18px;
-            font-weight: 900;
-            margin-bottom: 6px;
-        }
-        #lock-overlay .lock-subtitle {
-            color: rgba(255,255,255,0.75);
-            font-size: 13px;
-            line-height: 1.5;
-            margin-bottom: 14px;
-        }
-        #lock-overlay .wheels {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            align-items: center;
-            margin: 12px 0 16px;
-            flex-wrap: wrap;
-        }
-        .wheel {
-            width: 62px;
-            background: #0b1220;
-            border: 1px solid rgba(255,255,255,0.15);
-            border-radius: 12px;
-            padding: 10px 8px;
-            text-align: center;
-        }
-        .wheel .btn-up, .wheel .btn-down {
-            width: 100%;
-            border: none;
-            background: rgba(255,255,255,0.08);
-            color: white;
-            border-radius: 8px;
-            padding: 8px 0;
-            font-weight: 900;
-            cursor: pointer;
-        }
-        .wheel .digit {
-            font-size: 28px;
-            font-weight: 900;
-            margin: 10px 0;
-            letter-spacing: 1px;
-            background: rgba(255,255,255,0.06);
-            border-radius: 10px;
-            padding: 10px 0;
-            border: 1px solid rgba(255,255,255,0.08);
-        }
-        #lock-overlay .lock-actions {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            margin-top: 8px;
-        }
-        #lock-overlay .lock-actions button {
-            border: none;
-            border-radius: 10px;
-            padding: 12px 16px;
-            font-size: 15px;
-            font-weight: 900;
-            cursor: pointer;
-        }
+        .lock-card { width: min(520px, 92vw); background: rgba(20,20,20,0.96); border: 1px solid rgba(255,255,255,0.12); border-radius: 16px; padding: 18px; color: white; }
+        .wheels { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 12px 0 16px; flex-wrap: wrap; }
+        .wheel .btn-up, .wheel .btn-down { width: 100%; border: none; background: rgba(255,255,255,0.08); color: white; border-radius: 8px; padding: 8px 0; font-weight: 900; cursor: pointer; }
+        .wheel .digit { font-size: 28px; font-weight: 900; margin: 10px 0; letter-spacing: 1px; background: rgba(255,255,255,0.06); border-radius: 10px; padding: 10px 0; border: 1px solid rgba(255,255,255,0.08); }
+        .lock-actions { display: flex; gap: 10px; justify-content: center; margin-top: 8px; }
+        .lock-actions button { border: none; border-radius: 10px; padding: 12px 16px; font-size: 15px; font-weight: 900; cursor: pointer; }
         #btn-lock-cancel { background: #6c757d; color: #fff; }
-        #btn-lock-submit { background: #2563eb; color: #fff; box-shadow: 0 6px 18px rgba(37,99,235,0.35); }
-        #lock-msg {
-            text-align: center;
-            margin-top: 10px;
-            font-size: 13px;
-            color: rgba(255,255,255,0.8);
-            min-height: 18px;
-        }
-
-        /* 只有圖片時，讓它居中 */
-        #chest-obj.only-image .ar-content-row {
-            justify-content: center;
-        }
-        #chest-obj.only-image #chest-img {
-            width: 200px; height: 200px;
-        }
-        
-        /* 只有影片時，讓它居中 */
-        #chest-obj.only-video .ar-content-row {
-            justify-content: center;
-        }
-        #chest-obj.only-video #video-frame {
-            width: 300px; height: 200px;
-        }
-        
-        iframe {
-            width: 100%; height: 100%;
-            border: none;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-20px); }
-        }
-
-        #guide-arrow {
-            position: absolute;
-            top: 50%; left: 50%;
-            width: 60px; height: 60px;
-            margin-left: -30px; margin-top: -30px;
-            display: none;
-        }
-        #guide-arrow::after {
-            content: '';
-            display: block;
-            width: 100%; height: 100%;
-            border-top: 10px solid #ff3b30;
-            border-right: 10px solid #ff3b30;
-            transform: rotate(45deg);
-            box-shadow: 2px -2px 2px rgba(0,0,0,0.2);
-        }
+        #btn-lock-submit { background: #2563eb; color: #fff; }
+        #lock-msg { text-align: center; margin-top: 10px; font-size: 13px; color: rgba(255,255,255,0.8); min-height: 18px; }
+        /* 寶箱/道具等 3D Transform 相關 */
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+        #guide-arrow { position: absolute; top: 50%; left: 50%; width: 60px; height: 60px; margin-left: -30px; margin-top: -30px; display: none; }
+        #guide-arrow::after { content: ''; display: block; width: 100%; height: 100%; border-top: 10px solid #ff3b30; border-right: 10px solid #ff3b30; transform: rotate(45deg); box-shadow: 2px -2px 2px rgba(0,0,0,0.2); }
     </style>
 </head>
 <body>
-
     <video id="camera-feed" autoplay playsinline muted></video>
-
-    <!-- A-Frame 3D 場景 (3D 模式使用) -->
     <div id="aframe-scene-container"></div>
-
     <div id="ar-world">
-        <!-- 鎖定狀態物件 (沒有道具時顯示) -->
-        <div id="locked-obj">
-            <div id="locked-icon">❓</div>
-            <div id="locked-text">點擊查看線索</div>
-        </div>
-
-        <!-- 道具使用介面 (有道具但未使用時顯示) -->
-        <div id="item-use-obj" style="display:none;">
-            <div style="text-align:center; color:white; text-shadow:0 2px 4px rgba(0,0,0,0.8);">
+        <div id="locked-obj"><div id="locked-icon">❓</div><div id="locked-text">點擊查看線索</div></div>
+        <div id="item-use-obj" style="display:none; width: 250px; margin-left: -125px; margin-top: -150px; text-align: center;">
+            <div style="color:white; text-shadow:0 2px 4px rgba(0,0,0,0.8);">
                 <div style="font-size:18px; font-weight:bold; margin-bottom:10px;">🎒 使用道具</div>
                 <img id="item-use-image" src="" alt="道具圖片" style="width:150px; height:150px; object-fit:contain; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.5); cursor:pointer; margin-bottom:10px;" />
                 <div id="item-use-name" style="font-size:16px; font-weight:bold; margin-bottom:8px;"></div>
                 <div style="font-size:14px; color:#ffeb3b;">點擊道具圖片使用</div>
             </div>
         </div>
-
-        <!-- 打卡地標物件 -->
-        <div id="location-obj">
-            <div id="location-icon">📍</div>
-            <div id="location-label">點擊打卡</div>
-        </div>
-
-        <!-- 容器：可能是圖片、影片，或兩者都有 -->
-        <div id="chest-obj">
-            <div class="ar-content-row">
-                <!-- 1. AR 專用圖片 -->
-                <img id="chest-img" src="/images/mascot.png" alt="AR 圖片" style="display:none;">
-                
-                <!-- 2. YouTube 影片 -->
-                <div id="video-frame" style="display:none;">
-                    <iframe id="yt-player" src="" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+        <div id="location-obj"><div id="location-icon">📍</div><div id="location-label">點擊打卡</div></div>
+        <div id="chest-obj" style="width: 350px; margin-left: -175px; margin-top: -100px;">
+            <div class="ar-content-row" style="display: flex; gap: 15px; align-items: center; justify-content: center;">
+                <img id="chest-img" src="/images/mascot.png" alt="AR 圖片" style="display:none; width: 150px; height: 150px; object-fit: contain; filter: drop-shadow(0 10px 10px rgba(0,0,0,0.5)); animation: float 3s ease-in-out infinite;">
+                <div id="video-frame" style="display:none; width: 240px; height: 160px; background: #000; border: 12px solid #222; border-bottom-width: 25px; border-radius: 8px;">
+                    <iframe id="yt-player" src="" allow="autoplay; encrypted-media" allowfullscreen style="width:100%; height:100%; border:none;"></iframe>
                 </div>
             </div>
-
             <div id="tap-hint" style="color:white; text-align:center; text-shadow:0 2px 2px black; font-weight:bold; margin-top:10px;">點擊查看詳情</div>
         </div>
-        
         <div id="guide-arrow"></div>
     </div>
-
-    <!-- 放大檢視 Modal -->
-    <div id="ar-modal">
-        <div class="modal-content">
-            <div id="modal-body" style="display:flex; flex-direction:column; gap:10px; align-items:center; width:100%;">
-                <!-- 內容動態插入 -->
-            </div>
-            <div class="modal-actions">
-                <button class="btn-close" id="modal-close">關閉</button>
-                <button class="btn-reply" id="modal-submit">✍️ 點擊回覆問題</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 密碼鎖 Overlay（只給數字解謎使用） -->
-    <div id="lock-overlay">
-        <div class="lock-card">
-            <div class="lock-title">🔒 旋轉密碼鎖</div>
-            <div class="lock-subtitle">轉動數字輪盤後按「確定解鎖」。<br>提醒：需要完全正確，才能通關。</div>
-            <div class="wheels" id="lock-wheels"></div>
-            <div class="lock-actions">
-                <button id="btn-lock-cancel" type="button">關閉</button>
-                <button id="btn-lock-submit" type="button">確定解鎖</button>
-            </div>
-            <div id="lock-msg"></div>
-        </div>
-    </div>
-
+    <div id="ar-modal"><div class="modal-content"><div id="modal-body" style="display:flex; flex-direction:column; gap:10px; align-items:center; width:100%;"></div><div class="modal-actions"><button class="btn-close" id="modal-close">關閉</button><button class="btn-reply" id="modal-submit">✍️ 點擊回覆問題</button></div></div></div>
+    <div id="lock-overlay"><div class="lock-card"><div class="lock-title">🔒 旋轉密碼鎖</div><div class="lock-subtitle">轉動數字輪盤後按「確定解鎖」。<br>提醒：需要完全正確，才能通關。</div><div class="wheels" id="lock-wheels"></div><div class="lock-actions"><button id="btn-lock-cancel" type="button">關閉</button><button id="btn-lock-submit" type="button">確定解鎖</button></div><div id="lock-msg"></div></div></div>
     <div class="ui-layer">
-        <!-- 啟動蓋板 -->
         <div id="start-overlay" style="position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:2000; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white; pointer-events:auto;">
             <div style="font-size:1.5rem; font-weight:bold; margin-bottom:20px; text-align:center;">準備好了嗎？</div>
             <div style="margin-bottom:30px; color:#ccc; text-align:center; max-width:80%;">需要您的相機與方向感測器權限<br>以進行 AR 導航</div>
-            <button id="start-btn" style="padding:15px 40px; font-size:1.2rem; background:#007bff; color:white; border:none; border-radius:50px; font-weight:bold; box-shadow:0 0 20px rgba(0,123,255,0.5);">
-                🚀 開始搜尋
-            </button>
+            <button id="start-btn" style="padding:15px 40px; font-size:1.2rem; background:#007bff; color:white; border:none; border-radius:50px; font-weight:bold; box-shadow:0 0 20px rgba(0,123,255,0.5);">🚀 開始搜尋</button>
         </div>
-
-        <div class="info-box">
-            <div id="status">等待啟動...</div>
-            <div id="debug-info" style="font-size:0.8em; color:#ffeb3b; margin-top:5px;"></div>
-        </div>
+        <div class="info-box"><div id="status">等待啟動...</div><div id="debug-info" style="font-size:0.8em; color:#ffeb3b; margin-top:5px;"></div></div>
         <button id="btn-back" class="btn-back">🔙 返回填寫答案</button>
         <button id="btn-open-lock" type="button">🔒 輸入密碼</button>
     </div>
-
-    <!-- 非阻塞式提示訊息 -->
     <div id="toast-message"></div>
-
     <script>
-        const API_BASE = ''; // 本地用空字串
+        const API_BASE = ''; 
         const video = document.getElementById('camera-feed');
         const aframeContainer = document.getElementById('aframe-scene-container');
         const arWorld = document.getElementById('ar-world');
         const debug = document.getElementById('debug-info');
         const status = document.getElementById('status');
         
-        // 模式旗標
         let is3DMode = false;
-        let modelEntity = null;
-        let modelAsset = null;
-        let gpsLocked = false; // 3D 模式是否已鎖定 GPS
-
-        // === 新增這個函數：動態建立 3D 場景 ===
+        let gpsLocked = false; 
+        // === 動態建立 3D 場景 ===
         function init3DScene(modelUrl, scale = 1) {
             const container = document.getElementById('aframe-scene-container');
             
-            // 這裡我們動態產生 HTML 字串，避免 AR.js 在不需要時搶相機
+            // 修正 1: 增加 cursor="rayOrigin: mouse" 讓手指點擊有效
+            // 修正 2: 點擊區 ar-model-click-zone 設為透明但 visible，否則無法點擊
             container.innerHTML = `
                 <a-scene 
                     vr-mode-ui="enabled: false"
                     embedded
                     arjs='sourceType: webcam; debugUIEnabled: false;'
-                    renderer="logarithmicDepthBuffer: true; colorManagement: true; alpha: true;">
+                    renderer="logarithmicDepthBuffer: true; colorManagement: true; alpha: true;"
+                    cursor="rayOrigin: mouse">
                     
                     <a-camera gps-camera="minDistance: 0; maxDistance: 2000;" rotation-reader></a-camera>
-
                     <a-assets>
                         <a-asset-item id="animated-model-asset" src="${modelUrl}"></a-asset-item>
                     </a-assets>
@@ -619,52 +217,56 @@
                         look-at="[gps-camera]"
                         cursor-listener> 
                     </a-entity>
-
-                    <a-box id="ar-model-click-zone" visible="false" position="0 0 0" scale="2 2 2"></a-box>
+                    <a-box 
+                        id="ar-model-click-zone" 
+                        visible="false" 
+                        material="opacity: 0; transparent: true"
+                        position="0 0 0" 
+                        scale="2 2 2"
+                        gps-entity-place="">
+                    </a-box>
                 </a-scene>
             `;
-
-            // 重新綁定事件
             setTimeout(() => {
                 const modelEntity = document.querySelector('#ar-model-entity');
                 const clickZone = document.querySelector('#ar-model-click-zone');
                 
-                // 點擊事件
                 const clickHandler = () => {
-                    // 這裡需要傳入 currentTask，因為它是全域變數所以可以直接讀取，
-                    // 或者你可以把 currentTask 暫存起來
+                    console.log("3D Model Clicked!");
                     if(window.currentTask) showArModal(window.currentTask);
                 };
-
+                // 綁定點擊事件
                 if(modelEntity) {
                     modelEntity.addEventListener('click', clickHandler);
-                    modelEntity.addEventListener('touchstart', clickHandler); // 觸控兼容
+                    // 備用：如果有點不到模型的情況，點擊透明盒子也可以
+                    if(clickZone) clickZone.addEventListener('click', clickHandler);
                 }
                 
-                // 綁定 GPS 鎖定事件 (這原本是在 initSensors 做的，現在移到這裡)
+                // 綁定 GPS 鎖定事件
                 window.addEventListener('gps-camera-update-position', (e) => {
                     if (!gpsLocked) {
-                        // 更新全域變數
                         userLat = e.detail.position.latitude;
                         userLng = e.detail.position.longitude;
                         document.getElementById('status').innerText = `GPS 已鎖定 (精度: ${e.detail.position.accuracy?.toFixed(1) || '?'}m)`;
                         
-                        // 放置模型
                         if(modelEntity && targetLat && targetLng) {
                             modelEntity.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
                             modelEntity.setAttribute('visible', 'true');
                             
+                            // 讓點擊區也跟著移動
                             if(clickZone) {
                                 clickZone.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
+                                // 注意：clickZone 保持 visible=false (A-Frame 預設 visible=false 不可點擊)
+                                // 所以這裡我們用 material opacity 0 來隱藏，但屬性設為 visible
+                                clickZone.setAttribute('visible', 'true'); 
                             }
                             console.log(`📍 模型已放置於 ${targetLat}, ${targetLng}`);
                         }
                         gpsLocked = true;
                     }
                 });
-            }, 1000); // 延遲一下確保 DOM 寫入完成
+            }, 1000); 
         }
-
         // 2. 取得任務資訊
         const urlParams = new URLSearchParams(window.location.search);
         let targetLat = parseFloat(urlParams.get('lat'));
@@ -678,8 +280,6 @@
         let currentUserTaskId = null;
         let requiredItem = null;
         let hasRequiredItem = false;
-
-        // 載入任務詳情
         if (taskId) {
             fetch(`${API_BASE}/api/tasks/${taskId}`)
                 .then(res => res.json())
@@ -687,78 +287,42 @@
                     if (data.success && data.task) {
                         const task = data.task;
                         currentTask = task;
-                        
-                        // === 判斷是否為 3D 模式 ===
-                        // 將 currentTask 掛到 window 上以便事件存取
                         window.currentTask = task; 
-
                         if (task.ar_model_url) {
                             is3DMode = true;
                             console.log('🚀 切換至 3D 模型模式 (等待啟動):', task.ar_model_url);
-                            
-                            // 隱藏 CSS AR 介面
                             arWorld.style.display = 'none';
-                            video.style.display = 'none'; // 隱藏 2D 用的 video tag
+                            video.style.display = 'none';
                             aframeContainer.style.display = 'block';
-                            
-                            // ✅ 修正：這裡不要呼叫 init3DScene，留給按鈕去觸發
-
                         } else {
                             console.log('🖼️ 使用 CSS AR 模式');
                             is3DMode = false;
-                            aframeContainer.innerHTML = ''; // 確保清空
+                            aframeContainer.innerHTML = ''; 
                             aframeContainer.style.display = 'none';
                             arWorld.style.display = 'block';
                             video.style.display = 'block';
+                            setupCssArContent(task);
                         }
-
-                        // ... (以下為原有的道具/任務邏輯，部分需適配 3D 模式) ...
-                        
-                        // 檢查道具需求 (3D 模式暫時不顯示道具鎖，直接顯示模型但點擊無效或提示)
-                        // TODO: 未來可以讓 3D 模式也支援道具鎖定 (透過更換模型或隱藏模型)
                         if (task.required_item_id) {
-                            requiredItem = {
-                                id: task.required_item_id,
-                                name: task.required_item_name,
-                                image: task.required_item_image
-                            };
-                            
-                            // 檢查背包
+                            requiredItem = { id: task.required_item_id, name: task.required_item_name, image: task.required_item_image };
                             const loginUser = getLoginUser();
                             if (loginUser) {
                                 try {
-                                    const invRes = await fetch(`${API_BASE}/api/user/inventory`, {
-                                        headers: { 'x-username': loginUser.username }
-                                    });
+                                    const invRes = await fetch(`${API_BASE}/api/user/inventory`, { headers: { 'x-username': loginUser.username } });
                                     const invData = await invRes.json();
-                                    if (invData.success) {
-                                        hasRequiredItem = invData.inventory.some(i => i.item_id === task.required_item_id);
-                                    }
+                                    if (invData.success) hasRequiredItem = invData.inventory.some(i => i.item_id === task.required_item_id);
                                 } catch (e) { console.error(e); }
                             }
                         }
-
                         isNumberTask = (task.task_type === 'number');
                         isLocationTask = (task.task_type === 'location');
                         if (isLocationTask) fetchCurrentUserTaskId();
-
                         if (typeof task.correct_answer === 'string') {
                             const len = task.correct_answer.trim().length;
                             if (len >= 2 && len <= 8) lockDigits = len;
                         }
                         
-                        // 更新座標
-                        if (task.lat && task.lng) {
-                            targetLat = task.lat;
-                            targetLng = task.lng;
-                        }
-
-                        // === CSS AR 的 UI 設定 (只有在 !is3DMode 時才需要) ===
-                        if (!is3DMode) {
-                            setupCssArContent(task);
-                        }
-
-                        // 數字鎖按鈕 (通用)
+                        if (task.lat && task.lng) { targetLat = task.lat; targetLng = task.lng; }
                         const btnOpenLock = document.getElementById('btn-open-lock');
                         if (isNumberTask) {
                             btnOpenLock.style.display = 'block';
@@ -769,29 +333,14 @@
                         }
                     }
                 })
-                .catch(err => {
-                    console.error("無法載入任務詳情:", err);
-                    showToast("載入任務失敗，請稍後再試");
-                });
-        } else {
-            // 沒有 taskId，可能是測試模式或直接開啟
-            console.log('No taskId provided');
+                .catch(err => { console.error("無法載入任務:", err); showToast("載入任務失敗"); });
         }
-
-        // 設置 CSS AR 內容 (原本的邏輯封裝)
         function setupCssArContent(task) {
             const chestObj = document.getElementById('chest-obj');
             const chestImg = document.getElementById('chest-img');
             const videoFrame = document.getElementById('video-frame');
-            let hasImage = false;
-            let hasVideo = false;
-
-            if (task.ar_image_url) {
-                chestImg.src = task.ar_image_url;
-                chestImg.style.display = 'block';
-                hasImage = true;
-            }
-
+            let hasImage = false, hasVideo = false;
+            if (task.ar_image_url) { chestImg.src = task.ar_image_url; chestImg.style.display = 'block'; hasImage = true; }
             if (task.youtubeUrl) {
                 const ytId = extractYouTubeId(task.youtubeUrl);
                 if (ytId) {
@@ -800,671 +349,244 @@
                     hasVideo = true;
                 }
             }
-
-            if (!hasImage && !hasVideo) {
-                chestImg.src = '/images/mascot.png';
-                chestImg.style.display = 'block';
-                hasImage = true;
-            }
-
-            if (hasImage && hasVideo) {
-                chestObj.className = 'has-both';
-            } else if (hasImage) {
-                chestObj.className = 'only-image';
-            } else if (hasVideo) {
-                chestObj.className = 'only-video';
-            }
+            if (!hasImage && !hasVideo) { chestImg.src = '/images/mascot.png'; chestImg.style.display = 'block'; hasImage = true; }
+            if (hasImage && hasVideo) chestObj.className = 'has-both';
+            else if (hasImage) chestObj.className = 'only-image';
+            else if (hasVideo) chestObj.className = 'only-video';
         }
-
-        // 顯示放大檢視 Modal (3D 點擊後也用這個)
         function showArModal(task) {
-            // 如果需要道具但沒有，顯示提示
-            if (requiredItem && !hasRequiredItem) {
-                showToast(`🔒 需要道具：【${requiredItem.name}】\n請先去尋找道具再來吧！`, 3000);
-                return;
-            }
-
+            if (requiredItem && !hasRequiredItem) { showToast(`🔒 需要道具：【${requiredItem.name}】`, 3000); return; }
             const modalBody = document.getElementById('modal-body');
             const arModal = document.getElementById('ar-modal');
             modalBody.innerHTML = '';
-
-            // 如果是 3D 模式，顯示任務圖片當作替代預覽，或者如果有設定 ar_image_url 就顯示那個
             if (is3DMode) {
                 const img = document.createElement('img');
                 img.src = task.ar_image_url || task.photoUrl || '/images/mascot.png';
                 modalBody.appendChild(img);
-                
                 if (task.youtubeUrl) {
                     const ytId = extractYouTubeId(task.youtubeUrl);
                     if (ytId) {
                         const iframe = document.createElement('iframe');
                         iframe.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0&controls=1&playsinline=1`;
-                        iframe.style.width = '100%';
-                        iframe.style.height = '200px';
-                        iframe.style.border = 'none';
+                        iframe.style.width = '100%'; iframe.style.height = '200px'; iframe.style.border = 'none';
                         modalBody.appendChild(iframe);
                     }
                 }
             } else {
-                // CSS AR 模式：複製現有 DOM
                 const chestImg = document.getElementById('chest-img');
                 const videoFrame = document.getElementById('video-frame');
                 const ytPlayer = document.getElementById('yt-player');
-
-                if (chestImg.style.display !== 'none') {
-                    const img = document.createElement('img');
-                    img.src = chestImg.src;
-                    modalBody.appendChild(img);
-                }
+                if (chestImg.style.display !== 'none') { const img = document.createElement('img'); img.src = chestImg.src; modalBody.appendChild(img); }
                 if (videoFrame.style.display !== 'none') {
-                    const iframe = document.createElement('iframe');
-                    iframe.src = ytPlayer.src;
-                    iframe.style.width = '100%';
-                    iframe.style.height = '200px';
-                    iframe.style.border = 'none';
+                    const iframe = document.createElement('iframe'); iframe.src = ytPlayer.src;
+                    iframe.style.width = '100%'; iframe.style.height = '200px'; iframe.style.border = 'none';
                     modalBody.appendChild(iframe);
                 }
             }
-            
             arModal.style.display = 'flex';
         }
-
-        document.getElementById('btn-back').onclick = () => {
-            if (taskId) window.location.href = `/task-detail.html?id=${taskId}`;
-            else window.history.back();
-        };
-
-        // 3. 感測器與 AR 邏輯
+        document.getElementById('btn-back').onclick = () => { if (taskId) window.location.href = `/task-detail.html?id=${taskId}`; else window.history.back(); };
         const chest = document.getElementById('chest-obj');
-        // ... (保留其他變數) ...
         const lockedObj = document.getElementById('locked-obj');
         const itemUseObj = document.getElementById('item-use-obj');
         const locationObj = document.getElementById('location-obj');
         const arrow = document.getElementById('guide-arrow');
-        const debug = document.getElementById('debug-info');
-        const status = document.getElementById('status');
         const startOverlay = document.getElementById('start-overlay');
         const startBtn = document.getElementById('start-btn');
         const arModal = document.getElementById('ar-modal');
         const modalBody = document.getElementById('modal-body');
         const modalClose = document.getElementById('modal-close');
         const modalSubmit = document.getElementById('modal-submit');
-        const btnOpenLock = document.getElementById('btn-open-lock');
         const lockOverlay = document.getElementById('lock-overlay');
         const lockWheels = document.getElementById('lock-wheels');
         const lockMsg = document.getElementById('lock-msg');
         const btnLockCancel = document.getElementById('btn-lock-cancel');
         const btnLockSubmit = document.getElementById('btn-lock-submit');
         
-        let userLat = null, userLng = null;
-        let deviceHeading = 0;
-        let lastHeading = 0; // 平滑化用：上一次的角度
-        let smoothedHeading = 0; // 平滑化用：計算後的角度
-        let isObjectVisible = false; // 磁滯鎖定用：目前物體是否可見
-
-        // 非阻塞式提示訊息函數
+        let userLat = null, userLng = null, deviceHeading = 0, lastHeading = 0, isObjectVisible = false;
         function showToast(message, duration = 2000) {
-            const toast = document.getElementById('toast-message');
-            if (!toast) return;
-            toast.textContent = message;
-            toast.style.display = 'block';
-            setTimeout(() => {
-                toast.style.display = 'none';
-            }, duration);
+            const toast = document.getElementById('toast-message'); if (!toast) return;
+            toast.textContent = message; toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, duration);
         }
-
-        // 點擊打卡地標
         locationObj.onclick = async () => {
             if (!currentUserTaskId) currentUserTaskId = await fetchCurrentUserTaskId();
-            if (!currentUserTaskId) {
-                alert('找不到進行中的任務紀錄');
-                return;
-            }
-
+            if (!currentUserTaskId) { alert('找不到進行中的任務紀錄'); return; }
             if (confirm('📍 確定要在此處打卡嗎？')) {
                 try {
-                    const res = await fetch(`${API_BASE}/api/user-tasks/${currentUserTaskId}/answer`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ answer: 'checked_in' }) // 內容不重要，後端只看類型
-                    });
+                    const res = await fetch(`${API_BASE}/api/user-tasks/${currentUserTaskId}/answer`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answer: 'checked_in' }) });
                     const data = await res.json();
                     if (data.success && data.isCompleted) {
                         let msg = `🎉 打卡成功！\n${data.message}`;
-                        if (data.earnedItemName) {
-                            msg += `\n\n🎁 獲得道具：【${data.earnedItemName}】\n請至「個人主頁 > 我的背包」查看。`;
-                        }
-                        alert(msg);
-                        window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
-                    } else {
-                        alert(data.message || '打卡失敗');
-                    }
-                } catch (e) {
-                    console.error(e);
-                    alert('連線錯誤');
-                }
+                        if (data.earnedItemName) msg += `\n\n🎁 獲得道具：【${data.earnedItemName}】`;
+                        alert(msg); window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
+                    } else { alert(data.message || '打卡失敗'); }
+                } catch (e) { console.error(e); alert('連線錯誤'); }
             }
         };
-
-        // 點擊鎖定物件：沒有道具時顯示提示
-        document.getElementById('locked-obj').onclick = () => {
-            if (!requiredItem) return;
-            showToast(`🔒 需要道具：【${requiredItem.name}】\n請先去尋找道具再來吧！`, 3000);
-        };
-
-        // 點擊道具使用介面：使用道具並顯示 AR 內容
+        document.getElementById('locked-obj').onclick = () => { if (requiredItem) showToast(`🔒 需要道具：【${requiredItem.name}】`, 3000); };
         const itemUseImage = document.getElementById('item-use-image');
-        itemUseObj.onclick = () => {
-            if (!requiredItem || !hasRequiredItem) return;
-            // 使用道具，顯示非阻塞式提示（不會中斷相機）
-            showToast(`🎒 使用了【${requiredItem.name}】！\n謎題已解開！`, 2500);
-            // 隱藏道具使用介面，顯示 AR 內容
-            itemUseObj.style.display = 'none';
-            chest.style.display = 'block';
-            // 將 requiredItem 設為 null，避免 updateAR 再次顯示道具使用介面
-            requiredItem = null;
-        };
-        // 也可以點擊道具圖片本身
-        if (itemUseImage) {
-            itemUseImage.onclick = (e) => {
-                e.stopPropagation(); // 防止觸發父元素點擊
-                itemUseObj.click();
-            };
-        }
-
-        // 點擊事件：開啟放大檢視
-        document.getElementById('chest-obj').onclick = () => {
-            const chestImg = document.getElementById('chest-img');
-            const videoFrame = document.getElementById('video-frame');
-            const ytPlayer = document.getElementById('yt-player');
-
-            modalBody.innerHTML = ''; // 清空舊內容
-
-            // 如果有圖片，複製進 Modal
-            if (chestImg.style.display !== 'none') {
-                const img = document.createElement('img');
-                img.src = chestImg.src;
-                modalBody.appendChild(img);
-            }
-
-            // 如果有影片，複製進 Modal
-            if (videoFrame.style.display !== 'none') {
-                const iframe = document.createElement('iframe');
-                iframe.src = ytPlayer.src;
-                iframe.style.width = '100%';
-                iframe.style.height = '200px'; // Modal 內的高度
-                iframe.style.border = 'none';
-                iframe.allow = 'autoplay; encrypted-media';
-                iframe.allowFullscreen = true;
-                modalBody.appendChild(iframe);
-            }
-
-            arModal.style.display = 'flex';
-        };
-
-        // Modal 關閉
-        modalClose.onclick = () => {
-            arModal.style.display = 'none';
-            modalBody.innerHTML = ''; // 清空以停止影片播放
-        };
-
-        // Modal 回覆問題
-        modalSubmit.onclick = () => {
-            if (taskId) {
-                window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
-            } else {
-                alert("測試模式：目標已找到！");
-            }
-        };
-
-        // ====== 密碼鎖邏輯（number 題型） ======
+        itemUseObj.onclick = () => { if (!requiredItem || !hasRequiredItem) return; showToast(`🎒 使用了【${requiredItem.name}】！`, 2500); itemUseObj.style.display = 'none'; chest.style.display = 'block'; requiredItem = null; };
+        if (itemUseImage) itemUseImage.onclick = (e) => { e.stopPropagation(); itemUseObj.click(); };
+        document.getElementById('chest-obj').onclick = () => { showArModal(window.currentTask || {}); };
+        modalClose.onclick = () => { arModal.style.display = 'none'; modalBody.innerHTML = ''; };
+        modalSubmit.onclick = () => { if (taskId) window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`; else alert("測試模式：目標已找到！"); };
         function getLoginUser() {
-            try {
-                const lu = JSON.parse(localStorage.getItem('loginUser') || 'null');
-                if (lu && lu.username) return lu;
-            } catch {}
-            try {
-                const u = JSON.parse(localStorage.getItem('user') || 'null');
-                if (u && u.username) return u;
-            } catch {}
+            try { return JSON.parse(localStorage.getItem('loginUser') || 'null'); } catch {}
+            try { return JSON.parse(localStorage.getItem('user') || 'null'); } catch {}
             return null;
         }
-
         async function fetchCurrentUserTaskId() {
             if (!taskId) return null;
-            const loginUser = getLoginUser();
-            if (!loginUser || !loginUser.username) return null;
+            const loginUser = getLoginUser(); if (!loginUser || !loginUser.username) return null;
             try {
                 const res = await fetch(`${API_BASE}/api/user-tasks?username=${encodeURIComponent(loginUser.username)}`);
                 const data = await res.json();
                 if (!data.success || !Array.isArray(data.tasks)) return null;
                 const t = data.tasks.find(x => String(x.id) === String(taskId));
-                if (!t) return null;
-                currentUserTaskId = t.user_task_id;
-                return currentUserTaskId;
-            } catch (e) {
-                console.error('fetchCurrentUserTaskId error', e);
-                return null;
-            }
+                if (!t) return null; currentUserTaskId = t.user_task_id; return currentUserTaskId;
+            } catch (e) { return null; }
         }
-
         function initLockWheels(digits = 4) {
             if (!lockWheels) return;
             lockWheels.innerHTML = '';
             for (let i = 0; i < digits; i++) {
-                const wheel = document.createElement('div');
-                wheel.className = 'wheel';
-                wheel.dataset.value = '0';
-                wheel.innerHTML = `
-                    <button class="btn-up" type="button">▲</button>
-                    <div class="digit">0</div>
-                    <button class="btn-down" type="button">▼</button>
-                `;
+                const wheel = document.createElement('div'); wheel.className = 'wheel'; wheel.dataset.value = '0';
+                wheel.innerHTML = `<button class="btn-up" type="button">▲</button><div class="digit">0</div><button class="btn-down" type="button">▼</button>`;
                 const digitEl = wheel.querySelector('.digit');
-                const btnUp = wheel.querySelector('.btn-up');
-                const btnDown = wheel.querySelector('.btn-down');
-                const setVal = (v) => {
-                    const nv = (v + 10) % 10;
-                    wheel.dataset.value = String(nv);
-                    digitEl.textContent = String(nv);
-                };
-                btnUp.onclick = () => setVal(Number(wheel.dataset.value) + 1);
-                btnDown.onclick = () => setVal(Number(wheel.dataset.value) - 1);
-
-                // 觸控/滑動：上下滑動改變數字（簡易旋轉感）
+                const setVal = (v) => { const nv = (v + 10) % 10; wheel.dataset.value = String(nv); digitEl.textContent = String(nv); };
+                wheel.querySelector('.btn-up').onclick = () => setVal(Number(wheel.dataset.value) + 1);
+                wheel.querySelector('.btn-down').onclick = () => setVal(Number(wheel.dataset.value) - 1);
                 let startY = null;
-                wheel.addEventListener('pointerdown', (ev) => {
-                    startY = ev.clientY;
-                    wheel.setPointerCapture(ev.pointerId);
-                });
-                wheel.addEventListener('pointermove', (ev) => {
-                    if (startY == null) return;
-                    const dy = ev.clientY - startY;
-                    if (Math.abs(dy) > 18) {
-                        setVal(Number(wheel.dataset.value) + (dy < 0 ? 1 : -1));
-                        startY = ev.clientY;
-                    }
-                });
-                wheel.addEventListener('pointerup', () => { startY = null; });
-                wheel.addEventListener('pointercancel', () => { startY = null; });
-
+                wheel.addEventListener('pointerdown', (ev) => { startY = ev.clientY; wheel.setPointerCapture(ev.pointerId); });
+                wheel.addEventListener('pointermove', (ev) => { if (startY == null) return; const dy = ev.clientY - startY; if (Math.abs(dy) > 18) { setVal(Number(wheel.dataset.value) + (dy < 0 ? 1 : -1)); startY = ev.clientY; } });
+                wheel.addEventListener('pointerup', () => { startY = null; }); wheel.addEventListener('pointercancel', () => { startY = null; });
                 lockWheels.appendChild(wheel);
             }
         }
-
-        function getLockCode() {
-            const wheels = Array.from(lockWheels.querySelectorAll('.wheel'));
-            return wheels.map(w => w.dataset.value || '0').join('');
-        }
-
+        function getLockCode() { return Array.from(lockWheels.querySelectorAll('.wheel')).map(w => w.dataset.value || '0').join(''); }
         async function submitLockCode() {
-            lockMsg.style.color = 'rgba(255,255,255,0.85)';
-            lockMsg.textContent = '驗證中...';
-            btnLockSubmit.disabled = true;
-            btnLockCancel.disabled = true;
-
+            lockMsg.style.color = 'rgba(255,255,255,0.85)'; lockMsg.textContent = '驗證中...';
+            btnLockSubmit.disabled = true; btnLockCancel.disabled = true;
             const code = getLockCode();
             const userTaskId = currentUserTaskId || await fetchCurrentUserTaskId();
-            if (!userTaskId) {
-                lockMsg.style.color = '#fca5a5';
-                lockMsg.textContent = '找不到進行中的任務紀錄，請先回到題目頁按「開始任務」後再進入 AR。';
-                btnLockSubmit.disabled = false;
-                btnLockCancel.disabled = false;
-                return;
-            }
-
+            if (!userTaskId) { lockMsg.style.color = '#fca5a5'; lockMsg.textContent = '找不到任務紀錄'; btnLockSubmit.disabled = false; btnLockCancel.disabled = false; return; }
             try {
-                const res = await fetch(`${API_BASE}/api/user-tasks/${userTaskId}/answer`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ answer: code })
-                });
+                const res = await fetch(`${API_BASE}/api/user-tasks/${userTaskId}/answer`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answer: code }) });
                 const data = await res.json();
-                if (!data.success) {
-                    lockMsg.style.color = '#fca5a5';
-                    lockMsg.textContent = data.message || '驗證失敗';
-                } else if (data.isCompleted) {
-                    lockMsg.style.color = '#86efac';
-                    let msg = '答對了！任務完成，返回題目頁...';
-                    if (data.earnedItemName) {
-                        msg = `答對了！\n🎁 獲得道具：${data.earnedItemName}`;
-                    }
-                    lockMsg.textContent = msg;
-                    if (data.earnedItemName) alert(`恭喜獲得道具：${data.earnedItemName}`);
-                    
-                    setTimeout(() => {
-                        window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
-                    }, 1500);
-                    return;
-                } else {
-                    lockMsg.style.color = '#fde68a';
-                    lockMsg.textContent = data.message || '答案不正確，請再試一次';
-                }
-            } catch (e) {
-                console.error(e);
-                lockMsg.style.color = '#fca5a5';
-                lockMsg.textContent = '連線失敗，請稍後再試';
-            } finally {
-                btnLockSubmit.disabled = false;
-                btnLockCancel.disabled = false;
-            }
+                if (!data.success) { lockMsg.style.color = '#fca5a5'; lockMsg.textContent = data.message || '驗證失敗'; }
+                else if (data.isCompleted) {
+                    lockMsg.style.color = '#86efac'; lockMsg.textContent = data.earnedItemName ? `答對！獲得：${data.earnedItemName}` : '答對了！';
+                    setTimeout(() => { window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`; }, 1500); return;
+                } else { lockMsg.style.color = '#fde68a'; lockMsg.textContent = '答案錯誤'; }
+            } catch (e) { lockMsg.textContent = '連線失敗'; } finally { btnLockSubmit.disabled = false; btnLockCancel.disabled = false; }
         }
-
-        btnOpenLock.onclick = async () => {
-            if (!isNumberTask) return;
-            if (lockWheels && !lockWheels.children.length) initLockWheels(lockDigits || 4);
-            lockMsg.textContent = '';
-            lockOverlay.style.display = 'flex';
-            fetchCurrentUserTaskId();
-        };
-        btnLockCancel.onclick = () => {
-            lockOverlay.style.display = 'none';
-            lockMsg.textContent = '';
-        };
+        const btnLock = document.getElementById('btn-open-lock');
+        btnLock.onclick = () => { if (!isNumberTask) return; if (!lockWheels.children.length) initLockWheels(lockDigits || 4); lockMsg.textContent = ''; lockOverlay.style.display = 'flex'; fetchCurrentUserTaskId(); };
+        btnLockCancel.onclick = () => { lockOverlay.style.display = 'none'; lockMsg.textContent = ''; };
         btnLockSubmit.onclick = submitLockCode;
-        lockOverlay.addEventListener('click', (e) => {
-            if (e.target === lockOverlay) btnLockCancel.click();
-        });
-
+        lockOverlay.addEventListener('click', (e) => { if (e.target === lockOverlay) btnLockCancel.click(); });
         startBtn.onclick = async () => {
             try {
-                console.log('🚀 Start button clicked');
-                
-                // 1. 請求感測器權限 (iOS 13+)
                 if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                    try {
-                        const permission = await DeviceOrientationEvent.requestPermission();
-                        if (permission !== 'granted') {
-                            showToast('⚠️ 需要感測器權限才能顯示導航箭頭');
-                        }
-                    } catch (e) {
-                        console.error('Permission request failed', e);
-                        // 不阻擋流程，繼續執行
-                    }
+                    try { await DeviceOrientationEvent.requestPermission(); } catch (e) {}
                 }
-
-                // 2. 啟動相機
                 startCamera();
-
-                // 3. 隱藏蓋板
                 startOverlay.style.display = 'none';
                 initSensors();
-                
                 showToast(is3DMode ? '進入 3D AR 模式' : '進入 AR 導航模式');
-
-            } catch (err) {
-                console.error(err);
-                alert('啟動發生錯誤: ' + err.message);
-                // 發生錯誤也試著隱藏蓋板，讓用戶至少能看到畫面
-                startOverlay.style.display = 'none';
-            }
+            } catch (err) { alert('啟動錯誤: ' + err.message); startOverlay.style.display = 'none'; }
         };
-
         function startCamera() {
-            // 1. 無論是 3D 還是 2D，先在這裡請求權限
-            // 這樣瀏覽器會立刻彈出視窗，因為這是在 click 事件的第一時間執行的
             status.innerText = '請求相機權限中...';
-            
-            navigator.mediaDevices.getUserMedia({ 
-                video: { 
-                    facingMode: 'environment',
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
-                }, 
-                audio: false 
-            })
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false })
             .then(stream => { 
-                // 權限已取得！ 🎉
                 console.log("✅ 相機權限已取得");
                 if (is3DMode) {
-                    // === 3D 模式特殊處理 ===
-                    // 關鍵步驟：我們必須「先關閉」剛才拿到的 Stream
-                    // 這是為了釋放相機資源，讓 AR.js 稍後可以自己去接管相機
-                    // (因為權限已經在 Session 中被允許，瀏覽器通常不會再問第二次)
                     stream.getTracks().forEach(track => track.stop());
                     status.innerText = '啟動 3D 引擎...';
-                    
                     if (window.currentTask && window.currentTask.ar_model_url) {
                         const scale = window.currentTask.ar_model_scale || 0.5;
-                        // 現在可以安全地注入 A-Frame 了
                         init3DScene(window.currentTask.ar_model_url, scale);
-                    } else {
-                        alert("錯誤：找不到 3D 模型設定");
-                    }
+                    } else { alert("錯誤：找不到 3D 模型設定"); }
                 } else {
-                    // === 2D (CSS) 模式 ===
-                    // 直接把 Stream 餵給原本的 video 標籤
                     status.innerText = '啟動相機畫面...';
                     video.srcObject = stream;
-                    video.onloadedmetadata = () => {
-                        video.play();
-                    };
+                    video.onloadedmetadata = () => { video.play(); };
                 }
             })
             .catch(err => { 
                 console.error("相機權限請求失敗:", err);
                 status.innerText = "相機錯誤: " + err.message; 
-                
-                // 針對常見錯誤給予明確提示
-                if(err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                    alert("❌ 您拒絕了相機權限。\n請重新整理網頁，並在詢問時點擊「允許」。");
-                } else if (err.name === 'NotFoundError') {
-                    alert("❌ 找不到相機裝置。\n請檢查您的設備。");
-                } else {
-                    alert("無法啟動相機：" + err.message);
-                }
+                if(err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') alert("❌ 您拒絕了相機權限。");
             });
         }
-
         function initSensors() {
-            // CSS 模式：手動監聽 GPS 和羅盤
             if (!is3DMode) {
                 if ('geolocation' in navigator) {
                     navigator.geolocation.watchPosition(
-                        pos => {
-                            userLat = pos.coords.latitude;
-                            userLng = pos.coords.longitude;
-                            updateAR();
-                        },
-                        err => {
-                            status.innerText = "GPS 錯誤: " + err.message;
-                        },
+                        pos => { userLat = pos.coords.latitude; userLng = pos.coords.longitude; updateAR(); },
+                        err => { status.innerText = "GPS 錯誤: " + err.message; },
                         { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 }
                     );
                 }
-
                 window.addEventListener('deviceorientation', event => {
-                    let currentHeading = 0;
-                    if (event.webkitCompassHeading) {
-                        currentHeading = event.webkitCompassHeading;
-                    } else if (event.alpha) {
-                        currentHeading = 360 - event.alpha;
-                    }
-                    
+                    let currentHeading = event.webkitCompassHeading || (360 - event.alpha);
                     let diff = currentHeading - lastHeading;
-                    if (diff > 180) diff -= 360;
-                    if (diff < -180) diff += 360;
-                    
-                    const alpha = 0.15; 
-                    lastHeading += diff * alpha;
-                    deviceHeading = (lastHeading + 360) % 360;
-                    
+                    if (diff > 180) diff -= 360; if (diff < -180) diff += 360;
+                    lastHeading += diff * 0.15; deviceHeading = (lastHeading + 360) % 360;
                     updateAR();
                 }, true);
-            } else {
-                // 3D 模式：A-Frame 處理 GPS/Compass，我們只需要設定模型位置
-                window.addEventListener('gps-camera-update-position', (e) => {
-                    if (!gpsLocked) {
-                        userLat = e.detail.position.latitude;
-                        userLng = e.detail.position.longitude;
-                        status.innerText = `GPS 已鎖定 (精度: ${e.detail.position.accuracy?.toFixed(1) || '?'}m)`;
-                        
-                        // 首次鎖定後，放置模型
-                        placeModel();
-                        gpsLocked = true;
-                    }
-                });
             }
         }
-
-        // 3D 模式：放置模型到指定座標
-        function placeModel() {
-            if (!modelEntity || !targetLat || !targetLng) return;
-            
-            // 設定經緯度
-            modelEntity.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
-            // 抬高一點避免埋在土裡，並設為可見
-            modelEntity.setAttribute('position', '0 0 0'); // AR.js 會覆蓋這個，但預設歸零比較安全
-            modelEntity.setAttribute('visible', 'true');
-            
-            // 隱形點擊區也跟著放
-            const clickZone = document.getElementById('ar-model-click-zone');
-            if (clickZone) {
-                clickZone.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
-                clickZone.setAttribute('visible', 'false'); // 保持不可見，但可點擊
-            }
-
-            console.log(`📍 模型已放置於 ${targetLat}, ${targetLng}`);
-            status.innerText = '模型已放置，請尋找目標';
-        }
-
         function updateAR() {
-            // CSS AR 模式的更新邏輯
-            if (is3DMode) return; // 3D 模式不需要手動計算 transform
-
-            if (!userLat || !targetLat) {
-                status.innerText = `GPS 定位中... (目標:${targetLat},${targetLng})`;
-                return;
-            }
-
+            if (is3DMode) return; 
+            if (!userLat || !targetLat) { status.innerText = `GPS 定位中...`; return; }
             const dist = haversineDistance(userLat, userLng, targetLat, targetLng);
             const bearing = calculateBearing(userLat, userLng, targetLat, targetLng);
-            
             status.innerText = `距離目標: ${dist.toFixed(0)}m`;
-            
             let delta = bearing - deviceHeading;
-            while (delta < -180) delta += 360;
-            while (delta > 180) delta -= 360;
-
-            debug.innerText = `方位:${bearing.toFixed(0)}° 手機:${deviceHeading.toFixed(0)}° 差:${delta.toFixed(0)}°\nGPS: ${userLat.toFixed(5)}, ${userLng.toFixed(5)}`;
-
-            // === 3. 距離判斷 ===
-            // 只有距離夠近 (例如 15m 內) 才顯示寶箱，否則強制顯示箭頭
+            while (delta < -180) delta += 360; while (delta > 180) delta -= 360;
+            debug.innerText = `方位:${bearing.toFixed(0)}° 手機:${deviceHeading.toFixed(0)}° 差:${delta.toFixed(0)}°`;
             const VISIBLE_DISTANCE = 15; 
-
-            // 如果太遠，強制顯示導航箭頭
             if (dist > VISIBLE_DISTANCE) {
-                if (isObjectVisible) {
-                    isObjectVisible = false;
-                    chest.style.display = 'none';
-                    lockedObj.style.display = 'none';
-                    itemUseObj.style.display = 'none';
-                    locationObj.style.display = 'none';
-                }
-                arrow.style.display = 'block';
-                // 箭頭指向目標
-                arrow.style.transform = `rotate(${delta}deg) translate(0, -100px)`;
-                return; // 直接結束，不執行下方的視野判定
+                if (isObjectVisible) { isObjectVisible = false; chest.style.display = 'none'; lockedObj.style.display = 'none'; itemUseObj.style.display = 'none'; locationObj.style.display = 'none'; }
+                arrow.style.display = 'block'; arrow.style.transform = `rotate(${delta}deg) translate(0, -100px)`;
+                return; 
             }
-
-            // === 2. 視角磁滯鎖定 (Hysteresis) ===
-            // 如果已經看見，則放寬視野 (50度)；如果沒看見，則收緊視野 (30度)
             const fov = isObjectVisible ? 50 : 30; 
-
             if (Math.abs(delta) < fov) {
-                // 進入視野
                 if (!isObjectVisible) {
-                    isObjectVisible = true;
-                    arrow.style.display = 'none';
-                    
-                    // 根據任務類型決定顯示哪個物件
-                    if (isLocationTask) {
-                        // 地理圍欄任務：顯示打卡地標
-                        locationObj.style.display = 'block';
-                        chest.style.display = 'none';
-                        lockedObj.style.display = 'none';
-                        itemUseObj.style.display = 'none';
-                        console.log('[updateAR] 顯示打卡地標');
-                    } else if (requiredItem) {
-                        // 有道具需求
-                        console.log('[updateAR] 需要道具，hasRequiredItem:', hasRequiredItem, 'requiredItem:', requiredItem);
-                        if (hasRequiredItem) {
-                            // 有道具：顯示道具使用介面
-                            itemUseObj.style.display = 'block';
-                            lockedObj.style.display = 'none';
-                            chest.style.display = 'none';
-                            locationObj.style.display = 'none';
-                            console.log('[updateAR] 顯示道具使用介面');
-                        } else {
-                            // 沒有道具：顯示問號
-                            lockedObj.style.display = 'block';
-                            itemUseObj.style.display = 'none';
-                            chest.style.display = 'none';
-                            locationObj.style.display = 'none';
-                            console.log('[updateAR] 顯示鎖定狀態（沒有道具）');
-                        }
-                    } else {
-                        // 一般任務或已解鎖：顯示內容
-                        lockedObj.style.display = 'none';
-                        itemUseObj.style.display = 'none';
-                        locationObj.style.display = 'none';
-                        chest.style.display = 'block';
-                        console.log('[updateAR] 顯示 AR 內容');
-                    }
+                    isObjectVisible = true; arrow.style.display = 'none';
+                    if (isLocationTask) { locationObj.style.display = 'block'; chest.style.display = 'none'; lockedObj.style.display = 'none'; itemUseObj.style.display = 'none'; }
+                    else if (requiredItem) {
+                        if (hasRequiredItem) { itemUseObj.style.display = 'block'; lockedObj.style.display = 'none'; chest.style.display = 'none'; locationObj.style.display = 'none'; }
+                        else { lockedObj.style.display = 'block'; itemUseObj.style.display = 'none'; chest.style.display = 'none'; locationObj.style.display = 'none'; }
+                    } else { lockedObj.style.display = 'none'; itemUseObj.style.display = 'none'; locationObj.style.display = 'none'; chest.style.display = 'block'; }
                 }
-
                 const screenWidth = window.innerWidth;
-                const xOffset = (delta / 40) * (screenWidth / 2); // 分母固定為 40，避免移動速度隨 fov 改變
-                
-                // 距離縮放
-                let scale = 1.2 - (Math.min(dist, 50) / 60); 
-                if (scale < 0.4) scale = 0.4;
-
+                const xOffset = (delta / 40) * (screenWidth / 2);
+                let scale = 1.2 - (Math.min(dist, 50) / 60); if (scale < 0.4) scale = 0.4;
                 const transformStyle = `translate(${xOffset}px, 0) scale(${scale})`;
-                chest.style.transform = transformStyle;
-                lockedObj.style.transform = transformStyle;
-                itemUseObj.style.transform = transformStyle;
-                locationObj.style.transform = transformStyle;
-
+                chest.style.transform = transformStyle; lockedObj.style.transform = transformStyle; itemUseObj.style.transform = transformStyle; locationObj.style.transform = transformStyle;
             } else {
-                // 離開視野
-                if (isObjectVisible) {
-                    isObjectVisible = false;
-                    chest.style.display = 'none';
-                    lockedObj.style.display = 'none';
-                    itemUseObj.style.display = 'none';
-                    locationObj.style.display = 'none';
-                    arrow.style.display = 'block';
-                }
-                
+                if (isObjectVisible) { isObjectVisible = false; chest.style.display = 'none'; lockedObj.style.display = 'none'; itemUseObj.style.display = 'none'; locationObj.style.display = 'none'; arrow.style.display = 'block'; }
                 arrow.style.transform = `rotate(${delta}deg) translate(0, -100px)`; 
             }
         }
-
         function haversineDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371e3;
-            const φ1 = lat1 * Math.PI/180;
-            const φ2 = lat2 * Math.PI/180;
-            const Δφ = (lat2-lat1) * Math.PI/180;
-            const Δλ = (lon2-lon1) * Math.PI/180;
-            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-                    Math.cos(φ1) * Math.cos(φ2) *
-                    Math.sin(Δλ/2) * Math.sin(Δλ/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            return R * c;
+            const R = 6371e3; const φ1 = lat1 * Math.PI/180; const φ2 = lat2 * Math.PI/180;
+            const Δφ = (lat2-lat1) * Math.PI/180; const Δλ = (lon2-lon1) * Math.PI/180;
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
-
         function calculateBearing(startLat, startLng, destLat, destLng) {
             const y = Math.sin((destLng-startLng) * Math.PI/180) * Math.cos(destLat * Math.PI/180);
-            const x = Math.cos(startLat * Math.PI/180) * Math.sin(destLat * Math.PI/180) -
-                    Math.sin(startLat * Math.PI/180) * Math.cos(destLat * Math.PI/180) * Math.cos((destLng-startLng) * Math.PI/180);
-            const brng = Math.atan2(y, x) * 180 / Math.PI;
-            return (brng + 360) % 360;
+            const x = Math.cos(startLat * Math.PI/180) * Math.sin(destLat * Math.PI/180) - Math.sin(startLat * Math.PI/180) * Math.cos(destLat * Math.PI/180) * Math.cos((destLng-startLng) * Math.PI/180);
+            return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
         }
-
         function extractYouTubeId(url) {
-            const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
-            const match = url.match(regExp);
+            const match = url.match(/^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/);
             return (match && match[7].length == 11) ? match[7] : null;
         }
     </script>
