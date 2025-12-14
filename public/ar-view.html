@@ -694,17 +694,14 @@
 
                         if (task.ar_model_url) {
                             is3DMode = true;
-                            console.log('🚀 切換至 3D 模型模式:', task.ar_model_url);
+                            console.log('🚀 切換至 3D 模型模式 (等待啟動):', task.ar_model_url);
                             
                             // 隱藏 CSS AR 介面
                             arWorld.style.display = 'none';
                             video.style.display = 'none'; // 隱藏 2D 用的 video tag
                             aframeContainer.style.display = 'block';
                             
-                            // 【關鍵修改】動態初始化 3D 場景
-                            // 注意：如果有設定 task.ar_model_scale 就用，沒有就預設 0.5
-                            const scale = task.ar_model_scale || 0.5;
-                            init3DScene(task.ar_model_url, scale);
+                            // ✅ 修正：這裡不要呼叫 init3DScene，留給按鈕去觸發
 
                         } else {
                             console.log('🖼️ 使用 CSS AR 模式');
@@ -1204,13 +1201,24 @@
         };
 
         function startCamera() {
-            // 如果是 3D 模式，AR.js 會在注入 DOM 時自動接管相機
-            // 我們不需要做任何事，只要更新狀態文字
+            // === 3D 模式啟動邏輯 ===
             if (is3DMode) {
                 status.innerText = '啟動 3D AR 中...';
+                
+                // 確保有任務資料
+                if (window.currentTask && window.currentTask.ar_model_url) {
+                    const scale = window.currentTask.ar_model_scale || 0.5;
+                    // ✅ 在這裡（按鈕點擊後）才真正把 A-Frame 塞進去
+                    // 這會觸發 AR.js 的相機請求，因為是點擊觸發的，瀏覽器會允許
+                    init3DScene(window.currentTask.ar_model_url, scale);
+                } else {
+                    console.error("找不到 3D 模型資料");
+                    alert("任務資料異常，無法啟動 AR");
+                }
                 return;
             }
-            // 只有 CSS 模式才手動呼叫 getUserMedia
+
+            // === CSS (2D) 模式啟動邏輯 ===
             status.innerText = '啟動相機中...';
             
             // 增加錯誤處理和參數優化
