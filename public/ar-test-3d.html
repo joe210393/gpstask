@@ -35,6 +35,7 @@
     
     <div class="debug-ui">
         <div id="status-log" class="status-badge">正在載入 3D 模型...</div>
+        <button id="reset-btn" class="status-badge" style="margin-top: 10px; background: rgba(0,100,255,0.6); pointer-events: auto;">🔄 重置位置</button>
     </div>
 
     <!-- 
@@ -66,7 +67,7 @@
             id="ar-model"
             gltf-model="#animated-model"
             animation-mixer
-            scale="1 1 1"
+            scale="3 3 3"
             position="0 0 -5"
             visible="false"> 
         </a-entity>
@@ -76,40 +77,67 @@
     <script>
         const arModel = document.getElementById('ar-model');
         const statusLog = document.getElementById('status-log');
+        const resetBtn = document.getElementById('reset-btn');
+
+        // 核心顯示邏輯
+        function showModelInFront() {
+            try {
+                const camera = document.querySelector('a-camera');
+                if (!camera || !camera.object3D) {
+                    throw new Error("相機尚未準備好");
+                }
+
+                // 移除 GPS 屬性
+                arModel.removeAttribute('gps-entity-place');
+
+                // 掛載到相機
+                if (arModel.object3D.parent) arModel.object3D.parent.remove(arModel.object3D);
+                camera.object3D.add(arModel.object3D);
+
+                // 設定位置：正前方 2 米，稍微低一點 (-0.5)
+                arModel.object3D.position.set(0, -0.5, -2); 
+                arModel.object3D.scale.set(3, 3, 3); // 放大 3 倍
+                arModel.object3D.rotation.set(0, 0, 0); 
+                
+                arModel.setAttribute('visible', 'true');
+                
+                statusLog.innerText = "✅ 3D 模型已顯示";
+                statusLog.style.color = "#fff";
+                statusLog.style.backgroundColor = "rgba(40, 167, 69, 0.8)";
+                
+                // 3秒後隱藏狀態文字
+                setTimeout(() => {
+                    statusLog.style.opacity = '0';
+                }, 3000);
+            } catch (err) {
+                console.error(err);
+                statusLog.innerText = "⚠️ 重試中...";
+                // 如果失敗，1秒後再試
+                setTimeout(showModelInFront, 1000);
+            }
+        }
 
         // 1. 監聽模型加載並自動顯示
         arModel.addEventListener('model-loaded', () => {
             console.log("Model Loaded!");
-            statusLog.innerText = "✅ 3D 模型展示中";
+            statusLog.innerText = "⏳ 模型載入完成，等待相機...";
             
-            // 自動執行「強制顯示」邏輯
-            const camera = document.querySelector('a-camera');
-            
-            // 移除 GPS 屬性
-            arModel.removeAttribute('gps-entity-place');
-
-            // 掛載到相機
-            if (arModel.object3D.parent) arModel.object3D.parent.remove(arModel.object3D);
-            camera.object3D.add(arModel.object3D);
-
-            // 設定位置：正前方 2 米，稍微低一點 (-0.5)
-            // 讓使用者平視就能看到，不用低頭
-            arModel.object3D.position.set(0, -0.5, -2); 
-            arModel.object3D.scale.set(1, 1, 1);
-            arModel.object3D.rotation.set(0, 0, 0); 
-            
-            arModel.setAttribute('visible', 'true');
-            
-            // 3秒後隱藏狀態文字，讓畫面更乾淨
-            setTimeout(() => {
-                statusLog.style.display = 'none';
-            }, 3000);
+            // 延遲 2 秒再顯示，確保 AR.js 相機已啟動
+            setTimeout(showModelInFront, 2000);
         });
 
         arModel.addEventListener('model-error', (e) => {
             console.error("Model Error:", e);
             statusLog.innerText = "❌ 模型載入失敗";
             statusLog.style.backgroundColor = "rgba(255, 0, 0, 0.6)";
+        });
+
+        // 2. 手動重置按鈕
+        resetBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            statusLog.style.opacity = '1';
+            statusLog.innerText = "🔄 重新定位中...";
+            showModelInFront();
         });
     </script>
 </body>
