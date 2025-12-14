@@ -1201,27 +1201,10 @@
         };
 
         function startCamera() {
-            // === 3D 模式啟動邏輯 ===
-            if (is3DMode) {
-                status.innerText = '啟動 3D AR 中...';
-                
-                // 確保有任務資料
-                if (window.currentTask && window.currentTask.ar_model_url) {
-                    const scale = window.currentTask.ar_model_scale || 0.5;
-                    // ✅ 在這裡（按鈕點擊後）才真正把 A-Frame 塞進去
-                    // 這會觸發 AR.js 的相機請求，因為是點擊觸發的，瀏覽器會允許
-                    init3DScene(window.currentTask.ar_model_url, scale);
-                } else {
-                    console.error("找不到 3D 模型資料");
-                    alert("任務資料異常，無法啟動 AR");
-                }
-                return;
-            }
-
-            // === CSS (2D) 模式啟動邏輯 ===
-            status.innerText = '啟動相機中...';
+            // 1. 無論是 3D 還是 2D，先在這裡請求權限
+            // 這樣瀏覽器會立刻彈出視窗，因為這是在 click 事件的第一時間執行的
+            status.innerText = '請求相機權限中...';
             
-            // 增加錯誤處理和參數優化
             navigator.mediaDevices.getUserMedia({ 
                 video: { 
                     facingMode: 'environment',
@@ -1231,15 +1214,45 @@
                 audio: false 
             })
             .then(stream => { 
-                video.srcObject = stream;
-                video.onloadedmetadata = () => {
-                    video.play();
-                };
+                // 權限已取得！ 🎉
+                console.log("✅ 相機權限已取得");
+                if (is3DMode) {
+                    // === 3D 模式特殊處理 ===
+                    // 關鍵步驟：我們必須「先關閉」剛才拿到的 Stream
+                    // 這是為了釋放相機資源，讓 AR.js 稍後可以自己去接管相機
+                    // (因為權限已經在 Session 中被允許，瀏覽器通常不會再問第二次)
+                    stream.getTracks().forEach(track => track.stop());
+                    status.innerText = '啟動 3D 引擎...';
+                    
+                    if (window.currentTask && window.currentTask.ar_model_url) {
+                        const scale = window.currentTask.ar_model_scale || 0.5;
+                        // 現在可以安全地注入 A-Frame 了
+                        init3DScene(window.currentTask.ar_model_url, scale);
+                    } else {
+                        alert("錯誤：找不到 3D 模型設定");
+                    }
+                } else {
+                    // === 2D (CSS) 模式 ===
+                    // 直接把 Stream 餵給原本的 video 標籤
+                    status.innerText = '啟動相機畫面...';
+                    video.srcObject = stream;
+                    video.onloadedmetadata = () => {
+                        video.play();
+                    };
+                }
             })
             .catch(err => { 
-                console.error(err);
-                document.getElementById('status').innerText = "相機錯誤: " + err.message; 
-                alert("無法啟動相機：" + err.message);
+                console.error("相機權限請求失敗:", err);
+                status.innerText = "相機錯誤: " + err.message; 
+                
+                // 針對常見錯誤給予明確提示
+                if(err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                    alert("❌ 您拒絕了相機權限。\n請重新整理網頁，並在詢問時點擊「允許」。");
+                } else if (err.name === 'NotFoundError') {
+                    alert("❌ 找不到相機裝置。\n請檢查您的設備。");
+                } else {
+                    alert("無法啟動相機：" + err.message);
+                }
             });
         }
 
