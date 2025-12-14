@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <title>3D Engine Test (No AR)</title>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
+</head>
+<body style='margin: 0;'>
+    
+    <div style="position: fixed; top: 10px; left: 10px; color: white; background: rgba(0,0,0,0.5); padding: 10px; z-index: 9999;">
+        3D 引擎測試 (無相機)<br>
+        請確認是否看到：<br>
+        1. 藍色背景<br>
+        2. 紅色方塊<br>
+        3. 走路小人
+    </div>
+
+    <!-- 
+        移除 arjs，改為普通的 a-scene
+        設定背景顏色為藍色
+    -->
+    <a-scene renderer="logarithmicDepthBuffer: true;">
+        
+        <a-assets>
+            <a-asset-item id="animated-model" src="/models/CesiumMan.glb"></a-asset-item>
+        </a-assets>
+
+        <!-- 天空盒 (背景) -->
+        <a-sky color="#87CEEB"></a-sky>
+
+        <!-- 相機 (固定位置) -->
+        <a-entity position="0 1.6 3">
+            <a-camera look-controls wasd-controls></a-camera>
+        </a-entity>
+
+        <!-- 紅色方塊 (絕對座標) -->
+        <a-box position="-1 0.5 0" color="red" scale="0.5 0.5 0.5" animation="property: rotation; to: 0 360 0; loop: true; dur: 3000"></a-box>
+
+        <!-- 3D 小人 -->
+        <a-entity 
+            gltf-model="#animated-model"
+            animation-mixer
+            scale="2 2 2"
+            position="1 0 0"
+            rotation="0 -45 0">
+        </a-entity>
+
+        <!-- 地板 -->
+        <a-plane position="0 0 0" rotation="-90 0 0" width="10" height="10" color="#7BC8A4"></a-plane>
+
+    </a-scene>
+</body>
+</html>
