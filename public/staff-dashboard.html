@@ -208,20 +208,45 @@
             </div>
             
             <div class="form-group">
-              <label class="form-label">任務照片</label>
+              <label class="form-label">任務照片 (封面)</label>
               <input class="form-input" type="file" name="photo" accept="image/*" required />
             </div>
-            
-            <div class="form-group">
-              <label class="form-label">YouTube 影片連結</label>
-              <input class="form-input" type="text" name="youtubeUrl" placeholder="https://www.youtube.com/watch?v=..." />
-              <small style="color:var(--text-secondary);font-size:0.85rem;">此影片會在 AR 模式中顯示</small>
-            </div>
-            
-            <div class="form-group">
-              <label class="form-label">AR 專用圖片（選填）</label>
-              <input class="form-input" type="file" name="arImage" accept="image/*" />
-              <small style="color:var(--text-secondary);font-size:0.85rem;">此圖片會在 AR 模式中顯示，與任務封面圖分開</small>
+
+            <!-- AR 內容設定區塊 -->
+            <div class="form-group" style="background:#f8f9fa; border:1px solid #ddd; padding:15px; border-radius:8px;">
+              <label class="form-label" style="font-weight:bold; color:#2c3e50;">AR 內容顯示設定</label>
+              <div style="display:flex; gap:10px; margin-bottom:15px;">
+                <label style="cursor:pointer;"><input type="radio" name="ar_type" value="none" checked> 預設 (僅顯示地標)</label>
+                <label style="cursor:pointer;"><input type="radio" name="ar_type" value="image"> 圖片</label>
+                <label style="cursor:pointer;"><input type="radio" name="ar_type" value="youtube"> YouTube</label>
+                <label style="cursor:pointer;"><input type="radio" name="ar_type" value="3d"> 3D 模型</label>
+              </div>
+
+              <!-- 圖片選項 -->
+              <div id="arField_image" style="display:none;">
+                <label class="form-label">上傳 AR 圖片</label>
+                <input class="form-input" type="file" name="arImage" accept="image/*" />
+                <small style="color:#666;">將在 AR 中懸浮顯示</small>
+              </div>
+
+              <!-- YouTube 選項 -->
+              <div id="arField_youtube" style="display:none;">
+                <label class="form-label">YouTube 連結</label>
+                <input class="form-input" type="text" name="youtubeUrl" placeholder="https://youtu.be/..." />
+                <small style="color:#666;">將在 AR 中播放影片</small>
+              </div>
+
+              <!-- 3D 模型選項 -->
+              <div id="arField_3d" style="display:none;">
+                <label class="form-label">選擇 3D 模型</label>
+                <select name="ar_model_id" class="form-select" id="arModelSelect">
+                  <option value="">-- 請選擇模型 --</option>
+                  <!-- JS 動態載入 -->
+                </select>
+                <div style="margin-top:10px; font-size:0.9rem;">
+                  沒有想要的？<a href="#" id="quickUploadModelBtn" style="color:#0d6efd;">上傳新模型</a>
+                </div>
+              </div>
             </div>
             
             <button type="submit" class="btn btn-primary w-100">新增任務</button>
@@ -241,6 +266,18 @@
           </div>
           <div id="itemList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem;">
             <!-- 道具列表動態載入 -->
+            <div style="color: #888; font-size: 0.9rem;">載入中...</div>
+          </div>
+        </div>
+
+        <!-- 3D 模型庫管理區塊 -->
+        <div class="form-container" style="background: #e3f2fd; border: 1px solid #b6d4fe;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2 style="margin: 0; color: #052c65;">🧊 3D 模型庫</h2>
+            <button id="btnUploadModel" class="btn btn-secondary" style="font-size: 0.9rem; background: #0d6efd; border-color: #0d6efd; color: white;">+ 上傳模型</button>
+          </div>
+          <div id="modelList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem;">
+            <!-- 模型列表動態載入 -->
             <div style="color: #888; font-size: 0.9rem;">載入中...</div>
           </div>
         </div>
@@ -586,6 +623,36 @@
               <input class="form-input" type="number" name="quantity" min="1" value="1" required />
             </div>
             <button type="submit" class="btn btn-success w-100">確認發放</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    <!-- 3D 模型上傳 Modal -->
+    <div class="task-modal" id="modelModal">
+      <div class="task-modal-overlay"></div>
+      <div class="task-modal-content">
+        <div class="task-modal-header">
+          <h3>上傳 3D 模型 (.glb)</h3>
+          <button class="close-btn" id="closeModelModal">&times;</button>
+        </div>
+        <div class="task-modal-body">
+          <form id="uploadModelForm">
+            <div class="form-group">
+              <label class="form-label">模型名稱</label>
+              <input class="form-input" type="text" name="name" required placeholder="例如：寶箱、紅旗、飛龍" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">選擇檔案 (.glb / .gltf)</label>
+              <input class="form-input" type="file" name="modelFile" accept=".glb,.gltf" required />
+              <small style="color:#666;">建議大小：100MB 以內</small>
+            </div>
+            <div class="form-group">
+              <label class="form-label">預設縮放比例 (Scale)</label>
+              <input class="form-input" type="number" name="scale" step="0.1" value="1.0" />
+              <small style="color:#666;">如果模型太大或太小，可在此設定預設值</small>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">開始上傳</button>
+            <div id="uploadModelMsg" class="mt-2 text-center" style="min-height: 20px;"></div>
           </form>
         </div>
       </div>

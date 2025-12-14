@@ -210,13 +210,167 @@ function setupTaskTypeToggle(selectId, divId, standardAnswerDivId) {
 setupTaskTypeToggle('taskTypeSelect', 'multipleChoiceOptions', 'standardAnswerBlock');
 setupTaskTypeToggle('editTaskTypeSelect', 'editMultipleChoiceOptions', 'editStandardAnswerBlock');
 
-// 確保先載入劇情和道具，再載入任務
-Promise.all([loadQuestChains(), loadItems()]).then(() => {
+// 確保先載入劇情、道具和模型，再載入任務
+Promise.all([loadQuestChains(), loadItems(), loadARModels()]).then(() => {
   loadTasks();
 });
 
-// === 道具管理邏輯 ===
-let globalItemsMap = {};
+// === 3D 模型庫管理邏輯 ===
+let globalModelsMap = {};
+
+function loadARModels() {
+  // 注意：這裡假設後端會提供 /api/ar-models API
+  // 由於我們還沒寫後端 API，這一步先預留，稍後會補上 API
+  // 暫時用模擬數據或空的
+  return fetch(`${API_BASE}/api/ar-models`)
+    .then(res => res.json())
+    .then(data => {
+      if (!data.success) return;
+      globalModelsMap = {};
+      const list = document.getElementById('modelList');
+      const selects = document.querySelectorAll('#arModelSelect'); // 任務表單中的下拉選單
+      
+      if (list) list.innerHTML = '';
+      
+      // 更新下拉選單
+      selects.forEach(sel => {
+        const currentVal = sel.value; 
+        sel.innerHTML = '<option value="">-- 請選擇模型 --</option>';
+        data.models.forEach(m => {
+          sel.innerHTML += `<option value="${m.id}">${m.name}</option>`;
+        });
+        sel.value = currentVal;
+      });
+
+      if (data.models.length === 0) {
+        if (list) list.innerHTML = '<div style="color:#888;">目前沒有 3D 模型</div>';
+      } else {
+        data.models.forEach(m => {
+          globalModelsMap[m.id] = m;
+          if (list) {
+            const div = document.createElement('div');
+            div.style.cssText = 'background:white; padding:10px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.05); border-left:4px solid #0d6efd; position: relative;';
+            div.innerHTML = `
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:5px;">
+                <span style="font-size:1.5rem;">🧊</span>
+                <div style="font-weight:bold; font-size:1rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${m.name}</div>
+              </div>
+              <div style="font-size:0.75rem; color:#666;">Scale: ${m.scale || 1.0}</div>
+              <div style="display:flex; gap:5px; justify-content:flex-end; margin-top:5px;">
+                  <a href="${m.url}" target="_blank" class="btn-preview-model" style="padding:2px 8px; font-size:0.8rem; border-radius:4px; background:#17a2b8; color:white; text-decoration:none;" title="下載查看">⬇️</a>
+                  <button class="btn-delete-model" data-id="${m.id}" style="padding:2px 8px; font-size:0.8rem; border-radius:4px; background:#dc3545; color:white; border:none; cursor:pointer;" title="刪除模型">🗑️</button>
+              </div>
+            `;
+            list.appendChild(div);
+          }
+        });
+
+        // 綁定刪除按鈕
+        document.querySelectorAll('.btn-delete-model').forEach(btn => {
+          btn.addEventListener('click', function(e) {
+            if (!confirm('確定要刪除這個模型嗎？\n注意：如果該模型被任務引用，可能會導致顯示錯誤。')) return;
+            fetch(`${API_BASE}/api/ar-models/${this.dataset.id}`, {
+              method: 'DELETE',
+              headers: { 'x-username': loginUser.username }
+            })
+            .then(res => res.json())
+            .then(resData => {
+              if (resData.success) {
+                alert('模型已刪除');
+                loadARModels();
+              } else {
+                alert(resData.message || '刪除失敗');
+              }
+            });
+          });
+        });
+      }
+    })
+    .catch(err => console.error('載入模型失敗', err)); // 暫時忽略錯誤，因為 API 可能還沒好
+}
+
+// 模型上傳 Modal
+const btnUploadModel = document.getElementById('btnUploadModel');
+const modelModal = document.getElementById('modelModal');
+const closeModelModal = document.getElementById('closeModelModal');
+const quickUploadModelBtn = document.getElementById('quickUploadModelBtn');
+
+if (btnUploadModel && modelModal) {
+  const openModelModal = () => modelModal.classList.add('show');
+  btnUploadModel.onclick = openModelModal;
+  if (quickUploadModelBtn) quickUploadModelBtn.onclick = (e) => { e.preventDefault(); openModelModal(); };
+  if (closeModelModal) closeModelModal.onclick = () => modelModal.classList.remove('show');
+}
+
+// 提交模型上傳
+const uploadModelForm = document.getElementById('uploadModelForm');
+if (uploadModelForm) {
+  uploadModelForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const form = this;
+    const msg = document.getElementById('uploadModelMsg');
+    msg.textContent = '上傳中... 請稍候 (大檔案可能需要幾分鐘)';
+    msg.style.color = 'blue';
+
+    const fd = new FormData();
+    fd.append('name', form.name.value.trim());
+    fd.append('scale', form.scale.value);
+    if (form.modelFile.files[0]) {
+      fd.append('model', form.modelFile.files[0]);
+    }
+
+    fetch(`${API_BASE}/api/ar-models`, {
+      method: 'POST',
+      headers: { 'x-username': loginUser.username },
+      body: fd
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        msg.textContent = '上傳成功！';
+        msg.style.color = 'green';
+        form.reset();
+        setTimeout(() => {
+          modelModal.classList.remove('show');
+          msg.textContent = '';
+          loadARModels();
+        }, 1500);
+      } else {
+        msg.textContent = data.message || '上傳失敗';
+        msg.style.color = 'red';
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      msg.textContent = '發生錯誤';
+      msg.style.color = 'red';
+    });
+  });
+}
+
+// 初始化 AR 類型切換邏輯
+function setupArTypeToggle(radioName, containerIdPrefix) {
+  const radios = document.querySelectorAll(`input[name="${radioName}"]`);
+  const update = () => {
+    const selected = document.querySelector(`input[name="${radioName}"]:checked`)?.value || 'none';
+    // 隱藏所有
+    ['image', 'youtube', '3d'].forEach(type => {
+      const el = document.getElementById(`${containerIdPrefix}_${type}`);
+      if (el) el.style.display = 'none';
+    });
+    // 顯示選中的
+    const target = document.getElementById(`${containerIdPrefix}_${selected}`);
+    if (target) target.style.display = 'block';
+  };
+
+  radios.forEach(r => r.addEventListener('change', update));
+  // 延遲一點執行初始化，確保 DOM 載入
+  setTimeout(update, 100);
+}
+
+setupArTypeToggle('ar_type', 'arField');
+// 編輯模式的切換邏輯稍後在 openEditModal 中手動觸發，或者這裡也通用化
+
 
 function loadItems() {
   return fetch(`${API_BASE}/api/items`)
@@ -808,6 +962,19 @@ document.getElementById('addTaskForm').addEventListener('submit', async function
   // 道具欄位
   const required_item_id = form.required_item_id?.value || null;
   const reward_item_id = form.reward_item_id?.value || null;
+  
+  // AR 內容設定
+  const ar_type = document.querySelector('input[name="ar_type"]:checked')?.value || 'none';
+  let finalYoutubeUrl = null;
+  let finalArModelId = null;
+  
+  if (ar_type === 'youtube') {
+    finalYoutubeUrl = form.youtubeUrl.value.trim();
+  } else if (ar_type === '3d') {
+    finalArModelId = form.ar_model_id.value || null;
+  }
+  
+  // 注意：ar_image_url 會在下面上傳邏輯中處理 (如果是 ar_type === 'image')
 
   // 處理任務類型與選項
   const task_type = form.task_type.value;
@@ -880,9 +1047,9 @@ document.getElementById('addTaskForm').addEventListener('submit', async function
       return;
     }
     
-    // 2. 上傳 AR 圖片（如果有）
+    // 2. 上傳 AR 圖片（如果有，且模式為圖片）
     let arImageUrl = null;
-    if (arImageFile) {
+    if (ar_type === 'image' && arImageFile) {
       document.getElementById('addTaskMsg').textContent = 'AR 圖片上傳中...';
       const arFd = new FormData();
       arFd.append('photo', arImageFile);
@@ -911,7 +1078,10 @@ document.getElementById('addTaskForm').addEventListener('submit', async function
         'x-username': loginUser.username
       },
       body: JSON.stringify({ 
-        name, lat, lng, radius, points, description, photoUrl, youtubeUrl, ar_image_url: arImageUrl, 
+        name, lat, lng, radius, points, description, photoUrl, 
+        youtubeUrl: finalYoutubeUrl, 
+        ar_image_url: arImageUrl, 
+        ar_model_id: finalArModelId, // 新增欄位
         task_type, options, correct_answer,
         type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants,
         is_final_step, required_item_id, reward_item_id

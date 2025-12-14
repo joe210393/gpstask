@@ -231,7 +231,7 @@ const upload = multer({
     }
   }),
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB 限制
+    fileSize: 100 * 1024 * 1024, // 100MB 限制 (為了支援 GLB 模型)
     files: 1 // 一次只能上傳一個檔案
   },
   fileFilter: (req, file, cb) => {
@@ -241,18 +241,22 @@ const upload = multer({
       'image/jpg',
       'image/png',
       'image/gif',
-      'image/webp'
+      'image/webp',
+      'model/gltf-binary', // .glb
+      'model/gltf+json',   // .gltf
+      'application/octet-stream' // 有些瀏覽器會把 .glb 視為 octet-stream
     ];
 
-    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.glb', '.gltf'];
 
     const fileExtension = path.extname(file.originalname).toLowerCase();
 
     // 檢查 MIME type 和副檔名
-    if (allowedTypes.includes(file.mimetype) && allowedExtensions.includes(fileExtension)) {
+    // 注意：對於 .glb，mimetype 檢查可能不準確，主要依賴副檔名
+    if (allowedExtensions.includes(fileExtension)) {
       cb(null, true);
     } else {
-      cb(new Error('不支援的檔案類型。只允許 JPG、PNG、GIF、WebP 圖片檔案。'), false);
+      cb(new Error('不支援的檔案類型。只允許 JPG, PNG, GIF, WebP, GLB, GLTF。'), false);
     }
   }
 });
@@ -567,14 +571,16 @@ app.get('/api/tasks', async (req, res) => {
   let conn;
   try {
     conn = await mysql.createConnection(dbConfig);
-    // Join items 表格以獲取道具名稱
+    // Join items 表格以獲取道具名稱，Join ar_models 獲取 3D 模型
     const [rows] = await conn.execute(`
       SELECT t.*, 
              i_req.name as required_item_name, i_req.image_url as required_item_image,
-             i_rew.name as reward_item_name, i_rew.image_url as reward_item_image
+             i_rew.name as reward_item_name, i_rew.image_url as reward_item_image,
+             am.url as ar_model_url, am.scale as ar_model_scale
       FROM tasks t
       LEFT JOIN items i_req ON t.required_item_id = i_req.id
       LEFT JOIN items i_rew ON t.reward_item_id = i_rew.id
+      LEFT JOIN ar_models am ON t.ar_model_id = am.id
       WHERE 1=1 ORDER BY t.id DESC
     `);
     res.json({ success: true, tasks: rows });
@@ -709,6 +715,73 @@ app.delete('/api/quest-chains/:id', staffOrAdminAuth, async (req, res) => {
     await conn.execute('DELETE FROM quest_chains WHERE id = ?', [id]);
 
     res.json({ success: true, message: '劇情已刪除' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) await conn.end();
+  }
+});
+
+// ===== 3D 模型庫管理 API =====
+
+// 取得所有模型
+app.get('/api/ar-models', async (req, res) => {
+  let conn;
+  try {
+    conn = await mysql.createConnection(dbConfig);
+    const [rows] = await conn.execute('SELECT * FROM ar_models ORDER BY id DESC');
+    res.json({ success: true, models: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) await conn.end();
+  }
+});
+
+// 上傳模型 (Admin/Shop)
+app.post('/api/ar-models', staffOrAdminAuth, upload.single('model'), async (req, res) => {
+  const { name, scale } = req.body;
+  if (!name) return res.status(400).json({ success: false, message: '缺少模型名稱' });
+  if (!req.file) return res.status(400).json({ success: false, message: '未選擇檔案' });
+
+  const modelUrl = '/images/' + req.file.filename; // 因為我們還是存在 /images 目錄下 (雖然是 .glb)
+  const modelScale = parseFloat(scale) || 1.0;
+  const username = req.headers['x-username'] || req.user?.username;
+
+  let conn;
+  try {
+    conn = await mysql.createConnection(dbConfig);
+    await conn.execute(
+      'INSERT INTO ar_models (name, url, scale, created_by) VALUES (?, ?, ?, ?)',
+      [name, modelUrl, modelScale, username]
+    );
+    res.json({ success: true, message: '模型上傳成功' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) await conn.end();
+  }
+});
+
+// 刪除模型
+app.delete('/api/ar-models/:id', staffOrAdminAuth, async (req, res) => {
+  const { id } = req.params;
+  let conn;
+  try {
+    conn = await mysql.createConnection(dbConfig);
+    
+    // 檢查是否有任務引用
+    const [tasks] = await conn.execute('SELECT id FROM tasks WHERE ar_model_id = ?', [id]);
+    if (tasks.length > 0) {
+      return res.status(400).json({ success: false, message: '此模型正被任務使用中，無法刪除' });
+    }
+
+    // 刪除檔案 (選擇性實作，目前只刪除 DB 紀錄，保留檔案以防誤刪)
+    await conn.execute('DELETE FROM ar_models WHERE id = ?', [id]);
+    res.json({ success: true, message: '模型已刪除' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
@@ -902,7 +975,9 @@ app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
     // 道具參數
     required_item_id, reward_item_id,
     // 劇情結局關卡
-    is_final_step
+    is_final_step,
+    // AR 模型 ID
+    ar_model_id
   } = req.body;
 
   console.log('[POST /api/tasks] Received:', req.body);
@@ -958,19 +1033,20 @@ app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
     const reqItemId = required_item_id ? Number(required_item_id) : null;
     const rewItemId = reward_item_id ? Number(reward_item_id) : null;
     const isFinal = is_final_step === true || is_final_step === 'true' || is_final_step === 1;
+    const arModelId = ar_model_id ? Number(ar_model_id) : null;
 
     await conn.execute(
       `INSERT INTO tasks (
         name, lat, lng, radius, description, photoUrl, iconUrl, youtubeUrl, ar_image_url, points, created_by, 
         task_type, options, correct_answer,
         type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants,
-        required_item_id, reward_item_id, is_final_step
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        required_item_id, reward_item_id, is_final_step, ar_model_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         name, lat, lng, radius, description, photoUrl, '/images/flag-red.png', youtubeUrl || null, ar_image_url || null, pts, username, 
         tType, opts, correct_answer || null,
         mainType, qId, qOrder, tStart, tEnd, maxP,
-        reqItemId, rewItemId, isFinal
+        reqItemId, rewItemId, isFinal, arModelId
       ]
     );
     res.json({ success: true, message: '新增成功' });
@@ -1238,7 +1314,9 @@ app.put('/api/tasks/:id', staffOrAdminAuth, async (req, res) => {
     // 道具參數
     required_item_id, reward_item_id,
     // 劇情結局關卡
-    is_final_step
+    is_final_step,
+    // AR 模型 ID
+    ar_model_id
   } = req.body;
 
   if (!name || !lat || !lng || !radius || !description || !photoUrl) {
@@ -1293,19 +1371,20 @@ app.put('/api/tasks/:id', staffOrAdminAuth, async (req, res) => {
     const reqItemId = required_item_id ? Number(required_item_id) : null;
     const rewItemId = reward_item_id ? Number(reward_item_id) : null;
     const isFinal = is_final_step === true || is_final_step === 'true' || is_final_step === 1;
+    const arModelId = ar_model_id ? Number(ar_model_id) : null;
 
     await conn.execute(
       `UPDATE tasks SET 
         name=?, lat=?, lng=?, radius=?, description=?, photoUrl=?, youtubeUrl=?, ar_image_url=?, points=?, 
         task_type=?, options=?, correct_answer=?,
         type=?, quest_chain_id=?, quest_order=?, time_limit_start=?, time_limit_end=?, max_participants=?,
-        required_item_id=?, reward_item_id=?, is_final_step=?
+        required_item_id=?, reward_item_id=?, is_final_step=?, ar_model_id=?
        WHERE id=?`,
       [
         name, lat, lng, radius, description, photoUrl, youtubeUrl || null, ar_image_url || null, pts, 
         tType, opts, correct_answer || null, 
         mainType, qId, qOrder, tStart, tEnd, maxP,
-        reqItemId, rewItemId, isFinal,
+        reqItemId, rewItemId, isFinal, arModelId,
         id
       ]
     );
@@ -2330,6 +2409,43 @@ console.log('==================');
   const dbConnected = await testDatabaseConnection();
   if (!dbConnected) {
     console.error('⚠️  警告: 資料庫連接失敗，部分功能可能無法正常運作');
+  } else {
+    // 自動執行 AR 系統資料庫遷移
+    try {
+        const conn = await mysql.createConnection(dbConfig);
+        
+        // 1. 建立 ar_models 表
+        await conn.execute(`
+          CREATE TABLE IF NOT EXISTS ar_models (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            url VARCHAR(512) NOT NULL,
+            type VARCHAR(50) DEFAULT 'general',
+            scale FLOAT DEFAULT 1.0,
+            created_by VARCHAR(255),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+
+        // 2. 修改 tasks 表
+        const [taskCols] = await conn.execute("SHOW COLUMNS FROM tasks LIKE 'ar_model_id'");
+        if (taskCols.length === 0) {
+            await conn.execute("ALTER TABLE tasks ADD COLUMN ar_model_id INT DEFAULT NULL");
+            console.log('✅ 資料庫遷移: tasks 表已新增 ar_model_id');
+        }
+
+        // 3. 修改 items 表
+        const [itemCols] = await conn.execute("SHOW COLUMNS FROM items LIKE 'model_url'");
+        if (itemCols.length === 0) {
+            await conn.execute("ALTER TABLE items ADD COLUMN model_url VARCHAR(512) DEFAULT NULL");
+            console.log('✅ 資料庫遷移: items 表已新增 model_url');
+        }
+        
+        await conn.end();
+        console.log('✅ AR 系統資料庫結構檢查完成');
+    } catch (err) {
+        console.error('❌ AR 系統資料庫遷移失敗:', err);
+    }
   }
 })();
 
