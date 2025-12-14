@@ -487,35 +487,7 @@
     <video id="camera-feed" autoplay playsinline muted></video>
 
     <!-- A-Frame 3D 場景 (3D 模式使用) -->
-    <div id="aframe-scene-container">
-        <a-scene 
-            vr-mode-ui="enabled: false"
-            embedded
-            arjs='sourceType: webcam; debugUIEnabled: false;'
-            renderer="logarithmicDepthBuffer: true; colorManagement: true; alpha: true;">
-            
-            <a-camera gps-camera="minDistance: 0; maxDistance: 2000;" rotation-reader></a-camera>
-
-            <a-assets>
-                <!-- 動態載入模型 -->
-                <a-asset-item id="animated-model-asset" src=""></a-asset-item>
-            </a-assets>
-            
-            <!-- 使用者的 3D 模型 -->
-            <a-entity 
-                id="ar-model-entity"
-                gltf-model="#animated-model-asset"
-                animation-mixer
-                scale="0.5 0.5 0.5" 
-                visible="false"
-                look-at="[gps-camera]"
-                cursor-listener> 
-            </a-entity>
-
-            <!-- 點擊觸發用的隱形方塊 (因為有些模型很難點) -->
-            <a-box id="ar-model-click-zone" visible="false" position="0 0 0" scale="2 2 2"></a-box>
-        </a-scene>
-    </div>
+    <div id="aframe-scene-container"></div>
 
     <div id="ar-world">
         <!-- 鎖定狀態物件 (沒有道具時顯示) -->
@@ -620,6 +592,79 @@
         let modelAsset = null;
         let gpsLocked = false; // 3D 模式是否已鎖定 GPS
 
+        // === 新增這個函數：動態建立 3D 場景 ===
+        function init3DScene(modelUrl, scale = 1) {
+            const container = document.getElementById('aframe-scene-container');
+            
+            // 這裡我們動態產生 HTML 字串，避免 AR.js 在不需要時搶相機
+            container.innerHTML = `
+                <a-scene 
+                    vr-mode-ui="enabled: false"
+                    embedded
+                    arjs='sourceType: webcam; debugUIEnabled: false;'
+                    renderer="logarithmicDepthBuffer: true; colorManagement: true; alpha: true;">
+                    
+                    <a-camera gps-camera="minDistance: 0; maxDistance: 2000;" rotation-reader></a-camera>
+
+                    <a-assets>
+                        <a-asset-item id="animated-model-asset" src="${modelUrl}"></a-asset-item>
+                    </a-assets>
+                    
+                    <a-entity 
+                        id="ar-model-entity"
+                        gltf-model="#animated-model-asset"
+                        animation-mixer
+                        scale="${scale} ${scale} ${scale}" 
+                        visible="false"
+                        look-at="[gps-camera]"
+                        cursor-listener> 
+                    </a-entity>
+
+                    <a-box id="ar-model-click-zone" visible="false" position="0 0 0" scale="2 2 2"></a-box>
+                </a-scene>
+            `;
+
+            // 重新綁定事件
+            setTimeout(() => {
+                const modelEntity = document.querySelector('#ar-model-entity');
+                const clickZone = document.querySelector('#ar-model-click-zone');
+                
+                // 點擊事件
+                const clickHandler = () => {
+                    // 這裡需要傳入 currentTask，因為它是全域變數所以可以直接讀取，
+                    // 或者你可以把 currentTask 暫存起來
+                    if(window.currentTask) showArModal(window.currentTask);
+                };
+
+                if(modelEntity) {
+                    modelEntity.addEventListener('click', clickHandler);
+                    modelEntity.addEventListener('touchstart', clickHandler); // 觸控兼容
+                }
+                
+                // 綁定 GPS 鎖定事件 (這原本是在 initSensors 做的，現在移到這裡)
+                window.addEventListener('gps-camera-update-position', (e) => {
+                    if (!gpsLocked) {
+                        // 更新全域變數
+                        userLat = e.detail.position.latitude;
+                        userLng = e.detail.position.longitude;
+                        document.getElementById('status').innerText = `GPS 已鎖定 (精度: ${e.detail.position.accuracy?.toFixed(1) || '?'}m)`;
+                        
+                        // 放置模型
+                        if(modelEntity && targetLat && targetLng) {
+                            modelEntity.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
+                            modelEntity.setAttribute('visible', 'true');
+                            
+                            if(clickZone) {
+                                clickZone.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
+                            }
+                            console.log(`📍 模型已放置於 ${targetLat}, ${targetLng}`);
+                        }
+                        gpsLocked = true;
+                    }
+                });
+            }, 1000); // 延遲一下確保 DOM 寫入完成
+        }
+
         // 2. 取得任務資訊
         const urlParams = new URLSearchParams(window.location.search);
         let targetLat = parseFloat(urlParams.get('lat'));
@@ -644,38 +689,27 @@
                         currentTask = task;
                         
                         // === 判斷是否為 3D 模式 ===
+                        // 將 currentTask 掛到 window 上以便事件存取
+                        window.currentTask = task; 
+
                         if (task.ar_model_url) {
                             is3DMode = true;
                             console.log('🚀 切換至 3D 模型模式:', task.ar_model_url);
                             
-                            // 隱藏 CSS AR 介面，顯示 A-Frame
+                            // 隱藏 CSS AR 介面
                             arWorld.style.display = 'none';
-                            video.style.display = 'none'; // A-Frame 有自己的 video
+                            video.style.display = 'none'; // 隱藏 2D 用的 video tag
                             aframeContainer.style.display = 'block';
                             
-                            // 設定模型資源
-                            modelAsset = document.getElementById('animated-model-asset');
-                            modelEntity = document.getElementById('ar-model-entity');
-                            modelAsset.setAttribute('src', task.ar_model_url);
-                            
-                            // 設定縮放 (如果有設定)
-                            if (task.ar_model_scale) {
-                                const s = task.ar_model_scale;
-                                modelEntity.setAttribute('scale', `${s} ${s} ${s}`);
-                            }
-
-                            // 綁定點擊事件 (A-Frame)
-                            modelEntity.addEventListener('click', () => {
-                                showArModal(task);
-                            });
-                            // 觸摸事件兼容
-                            modelEntity.addEventListener('touchstart', () => {
-                                showArModal(task);
-                            });
+                            // 【關鍵修改】動態初始化 3D 場景
+                            // 注意：如果有設定 task.ar_model_scale 就用，沒有就預設 0.5
+                            const scale = task.ar_model_scale || 0.5;
+                            init3DScene(task.ar_model_url, scale);
 
                         } else {
                             console.log('🖼️ 使用 CSS AR 模式');
                             is3DMode = false;
+                            aframeContainer.innerHTML = ''; // 確保清空
                             aframeContainer.style.display = 'none';
                             arWorld.style.display = 'block';
                             video.style.display = 'block';
@@ -1170,15 +1204,35 @@
         };
 
         function startCamera() {
+            // 如果是 3D 模式，AR.js 會在注入 DOM 時自動接管相機
+            // 我們不需要做任何事，只要更新狀態文字
             if (is3DMode) {
-                // A-Frame AR.js 會自動啟動相機，不需要手動 getUserMedia
                 status.innerText = '啟動 3D AR 中...';
                 return;
             }
+            // 只有 CSS 模式才手動呼叫 getUserMedia
             status.innerText = '啟動相機中...';
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-                .then(stream => { video.srcObject = stream; })
-                .catch(err => { document.getElementById('status').innerText = "相機錯誤: " + err.message; });
+            
+            // 增加錯誤處理和參數優化
+            navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    facingMode: 'environment',
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }, 
+                audio: false 
+            })
+            .then(stream => { 
+                video.srcObject = stream;
+                video.onloadedmetadata = () => {
+                    video.play();
+                };
+            })
+            .catch(err => { 
+                console.error(err);
+                document.getElementById('status').innerText = "相機錯誤: " + err.message; 
+                alert("無法啟動相機：" + err.message);
+            });
         }
 
         function initSensors() {
