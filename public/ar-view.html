@@ -738,7 +738,13 @@
                         }
                     }
                 })
-                .catch(err => console.error("無法載入任務詳情:", err));
+                .catch(err => {
+                    console.error("無法載入任務詳情:", err);
+                    showToast("載入任務失敗，請稍後再試");
+                });
+        } else {
+            // 沒有 taskId，可能是測試模式或直接開啟
+            console.log('No taskId provided');
         }
 
         // 設置 CSS AR 內容 (原本的邏輯封裝)
@@ -1130,24 +1136,37 @@
         });
 
         startBtn.onclick = async () => {
-            // 1. 請求感測器權限 (iOS 13+)
-            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                try {
-                    const permission = await DeviceOrientationEvent.requestPermission();
-                    if (permission !== 'granted') {
-                        alert('需要感測器權限才能顯示導航箭頭');
+            try {
+                console.log('🚀 Start button clicked');
+                
+                // 1. 請求感測器權限 (iOS 13+)
+                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    try {
+                        const permission = await DeviceOrientationEvent.requestPermission();
+                        if (permission !== 'granted') {
+                            showToast('⚠️ 需要感測器權限才能顯示導航箭頭');
+                        }
+                    } catch (e) {
+                        console.error('Permission request failed', e);
+                        // 不阻擋流程，繼續執行
                     }
-                } catch (e) {
-                    console.error(e);
                 }
+
+                // 2. 啟動相機
+                startCamera();
+
+                // 3. 隱藏蓋板
+                startOverlay.style.display = 'none';
+                initSensors();
+                
+                showToast(is3DMode ? '進入 3D AR 模式' : '進入 AR 導航模式');
+
+            } catch (err) {
+                console.error(err);
+                alert('啟動發生錯誤: ' + err.message);
+                // 發生錯誤也試著隱藏蓋板，讓用戶至少能看到畫面
+                startOverlay.style.display = 'none';
             }
-
-            // 2. 啟動相機
-            startCamera();
-
-            // 3. 隱藏蓋板
-            startOverlay.style.display = 'none';
-            initSensors();
         };
 
         function startCamera() {
