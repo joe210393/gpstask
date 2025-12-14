@@ -50,8 +50,8 @@
         <a-light type="directional" position="1 1 1" intensity="1"></a-light>
 
         <a-assets>
-            <!-- 改回使用 GitHub CDN 絕對路徑，確保讀取得到 -->
-            <a-asset-item id="animated-model" src="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/CesiumMan/glTF-Binary/CesiumMan.glb"></a-asset-item>
+            <!-- 改用使用者的自定義模型 -->
+            <a-asset-item id="animated-model" src="/models/result.glb"></a-asset-item>
         </a-assets>
 
         <a-camera gps-camera rotation-reader></a-camera>
@@ -106,12 +106,13 @@
             // 設定位置：正前方 2 米，稍微低一點
             // 注意：這裡直接操作 object3D 的 position，單位是米
             arModel.object3D.position.set(0, -1, -2);
-            arModel.object3D.scale.set(2, 2, 2);
-            arModel.object3D.rotation.set(0, Math.PI, 0); // 轉 180 度 (Math.PI)
+            // 重置比例為 1，因為不確定使用者模型大小
+            arModel.object3D.scale.set(1, 1, 1);
+            arModel.object3D.rotation.set(0, 0, 0); // 先不旋轉，看模型原始方向
             
             arModel.setAttribute('visible', 'true');
             
-            statusLog.innerText = "模式：黏在鏡頭上 (測試用)";
+            statusLog.innerText = "模式：黏在鏡頭上 (自定義模型)";
         });
     </script>
 </body>
