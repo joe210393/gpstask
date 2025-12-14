@@ -136,11 +136,15 @@
             animation-mixer: 播放動畫
             look-at: 讓模型永遠面向鏡頭
         -->
+        
+        <!-- 一個紅色的參考方塊，用來確認渲染引擎是否正常運作 -->
+        <a-box id="ref-box" position="0 0 -3" scale="0.5 0.5 0.5" color="red" visible="false"></a-box>
+
         <a-entity 
             id="ar-model"
             gltf-model="#animated-model"
             animation-mixer
-            scale="0.5 0.5 0.5"
+            scale="5 5 5"
             look-at="[gps-camera]"
             position="0 0 0">
         </a-entity>
@@ -227,7 +231,20 @@
             try {
                 showToast('✅ 按鈕點擊確認！處理中...', 1000);
                 
-                const m = document.getElementById('ar-model'); // 重新獲取
+                const m = document.getElementById('ar-model');
+                const box = document.getElementById('ref-box'); // 獲取紅色方塊
+                
+                // 顯示紅色參考方塊
+                if (box) {
+                    box.setAttribute('visible', 'true');
+                    // 將方塊也掛到相機下
+                    const camera = document.querySelector('a-camera');
+                    if (box.parentNode !== camera) {
+                        box.parentNode.removeChild(box);
+                        camera.appendChild(box);
+                    }
+                    box.setAttribute('position', '0 0.5 -2'); // 在上方一點
+                }
                 
                 // 移除 GPS 屬性，改為純 3D 座標
                 m.removeAttribute('gps-entity-place');
@@ -241,14 +258,19 @@
                     camera.appendChild(m);
                 }
                 
-                m.setAttribute('position', '0 -1 -2');
-                m.setAttribute('scale', '0.5 0.5 0.5'); 
+                // 放大模型！
+                m.setAttribute('scale', '5 5 5'); 
+                m.setAttribute('position', '0 -1 -3'); // 往前 3 米，往下 1 米
                 m.setAttribute('rotation', '0 180 0');
+                
+                // 同步更新 UI
+                scaleSlider.value = 5;
+                scaleVal.textContent = '5';
                 
                 infoDiv.innerText = "模式: 強制眼前 (無 GPS)";
                 distDisplay.innerText = "距離: N/A";
                 
-                showToast('模型已固定在鏡頭前方！\n請看畫面正中央');
+                showToast('模型已固定！\n請看畫面中央 (上方應有紅色方塊)');
             } catch (err) {
                 console.error(err);
                 showToast('按鈕執行錯誤: ' + err.message);
