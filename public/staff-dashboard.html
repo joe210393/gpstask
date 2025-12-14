@@ -471,19 +471,41 @@
               <div class="mt-2"><img id="editPhotoPreview" src="" alt="預覽" style="max-width:100%;max-height:150px;border-radius:8px;display:none;"></div>
             </div>
             
-            <div class="form-group">
-              <label class="form-label">YouTube 影片連結</label>
-              <input class="form-input" type="text" name="youtubeUrl" />
-              <small style="color:var(--text-secondary);font-size:0.85rem;">此影片會在 AR 模式中顯示</small>
-            </div>
-            
-            <div class="form-group">
-              <label class="form-label">AR 專用圖片（選填）</label>
-              <input class="form-input" type="text" name="ar_image_url" placeholder="/images/..." />
-              <div style="margin-top:8px;font-size:0.9rem;color:var(--text-secondary);">或上傳新圖片：</div>
-              <input type="file" name="editArImage" id="editArImageInput" accept="image/*" class="form-input" style="padding:5px;">
-              <div class="mt-2"><img id="editArImagePreview" src="" alt="預覽" style="max-width:100%;max-height:150px;border-radius:8px;display:none;"></div>
-              <small style="color:var(--text-secondary);font-size:0.85rem;">此圖片會在 AR 模式中顯示，與任務封面圖分開</small>
+            <!-- AR 內容設定區塊 (編輯) -->
+            <div class="form-group" style="background:#f8f9fa; border:1px solid #ddd; padding:15px; border-radius:8px;">
+              <label class="form-label" style="font-weight:bold; color:#2c3e50;">AR 內容顯示設定</label>
+              <div style="display:flex; gap:10px; margin-bottom:15px;">
+                <label style="cursor:pointer;"><input type="radio" name="edit_ar_type" value="none" checked> 預設</label>
+                <label style="cursor:pointer;"><input type="radio" name="edit_ar_type" value="image"> 圖片</label>
+                <label style="cursor:pointer;"><input type="radio" name="edit_ar_type" value="youtube"> YouTube</label>
+                <label style="cursor:pointer;"><input type="radio" name="edit_ar_type" value="3d"> 3D 模型</label>
+              </div>
+
+              <!-- 圖片選項 -->
+              <div id="editArField_image" style="display:none;">
+                <label class="form-label">AR 專用圖片</label>
+                <input class="form-input" type="text" name="ar_image_url" placeholder="/images/..." />
+                <div style="margin-top:8px;font-size:0.9rem;color:var(--text-secondary);">或上傳新圖片：</div>
+                <input type="file" name="editArImage" id="editArImageInput" accept="image/*" class="form-input" style="padding:5px;">
+                <div class="mt-2"><img id="editArImagePreview" src="" alt="預覽" style="max-width:100%;max-height:150px;border-radius:8px;display:none;"></div>
+                <small style="color:#666;">將在 AR 中懸浮顯示</small>
+              </div>
+
+              <!-- YouTube 選項 -->
+              <div id="editArField_youtube" style="display:none;">
+                <label class="form-label">YouTube 連結</label>
+                <input class="form-input" type="text" name="youtubeUrl" placeholder="https://youtu.be/..." />
+                <small style="color:#666;">將在 AR 中播放影片</small>
+              </div>
+
+              <!-- 3D 模型選項 -->
+              <div id="editArField_3d" style="display:none;">
+                <label class="form-label">選擇 3D 模型</label>
+                <select name="ar_model_id" class="form-select" id="editArModelSelect">
+                  <option value="">-- 請選擇模型 --</option>
+                  <!-- JS 動態載入 -->
+                </select>
+              </div>
             </div>
             
             <div style="display:flex; gap:10px; margin-top:20px;">

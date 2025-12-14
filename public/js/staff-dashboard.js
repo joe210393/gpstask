@@ -228,7 +228,8 @@ function loadARModels() {
       if (!data.success) return;
       globalModelsMap = {};
       const list = document.getElementById('modelList');
-      const selects = document.querySelectorAll('#arModelSelect'); // 任務表單中的下拉選單
+      // 選取所有 name="ar_model_id" 的 select (包含新增和編輯表單)
+      const selects = document.querySelectorAll('select[name="ar_model_id"]');
       
       if (list) list.innerHTML = '';
       
@@ -369,7 +370,7 @@ function setupArTypeToggle(radioName, containerIdPrefix) {
 }
 
 setupArTypeToggle('ar_type', 'arField');
-// 編輯模式的切換邏輯稍後在 openEditModal 中手動觸發，或者這裡也通用化
+setupArTypeToggle('edit_ar_type', 'editArField');
 
 
 function loadItems() {
@@ -818,16 +819,47 @@ function loadTasks() {
               form.points.value = t.points || 0;
               form.description.value = t.description;
               form.photoUrl.value = t.photoUrl;
-              form.youtubeUrl.value = t.youtubeUrl || '';
-              form.ar_image_url.value = t.ar_image_url || '';
               
-              // 預覽 AR 圖片
-              const arPreview = document.getElementById('editArImagePreview');
-              if (t.ar_image_url) {
-                arPreview.src = t.ar_image_url;
-                arPreview.style.display = '';
+              // 決定 AR 類型
+              let currentArType = 'none';
+              if (t.ar_model_id) currentArType = '3d';
+              else if (t.youtubeUrl) currentArType = 'youtube';
+              else if (t.ar_image_url) currentArType = 'image';
+              
+              // 設定 radio
+              const arRadios = document.querySelectorAll('input[name="edit_ar_type"]');
+              arRadios.forEach(r => {
+                r.checked = (r.value === currentArType);
+              });
+              // 觸發顯示更新
+              const checkedRadio = document.querySelector('input[name="edit_ar_type"]:checked');
+              if(checkedRadio) checkedRadio.dispatchEvent(new Event('change'));
+
+              // 填入各個 AR 欄位的值
+              if (t.ar_model_id) {
+                // 等待一下確保下拉選單已載入 (雖然 loadARModels 應該早跑完了)
+                // 這裡假設 arModelSelect 是一個 class 或者我們用 querySelector 找編輯表單內的
+                const editArModelSelect = document.querySelector('#editTaskForm select[name="ar_model_id"]');
+                if(editArModelSelect) editArModelSelect.value = t.ar_model_id;
+              }
+              
+              if (t.youtubeUrl) {
+                document.querySelector('#editTaskForm input[name="youtubeUrl"]').value = t.youtubeUrl;
               } else {
-                arPreview.style.display = 'none';
+                document.querySelector('#editTaskForm input[name="youtubeUrl"]').value = '';
+              }
+
+              if (t.ar_image_url) {
+                document.querySelector('#editTaskForm input[name="ar_image_url"]').value = t.ar_image_url;
+                const arPreview = document.getElementById('editArImagePreview');
+                if (arPreview) {
+                  arPreview.src = t.ar_image_url;
+                  arPreview.style.display = '';
+                }
+              } else {
+                document.querySelector('#editTaskForm input[name="ar_image_url"]').value = '';
+                const arPreview = document.getElementById('editArImagePreview');
+                if (arPreview) arPreview.style.display = 'none';
               }
               document.getElementById('editArImageInput').value = '';
 
@@ -1127,9 +1159,25 @@ document.getElementById('editTaskForm').addEventListener('submit', async functio
   const points = form.points.value;
   const description = form.description.value.trim();
   const photoUrl = form.photoUrl.value.trim();
-  const youtubeUrl = form.youtubeUrl.value.trim();
-  let arImageUrl = form.ar_image_url.value.trim() || null;
+  
+  // AR 內容設定處理
+  const ar_type = document.querySelector('input[name="edit_ar_type"]:checked')?.value || 'none';
+  let youtubeUrl = null;
+  let arImageUrl = null; // 注意這裡先設為 null，下面會根據 type 決定
+  let arModelId = null;
+  
+  const rawYoutubeUrl = form.youtubeUrl.value.trim();
+  const rawArImageUrl = form.ar_image_url.value.trim();
+  const rawArModelId = form.ar_model_id.value;
   const editArImageFile = form.editArImage?.files[0]; // 選填
+
+  if (ar_type === 'youtube') {
+    youtubeUrl = rawYoutubeUrl;
+  } else if (ar_type === 'image') {
+    arImageUrl = rawArImageUrl; // 如果沒上傳新圖，就用原本的網址
+  } else if (ar_type === '3d') {
+    arModelId = rawArModelId || null;
+  }
   
   // 處理任務分類與額外欄位
   const type = document.getElementById('editTaskCategorySelect').value;
@@ -1212,7 +1260,10 @@ document.getElementById('editTaskForm').addEventListener('submit', async functio
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'x-username': loginUser.username },
       body: JSON.stringify({ 
-        name, lat, lng, radius, points, description, photoUrl, youtubeUrl, ar_image_url: arImageUrl, 
+        name, lat, lng, radius, points, description, photoUrl, 
+        youtubeUrl: youtubeUrl, 
+        ar_image_url: arImageUrl, 
+        ar_model_id: arModelId, // 新增
         task_type, options, correct_answer,
         type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants,
         is_final_step, required_item_id, reward_item_id
