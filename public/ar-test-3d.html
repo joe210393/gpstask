@@ -116,9 +116,9 @@
         arjs='sourceType: webcam; videoTexture: true; debugUIEnabled: false;'
         renderer="logarithmicDepthBuffer: true;">
 
-        <!-- 預載資源：使用一個公開的 CesiumMan 模型 (會走路的小人) -->
+        <!-- 預載資源：改用本地檔案 -->
         <a-assets>
-            <a-asset-item id="animated-model" src="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/CesiumMan/glTF-Binary/CesiumMan.glb"></a-asset-item>
+            <a-asset-item id="animated-model" src="/models/CesiumMan.glb"></a-asset-item>
         </a-assets>
 
         <!-- 
