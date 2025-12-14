@@ -1283,14 +1283,16 @@ app.get('/api/tasks/:id', async (req, res) => {
   let conn;
   try {
     conn = await mysql.createConnection(dbConfig);
-    // Join items 表格以獲取道具名稱
+    // Join items 表格以獲取道具名稱，Join ar_models 獲取 3D 模型
     const [rows] = await conn.execute(`
       SELECT t.*, 
              i_req.name as required_item_name, i_req.image_url as required_item_image,
-             i_rew.name as reward_item_name, i_rew.image_url as reward_item_image
+             i_rew.name as reward_item_name, i_rew.image_url as reward_item_image,
+             am.url as ar_model_url, am.scale as ar_model_scale
       FROM tasks t
       LEFT JOIN items i_req ON t.required_item_id = i_req.id
       LEFT JOIN items i_rew ON t.reward_item_id = i_rew.id
+      LEFT JOIN ar_models am ON t.ar_model_id = am.id
       WHERE t.id = ?
     `, [id]);
     
