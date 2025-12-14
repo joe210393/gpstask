@@ -4,6 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>AR 尋找線索</title>
+    <!-- A-Frame & AR.js Libraries -->
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src='https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js'></script>
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
     <style>
         body { margin: 0; overflow: hidden; background: black; font-family: sans-serif; }
         
@@ -14,6 +18,18 @@
             object-fit: cover;
             z-index: 1;
         }
+
+        /* A-Frame 3D 場景容器 */
+        #aframe-scene-container {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 2; /* 在 camera-feed 上方 */
+            display: none; /* 預設隱藏，只在 3D 模式顯示 */
+        }
+        
+        /* 隱藏 A-Frame 自帶的 VR 按鈕 */
+        .a-enter-vr { display: none; }
 
         .ui-layer {
             position: fixed;
@@ -470,6 +486,37 @@
 
     <video id="camera-feed" autoplay playsinline muted></video>
 
+    <!-- A-Frame 3D 場景 (3D 模式使用) -->
+    <div id="aframe-scene-container">
+        <a-scene 
+            vr-mode-ui="enabled: false"
+            embedded
+            arjs='sourceType: webcam; debugUIEnabled: false;'
+            renderer="logarithmicDepthBuffer: true; colorManagement: true; alpha: true;">
+            
+            <a-camera gps-camera="minDistance: 0; maxDistance: 2000;" rotation-reader></a-camera>
+
+            <a-assets>
+                <!-- 動態載入模型 -->
+                <a-asset-item id="animated-model-asset" src=""></a-asset-item>
+            </a-assets>
+            
+            <!-- 使用者的 3D 模型 -->
+            <a-entity 
+                id="ar-model-entity"
+                gltf-model="#animated-model-asset"
+                animation-mixer
+                scale="0.5 0.5 0.5" 
+                visible="false"
+                look-at="[gps-camera]"
+                cursor-listener> 
+            </a-entity>
+
+            <!-- 點擊觸發用的隱形方塊 (因為有些模型很難點) -->
+            <a-box id="ar-model-click-zone" visible="false" position="0 0 0" scale="2 2 2"></a-box>
+        </a-scene>
+    </div>
+
     <div id="ar-world">
         <!-- 鎖定狀態物件 (沒有道具時顯示) -->
         <div id="locked-obj">
@@ -562,24 +609,32 @@
     <script>
         const API_BASE = ''; // 本地用空字串
         const video = document.getElementById('camera-feed');
+        const aframeContainer = document.getElementById('aframe-scene-container');
+        const arWorld = document.getElementById('ar-world');
+        const debug = document.getElementById('debug-info');
+        const status = document.getElementById('status');
         
-        // 移除自動啟動相機，改為在 startBtn.onclick 中啟動
-        
+        // 模式旗標
+        let is3DMode = false;
+        let modelEntity = null;
+        let modelAsset = null;
+        let gpsLocked = false; // 3D 模式是否已鎖定 GPS
+
         // 2. 取得任務資訊
         const urlParams = new URLSearchParams(window.location.search);
-        // 注意：這裡我們主要依賴 API 回傳的座標，但如果網址有傳 lat/lng 也會先用
         let targetLat = parseFloat(urlParams.get('lat'));
         let targetLng = parseFloat(urlParams.get('lng'));
         const taskId = urlParams.get('taskId');
+        
         let currentTask = null;
         let isNumberTask = false;
         let isLocationTask = false;
         let lockDigits = 4;
-        let currentUserTaskId = null; // user_tasks.id
-        let requiredItem = null; // 任務需要的道具資訊
-        let hasRequiredItem = false; // 玩家是否擁有該道具
+        let currentUserTaskId = null;
+        let requiredItem = null;
+        let hasRequiredItem = false;
 
-        // 載入任務詳情 (為了拿 YouTube 連結)
+        // 載入任務詳情
         if (taskId) {
             fetch(`${API_BASE}/api/tasks/${taskId}`)
                 .then(res => res.json())
@@ -588,14 +643,54 @@
                         const task = data.task;
                         currentTask = task;
                         
-                        // 檢查道具需求
+                        // === 判斷是否為 3D 模式 ===
+                        if (task.ar_model_url) {
+                            is3DMode = true;
+                            console.log('🚀 切換至 3D 模型模式:', task.ar_model_url);
+                            
+                            // 隱藏 CSS AR 介面，顯示 A-Frame
+                            arWorld.style.display = 'none';
+                            video.style.display = 'none'; // A-Frame 有自己的 video
+                            aframeContainer.style.display = 'block';
+                            
+                            // 設定模型資源
+                            modelAsset = document.getElementById('animated-model-asset');
+                            modelEntity = document.getElementById('ar-model-entity');
+                            modelAsset.setAttribute('src', task.ar_model_url);
+                            
+                            // 設定縮放 (如果有設定)
+                            if (task.ar_model_scale) {
+                                const s = task.ar_model_scale;
+                                modelEntity.setAttribute('scale', `${s} ${s} ${s}`);
+                            }
+
+                            // 綁定點擊事件 (A-Frame)
+                            modelEntity.addEventListener('click', () => {
+                                showArModal(task);
+                            });
+                            // 觸摸事件兼容
+                            modelEntity.addEventListener('touchstart', () => {
+                                showArModal(task);
+                            });
+
+                        } else {
+                            console.log('🖼️ 使用 CSS AR 模式');
+                            is3DMode = false;
+                            aframeContainer.style.display = 'none';
+                            arWorld.style.display = 'block';
+                            video.style.display = 'block';
+                        }
+
+                        // ... (以下為原有的道具/任務邏輯，部分需適配 3D 模式) ...
+                        
+                        // 檢查道具需求 (3D 模式暫時不顯示道具鎖，直接顯示模型但點擊無效或提示)
+                        // TODO: 未來可以讓 3D 模式也支援道具鎖定 (透過更換模型或隱藏模型)
                         if (task.required_item_id) {
                             requiredItem = {
                                 id: task.required_item_id,
                                 name: task.required_item_name,
                                 image: task.required_item_image
                             };
-                            console.log('[AR] 任務需要道具:', requiredItem);
                             
                             // 檢查背包
                             const loginUser = getLoginUser();
@@ -605,109 +700,38 @@
                                         headers: { 'x-username': loginUser.username }
                                     });
                                     const invData = await invRes.json();
-                                    console.log('[AR] 背包資料:', invData);
                                     if (invData.success) {
-                                        hasRequiredItem = invData.inventory.some(i => {
-                                            const match = i.item_id === task.required_item_id;
-                                            console.log(`[AR] 檢查道具 ${i.item_id} === ${task.required_item_id}:`, match);
-                                            return match;
-                                        });
-                                        console.log('[AR] 是否擁有道具:', hasRequiredItem);
-                                        
-                                        // 如果有道具，設置道具使用介面
-                                        if (hasRequiredItem) {
-                                            const itemUseImage = document.getElementById('item-use-image');
-                                            const itemUseName = document.getElementById('item-use-name');
-                                            if (itemUseImage) {
-                                                if (requiredItem.image) {
-                                                    itemUseImage.src = requiredItem.image;
-                                                    itemUseImage.style.display = 'block';
-                                                    console.log('[AR] 設置道具圖片:', requiredItem.image);
-                                                } else {
-                                                    itemUseImage.style.display = 'none';
-                                                    console.log('[AR] 道具沒有圖片，隱藏圖片元素');
-                                                }
-                                            }
-                                            if (itemUseName) {
-                                                itemUseName.textContent = requiredItem.name || '未知道具';
-                                                console.log('[AR] 設置道具名稱:', requiredItem.name);
-                                            }
-                                            console.log('[AR] 道具使用介面已準備就緒');
-                                        }
+                                        hasRequiredItem = invData.inventory.some(i => i.item_id === task.required_item_id);
                                     }
-                                } catch (e) {
-                                    console.error('[AR] 檢查背包失敗', e);
-                                }
-                            } else {
-                                console.warn('[AR] 無法取得登入用戶資訊');
+                                } catch (e) { console.error(e); }
                             }
-                        } else {
-                            console.log('[AR] 此任務不需要道具');
                         }
 
                         isNumberTask = (task.task_type === 'number');
                         isLocationTask = (task.task_type === 'location');
-                        
-                        // 如果是打卡任務，預先抓 user_task_id
                         if (isLocationTask) fetchCurrentUserTaskId();
 
-                        // 依答案長度決定位數（不暴露答案內容；若無則預設 4）
                         if (typeof task.correct_answer === 'string') {
                             const len = task.correct_answer.trim().length;
                             if (len >= 2 && len <= 8) lockDigits = len;
                         }
                         
-                        // 更新座標 (以資料庫為準)
+                        // 更新座標
                         if (task.lat && task.lng) {
                             targetLat = task.lat;
                             targetLng = task.lng;
                         }
 
-                        const chestObj = document.getElementById('chest-obj');
-                        const chestImg = document.getElementById('chest-img');
-                        const videoFrame = document.getElementById('video-frame');
-                        let hasImage = false;
-                        let hasVideo = false;
-
-                        // 檢查是否有 AR 專用圖片
-                        if (task.ar_image_url) {
-                            chestImg.src = task.ar_image_url;
-                            chestImg.style.display = 'block';
-                            hasImage = true;
+                        // === CSS AR 的 UI 設定 (只有在 !is3DMode 時才需要) ===
+                        if (!is3DMode) {
+                            setupCssArContent(task);
                         }
 
-                        // 檢查是否有 YouTube 連結
-                        if (task.youtubeUrl) {
-                            const ytId = extractYouTubeId(task.youtubeUrl);
-                            if (ytId) {
-                                videoFrame.style.display = 'block';
-                                document.getElementById('yt-player').src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0&controls=1&playsinline=1`;
-                                hasVideo = true;
-                            }
-                        }
-
-                        // 如果都沒有，顯示預設寶箱
-                        if (!hasImage && !hasVideo) {
-                            chestImg.src = '/images/mascot.png';
-                            chestImg.style.display = 'block';
-                            hasImage = true;
-                        }
-
-                        // 設定容器類別（用於樣式調整）
-                        if (hasImage && hasVideo) {
-                            chestObj.className = 'has-both';
-                        } else if (hasImage) {
-                            chestObj.className = 'only-image';
-                        } else if (hasVideo) {
-                            chestObj.className = 'only-video';
-                        }
-
-                        // 若是數字解謎，顯示密碼鎖按鈕
+                        // 數字鎖按鈕 (通用)
                         const btnOpenLock = document.getElementById('btn-open-lock');
                         if (isNumberTask) {
                             btnOpenLock.style.display = 'block';
                             initLockWheels(lockDigits);
-                            // 預先抓一次 user_task_id
                             fetchCurrentUserTaskId();
                         } else {
                             btnOpenLock.style.display = 'none';
@@ -717,6 +741,97 @@
                 .catch(err => console.error("無法載入任務詳情:", err));
         }
 
+        // 設置 CSS AR 內容 (原本的邏輯封裝)
+        function setupCssArContent(task) {
+            const chestObj = document.getElementById('chest-obj');
+            const chestImg = document.getElementById('chest-img');
+            const videoFrame = document.getElementById('video-frame');
+            let hasImage = false;
+            let hasVideo = false;
+
+            if (task.ar_image_url) {
+                chestImg.src = task.ar_image_url;
+                chestImg.style.display = 'block';
+                hasImage = true;
+            }
+
+            if (task.youtubeUrl) {
+                const ytId = extractYouTubeId(task.youtubeUrl);
+                if (ytId) {
+                    videoFrame.style.display = 'block';
+                    document.getElementById('yt-player').src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0&controls=1&playsinline=1`;
+                    hasVideo = true;
+                }
+            }
+
+            if (!hasImage && !hasVideo) {
+                chestImg.src = '/images/mascot.png';
+                chestImg.style.display = 'block';
+                hasImage = true;
+            }
+
+            if (hasImage && hasVideo) {
+                chestObj.className = 'has-both';
+            } else if (hasImage) {
+                chestObj.className = 'only-image';
+            } else if (hasVideo) {
+                chestObj.className = 'only-video';
+            }
+        }
+
+        // 顯示放大檢視 Modal (3D 點擊後也用這個)
+        function showArModal(task) {
+            // 如果需要道具但沒有，顯示提示
+            if (requiredItem && !hasRequiredItem) {
+                showToast(`🔒 需要道具：【${requiredItem.name}】\n請先去尋找道具再來吧！`, 3000);
+                return;
+            }
+
+            const modalBody = document.getElementById('modal-body');
+            const arModal = document.getElementById('ar-modal');
+            modalBody.innerHTML = '';
+
+            // 如果是 3D 模式，顯示任務圖片當作替代預覽，或者如果有設定 ar_image_url 就顯示那個
+            if (is3DMode) {
+                const img = document.createElement('img');
+                img.src = task.ar_image_url || task.photoUrl || '/images/mascot.png';
+                modalBody.appendChild(img);
+                
+                if (task.youtubeUrl) {
+                    const ytId = extractYouTubeId(task.youtubeUrl);
+                    if (ytId) {
+                        const iframe = document.createElement('iframe');
+                        iframe.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0&controls=1&playsinline=1`;
+                        iframe.style.width = '100%';
+                        iframe.style.height = '200px';
+                        iframe.style.border = 'none';
+                        modalBody.appendChild(iframe);
+                    }
+                }
+            } else {
+                // CSS AR 模式：複製現有 DOM
+                const chestImg = document.getElementById('chest-img');
+                const videoFrame = document.getElementById('video-frame');
+                const ytPlayer = document.getElementById('yt-player');
+
+                if (chestImg.style.display !== 'none') {
+                    const img = document.createElement('img');
+                    img.src = chestImg.src;
+                    modalBody.appendChild(img);
+                }
+                if (videoFrame.style.display !== 'none') {
+                    const iframe = document.createElement('iframe');
+                    iframe.src = ytPlayer.src;
+                    iframe.style.width = '100%';
+                    iframe.style.height = '200px';
+                    iframe.style.border = 'none';
+                    modalBody.appendChild(iframe);
+                }
+            }
+            
+            arModal.style.display = 'flex';
+        }
+
         document.getElementById('btn-back').onclick = () => {
             if (taskId) window.location.href = `/task-detail.html?id=${taskId}`;
             else window.history.back();
@@ -724,6 +839,7 @@
 
         // 3. 感測器與 AR 邏輯
         const chest = document.getElementById('chest-obj');
+        // ... (保留其他變數) ...
         const lockedObj = document.getElementById('locked-obj');
         const itemUseObj = document.getElementById('item-use-obj');
         const locationObj = document.getElementById('location-obj');
@@ -1035,6 +1151,11 @@
         };
 
         function startCamera() {
+            if (is3DMode) {
+                // A-Frame AR.js 會自動啟動相機，不需要手動 getUserMedia
+                status.innerText = '啟動 3D AR 中...';
+                return;
+            }
             status.innerText = '啟動相機中...';
             navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
                 .then(stream => { video.srcObject = stream; })
@@ -1042,51 +1163,81 @@
         }
 
         function initSensors() {
-            // 啟動 GPS
-            if ('geolocation' in navigator) {
-                navigator.geolocation.watchPosition(
-                    pos => {
-                        userLat = pos.coords.latitude;
-                        userLng = pos.coords.longitude;
-                        updateAR();
-                    },
-                    err => {
-                        status.innerText = "GPS 錯誤: " + err.message;
-                    },
-                    { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 }
-                );
-            }
-
-            // 啟動羅盤
-            window.addEventListener('deviceorientation', event => {
-                let currentHeading = 0;
-                if (event.webkitCompassHeading) {
-                    currentHeading = event.webkitCompassHeading;
-                } else if (event.alpha) {
-                    currentHeading = 360 - event.alpha;
+            // CSS 模式：手動監聽 GPS 和羅盤
+            if (!is3DMode) {
+                if ('geolocation' in navigator) {
+                    navigator.geolocation.watchPosition(
+                        pos => {
+                            userLat = pos.coords.latitude;
+                            userLng = pos.coords.longitude;
+                            updateAR();
+                        },
+                        err => {
+                            status.innerText = "GPS 錯誤: " + err.message;
+                        },
+                        { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 }
+                    );
                 }
-                
-                // === 羅盤平滑化 (Weighted Smoothing) ===
-                // 處理 0/360 度交界問題 (例如 359 -> 1 度)
-                let diff = currentHeading - lastHeading;
-                if (diff > 180) diff -= 360;
-                if (diff < -180) diff += 360;
-                
-                // alpha 係數：越小越平滑但反應越慢，越大越靈敏但越抖
-                // 0.15 是一個不錯的平衡點
-                const alpha = 0.15; 
-                lastHeading += diff * alpha;
-                
-                // 正規化回 0-360
-                deviceHeading = (lastHeading + 360) % 360;
-                
-                updateAR();
-            }, true);
+
+                window.addEventListener('deviceorientation', event => {
+                    let currentHeading = 0;
+                    if (event.webkitCompassHeading) {
+                        currentHeading = event.webkitCompassHeading;
+                    } else if (event.alpha) {
+                        currentHeading = 360 - event.alpha;
+                    }
+                    
+                    let diff = currentHeading - lastHeading;
+                    if (diff > 180) diff -= 360;
+                    if (diff < -180) diff += 360;
+                    
+                    const alpha = 0.15; 
+                    lastHeading += diff * alpha;
+                    deviceHeading = (lastHeading + 360) % 360;
+                    
+                    updateAR();
+                }, true);
+            } else {
+                // 3D 模式：A-Frame 處理 GPS/Compass，我們只需要設定模型位置
+                window.addEventListener('gps-camera-update-position', (e) => {
+                    if (!gpsLocked) {
+                        userLat = e.detail.position.latitude;
+                        userLng = e.detail.position.longitude;
+                        status.innerText = `GPS 已鎖定 (精度: ${e.detail.position.accuracy?.toFixed(1) || '?'}m)`;
+                        
+                        // 首次鎖定後，放置模型
+                        placeModel();
+                        gpsLocked = true;
+                    }
+                });
+            }
         }
 
-        // 移除原有的自動啟動邏輯，改由按鈕觸發
+        // 3D 模式：放置模型到指定座標
+        function placeModel() {
+            if (!modelEntity || !targetLat || !targetLng) return;
+            
+            // 設定經緯度
+            modelEntity.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
+            // 抬高一點避免埋在土裡，並設為可見
+            modelEntity.setAttribute('position', '0 0 0'); // AR.js 會覆蓋這個，但預設歸零比較安全
+            modelEntity.setAttribute('visible', 'true');
+            
+            // 隱形點擊區也跟著放
+            const clickZone = document.getElementById('ar-model-click-zone');
+            if (clickZone) {
+                clickZone.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
+                clickZone.setAttribute('visible', 'false'); // 保持不可見，但可點擊
+            }
+
+            console.log(`📍 模型已放置於 ${targetLat}, ${targetLng}`);
+            status.innerText = '模型已放置，請尋找目標';
+        }
 
         function updateAR() {
+            // CSS AR 模式的更新邏輯
+            if (is3DMode) return; // 3D 模式不需要手動計算 transform
+
             if (!userLat || !targetLat) {
                 status.innerText = `GPS 定位中... (目標:${targetLat},${targetLng})`;
                 return;
