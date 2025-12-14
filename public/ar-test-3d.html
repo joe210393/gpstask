@@ -3,196 +3,161 @@
 <head>
     <meta charset='utf-8'>
     <meta http-equiv='X-UA-Compatible' content='IE=edge'>
-    <title>GPS AR 3D Showcase</title>
-    <!-- A-Frame 1.4.0 -->
+    <title>GPS AR Giant Debug</title>
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-    <!-- AR.js for A-Frame (NFT build works well for location too) -->
     <script src='https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js'></script>
-    <!-- A-Frame Extras (for animation-mixer) -->
+    <!-- 加入 A-Frame Extras 讓模型動畫可以播放 -->
     <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
-    <!-- 加入 look-at 套件，讓文字永遠面向使用者 -->
-    <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
 
     <style>
         body { margin: 0; overflow: hidden; }
         .debug-ui {
-            position: fixed; bottom: 20px; left: 0; width: 100%; z-index: 99999;
-            background: transparent; 
+            position: fixed; top: 10px; left: 10px; z-index: 99999;
+            background: rgba(0, 0, 0, 0.7);
+            color: #0f0;
             padding: 10px;
-            pointer-events: none; /* 讓點擊穿透 */
-            display: flex; flex-direction: column; align-items: center; gap: 10px;
-        }
-        .status-badge {
-            background: rgba(0, 0, 0, 0.6);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-family: sans-serif;
+            font-family: monospace;
             font-size: 14px;
-            backdrop-filter: blur(5px);
+            pointer-events: none;
+            max-width: 80%;
+            border-radius: 8px;
+        }
+        .action-btn {
+            position: fixed; bottom: 30px; left: 50%;
+            transform: translateX(-50%);
+            z-index: 99999;
+            padding: 15px 30px;
+            background: #ff0000;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            pointer-events: auto;
+            white-space: nowrap;
         }
     </style>
 </head>
-
 <body style='margin: 0; overflow: hidden;'>
-    
-    <div class="debug-ui">
-        <div id="status-log" class="status-badge">📡 等待 GPS 定位...</div>
-        <div id="dist-log" class="status-badge" style="display:none; color: yellow;">📏 尚未放置</div>
-        <button id="place-btn" class="status-badge" style="margin-top: 10px; background: rgba(0,200,100,0.8); pointer-events: auto; display: none;">📍 在北方 2 公尺放置</button>
+
+    <div class="debug-ui" id="debug-text">
+        初始化 GPS...<br>
+        請走到戶外或是窗邊測試
     </div>
 
-    <!-- 
-        renderer: 
-        - logarithmicDepthBuffer: 解決深度閃爍
-        - colorManagement: 確保 GLTF 顏色正確
-        arjs: 
-        - sourceType: webcam
-        - debugUIEnabled: false
-        - videoTexture: true
-    -->
+    <button id="spawn-btn" class="action-btn">🏟️ 在這裡建立巨人地標</button>
+
     <a-scene 
         vr-mode-ui="enabled: false"
         embedded
-        arjs='sourceType: webcam; debugUIEnabled: false; videoTexture: true;'
+        arjs='sourceType: webcam; debugUIEnabled: false;'
         renderer="logarithmicDepthBuffer: true; colorManagement: true;">
 
-        <a-light type="ambient" color="#ffffff" intensity="1.5"></a-light>
-        <a-light type="directional" position="1 1 1" intensity="1"></a-light>
+        <!-- 增加 maxDistance 到 2000，確保看得到遠處物體 -->
+        <a-camera gps-camera="minDistance: 0; maxDistance: 2000;" rotation-reader></a-camera>
 
+        <!-- 3D 模型資源 -->
         <a-assets>
             <a-asset-item id="animated-model" src="/models/result.glb"></a-asset-item>
         </a-assets>
 
-        <!-- minDistance: 0 確保再近也能看到，maxDistance: 100 限制顯示範圍 -->
-        <a-camera gps-camera="minDistance: 0; maxDistance: 1000;" rotation-reader></a-camera>
+        <!-- 四方巨柱 (初始隱藏) -->
+        <a-cylinder id="col-n" color="red" height="30" radius="2" visible="false"></a-cylinder>
+        <a-cylinder id="col-e" color="green" height="30" radius="2" visible="false"></a-cylinder>
+        <a-cylinder id="col-s" color="blue" height="30" radius="2" visible="false"></a-cylinder>
+        <a-cylinder id="col-w" color="yellow" height="30" radius="2" visible="false"></a-cylinder>
+        
+        <!-- 中心點標記 -->
+        <a-box id="col-center" color="white" scale="1 1 1" visible="false"></a-box>
 
-        <!-- 3D 模型 -->
+        <!-- 使用者的 3D 模型 (放在北方紅柱旁) -->
         <a-entity 
             id="ar-model"
             gltf-model="#animated-model"
             animation-mixer
-            scale="3 3 3"
-            position="0 0 0"
+            scale="5 5 5" 
             visible="false"> 
         </a-entity>
-
-        <!-- 改用巨大立體柱子當路標，確保各個角度都看得到 -->
-        <!-- 北 (紅) - 半徑加大到 0.5，高度 5 -->
-        <a-cylinder id="dir-n" color="#ff0000" height="5" radius="0.5" position="0 2.5 0" visible="false"></a-cylinder>
-        <!-- 南 (藍) -->
-        <a-cylinder id="dir-s" color="#0000ff" height="5" radius="0.5" position="0 2.5 0" visible="false"></a-cylinder>
-        <!-- 東 (綠) -->
-        <a-cylinder id="dir-e" color="#00ff00" height="5" radius="0.5" position="0 2.5 0" visible="false"></a-cylinder>
-        <!-- 西 (黃) -->
-        <a-cylinder id="dir-w" color="#ffff00" height="5" radius="0.5" position="0 2.5 0" visible="false"></a-cylinder>
 
     </a-scene>
 
     <script>
-        const arModel = document.getElementById('ar-model');
-        const statusLog = document.getElementById('status-log');
-        const distLog = document.getElementById('dist-log');
-        const placeBtn = document.getElementById('place-btn');
-        const camera = document.querySelector('a-camera');
-        
-        // 方位元素
-        const dirN = document.getElementById('dir-n');
-        const dirS = document.getElementById('dir-s');
-        const dirE = document.getElementById('dir-e');
-        const dirW = document.getElementById('dir-w');
+        const debugText = document.getElementById('debug-text');
+        const spawnBtn = document.getElementById('spawn-btn');
+        let currentPos = null;
 
-        let currentCoords = null;
-        let modelLoaded = false;
-        let placed = false;
-
-        // 監聽 GPS 更新
+        // 監聽 GPS 更新 (顯示精度)
         window.addEventListener('gps-camera-update-position', (e) => {
-            currentCoords = e.detail.position;
+            currentPos = e.detail.position;
             
-            if (!placeBtn.style.display || placeBtn.style.display === 'none') {
-                statusLog.innerText = "✅ GPS 已鎖定";
-                statusLog.style.backgroundColor = "rgba(40, 167, 69, 0.8)";
-                if (modelLoaded) {
-                    placeBtn.style.display = 'block';
-                }
-            }
-
-            // 如果已經放置，計算與北方柱子的距離
-            if (placed && dirN.getAttribute('gps-entity-place')) {
-                const dist = dirN.getAttribute('distance'); // AR.js 自動計算的距離
-                const camPos = camera.object3D.position;
-                const nPos = dirN.object3D.position;
-                
-                // 簡單除錯距離
-                if (dist) {
-                    distLog.innerText = `📏 距離北方紅柱: ${Math.round(dist)}m`;
-                } else {
-                    // 手動計算大概距離 (僅供參考)
-                    const dx = camPos.x - nPos.x;
-                    const dz = camPos.z - nPos.z;
-                    const manualDist = Math.sqrt(dx*dx + dz*dz);
-                    distLog.innerText = `📏 距離北方紅柱(3D): ${manualDist.toFixed(1)}m`;
-                }
-            }
+            // accuracy 代表誤差範圍 (公尺)
+            // 如果 accuracy > 50，代表你在室內，基本上 AR 不會準
+            const acc = e.detail.position.accuracy || 0;
+            
+            debugText.innerHTML = `
+                GPS 已鎖定 🛰️<br>
+                Lat: ${currentPos.latitude.toFixed(6)}<br>
+                Lng: ${currentPos.longitude.toFixed(6)}<br>
+                誤差: ±${acc.toFixed(1)} 公尺<br>
+                (誤差若大於 20m 請移動到戶外)
+            `;
+            
+            spawnBtn.style.background = "#28a745"; // 變綠色代表 Ready
         });
 
-        // 監聽模型載入
-        arModel.addEventListener('model-loaded', () => {
-            console.log("Model Loaded!");
-            modelLoaded = true;
-            if (currentCoords) {
-                placeBtn.style.display = 'block';
-                statusLog.innerText = "🚀 準備就緒，請點擊放置";
-            } else {
-                statusLog.innerText = "⏳ 模型 OK，等待 GPS...";
-            }
-        });
-
-        // 放置按鈕邏輯
-        placeBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            if (!currentCoords) return;
-
-            statusLog.innerText = "📍 計算位置中...";
-            distLog.style.display = 'block';
-            placed = true;
-
-            // 1. 確保模型從相機中移除
-            if (arModel.object3D.parent !== arModel.sceneEl.object3D) {
-                arModel.sceneEl.object3D.add(arModel.object3D);
+        spawnBtn.addEventListener('click', () => {
+            if(!currentPos) {
+                alert("尚未抓到 GPS 訊號！請稍候...");
+                return;
             }
 
-            // 2. 計算座標
-            // 2公尺緯度差約 0.000018度
-            // 3公尺方位指示約 0.000027度
-            const diff2m = 0.000018;
-            const diff3m = 0.000027;
+            const lat = currentPos.latitude;
+            const lng = currentPos.longitude;
 
-            const lat = currentCoords.latitude;
-            const lng = currentCoords.longitude;
+            // 設定距離：20 公尺 (比較保險的距離，避開近距離裁切)
+            // 經緯度換算：約 0.00018 度
+            const offset = 0.00018; 
 
-            // 3. 設定模型位置 (北方 2m)
-            arModel.setAttribute('gps-entity-place', `latitude: ${lat + diff2m}; longitude: ${lng};`);
-            arModel.setAttribute('position', '0 0 0'); // 地面
-            arModel.setAttribute('scale', '3 3 3'); 
-            arModel.setAttribute('visible', 'true');
+            // 1. 放置北柱 (紅)
+            placeObject('col-n', lat + offset, lng, '北方 20m (紅)');
+            
+            // 順便放置使用者的 3D 模型在北柱旁 (稍微偏一點點)
+            const modelEl = document.getElementById('ar-model');
+            modelEl.setAttribute('gps-entity-place', `latitude: ${lat + offset}; longitude: ${lng};`);
+            modelEl.setAttribute('position', '5 0 0'); // 在紅柱右邊 5 米
+            modelEl.setAttribute('visible', 'true');
 
-            // 4. 設定方位柱子 (3m 處)
-            setGpsPos(dirN, lat + diff3m, lng); // 北 (紅)
-            setGpsPos(dirS, lat - diff3m, lng); // 南 (藍)
-            setGpsPos(dirE, lat, lng + diff3m); // 東 (綠)
-            setGpsPos(dirW, lat, lng - diff3m); // 西 (黃)
+            // 2. 放置南柱 (藍)
+            placeObject('col-s', lat - offset, lng, '南方 20m (藍)');
+            
+            // 3. 放置東柱 (綠)
+            placeObject('col-e', lat, lng + offset, '東方 20m (綠)');
+            
+            // 4. 放置西柱 (黃)
+            placeObject('col-w', lat, lng - offset, '西方 20m (黃)');
 
-            // 5. 更新 UI
-            statusLog.innerText = `📍 路標已放置 (半徑0.5m 高5m)`;
-            placeBtn.innerText = "🔄 重置位置";
+            // 5. 放置中心點
+            placeObject('col-center', lat, lng, '腳下');
+
+            spawnBtn.style.display = 'none'; // 隱藏按鈕
+            debugText.innerHTML += "<br>✅ 巨柱已生成！請原地轉圈尋找";
         });
 
-        function setGpsPos(el, lat, lng) {
+        function placeObject(id, lat, lng, label) {
+            const el = document.getElementById(id);
             el.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lng};`);
-            el.setAttribute('position', '0 2.5 0'); // 中心點在 2.5m (高度的一半)，確保立在地面上
+            
+            // y=15 代表柱子中心在離地 15米處 (因為柱高30米，這樣剛好立在地上)
+            // 中心點盒子則貼地
+            if (id === 'col-center') {
+                el.setAttribute('position', '0 0 0');
+            } else {
+                el.setAttribute('position', '0 15 0'); 
+            }
+            
             el.setAttribute('visible', 'true');
+            console.log(`Placed ${label} at ${lat}, ${lng}`);
         }
     </script>
 </body>
