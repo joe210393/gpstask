@@ -111,18 +111,18 @@
             const lat = currentPos.latitude;
             const lng = currentPos.longitude;
 
-            // 設定距離：80 公尺 (拉遠距離，避免生成在使用者身上)
-            // 經緯度換算：約 0.00072 度
-            const offset = 0.00072; 
+            // 設定距離：100 公尺 (再拉遠一點)
+            // 經緯度換算：約 0.0009 度
+            const offset = 0.0009; 
 
-            // 模型放在北方 80m
+            // 模型放在北方 100m
             const modelEl = document.getElementById('ar-model');
             modelEl.setAttribute('gps-entity-place', `latitude: ${lat + offset}; longitude: ${lng};`);
             
-            // Y=0 地面
-            // Scale=10 (從 50 縮小到 10，避免太巨大)
-            modelEl.setAttribute('position', '0 0 0'); 
-            modelEl.setAttribute('scale', '10 10 10');
+            // Y=5 稍微抬高
+            // Scale=0.5 (因為模型原始尺寸似乎非常巨大，所以我們縮小它)
+            modelEl.setAttribute('position', '0 5 0'); 
+            modelEl.setAttribute('scale', '0.5 0.5 0.5');
             modelEl.setAttribute('visible', 'true');
 
             // 中心點
@@ -132,7 +132,7 @@
             centerEl.setAttribute('visible', 'true');
 
             spawnBtn.style.display = 'none';
-            debugText.innerHTML += "<br>✅ 模型已放置在北方 80m (縮小為 10x)";
+            debugText.innerHTML += "<br>✅ 模型已放置在北方 100m (縮小為 0.5x)";
         });
 
         function placeObject(id, lat, lng, label) {
