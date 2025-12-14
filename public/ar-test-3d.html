@@ -87,8 +87,12 @@
             <input type="range" id="height-slider" min="-10" max="10" step="0.5" value="0">
         </div>
         <div class="debug-row">
-            <button id="set-loc-btn">📍 放置模型在當前位置</button>
+            <button id="set-loc-btn">📍 GPS 放置 (北方)</button>
+            <button id="force-show-btn" style="background: #28a745;">👁️ 強制眼前 (無 GPS)</button>
+        </div>
+        <div class="debug-row">
             <span id="dist-val">距離: ? m</span>
+            <span id="gps-acc">精度: ?</span>
         </div>
         <div class="debug-row">
             <span>模擬 GPS: </span>
@@ -139,10 +143,8 @@
     </a-scene>
 
     <script>
-        const model = document.getElementById('ar-model');
-        const setLocBtn = document.getElementById('set-loc-btn');
-        const distDisplay = document.getElementById('dist-val');
-        const infoDiv = document.getElementById('info');
+        const forceShowBtn = document.getElementById('force-show-btn');
+        const gpsAccDisplay = document.getElementById('gps-acc');
         
         // UI Controls
         const scaleSlider = document.getElementById('scale-slider');
@@ -155,6 +157,10 @@
             showToast('✅ 3D 模型載入成功！');
             infoDiv.innerText += ' | 模型 OK';
             infoDiv.style.color = '#0f0';
+            // 預設縮放稍微大一點，避免太小看不到
+            model.setAttribute('scale', '2 2 2');
+            scaleSlider.value = 2;
+            scaleVal.textContent = '2';
         });
 
         model.addEventListener('model-error', (e) => {
@@ -195,20 +201,65 @@
         // 調整高度 (Y軸)
         heightSlider.addEventListener('input', (e) => {
             const val = e.target.value;
-            // 保持原本的 gps-entity-place，只改 position 的 y
-            // 注意：gps-entity-place 會覆蓋 position 的 x, z，所以通常直接修改 position 屬性可能會被蓋掉
-            // 這裡我們嘗試用 translateY
             model.object3D.position.y = parseFloat(val);
             heightVal.textContent = val;
+        });
+        
+        // 強制放置在鏡頭前方 (不使用 GPS)
+        forceShowBtn.addEventListener('click', () => {
+            showToast('正在強制將模型移至眼前...', 1000);
+            
+            // 移除 GPS 屬性，改為純 3D 座標
+            model.removeAttribute('gps-entity-place');
+            model.removeAttribute('look-at'); // 暫時移除 look-at 以避免旋轉問題
+            
+            // 取得相機
+            const camera = document.querySelector('a-camera');
+            
+            // 將模型「掛」在相機下面，成為子物件，這樣它就會跟著鏡頭跑
+            // 但 A-Frame 動態 reparenting 比較麻煩，我們直接設定在世界座標
+            
+            // 簡單暴力法：將模型設定在 (0, 0, -5)，也就是世界原點前方 5 米
+            // 但因為 gps-camera 會移動 camera，所以我們需要把模型掛在 camera 裡面
+            
+            // 重新將 model 加入到 camera 內部
+            if (model.parentNode !== camera) {
+                model.parentNode.removeChild(model);
+                camera.appendChild(model);
+            }
+            
+            // 設定在相機前方 2 米，高度稍微低一點
+            model.setAttribute('position', '0 -1 -2');
+            model.setAttribute('scale', '0.5 0.5 0.5'); // 在眼前的話要小一點
+            
+            // 旋轉一下讓他面對鏡頭
+            model.setAttribute('rotation', '0 180 0');
+            
+            infoDiv.innerText = "模式: 強制眼前 (無 GPS)";
+            distDisplay.innerText = "距離: N/A";
+            
+            showToast('模型已固定在鏡頭前方！\n請看畫面正中央');
         });
 
         // 按下按鈕時，將模型放置在使用者當前位置的"稍微前面一點"
         setLocBtn.addEventListener('click', () => {
+            // 如果之前被移入 camera，要移出來回到 scene
+            const scene = document.querySelector('a-scene');
+            const camera = document.querySelector('a-camera');
+            if (model.parentNode === camera) {
+                model.parentNode.removeChild(model);
+                scene.appendChild(model);
+                model.setAttribute('look-at', '[gps-camera]');
+            }
+
             if (navigator.geolocation) {
                 showToast('正在獲取 GPS...', 1000);
                 navigator.geolocation.getCurrentPosition((position) => {
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
+                    const acc = position.coords.accuracy;
+                    
+                    gpsAccDisplay.innerText = `精度: ${acc.toFixed(0)}m`;
                     
                     // 嘗試放置在多個方位，增加被看到的機率
                     // 預設放在北方 1.5 公尺
@@ -222,15 +273,17 @@
                     model.setAttribute('gps-entity-place', `latitude: ${newLat}; longitude: ${newLng};`);
                     
                     // 重置高度和大小，避免設定跑掉
-                    model.setAttribute('scale', '0.5 0.5 0.5');
-                    scaleSlider.value = 0.5;
-                    scaleVal.textContent = '0.5';
+                    model.setAttribute('scale', '2 2 2');
+                    scaleSlider.value = 2;
+                    scaleVal.textContent = '2';
                     
                     model.object3D.position.y = 0;
                     heightSlider.value = 0;
                     heightVal.textContent = '0';
+                    
+                    infoDiv.innerText = "模式: GPS 定位";
 
-                    showToast(`模型已放置在北方約 1.5 公尺處！\nLat: ${newLat.toFixed(6)}\nLng: ${newLng.toFixed(6)}`);
+                    showToast(`模型已放置在北方約 1.5 公尺處！\n精度: ${acc.toFixed(0)}m\nLat: ${newLat.toFixed(6)}\nLng: ${newLng.toFixed(6)}`);
 
                 }, (err) => {
                     showToast('無法獲取 GPS: ' + err.message);
