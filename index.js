@@ -574,8 +574,8 @@ app.get('/api/tasks', async (req, res) => {
     // Join items 表格以獲取道具名稱，Join ar_models 獲取 3D 模型
     const [rows] = await conn.execute(`
       SELECT t.*, 
-             i_req.name as required_item_name, i_req.image_url as required_item_image,
-             i_rew.name as reward_item_name, i_rew.image_url as reward_item_image,
+             i_req.name as required_item_name, i_req.image_url as required_item_image, i_req.model_url as required_item_model,
+             i_rew.name as reward_item_name, i_rew.image_url as reward_item_image, i_rew.model_url as reward_item_model,
              am.url as ar_model_url, am.scale as ar_model_scale
       FROM tasks t
       LEFT JOIN items i_req ON t.required_item_id = i_req.id
@@ -809,7 +809,7 @@ app.get('/api/items', async (req, res) => {
 
 // 新增道具 (Admin/Shop)
 app.post('/api/items', staffOrAdminAuth, upload.single('image'), async (req, res) => {
-  const { name, description } = req.body;
+  const { name, description, model_url } = req.body;
   if (!name) return res.status(400).json({ success: false, message: '缺少道具名稱' });
 
   let image_url = null;
@@ -823,8 +823,8 @@ app.post('/api/items', staffOrAdminAuth, upload.single('image'), async (req, res
   try {
     conn = await mysql.createConnection(dbConfig);
     await conn.execute(
-      'INSERT INTO items (name, description, image_url) VALUES (?, ?, ?)',
-      [name, description || '', image_url]
+      'INSERT INTO items (name, description, image_url, model_url) VALUES (?, ?, ?, ?)',
+      [name, description || '', image_url, model_url || null]
     );
     res.json({ success: true, message: '道具新增成功' });
   } catch (err) {
@@ -838,7 +838,7 @@ app.post('/api/items', staffOrAdminAuth, upload.single('image'), async (req, res
 // 編輯道具
 app.put('/api/items/:id', staffOrAdminAuth, upload.single('image'), async (req, res) => {
   const { id } = req.params;
-  const { name, description } = req.body;
+  const { name, description, model_url } = req.body;
   if (!name) return res.status(400).json({ success: false, message: '缺少道具名稱' });
 
   let conn;
@@ -849,14 +849,14 @@ app.put('/api/items/:id', staffOrAdminAuth, upload.single('image'), async (req, 
     let sql, params;
     if (req.file) {
       const image_url = '/images/' + req.file.filename;
-      sql = 'UPDATE items SET name = ?, description = ?, image_url = ? WHERE id = ?';
-      params = [name, description || '', image_url, id];
+      sql = 'UPDATE items SET name = ?, description = ?, image_url = ?, model_url = ? WHERE id = ?';
+      params = [name, description || '', image_url, model_url || null, id];
     } else if (req.body.image_url) {
-      sql = 'UPDATE items SET name = ?, description = ?, image_url = ? WHERE id = ?';
-      params = [name, description || '', req.body.image_url, id];
+      sql = 'UPDATE items SET name = ?, description = ?, image_url = ?, model_url = ? WHERE id = ?';
+      params = [name, description || '', req.body.image_url, model_url || null, id];
     } else {
-      sql = 'UPDATE items SET name = ?, description = ? WHERE id = ?';
-      params = [name, description || '', id];
+      sql = 'UPDATE items SET name = ?, description = ?, model_url = ? WHERE id = ?';
+      params = [name, description || '', model_url || null, id];
     }
 
     await conn.execute(sql, params);
@@ -1286,8 +1286,8 @@ app.get('/api/tasks/:id', async (req, res) => {
     // Join items 表格以獲取道具名稱，Join ar_models 獲取 3D 模型
     const [rows] = await conn.execute(`
       SELECT t.*, 
-             i_req.name as required_item_name, i_req.image_url as required_item_image,
-             i_rew.name as reward_item_name, i_rew.image_url as reward_item_image,
+             i_req.name as required_item_name, i_req.image_url as required_item_image, i_req.model_url as required_item_model,
+             i_rew.name as reward_item_name, i_rew.image_url as reward_item_image, i_rew.model_url as reward_item_model,
              am.url as ar_model_url, am.scale as ar_model_scale
       FROM tasks t
       LEFT JOIN items i_req ON t.required_item_id = i_req.id

@@ -8,6 +8,7 @@
     <script src='https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js'></script>
     <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
     <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
     <style>
         body { margin: 0; overflow: hidden; background: black; font-family: sans-serif; }
         
@@ -149,9 +150,12 @@
         <div id="item-use-obj" style="display:none; width: 250px; margin-left: -125px; margin-top: -150px; text-align: center;">
             <div style="color:white; text-shadow:0 2px 4px rgba(0,0,0,0.8);">
                 <div style="font-size:18px; font-weight:bold; margin-bottom:10px;">🎒 使用道具</div>
-                <img id="item-use-image" src="" alt="道具圖片" style="width:150px; height:150px; object-fit:contain; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.5); cursor:pointer; margin-bottom:10px;" />
+                <div id="item-use-media-container" style="width:150px; height:150px; margin: 0 auto 10px auto; position: relative;">
+                    <img id="item-use-image" src="" alt="道具圖片" style="width:100%; height:100%; object-fit:contain; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.5); cursor:pointer;" />
+                    <model-viewer id="item-use-model" src="" style="width:100%; height:100%; display:none; border-radius:12px;" auto-rotate camera-controls disable-zoom></model-viewer>
+                </div>
                 <div id="item-use-name" style="font-size:16px; font-weight:bold; margin-bottom:8px;"></div>
-                <div style="font-size:14px; color:#ffeb3b;">點擊道具圖片使用</div>
+                <div style="font-size:14px; color:#ffeb3b;">點擊道具使用</div>
             </div>
         </div>
         <div id="location-obj"><div id="location-icon">📍</div><div id="location-label">點擊打卡</div></div>
@@ -325,7 +329,12 @@
                             setupCssArContent(task);
                         }
                         if (task.required_item_id) {
-                            requiredItem = { id: task.required_item_id, name: task.required_item_name, image: task.required_item_image };
+                            requiredItem = { 
+                                id: task.required_item_id, 
+                                name: task.required_item_name, 
+                                image: task.required_item_image,
+                                model: task.required_item_model // 新增
+                            };
                             const loginUser = getLoginUser();
                             if (loginUser) {
                                 try {
@@ -376,7 +385,58 @@
             else if (hasVideo) chestObj.className = 'only-video';
         }
         function showArModal(task) {
-            if (requiredItem && !hasRequiredItem) { showToast(`🔒 需要道具：【${requiredItem.name}】`, 3000); return; }
+            // 1. 檢查是否需要道具且尚未解鎖
+            if (requiredItem) {
+                if (!hasRequiredItem) { 
+                    showToast(`🔒 需要道具：【${requiredItem.name}】`, 3000); 
+                    return; 
+                }
+                
+                // 有道具，顯示「使用道具」確認視窗
+                const modalBody = document.getElementById('modal-body');
+                const arModal = document.getElementById('ar-modal');
+                const modalSubmitBtn = document.getElementById('modal-submit');
+                
+                modalBody.innerHTML = '';
+                
+                // 標題
+                const title = document.createElement('div');
+                title.innerHTML = `<div style="font-size:1.2rem; font-weight:bold; color:white; margin-bottom:10px;">🎒 使用道具解鎖</div>`;
+                modalBody.appendChild(title);
+
+                // 道具展示 (3D 或 圖片)
+                if (requiredItem.model) {
+                     const mv = document.createElement('model-viewer');
+                     mv.src = requiredItem.model;
+                     mv.style.width = '100%';
+                     mv.style.height = '250px';
+                     mv.style.backgroundColor = 'rgba(0,0,0,0.2)';
+                     mv.style.borderRadius = '8px';
+                     mv.setAttribute('auto-rotate', '');
+                     mv.setAttribute('camera-controls', '');
+                     mv.setAttribute('disable-zoom', '');
+                     modalBody.appendChild(mv);
+                } else {
+                     const img = document.createElement('img');
+                     img.src = requiredItem.image || '/images/mascot.png';
+                     modalBody.appendChild(img);
+                }
+                
+                const name = document.createElement('div');
+                name.innerHTML = `<div style="font-size:1rem; color:#ffeb3b; margin-top:10px;">${requiredItem.name}</div>`;
+                modalBody.appendChild(name);
+
+                modalSubmitBtn.textContent = '✨ 確認使用';
+                modalSubmitBtn.onclick = () => {
+                     showToast(`🎒 使用了【${requiredItem.name}】！`, 2000);
+                     requiredItem = null; // 標記為已使用
+                     showArModal(task); // 重新呼叫以顯示任務內容
+                };
+                
+                arModal.style.display = 'flex';
+                return;
+            }
+
             const modalBody = document.getElementById('modal-body');
             const arModal = document.getElementById('ar-modal');
             const modalSubmitBtn = document.getElementById('modal-submit');
@@ -407,10 +467,15 @@
                         });
                         const data = await res.json();
                         if (data.success && data.isCompleted) {
-                            let msg = `🎉 打卡成功！\n${data.message}`;
-                            if (data.earnedItemName) msg += `\n\n🎁 獲得道具：【${data.earnedItemName}】`;
-                            alert(msg); 
-                            window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
+                            if (data.earnedItemName) {
+                                showRewardModal(data.earnedItemName, window.currentTask.reward_item_image, window.currentTask.reward_item_model, () => {
+                                    window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
+                                });
+                            } else {
+                                let msg = `🎉 打卡成功！\n${data.message}`;
+                                alert(msg); 
+                                window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
+                            }
                         } else { 
                             alert(data.message || '打卡失敗'); 
                             modalSubmitBtn.disabled = false;
@@ -454,6 +519,55 @@
             }
             arModal.style.display = 'flex';
         }
+        function showRewardModal(itemName, itemImage, itemModel, callback) {
+            const modalBody = document.getElementById('modal-body');
+            const arModal = document.getElementById('ar-modal');
+            const modalSubmitBtn = document.getElementById('modal-submit');
+            
+            modalBody.innerHTML = '';
+            
+            const title = document.createElement('div');
+            title.innerHTML = `<div style="font-size:1.5rem; font-weight:bold; color:#4ade80; margin-bottom:15px; text-shadow:0 2px 4px rgba(0,0,0,0.5);">🎉 獲得獎勵！</div>`;
+            modalBody.appendChild(title);
+
+            if (itemModel) {
+                const mv = document.createElement('model-viewer');
+                mv.src = itemModel;
+                mv.style.width = '100%';
+                mv.style.height = '250px';
+                mv.style.backgroundColor = 'rgba(255,255,255,0.1)';
+                mv.style.borderRadius = '12px';
+                mv.setAttribute('auto-rotate', '');
+                mv.setAttribute('camera-controls', '');
+                mv.setAttribute('disable-zoom', '');
+                mv.setAttribute('shadow-intensity', '1');
+                modalBody.appendChild(mv);
+            } else if (itemImage) {
+                const img = document.createElement('img');
+                img.src = itemImage;
+                img.style.maxHeight = '250px';
+                img.style.objectFit = 'contain';
+                modalBody.appendChild(img);
+            } else {
+                 const placeholder = document.createElement('div');
+                 placeholder.style.fontSize = '4rem';
+                 placeholder.textContent = '🎁';
+                 modalBody.appendChild(placeholder);
+            }
+            
+            const name = document.createElement('div');
+            name.innerHTML = `<div style="font-size:1.2rem; color:white; margin-top:15px; font-weight:bold;">${itemName}</div>`;
+            modalBody.appendChild(name);
+
+            modalSubmitBtn.textContent = '📥 收下獎勵';
+            modalSubmitBtn.onclick = () => {
+                if (callback) callback();
+                else arModal.style.display = 'none';
+            };
+            
+            arModal.style.display = 'flex';
+        }
+
         document.getElementById('btn-back').onclick = () => { if (taskId) window.location.href = `/task-detail.html?id=${taskId}`; else window.history.back(); };
         const chest = document.getElementById('chest-obj');
         const lockedObj = document.getElementById('locked-obj');
@@ -486,9 +600,15 @@
                     const res = await fetch(`${API_BASE}/api/user-tasks/${currentUserTaskId}/answer`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answer: 'checked_in' }) });
                     const data = await res.json();
                     if (data.success && data.isCompleted) {
-                        let msg = `🎉 打卡成功！\n${data.message}`;
-                        if (data.earnedItemName) msg += `\n\n🎁 獲得道具：【${data.earnedItemName}】`;
-                        alert(msg); window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
+                        if (data.earnedItemName) {
+                            showRewardModal(data.earnedItemName, window.currentTask.reward_item_image, window.currentTask.reward_item_model, () => {
+                                window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
+                            });
+                        } else {
+                            let msg = `🎉 打卡成功！\n${data.message}`;
+                            alert(msg); 
+                            window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
+                        }
                     } else { alert(data.message || '打卡失敗'); }
                 } catch (e) { console.error(e); alert('連線錯誤'); }
             }
@@ -634,7 +754,27 @@
                     isObjectVisible = true; arrow.style.display = 'none';
                     if (isLocationTask) { locationObj.style.display = 'block'; chest.style.display = 'none'; lockedObj.style.display = 'none'; itemUseObj.style.display = 'none'; }
                     else if (requiredItem) {
-                        if (hasRequiredItem) { itemUseObj.style.display = 'block'; lockedObj.style.display = 'none'; chest.style.display = 'none'; locationObj.style.display = 'none'; }
+                        if (hasRequiredItem) { 
+                            itemUseObj.style.display = 'block'; 
+                            lockedObj.style.display = 'none'; 
+                            chest.style.display = 'none'; 
+                            locationObj.style.display = 'none';
+                            
+                            // 更新道具顯示 (2D/3D)
+                            const itemImg = document.getElementById('item-use-image');
+                            const itemModel = document.getElementById('item-use-model');
+                            document.getElementById('item-use-name').textContent = requiredItem.name;
+                            
+                            if (requiredItem.model) {
+                                itemImg.style.display = 'none';
+                                itemModel.style.display = 'block';
+                                itemModel.src = requiredItem.model;
+                            } else {
+                                itemModel.style.display = 'none';
+                                itemImg.style.display = 'block';
+                                itemImg.src = requiredItem.image || '/images/mascot.png';
+                            }
+                        }
                         else { lockedObj.style.display = 'block'; itemUseObj.style.display = 'none'; chest.style.display = 'none'; locationObj.style.display = 'none'; }
                     } else { lockedObj.style.display = 'none'; itemUseObj.style.display = 'none'; locationObj.style.display = 'none'; chest.style.display = 'block'; }
                 }

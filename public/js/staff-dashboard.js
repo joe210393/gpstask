@@ -230,15 +230,27 @@ function loadARModels() {
       const list = document.getElementById('modelList');
       // 選取所有 name="ar_model_id" 的 select (包含新增和編輯表單)
       const selects = document.querySelectorAll('select[name="ar_model_id"]');
+      // 選取所有 class="ar-model-url-select" 的 select (用於道具表單)
+      const urlSelects = document.querySelectorAll('.ar-model-url-select');
       
       if (list) list.innerHTML = '';
       
-      // 更新下拉選單
+      // 更新 Task 的下拉選單 (存 ID)
       selects.forEach(sel => {
         const currentVal = sel.value; 
         sel.innerHTML = '<option value="">-- 請選擇模型 --</option>';
         data.models.forEach(m => {
           sel.innerHTML += `<option value="${m.id}">${m.name}</option>`;
+        });
+        sel.value = currentVal;
+      });
+
+      // 更新 Item 的下拉選單 (存 URL)
+      urlSelects.forEach(sel => {
+        const currentVal = sel.value;
+        sel.innerHTML = '<option value="">-- 無 --</option>';
+        data.models.forEach(m => {
+          sel.innerHTML += `<option value="${m.url}">${m.name}</option>`;
         });
         sel.value = currentVal;
       });
@@ -482,6 +494,10 @@ function setupItemButtons() {
         editItemForm.name.value = item.name;
         editItemForm.description.value = item.description || '';
         editItemForm.image_url.value = item.image_url || '';
+        // 設定 model_url
+        const modelUrlSelect = editItemForm.querySelector('.ar-model-url-select');
+        if (modelUrlSelect) modelUrlSelect.value = item.model_url || '';
+        
         editItemImageInput.value = ''; // 清空檔案選擇
         
         if (item.image_url) {
@@ -505,6 +521,7 @@ function setupItemButtons() {
         const fd = new FormData();
         fd.append('name', this.name.value.trim());
         fd.append('description', this.description.value.trim());
+        fd.append('model_url', this.model_url.value); // 新增 model_url
         
         // 優先使用上傳的圖片
         if (this.new_image.files[0]) {
@@ -625,6 +642,7 @@ if (createItemForm) {
     const fd = new FormData();
     fd.append('name', form.name.value.trim());
     fd.append('description', form.description.value.trim());
+    fd.append('model_url', form.model_url.value); // 新增 model_url
     if (form.image.files[0]) {
       fd.append('image', form.image.files[0]);
     }
