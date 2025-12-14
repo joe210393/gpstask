@@ -407,7 +407,7 @@
                     const hint = document.querySelector('#ar-model-hint');
                     
                     if (window.rotationMode) {
-                        // 切換到旋轉模式：固定在相機前方
+                        // === 切換到 [旋轉模式] ===
                         if (modelEntity) {
                             // 先確保模型可見
                             modelEntity.setAttribute('visible', 'true');
@@ -418,15 +418,18 @@
                             
                             // 將模型作為相機的子元素，固定在相機前方
                             const camera = document.querySelector('a-camera');
+                            const scene = document.querySelector('a-scene');
                             if (camera) {
                                 // 先將模型從場景移除（如果已經在場景中）
-                                const scene = document.querySelector('a-scene');
                                 if (scene && modelEntity.parentNode === scene) {
                                     scene.removeChild(modelEntity);
                                 }
                                 
-                                // 設置相對於相機的位置（相機坐標系：Y 向上，Z 向前）
-                                modelEntity.setAttribute('position', '0 0 -2');
+                                // 🔥 關鍵修改 1：設定位置與「縮小」
+                                // 原本是 0 0 -2，但模型 scale 是 3，會穿模
+                                // 我們這裡把父層級 scale 縮小，讓它變成適合手持檢視的大小
+                                modelEntity.setAttribute('position', '0 0 -4'); // 拉遠一點到 4 米
+                                modelEntity.setAttribute('scale', '0.2 0.2 0.2'); // 🔥 強制縮小 (原本是 1)
                                 modelEntity.setAttribute('rotation', '0 0 0'); // 重置旋轉
                                 
                                 // 將模型附加到相機
@@ -441,11 +444,12 @@
                                 setTimeout(() => {
                                     modelEntity.setAttribute('visible', 'true');
                                     if (innerModel) innerModel.setAttribute('visible', 'true');
-                                    console.log('✅ 模型已切換到旋轉模式');
+                                    console.log('✅ 模型已切換到旋轉模式 (縮小版)');
                                 }, 100);
                             } else {
                                 // 如果找不到相機，使用場景坐標
-                                modelEntity.setAttribute('position', '0 1.6 -2');
+                                modelEntity.setAttribute('position', '0 1.6 -4');
+                                modelEntity.setAttribute('scale', '0.2 0.2 0.2');
                                 modelEntity.setAttribute('rotation', '0 0 0');
                             }
                         }
@@ -458,30 +462,29 @@
                                 if (scene && clickZone.parentNode === scene) {
                                     scene.removeChild(clickZone);
                                 }
-                                clickZone.setAttribute('position', '0 0 -2');
+                                clickZone.setAttribute('position', '0 0 -4');
+                                clickZone.setAttribute('scale', '0.2 0.2 0.2');
                                 camera.appendChild(clickZone);
                             }
                         }
+                        // 旋轉時隱藏標籤比較乾淨
                         if (label) {
-                            // 在旋轉模式下，標籤應該面向相機（但使用相機引用而不是 gps-camera）
-                            label.setAttribute('look-at', '[camera]');
-                            label.setAttribute('value', '🔄 拖動旋轉');
-                            label.setAttribute('visible', 'true');
+                            label.setAttribute('visible', 'false');
                         }
                         if (hint) {
-                            hint.setAttribute('look-at', '[camera]');
-                            hint.setAttribute('value', '旋轉模式：可拖動查看');
-                            hint.setAttribute('visible', 'true');
+                            hint.setAttribute('visible', 'false');
                         }
-                        if (btn) btn.textContent = '📍 GPS 模式';
-                        if (btn) btn.style.background = '#ffc107';
-                        showToast('🔄 已切換到旋轉模式，可拖動查看模型', 2000);
+                        if (btn) {
+                            btn.textContent = '📍 結束旋轉';
+                            btn.style.background = '#ffc107'; // 黃色提醒
+                        }
+                        showToast('🔄 旋轉模式：請滑動螢幕旋轉模型', 2000);
                     } else {
-                        // 切換回 GPS 模式
+                        // === 切換回 [GPS 模式] ===
                         const scene = document.querySelector('a-scene');
+                        const camera = document.querySelector('a-camera');
                         if (modelEntity && targetLat && targetLng && scene) {
                             // 將模型從相機移除，放回場景
-                            const camera = document.querySelector('a-camera');
                             if (camera && modelEntity.parentNode === camera) {
                                 camera.removeChild(modelEntity);
                             }
@@ -491,10 +494,11 @@
                                 scene.appendChild(modelEntity);
                             }
                             
-                            // 移除固定位置，恢復 GPS 定位
-                            modelEntity.removeAttribute('position');
+                            // 🔥 關鍵修改 2：恢復 GPS 設定與原始大小
+                            modelEntity.removeAttribute('position'); // 移除相對座標
+                            modelEntity.setAttribute('scale', '1 1 1'); // 🔥 恢復原本大小 (讓 innerModel 的 scale 3 生效)
                             modelEntity.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
-                            modelEntity.setAttribute('look-at', '[gps-camera]');
+                            modelEntity.setAttribute('look-at', '[gps-camera]'); // 加回面向相機
                             modelEntity.setAttribute('rotation', '0 0 0'); // 重置旋轉
                             modelEntity.setAttribute('visible', 'true');
                             
@@ -512,7 +516,6 @@
                             }, 100);
                         }
                         if (clickZone && targetLat && targetLng && scene) {
-                            const camera = document.querySelector('a-camera');
                             if (camera && clickZone.parentNode === camera) {
                                 camera.removeChild(clickZone);
                             }
@@ -520,6 +523,7 @@
                                 scene.appendChild(clickZone);
                             }
                             clickZone.removeAttribute('position');
+                            clickZone.setAttribute('scale', '1 1 1'); // 恢復原始大小
                             clickZone.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
                             clickZone.setAttribute('visible', 'true');
                         }
@@ -533,9 +537,11 @@
                             hint.setAttribute('value', '點擊查看詳情');
                             hint.setAttribute('visible', 'true');
                         }
-                        if (btn) btn.textContent = '🔄 旋轉模式';
-                        if (btn) btn.style.background = '#28a745';
-                        showToast('📍 已切換到 GPS 模式', 2000);
+                        if (btn) {
+                            btn.textContent = '🔄 旋轉模式';
+                            btn.style.background = '#28a745';
+                        }
+                        showToast('📍 已回到 GPS 定位模式', 2000);
                     }
                 };
                 
