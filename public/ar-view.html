@@ -213,6 +213,7 @@
                         gltf-model="#animated-model-asset"
                         animation-mixer
                         scale="${scale} ${scale} ${scale}" 
+                        position="0 2 0"
                         visible="false"
                         look-at="[gps-camera]"
                         cursor-listener> 
@@ -244,11 +245,18 @@
                 
                 // 綁定 GPS 鎖定事件
                 window.addEventListener('gps-camera-update-position', (e) => {
+                    // 持續更新距離與方位資訊 (無論是否鎖定)
+                    userLat = e.detail.position.latitude;
+                    userLng = e.detail.position.longitude;
+                    
+                    if (targetLat && targetLng) {
+                        const dist = haversineDistance(userLat, userLng, targetLat, targetLng);
+                        const bearing = calculateBearing(userLat, userLng, targetLat, targetLng);
+                        document.getElementById('status').innerText = `距離目標: ${dist.toFixed(0)}m (GPS精度: ${e.detail.position.accuracy?.toFixed(0)}m)`;
+                        document.getElementById('debug-info').innerText = `目標方位: ${bearing.toFixed(0)}°`;
+                    }
+
                     if (!gpsLocked) {
-                        userLat = e.detail.position.latitude;
-                        userLng = e.detail.position.longitude;
-                        document.getElementById('status').innerText = `GPS 已鎖定 (精度: ${e.detail.position.accuracy?.toFixed(1) || '?'}m)`;
-                        
                         if(modelEntity && targetLat && targetLng) {
                             modelEntity.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
                             modelEntity.setAttribute('visible', 'true');
@@ -256,8 +264,6 @@
                             // 讓點擊區也跟著移動
                             if(clickZone) {
                                 clickZone.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
-                                // 注意：clickZone 保持 visible=false (A-Frame 預設 visible=false 不可點擊)
-                                // 所以這裡我們用 material opacity 0 來隱藏，但屬性設為 visible
                                 clickZone.setAttribute('visible', 'true'); 
                             }
                             console.log(`📍 模型已放置於 ${targetLat}, ${targetLng}`);
