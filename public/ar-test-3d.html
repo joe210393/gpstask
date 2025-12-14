@@ -149,7 +149,10 @@
 
     <script>
         const forceShowBtn = document.getElementById('force-show-btn');
+        const setLocBtn = document.getElementById('set-loc-btn');
+        const distDisplay = document.getElementById('dist-val');
         const gpsAccDisplay = document.getElementById('gps-acc');
+        const infoDiv = document.getElementById('info');
         
         // UI Controls
         const scaleSlider = document.getElementById('scale-slider');
@@ -157,24 +160,28 @@
         const scaleVal = document.getElementById('scale-val');
         const heightVal = document.getElementById('height-val');
 
-        // 全局錯誤捕捉：將錯誤顯示在畫面上，方便手機除錯
+        // 全局錯誤捕捉
         window.onerror = function(msg, url, lineNo, columnNo, error) {
+            // 忽略一些不影響運作的警告
+            if (msg.includes('Script error')) return false;
             showToast('⚠️ 錯誤: ' + msg, 5000);
             return false;
         };
+        
+        // 確保模型元素存在
+        const arModel = document.getElementById('ar-model');
 
         // 模型載入狀態監聽
-        model.addEventListener('model-loaded', () => {
+        arModel.addEventListener('model-loaded', () => {
             showToast('✅ 3D 模型載入成功！');
             infoDiv.innerText += ' | 模型 OK';
             infoDiv.style.color = '#0f0';
-            // 預設縮放稍微大一點，避免太小看不到
-            model.setAttribute('scale', '2 2 2');
+            arModel.setAttribute('scale', '2 2 2');
             scaleSlider.value = 2;
             scaleVal.textContent = '2';
         });
 
-        model.addEventListener('model-error', (e) => {
+        arModel.addEventListener('model-error', (e) => {
             console.error('Model failed to load:', e);
             showToast('❌ 3D 模型載入失敗！請檢查網路。', 5000);
             infoDiv.innerText += ' | 模型失敗';
@@ -186,77 +193,57 @@
             toast.className = 'toast-message';
             toast.innerText = message;
             document.body.appendChild(toast);
-            
-            // Trigger reflow
             void toast.offsetWidth;
-            
             toast.classList.add('show');
-            
             setTimeout(() => {
                 toast.classList.remove('show');
                 setTimeout(() => {
-                    if (document.body.contains(toast)) {
-                        document.body.removeChild(toast);
-                    }
+                    if (document.body.contains(toast)) document.body.removeChild(toast);
                 }, 300);
             }, duration);
         }
 
         // 調整大小
         scaleSlider.addEventListener('input', (e) => {
+            const m = document.getElementById('ar-model'); // 重新獲取
             const val = e.target.value;
-            model.setAttribute('scale', `${val} ${val} ${val}`);
+            m.setAttribute('scale', `${val} ${val} ${val}`);
             scaleVal.textContent = val;
         });
 
         // 調整高度 (Y軸)
         heightSlider.addEventListener('input', (e) => {
+            const m = document.getElementById('ar-model'); // 重新獲取
             const val = e.target.value;
-            model.object3D.position.y = parseFloat(val);
+            m.object3D.position.y = parseFloat(val);
             heightVal.textContent = val;
         });
         
         // 強制放置在鏡頭前方 (不使用 GPS)
         forceShowBtn.addEventListener('click', (e) => {
-            // 防止事件冒泡或被攔截
             e.preventDefault();
             e.stopPropagation();
 
             try {
                 showToast('✅ 按鈕點擊確認！處理中...', 1000);
                 
+                const m = document.getElementById('ar-model'); // 重新獲取
+                
                 // 移除 GPS 屬性，改為純 3D 座標
-                model.removeAttribute('gps-entity-place');
-                model.removeAttribute('look-at'); // 暫時移除 look-at 以避免旋轉問題
+                m.removeAttribute('gps-entity-place');
+                m.removeAttribute('look-at');
                 
-                // 取得相機
                 const camera = document.querySelector('a-camera');
+                if (!camera) throw new Error('找不到相機元件 (a-camera)');
                 
-                if (!camera) {
-                    throw new Error('找不到相機元件 (a-camera)');
+                if (m.parentNode !== camera) {
+                    m.parentNode.removeChild(m);
+                    camera.appendChild(m);
                 }
                 
-                // 將模型「掛」在相機下面，成為子物件，這樣它就會跟著鏡頭跑
-                // 但 A-Frame 動態 reparenting 比較麻煩，我們直接設定在世界座標
-                
-                // 簡單暴力法：將模型設定在 (0, 0, -5)，也就是世界原點前方 5 米
-                // 但因為 gps-camera 會移動 camera，所以我們需要把模型掛在 camera 裡面
-                
-                // 重新將 model 加入到 camera 內部
-                if (model.parentNode !== camera) {
-                    model.parentNode.removeChild(model);
-                    camera.appendChild(model);
-                }
-                
-                // 設定在相機前方 2 米，高度稍微低一點
-                // 注意：掛在 camera 下面後，座標系是相對於 camera 的
-                model.setAttribute('position', '0 -1 -2');
-                model.setAttribute('scale', '0.5 0.5 0.5'); // 在眼前的話要小一點
-                
-                // 旋轉一下讓他面對鏡頭
-                // 因為是子物件，180度應該是背對，0度是正對？這取決於模型原始方向
-                // CesiumMan 原始方向通常是 Z+，所以可能需要轉 180
-                model.setAttribute('rotation', '0 180 0');
+                m.setAttribute('position', '0 -1 -2');
+                m.setAttribute('scale', '0.5 0.5 0.5'); 
+                m.setAttribute('rotation', '0 180 0');
                 
                 infoDiv.innerText = "模式: 強制眼前 (無 GPS)";
                 distDisplay.innerText = "距離: N/A";
@@ -274,14 +261,14 @@
             e.stopPropagation();
 
             try {
-                // 如果之前被移入 camera，要移出來回到 scene
+                const m = document.getElementById('ar-model'); // 重新獲取
                 const scene = document.querySelector('a-scene');
                 const camera = document.querySelector('a-camera');
                 
-                if (model.parentNode === camera) {
-                    model.parentNode.removeChild(model);
-                    scene.appendChild(model);
-                    model.setAttribute('look-at', '[gps-camera]');
+                if (m.parentNode === camera) {
+                    m.parentNode.removeChild(m);
+                    scene.appendChild(m);
+                    m.setAttribute('look-at', '[gps-camera]');
                 }
 
                 if (navigator.geolocation) {
@@ -293,23 +280,17 @@
                         
                         gpsAccDisplay.innerText = `精度: ${acc.toFixed(0)}m`;
                         
-                        // 嘗試放置在多個方位，增加被看到的機率
-                        // 預設放在北方 1.5 公尺
-                        // 0.00001 度約等於 1.1 公尺
                         const newLat = lat + 0.000015; 
                         const newLng = lng;
 
                         console.log(`Setting model to: ${newLat}, ${newLng}`);
                         
-                        // 設定模型的 GPS 座標
-                        model.setAttribute('gps-entity-place', `latitude: ${newLat}; longitude: ${newLng};`);
-                        
-                        // 重置高度和大小，避免設定跑掉
-                        model.setAttribute('scale', '2 2 2');
+                        m.setAttribute('gps-entity-place', `latitude: ${newLat}; longitude: ${newLng};`);
+                        m.setAttribute('scale', '2 2 2');
                         scaleSlider.value = 2;
                         scaleVal.textContent = '2';
                         
-                        model.object3D.position.y = 0;
+                        m.object3D.position.y = 0;
                         heightSlider.value = 0;
                         heightVal.textContent = '0';
                         
@@ -334,7 +315,7 @@
         });
 
         // 監聽距離事件 (AR.js 特有事件)
-        model.addEventListener('gps-entity-place-update-positon', (event) => {
+        arModel.addEventListener('gps-entity-place-update-positon', (event) => {
             if(event.detail.distance) {
                 distDisplay.textContent = `距離: ${event.detail.distance.toFixed(1)} m`;
             }
@@ -342,20 +323,8 @@
         
         // 模擬移動 (測試用)
         window.simulateMove = function(dLat, dLng) {
-            // 這邊只能模擬 model 的位置改變，比較難模擬 camera 的 GPS
-            // 簡單起見，我們直接移動模型
-            const currentAttr = model.getAttribute('gps-entity-place');
-            if (currentAttr) {
-                // 解析現有座標 (這比較麻煩，先不實作複雜解析)
-                // 這裡留給開發者測試用
-                console.log('Simulate move not fully implemented via JS buttons yet, rely on real GPS');
-            }
+            console.log('Simulate move not fully implemented via JS buttons yet, rely on real GPS');
         };
-        
-        // 一開始先嘗試自動放置一次
-        setTimeout(() => {
-            setLocBtn.click();
-        }, 3000);
 
     </script>
 </body>
