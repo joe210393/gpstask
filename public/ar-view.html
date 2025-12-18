@@ -136,6 +136,121 @@
         #btn-lock-cancel { background: #6c757d; color: #fff; }
         #btn-lock-submit { background: #2563eb; color: #fff; }
         #lock-msg { text-align: center; margin-top: 10px; font-size: 13px; color: rgba(255,255,255,0.8); min-height: 18px; }
+        
+        /* 答題 Modal */
+        #answer-modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: none;
+            align-items: center; justify-content: center; z-index: 3500; padding: 20px;
+        }
+        .answer-card {
+            width: min(500px, 90vw); background: rgba(20,20,20,0.98); 
+            border: 1px solid rgba(255,255,255,0.15); border-radius: 16px; 
+            padding: 24px; color: white; max-height: 85vh; overflow-y: auto;
+        }
+        .answer-title {
+            font-size: 1.3rem; font-weight: bold; margin-bottom: 8px; color: #fff;
+        }
+        .answer-description {
+            font-size: 0.95rem; color: rgba(255,255,255,0.7); margin-bottom: 20px; line-height: 1.5;
+        }
+        .answer-input-group {
+            margin-bottom: 20px;
+        }
+        .answer-input-group label {
+            display: block; font-size: 0.9rem; color: rgba(255,255,255,0.8); margin-bottom: 8px;
+        }
+        .answer-input-group input[type="text"],
+        .answer-input-group textarea {
+            width: 100%; padding: 12px; background: rgba(255,255,255,0.1); 
+            border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; 
+            color: white; font-size: 1rem;
+        }
+        .answer-input-group textarea {
+            min-height: 100px; resize: vertical;
+        }
+        .answer-choices {
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .answer-choice {
+            background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 10px; padding: 14px; cursor: pointer; transition: all 0.2s;
+            font-size: 1rem; text-align: left;
+        }
+        .answer-choice:hover {
+            background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.4);
+        }
+        .answer-choice.selected {
+            background: rgba(34, 197, 94, 0.3); border-color: #22c55e;
+        }
+        .answer-actions {
+            display: flex; gap: 12px; margin-top: 20px;
+        }
+        .answer-actions button {
+            flex: 1; padding: 14px; border: none; border-radius: 10px; 
+            font-size: 1rem; font-weight: bold; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-answer-cancel {
+            background: #6c757d; color: white;
+        }
+        .btn-answer-submit {
+            background: #22c55e; color: white;
+        }
+        .btn-answer-submit:disabled {
+            background: #4b5563; cursor: not-allowed; opacity: 0.5;
+        }
+        #answer-message {
+            text-align: center; margin-top: 12px; font-size: 0.9rem; min-height: 20px;
+        }
+        
+        /* 完成任務 Modal */
+        #completion-modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: none;
+            align-items: center; justify-content: center; z-index: 3600; padding: 20px;
+        }
+        .completion-card {
+            width: min(450px, 90vw); background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(20,20,20,0.98));
+            border: 2px solid rgba(34, 197, 94, 0.5); border-radius: 20px; 
+            padding: 30px; color: white; text-align: center;
+        }
+        .completion-icon {
+            font-size: 4rem; margin-bottom: 15px;
+        }
+        .completion-title {
+            font-size: 1.5rem; font-weight: bold; margin-bottom: 10px; color: #22c55e;
+        }
+        .completion-reward {
+            font-size: 1.1rem; color: #fbbf24; margin-bottom: 20px;
+        }
+        .completion-next-info {
+            background: rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; margin-bottom: 20px;
+        }
+        .completion-next-title {
+            font-size: 0.9rem; color: rgba(255,255,255,0.7); margin-bottom: 8px;
+        }
+        .completion-next-name {
+            font-size: 1.2rem; font-weight: bold; margin-bottom: 8px;
+        }
+        .completion-next-distance {
+            font-size: 1rem; color: #fbbf24;
+        }
+        .completion-actions {
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        .completion-actions button {
+            width: 100%; padding: 16px; border: none; border-radius: 12px;
+            font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-continue-quest {
+            background: linear-gradient(135deg, #22c55e, #16a34a); color: white;
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+        }
+        .btn-continue-quest:hover {
+            transform: translateY(-2px); box-shadow: 0 6px 16px rgba(34, 197, 94, 0.6);
+        }
+        .btn-back-home {
+            background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.3);
+        }
+        
         /* 寶箱/道具等 3D Transform 相關 */
         @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
         #guide-arrow { position: absolute; top: 50%; left: 50%; width: 60px; height: 60px; margin-left: -30px; margin-top: -30px; display: none; }
@@ -172,6 +287,39 @@
     </div>
     <div id="ar-modal"><div class="modal-content"><div id="modal-body" style="display:flex; flex-direction:column; gap:10px; align-items:center; width:100%;"></div><div class="modal-actions"><button class="btn-close" id="modal-close">關閉</button><button class="btn-reply" id="modal-submit">✍️ 點擊回覆問題</button></div></div></div>
     <div id="lock-overlay"><div class="lock-card"><div class="lock-title">🔒 旋轉密碼鎖</div><div class="lock-subtitle">轉動數字輪盤後按「確定解鎖」。<br>提醒：需要完全正確，才能通關。</div><div class="wheels" id="lock-wheels"></div><div class="lock-actions"><button id="btn-lock-cancel" type="button">關閉</button><button id="btn-lock-submit" type="button">確定解鎖</button></div><div id="lock-msg"></div></div></div>
+    
+    <!-- 答題 Modal -->
+    <div id="answer-modal">
+        <div class="answer-card">
+            <div class="answer-title" id="answer-task-name">任務標題</div>
+            <div class="answer-description" id="answer-task-description">任務描述</div>
+            <div id="answer-input-container"></div>
+            <div class="answer-actions">
+                <button class="btn-answer-cancel" id="btn-answer-cancel">取消</button>
+                <button class="btn-answer-submit" id="btn-answer-submit">送出答案</button>
+            </div>
+            <div id="answer-message"></div>
+        </div>
+    </div>
+    
+    <!-- 完成任務 Modal -->
+    <div id="completion-modal">
+        <div class="completion-card">
+            <div class="completion-icon">🎉</div>
+            <div class="completion-title" id="completion-title">任務完成！</div>
+            <div class="completion-reward" id="completion-reward"></div>
+            <div class="completion-next-info" id="completion-next-info" style="display:none;">
+                <div class="completion-next-title">📍 下一關</div>
+                <div class="completion-next-name" id="completion-next-name"></div>
+                <div class="completion-next-distance" id="completion-next-distance"></div>
+            </div>
+            <div class="completion-actions">
+                <button class="btn-continue-quest" id="btn-continue-quest" style="display:none;">🚀 繼續冒險</button>
+                <button class="btn-back-home" id="btn-back-home">📋 返回查看</button>
+            </div>
+        </div>
+    </div>
+    
     <div class="ui-layer">
         <div id="start-overlay" style="position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:2000; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white; pointer-events:auto;">
             <div style="font-size:1.5rem; font-weight:bold; margin-bottom:20px; text-align:center;">準備好了嗎？</div>
@@ -557,7 +705,7 @@
         const urlParams = new URLSearchParams(window.location.search);
         let targetLat = parseFloat(urlParams.get('lat'));
         let targetLng = parseFloat(urlParams.get('lng'));
-        const taskId = urlParams.get('taskId');
+        let taskId = urlParams.get('taskId'); // Changed to let for dynamic updates
         
         let currentTask = null;
         let isNumberTask = false;
@@ -790,7 +938,7 @@
                     }
                 }
                 
-                modalSubmitBtn.textContent = stepNum < totalSteps ? '➡️ 下一步' : '✍️ 前往答題';
+                modalSubmitBtn.textContent = stepNum < totalSteps ? '➡️ 下一步' : '✍️ 開始答題';
                 modalSubmitBtn.onclick = () => {
                     currentArStep++;
                     if (currentArStep < arSteps.length) {
@@ -801,9 +949,12 @@
                         if (task.task_type === 'location') {
                             // 地點任務直接完成
                             locationObj.click();
+                        } else if (task.task_type === 'number') {
+                            // 數字任務使用密碼鎖
+                            document.getElementById('btn-open-lock').click();
                         } else {
-                            // 其他任務前往答題頁面
-                            window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
+                            // 其他任務在 AR 模式下顯示答題界面
+                            showAnswerModal(task);
                         }
                     }
                 };
@@ -816,7 +967,6 @@
             if (task.task_type === 'location') {
                 modalSubmitBtn.textContent = '📍 確認打卡';
                 modalSubmitBtn.onclick = async () => {
-                    // 直接觸發打卡 API
                     modalSubmitBtn.disabled = true;
                     modalSubmitBtn.textContent = '打卡中...';
                     
@@ -836,14 +986,21 @@
                         });
                         const data = await res.json();
                         if (data.success && data.isCompleted) {
-                            if (data.earnedItemName) {
-                                showRewardModal(data.earnedItemName, window.currentTask.reward_item_image, window.currentTask.reward_item_model, () => {
+                            const onComplete = async () => {
+                                const hasNext = await loadNextTask(window.currentTask);
+                                if (!hasNext) {
                                     window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
-                                });
+                                } else {
+                                    arModal.style.display = 'none';
+                                }
+                            };
+
+                            if (data.earnedItemName) {
+                                showRewardModal(data.earnedItemName, window.currentTask.reward_item_image, window.currentTask.reward_item_model, onComplete);
                             } else {
                                 let msg = `🎉 打卡成功！\n${data.message}`;
                                 alert(msg); 
-                                window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
+                                onComplete();
                             }
                         } else { 
                             alert(data.message || '打卡失敗'); 
@@ -857,8 +1014,110 @@
                         modalSubmitBtn.textContent = '📍 確認打卡';
                     }
                 };
+            } else if (['qa', 'multiple_choice', 'keyword'].includes(task.task_type)) {
+                // 在 Modal 中直接顯示答題介面
+                const qTitle = document.createElement('div');
+                qTitle.innerHTML = `<div style="font-size:1.2rem; font-weight:bold; color:white; margin-bottom:15px; text-align:center;">❓ ${task.description || '請回答問題'}</div>`;
+                modalBody.appendChild(qTitle);
+
+                let inputEl;
+                if (task.task_type === 'multiple_choice' && task.options) {
+                    let opts = [];
+                    try { opts = JSON.parse(task.options); } catch(e) {}
+                    const container = document.createElement('div');
+                    container.style.width = '100%';
+                    container.style.display = 'flex';
+                    container.style.flexDirection = 'column';
+                    container.style.gap = '10px';
+                    
+                    opts.forEach((opt) => {
+                        const label = document.createElement('label');
+                        label.style.display = 'flex';
+                        label.style.alignItems = 'center';
+                        label.style.padding = '12px';
+                        label.style.background = 'rgba(255,255,255,0.1)';
+                        label.style.borderRadius = '8px';
+                        label.style.cursor = 'pointer';
+                        label.innerHTML = `<input type="radio" name="ar-answer" value="${opt}" style="margin-right:10px; transform: scale(1.2);"> <span style="color:white; font-size:1.1rem;">${opt}</span>`;
+                        container.appendChild(label);
+                    });
+                    modalBody.appendChild(container);
+                } else {
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.placeholder = '請輸入答案...';
+                    input.id = 'ar-answer-input';
+                    input.style.width = '90%';
+                    input.style.padding = '15px';
+                    input.style.borderRadius = '8px';
+                    input.style.border = '1px solid #555';
+                    input.style.background = '#222';
+                    input.style.color = 'white';
+                    input.style.fontSize = '18px';
+                    input.style.marginBottom = '10px';
+                    modalBody.appendChild(input);
+                    inputEl = input;
+                }
+
+                modalSubmitBtn.textContent = '送出答案';
+                modalSubmitBtn.onclick = async () => {
+                    let answer = '';
+                    if (task.task_type === 'multiple_choice') {
+                        const selected = modalBody.querySelector('input[name="ar-answer"]:checked');
+                        if (!selected) { alert('請選擇一個答案'); return; }
+                        answer = selected.value;
+                    } else {
+                        const inp = document.getElementById('ar-answer-input');
+                        answer = inp ? inp.value.trim() : '';
+                        if (!answer) { alert('請輸入答案'); return; }
+                    }
+
+                    modalSubmitBtn.disabled = true;
+                    modalSubmitBtn.textContent = '驗證中...';
+
+                    if (!currentUserTaskId) currentUserTaskId = await fetchCurrentUserTaskId();
+                    if (!currentUserTaskId) { alert('找不到進行中的任務'); return; }
+
+                    try {
+                        const res = await fetch(`${API_BASE}/api/user-tasks/${currentUserTaskId}/answer`, { 
+                            method: 'PATCH', 
+                            headers: { 'Content-Type': 'application/json' }, 
+                            body: JSON.stringify({ answer }) 
+                        });
+                        const data = await res.json();
+                        
+                        if (data.success && data.isCompleted) {
+                            const onComplete = async () => {
+                                const hasNext = await loadNextTask(window.currentTask);
+                                if (!hasNext) {
+                                    window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
+                                } else {
+                                    arModal.style.display = 'none';
+                                }
+                            };
+
+                            let msg = data.earnedItemName ? `答對！獲得：${data.earnedItemName}` : '答對了！';
+                            showToast(msg, 2000);
+                            
+                            if (data.earnedItemName) {
+                                showRewardModal(data.earnedItemName, window.currentTask.reward_item_image, window.currentTask.reward_item_model, onComplete);
+                            } else {
+                                setTimeout(onComplete, 1500);
+                            }
+                        } else {
+                            alert(data.message || '答案錯誤');
+                            modalSubmitBtn.disabled = false;
+                            modalSubmitBtn.textContent = '送出答案';
+                        }
+                    } catch(e) {
+                        console.error(e);
+                        alert('連線錯誤');
+                        modalSubmitBtn.disabled = false;
+                        modalSubmitBtn.textContent = '送出答案';
+                    }
+                };
             } else {
-                modalSubmitBtn.textContent = '✍️ 點擊回覆問題';
+                modalSubmitBtn.textContent = '✍️ 前往答題頁面';
                 modalSubmitBtn.onclick = () => { if (taskId) window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`; else alert("測試模式：目標已找到！"); };
             }
 
@@ -1036,10 +1295,440 @@
                 if (!data.success) { lockMsg.style.color = '#fca5a5'; lockMsg.textContent = data.message || '驗證失敗'; }
                 else if (data.isCompleted) {
                     lockMsg.style.color = '#86efac'; lockMsg.textContent = data.earnedItemName ? `答對！獲得：${data.earnedItemName}` : '答對了！';
+                    
+                    // 嘗試載入下一關
+                    const hasNext = await loadNextTask(window.currentTask);
+                    if (hasNext) {
+                        lockOverlay.style.display = 'none';
+                        return;
+                    }
+                    
                     setTimeout(() => { window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`; }, 1500); return;
                 } else { lockMsg.style.color = '#fde68a'; lockMsg.textContent = '答案錯誤'; }
             } catch (e) { lockMsg.textContent = '連線失敗'; } finally { btnLockSubmit.disabled = false; btnLockCancel.disabled = false; }
         }
+        async function loadNextTask(completedTask) {
+            if (!completedTask.quest_chain_id || !completedTask.quest_order) return false;
+
+            showToast('正在搜尋下一關...', 3000);
+
+            try {
+                // Fetch all tasks to find the next one
+                const res = await fetch(`${API_BASE}/api/tasks`);
+                const data = await res.json();
+                if (!data.success) throw new Error("Failed to fetch tasks");
+
+                const nextTask = data.tasks.find(t => 
+                    t.quest_chain_id === completedTask.quest_chain_id && 
+                    t.quest_order === completedTask.quest_order + 1
+                );
+
+                if (!nextTask) return false; // No next task found
+
+                // Start the next task
+                const loginUser = getLoginUser();
+                if (!loginUser) return false;
+
+                const startRes = await fetch(`${API_BASE}/api/user-tasks`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: loginUser.username, task_id: nextTask.id })
+                });
+                const startData = await startRes.json();
+                
+                // Note: If startData.message is '已在進行中' it's fine.
+                if (!startData.success && startData.message !== '已在進行中') {
+                    console.error("Failed to start next task:", startData.message);
+                    return false;
+                }
+
+                // Update Global State
+                taskId = String(nextTask.id);
+                window.currentTask = nextTask;
+                currentTask = nextTask;
+                
+                // Update URL without reload
+                const newUrl = new URL(window.location);
+                newUrl.searchParams.set('taskId', nextTask.id);
+                newUrl.searchParams.set('lat', nextTask.lat);
+                newUrl.searchParams.set('lng', nextTask.lng);
+                window.history.pushState({}, '', newUrl);
+
+                // Reset AR State
+                targetLat = nextTask.lat;
+                targetLng = nextTask.lng;
+                currentUserTaskId = null; // Will be refetched if needed
+                
+                // Reset variables
+                requiredItem = null;
+                hasRequiredItem = false;
+                isNumberTask = (nextTask.task_type === 'number');
+                isLocationTask = (nextTask.task_type === 'location');
+                lockDigits = 4;
+                if (typeof nextTask.correct_answer === 'string') {
+                    const len = nextTask.correct_answer.trim().length;
+                    if (len >= 2 && len <= 8) lockDigits = len;
+                }
+
+                // Reset AR Steps
+                arSteps = [];
+                const steps = [];
+                if (nextTask.ar_order_model && nextTask.ar_model_url) {
+                    steps.push({ type: '3d', order: nextTask.ar_order_model, url: nextTask.ar_model_url, scale: nextTask.ar_model_scale || 3.0 });
+                }
+                if (nextTask.ar_order_image && nextTask.ar_image_url) {
+                    steps.push({ type: 'image', order: nextTask.ar_order_image, url: nextTask.ar_image_url });
+                }
+                if (nextTask.ar_order_youtube && nextTask.youtubeUrl) {
+                    steps.push({ type: 'youtube', order: nextTask.ar_order_youtube, url: nextTask.youtubeUrl });
+                }
+                arSteps = steps.sort((a, b) => a.order - b.order);
+                currentArStep = 0;
+
+                // Check required item
+                if (nextTask.required_item_id) {
+                    requiredItem = { 
+                        id: nextTask.required_item_id, 
+                        name: nextTask.required_item_name, 
+                        image: nextTask.required_item_image,
+                        model: nextTask.required_item_model 
+                    };
+                    try {
+                        const invRes = await fetch(`${API_BASE}/api/user/inventory`, { headers: { 'x-username': loginUser.username } });
+                        const invData = await invRes.json();
+                        if (invData.success) hasRequiredItem = invData.inventory.some(i => i.item_id === nextTask.required_item_id);
+                    } catch (e) { console.error(e); }
+                }
+
+                // UI Updates
+                showToast(`🎉 下一關：${nextTask.name}`, 4000);
+                document.getElementById('status').innerText = `目標更新：${nextTask.name}`;
+                
+                // Handle Scene Transition
+                const container = document.getElementById('aframe-scene-container');
+                container.innerHTML = '';
+                
+                const firstStep = arSteps.length > 0 && arSteps[0].type === '3d';
+                if (firstStep) {
+                    is3DMode = true;
+                    document.getElementById('ar-world').style.display = 'none';
+                    video.style.display = 'none';
+                    container.style.display = 'block';
+                    const btnRotation = document.getElementById('btn-rotation-mode');
+                    if (btnRotation) btnRotation.style.display = 'block';
+                    
+                    const step = arSteps[0];
+                    init3DScene(step.url, step.scale);
+                } else if (nextTask.ar_model_url && (!arSteps.length || arSteps[0].type === '3d')) {
+                    is3DMode = true;
+                    document.getElementById('ar-world').style.display = 'none';
+                    video.style.display = 'none';
+                    container.style.display = 'block';
+                    const btnRotation = document.getElementById('btn-rotation-mode');
+                    if (btnRotation) btnRotation.style.display = 'block';
+                    init3DScene(nextTask.ar_model_url, nextTask.ar_model_scale || 3.0);
+                } else {
+                    is3DMode = false;
+                    container.style.display = 'none';
+                    document.getElementById('ar-world').style.display = 'block';
+                    video.style.display = 'block';
+                    const btnRotation = document.getElementById('btn-rotation-mode');
+                    if (btnRotation) btnRotation.style.display = 'none';
+                    setupCssArContent(nextTask);
+                }
+
+                // Reset Object Visibility
+                isObjectVisible = false;
+                gpsLocked = false;
+                document.getElementById('guide-arrow').style.display = 'block';
+                document.getElementById('chest-obj').style.display = 'none';
+                document.getElementById('locked-obj').style.display = 'none';
+                document.getElementById('item-use-obj').style.display = 'none';
+                document.getElementById('location-obj').style.display = 'none';
+
+                // Update Lock Button
+                const btnOpenLock = document.getElementById('btn-open-lock');
+                if (isNumberTask) {
+                    btnOpenLock.style.display = 'block';
+                    initLockWheels(lockDigits);
+                } else {
+                    btnOpenLock.style.display = 'none';
+                }
+                
+                return true;
+
+            } catch (e) {
+                console.error("Error loading next task:", e);
+                return false;
+            }
+        }
+
+        // === 答題 Modal 功能 ===
+        function showAnswerModal(task) {
+            const answerModal = document.getElementById('answer-modal');
+            const answerTaskName = document.getElementById('answer-task-name');
+            const answerTaskDescription = document.getElementById('answer-task-description');
+            const answerInputContainer = document.getElementById('answer-input-container');
+            const answerMessage = document.getElementById('answer-message');
+            const btnAnswerSubmit = document.getElementById('btn-answer-submit');
+
+            // 設定任務資訊
+            answerTaskName.textContent = task.name;
+            answerTaskDescription.textContent = task.description || '請根據提示回答問題';
+            answerMessage.textContent = '';
+            answerInputContainer.innerHTML = '';
+
+            // 根據任務類型顯示不同的輸入界面
+            if (task.task_type === 'multiple_choice') {
+                // 選擇題
+                const choices = task.options || [];
+                const choicesDiv = document.createElement('div');
+                choicesDiv.className = 'answer-choices';
+                
+                choices.forEach((choice, index) => {
+                    const choiceBtn = document.createElement('div');
+                    choiceBtn.className = 'answer-choice';
+                    choiceBtn.textContent = choice;
+                    choiceBtn.dataset.value = choice;
+                    choiceBtn.onclick = () => {
+                        // 清除其他選項的選中狀態
+                        choicesDiv.querySelectorAll('.answer-choice').forEach(c => c.classList.remove('selected'));
+                        // 選中當前選項
+                        choiceBtn.classList.add('selected');
+                        btnAnswerSubmit.disabled = false;
+                    };
+                    choicesDiv.appendChild(choiceBtn);
+                });
+                
+                answerInputContainer.appendChild(choicesDiv);
+                btnAnswerSubmit.disabled = true;
+
+            } else if (task.task_type === 'photo') {
+                // 拍照題
+                const photoGroup = document.createElement('div');
+                photoGroup.className = 'answer-input-group';
+                photoGroup.innerHTML = `
+                    <label>📸 上傳照片</label>
+                    <input type="file" id="answer-photo-input" accept="image/*" capture="environment" style="width:100%; padding:12px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:8px; color:white;">
+                    <img id="answer-photo-preview" style="display:none; max-width:100%; margin-top:10px; border-radius:8px;">
+                `;
+                answerInputContainer.appendChild(photoGroup);
+                
+                const photoInput = document.getElementById('answer-photo-input');
+                const photoPreview = document.getElementById('answer-photo-preview');
+                photoInput.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            photoPreview.src = e.target.result;
+                            photoPreview.style.display = 'block';
+                            btnAnswerSubmit.disabled = false;
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                });
+                btnAnswerSubmit.disabled = true;
+
+            } else {
+                // 文字題 (qa, keyword)
+                const textGroup = document.createElement('div');
+                textGroup.className = 'answer-input-group';
+                textGroup.innerHTML = `
+                    <label>✍️ 請輸入答案</label>
+                    <input type="text" id="answer-text-input" placeholder="請輸入您的答案..." autocomplete="off">
+                `;
+                answerInputContainer.appendChild(textGroup);
+                
+                const textInput = document.getElementById('answer-text-input');
+                textInput.addEventListener('input', () => {
+                    btnAnswerSubmit.disabled = textInput.value.trim() === '';
+                });
+                btnAnswerSubmit.disabled = true;
+                
+                // 自動聚焦
+                setTimeout(() => textInput.focus(), 300);
+            }
+
+            // 顯示 Modal
+            answerModal.style.display = 'flex';
+        }
+
+        // 提交答案
+        async function submitAnswer() {
+            const task = window.currentTask;
+            const btnAnswerSubmit = document.getElementById('btn-answer-submit');
+            const answerMessage = document.getElementById('answer-message');
+            const answerModal = document.getElementById('answer-modal');
+            
+            // 獲取答案
+            let answer = '';
+            if (task.task_type === 'multiple_choice') {
+                const selected = document.querySelector('.answer-choice.selected');
+                if (!selected) {
+                    answerMessage.textContent = '❌ 請選擇一個答案';
+                    answerMessage.style.color = '#fca5a5';
+                    return;
+                }
+                answer = selected.dataset.value;
+            } else if (task.task_type === 'photo') {
+                const photoInput = document.getElementById('answer-photo-input');
+                if (!photoInput.files[0]) {
+                    answerMessage.textContent = '❌ 請上傳照片';
+                    answerMessage.style.color = '#fca5a5';
+                    return;
+                }
+                // 上傳照片並獲取 URL
+                const formData = new FormData();
+                formData.append('photo', photoInput.files[0]);
+                try {
+                    btnAnswerSubmit.disabled = true;
+                    answerMessage.textContent = '📤 上傳照片中...';
+                    answerMessage.style.color = 'rgba(255,255,255,0.8)';
+                    
+                    const uploadRes = await fetch(`${API_BASE}/api/upload`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const uploadData = await uploadRes.json();
+                    if (!uploadData.success) throw new Error('上傳失敗');
+                    answer = uploadData.url;
+                } catch (e) {
+                    answerMessage.textContent = '❌ 上傳失敗，請重試';
+                    answerMessage.style.color = '#fca5a5';
+                    btnAnswerSubmit.disabled = false;
+                    return;
+                }
+            } else {
+                const textInput = document.getElementById('answer-text-input');
+                answer = textInput.value.trim();
+                if (!answer) {
+                    answerMessage.textContent = '❌ 請輸入答案';
+                    answerMessage.style.color = '#fca5a5';
+                    return;
+                }
+            }
+
+            // 提交答案
+            try {
+                btnAnswerSubmit.disabled = true;
+                answerMessage.textContent = '⏳ 驗證中...';
+                answerMessage.style.color = 'rgba(255,255,255,0.8)';
+
+                // 獲取 user_task_id
+                if (!currentUserTaskId) await fetchCurrentUserTaskId();
+                if (!currentUserTaskId) {
+                    throw new Error('找不到任務記錄');
+                }
+
+                const res = await fetch(`${API_BASE}/api/user-tasks/${currentUserTaskId}/answer`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ answer })
+                });
+                const data = await res.json();
+
+                if (data.success && data.isCompleted) {
+                    // 答對了！
+                    answerModal.style.display = 'none';
+                    showCompletionModal(data.earnedItemName);
+                } else {
+                    // 答錯了
+                    answerMessage.textContent = '❌ ' + (data.message || '答案錯誤，請重試');
+                    answerMessage.style.color = '#fca5a5';
+                    btnAnswerSubmit.disabled = false;
+                }
+            } catch (e) {
+                console.error(e);
+                answerMessage.textContent = '❌ 連線失敗';
+                answerMessage.style.color = '#fca5a5';
+                btnAnswerSubmit.disabled = false;
+            }
+        }
+
+        // 顯示完成任務 Modal
+        async function showCompletionModal(earnedItemName) {
+            const completionModal = document.getElementById('completion-modal');
+            const completionReward = document.getElementById('completion-reward');
+            const completionNextInfo = document.getElementById('completion-next-info');
+            const completionNextName = document.getElementById('completion-next-name');
+            const completionNextDistance = document.getElementById('completion-next-distance');
+            const btnContinueQuest = document.getElementById('btn-continue-quest');
+            const btnBackHome = document.getElementById('btn-back-home');
+
+            // 顯示獎勵
+            if (earnedItemName) {
+                completionReward.textContent = `🎁 獲得：${earnedItemName}`;
+                completionReward.style.display = 'block';
+            } else {
+                completionReward.style.display = 'none';
+            }
+
+            // 檢查是否有下一關
+            const task = window.currentTask;
+            if (task.type === 'quest' && task.quest_chain_id && task.quest_order) {
+                // 尋找下一關
+                try {
+                    const res = await fetch(`${API_BASE}/api/tasks`);
+                    const data = await res.json();
+                    if (data.success) {
+                        const nextTask = data.tasks.find(t => 
+                            t.quest_chain_id === task.quest_chain_id && 
+                            t.quest_order === task.quest_order + 1
+                        );
+                        
+                        if (nextTask) {
+                            // 有下一關
+                            completionNextInfo.style.display = 'block';
+                            btnContinueQuest.style.display = 'block';
+                            completionNextName.textContent = nextTask.name;
+                            
+                            // 計算距離
+                            if (userLat && userLng) {
+                                const dist = haversineDistance(userLat, userLng, nextTask.lat, nextTask.lng);
+                                completionNextDistance.textContent = `📏 距離：約 ${Math.round(dist)} 公尺`;
+                            } else {
+                                completionNextDistance.textContent = '';
+                            }
+                            
+                            btnContinueQuest.onclick = async () => {
+                                completionModal.style.display = 'none';
+                                const hasNext = await loadNextTask(task);
+                                if (!hasNext) {
+                                    showToast('⚠️ 無法載入下一關', 2000);
+                                }
+                            };
+                        } else {
+                            // 沒有下一關（劇情結束）
+                            completionNextInfo.style.display = 'none';
+                            btnContinueQuest.style.display = 'none';
+                        }
+                    }
+                } catch (e) {
+                    console.error(e);
+                    completionNextInfo.style.display = 'none';
+                    btnContinueQuest.style.display = 'none';
+                }
+            } else {
+                // 不是劇情任務，不顯示下一關
+                completionNextInfo.style.display = 'none';
+                btnContinueQuest.style.display = 'none';
+            }
+
+            btnBackHome.onclick = () => {
+                window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
+            };
+
+            // 顯示 Modal
+            completionModal.style.display = 'flex';
+        }
+
+        // 綁定答題 Modal 按鈕
+        document.getElementById('btn-answer-cancel').onclick = () => {
+            document.getElementById('answer-modal').style.display = 'none';
+        };
+        document.getElementById('btn-answer-submit').onclick = submitAnswer;
+
         const btnLock = document.getElementById('btn-open-lock');
         btnLock.onclick = () => { if (!isNumberTask) return; if (!lockWheels.children.length) initLockWheels(lockDigits || 4); lockMsg.textContent = ''; lockOverlay.style.display = 'flex'; fetchCurrentUserTaskId(); };
         btnLockCancel.onclick = () => { lockOverlay.style.display = 'none'; lockMsg.textContent = ''; };
