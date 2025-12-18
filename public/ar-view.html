@@ -1302,12 +1302,33 @@
                     if (btnRotation) btnRotation.style.display = 'block';
                     init3DScene(nextTask.ar_model_url, nextTask.ar_model_scale || 3.0);
                 } else {
+                    // 切換回 2D 模式
                     is3DMode = false;
                     container.style.display = 'none';
                     document.getElementById('ar-world').style.display = 'block';
                     video.style.display = 'block';
                     const btnRotation = document.getElementById('btn-rotation-mode');
                     if (btnRotation) btnRotation.style.display = 'none';
+                    
+                    // 確保相機流正在運行
+                    if (!video.srcObject || !video.srcObject.active) {
+                        console.log('🎥 重新啟動相機流');
+                        navigator.mediaDevices.getUserMedia({ 
+                            video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }, 
+                            audio: false 
+                        })
+                        .then(stream => {
+                            video.srcObject = stream;
+                            video.onloadedmetadata = () => { video.play(); };
+                        })
+                        .catch(err => {
+                            console.error("相機啟動失敗:", err);
+                        });
+                    } else {
+                        // 相機流還在運行，確保 video 正在播放
+                        video.play();
+                    }
+                    
                     setupCssArContent(nextTask);
                 }
 
