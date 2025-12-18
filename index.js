@@ -1888,18 +1888,10 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
                
                // 發放額外積分
                if (questChainReward.chain_points > 0) {
-                 // 使用 INSERT ... ON DUPLICATE KEY UPDATE 確保用戶記錄存在
+                 // 記錄積分交易 (系統會自動計算總積分，無需更新 user_points 表)
                  await conn.execute(
-                   `INSERT INTO user_points (user_id, total_points) 
-                    VALUES (?, ?) 
-                    ON DUPLICATE KEY UPDATE total_points = total_points + ?`,
-                   [userTask.user_id, questChainReward.chain_points, questChainReward.chain_points]
-                 );
-                 
-                 // 記錄積分交易
-                 await conn.execute(
-                   'INSERT INTO point_transactions (user_id, points, transaction_type, description) VALUES (?, ?, ?, ?)',
-                   [userTask.user_id, questChainReward.chain_points, 'quest_chain_completion', `完成劇情線：${questChainReward.badge_name || '未命名劇情'}`]
+                   'INSERT INTO point_transactions (user_id, type, points, description, reference_type, reference_id) VALUES (?, ?, ?, ?, ?, ?)',
+                   [userTask.user_id, 'earned', questChainReward.chain_points, `完成劇情線：${questChainReward.badge_name || '未命名劇情'}`, 'quest_chain_completion', userTask.quest_chain_id]
                  );
                }
                
@@ -2545,19 +2537,6 @@ console.log('==================');
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           )
         `);
-
-        // 1.5. 建立 user_points 表（如果不存在）
-        await conn.execute(`
-          CREATE TABLE IF NOT EXISTS user_points (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            user_id INT NOT NULL,
-            total_points INT NOT NULL DEFAULT 0,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-            UNIQUE KEY unique_user_points (user_id)
-          )
-        `);
-        console.log('✅ 資料庫遷移: user_points 表已檢查/建立');
 
         // 2. 修改 tasks 表
         const [taskCols] = await conn.execute("SHOW COLUMNS FROM tasks LIKE 'ar_model_id'");
