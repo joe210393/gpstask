@@ -1001,9 +1001,22 @@
                     }
                 };
             } else {
-                // 其他任務類型不需要在這裡處理，會在 AR 步驟結束後調用 showAnswerModal
-                modalSubmitBtn.textContent = '✍️ 前往答題頁面';
-                modalSubmitBtn.onclick = () => { if (taskId) window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`; else alert("測試模式：目標已找到！"); };
+                // 其他任務類型：在 AR 模式下顯示答題界面
+                if (task.task_type === 'number') {
+                    // 數字任務使用密碼鎖
+                    modalSubmitBtn.textContent = '🔒 輸入密碼';
+                    modalSubmitBtn.onclick = () => {
+                        arModal.style.display = 'none';
+                        document.getElementById('btn-open-lock').click();
+                    };
+                } else {
+                    // 其他任務（文字、選擇、拍照）在 AR 模式下答題
+                    modalSubmitBtn.textContent = '✍️ 開始答題';
+                    modalSubmitBtn.onclick = () => {
+                        arModal.style.display = 'none';
+                        showAnswerModal(task);
+                    };
+                }
             }
 
             if (is3DMode) {
