@@ -1540,6 +1540,16 @@
                     // 答對了！
                     answerModal.style.display = 'none';
                     showCompletionModal(data.earnedItemName, data.questChainCompleted, data.questChainReward);
+                } else if (data.success && data.message && data.message.includes('已完成')) {
+                    // 任務已經完成（可能是重複提交）
+                    answerModal.style.display = 'none';
+                    showToast('✅ 任務已完成', 2000);
+                    // 重新載入任務狀態
+                    if (taskId) {
+                        setTimeout(() => {
+                            window.location.href = `/task-detail.html?id=${taskId}&ar_found=true`;
+                        }, 2000);
+                    }
                 } else {
                     // 答錯了
                     answerMessage.textContent = '❌ ' + (data.message || '答案錯誤，請重試');
