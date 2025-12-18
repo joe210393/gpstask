@@ -1895,23 +1895,7 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
                  );
                }
                
-               // 授予稱號
-               if (questChainReward.badge_name) {
-                 // 檢查是否已經擁有該稱號
-                 const [existingBadge] = await conn.execute(
-                   'SELECT id FROM user_badges WHERE user_id = ? AND source_id = ? AND source_type = ?',
-                   [userTask.user_id, userTask.quest_chain_id, 'quest']
-                 );
-                 
-                 if (existingBadge.length === 0) {
-                   await conn.execute(
-                     'INSERT INTO user_badges (user_id, name, image_url, source_type, source_id) VALUES (?, ?, ?, ?, ?)',
-                     [userTask.user_id, questChainReward.badge_name, questChainReward.badge_image || '', 'quest', userTask.quest_chain_id]
-                   );
-                 }
-               }
-               
-               // 標記劇情線為完成
+               // 標記劇情線為完成（稱號信息已經在 quest_chains 表中，不需要額外存儲）
                await conn.execute(
                  'UPDATE user_quests SET is_completed = TRUE, completed_at = NOW() WHERE user_id = ? AND quest_chain_id = ?',
                  [userTask.user_id, userTask.quest_chain_id]
@@ -1969,9 +1953,19 @@ app.get('/api/user/badges', async (req, res) => {
     }
     const userId = users[0].id;
 
-    // 獲取所有稱號
+    // 從 user_quests JOIN quest_chains 獲取已完成的劇情稱號
     const [badges] = await conn.execute(
-      'SELECT id, name, image_url, obtained_at, source_type, source_id FROM user_badges WHERE user_id = ? ORDER BY obtained_at DESC',
+      `SELECT 
+        uq.id,
+        qc.badge_name as name,
+        qc.badge_image as image_url,
+        uq.completed_at as obtained_at,
+        'quest' as source_type,
+        uq.quest_chain_id as source_id
+      FROM user_quests uq
+      JOIN quest_chains qc ON uq.quest_chain_id = qc.id
+      WHERE uq.user_id = ? AND uq.is_completed = TRUE AND qc.badge_name IS NOT NULL
+      ORDER BY uq.completed_at DESC`,
       [userId]
     );
 
