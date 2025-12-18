@@ -987,7 +987,7 @@
                         const data = await res.json();
                         if (data.success && data.isCompleted) {
                             arModal.style.display = 'none';
-                            showCompletionModal(data.earnedItemName);
+                            showCompletionModal(data.earnedItemName, data.questChainCompleted, data.questChainReward);
                         } else { 
                             alert(data.message || '打卡失敗'); 
                             modalSubmitBtn.disabled = false;
@@ -1127,7 +1127,7 @@
                     const res = await fetch(`${API_BASE}/api/user-tasks/${currentUserTaskId}/answer`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answer: 'checked_in' }) });
                     const data = await res.json();
                     if (data.success && data.isCompleted) {
-                        showCompletionModal(data.earnedItemName);
+                        showCompletionModal(data.earnedItemName, data.questChainCompleted, data.questChainReward);
                     } else { alert(data.message || '打卡失敗'); }
                 } catch (e) { console.error(e); alert('連線錯誤'); }
             }
@@ -1188,7 +1188,7 @@
                     
                     setTimeout(() => {
                         lockOverlay.style.display = 'none';
-                        showCompletionModal(data.earnedItemName);
+                        showCompletionModal(data.earnedItemName, data.questChainCompleted, data.questChainReward);
                     }, 1500);
                     return;
                 } else { lockMsg.style.color = '#fde68a'; lockMsg.textContent = '答案錯誤'; }
@@ -1539,7 +1539,7 @@
                 if (data.success && data.isCompleted) {
                     // 答對了！
                     answerModal.style.display = 'none';
-                    showCompletionModal(data.earnedItemName);
+                    showCompletionModal(data.earnedItemName, data.questChainCompleted, data.questChainReward);
                 } else {
                     // 答錯了
                     answerMessage.textContent = '❌ ' + (data.message || '答案錯誤，請重試');
@@ -1555,7 +1555,7 @@
         }
 
         // 顯示完成任務 Modal
-        async function showCompletionModal(earnedItemName) {
+        async function showCompletionModal(earnedItemName, questChainCompleted, questChainReward) {
             const completionModal = document.getElementById('completion-modal');
             const completionReward = document.getElementById('completion-reward');
             const completionNextInfo = document.getElementById('completion-next-info');
@@ -1565,8 +1565,24 @@
             const btnBackHome = document.getElementById('btn-back-home');
 
             // 顯示獎勵
+            let rewardText = '';
             if (earnedItemName) {
-                completionReward.textContent = `🎁 獲得：${earnedItemName}`;
+                rewardText = `🎁 獲得：${earnedItemName}`;
+            }
+            
+            // 顯示劇情完成獎勵
+            if (questChainCompleted && questChainReward) {
+                if (rewardText) rewardText += '\n';
+                if (questChainReward.chain_points > 0) {
+                    rewardText += `\n🎊 劇情完成獎勵：${questChainReward.chain_points} 積分`;
+                }
+                if (questChainReward.badge_name) {
+                    rewardText += `\n🏆 獲得稱號：${questChainReward.badge_name}`;
+                }
+            }
+            
+            if (rewardText) {
+                completionReward.innerHTML = rewardText.split('\n').join('<br>');
                 completionReward.style.display = 'block';
             } else {
                 completionReward.style.display = 'none';

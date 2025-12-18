@@ -1834,6 +1834,9 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
          }
 
          // 更新劇情任務進度
+         let questChainCompleted = false;
+         let questChainReward = null;
+         
          if (userTask.quest_chain_id && userTask.quest_order) {
            const [userQuests] = await conn.execute(
              'SELECT id, current_step_order FROM user_quests WHERE user_id = ? AND quest_chain_id = ?',
@@ -1857,6 +1860,64 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
                [userTask.user_id, userTask.quest_chain_id, userTask.quest_order + 1]
              );
            }
+           
+           // 檢查是否完成整個劇情線
+           // 查詢該劇情線的最大關卡數
+           const [maxOrder] = await conn.execute(
+             'SELECT MAX(quest_order) as max_order FROM tasks WHERE quest_chain_id = ?',
+             [userTask.quest_chain_id]
+           );
+           
+           if (maxOrder.length > 0 && maxOrder[0].max_order === userTask.quest_order) {
+             // 完成了最後一關！
+             questChainCompleted = true;
+             
+             // 獲取劇情線的獎勵信息
+             const [questChain] = await conn.execute(
+               'SELECT chain_points, badge_name, badge_image FROM quest_chains WHERE id = ?',
+               [userTask.quest_chain_id]
+             );
+             
+             if (questChain.length > 0) {
+               questChainReward = questChain[0];
+               
+               // 發放額外積分
+               if (questChainReward.chain_points > 0) {
+                 await conn.execute(
+                   'UPDATE user_points SET total_points = total_points + ? WHERE user_id = ?',
+                   [questChainReward.chain_points, userTask.user_id]
+                 );
+                 
+                 // 記錄積分交易
+                 await conn.execute(
+                   'INSERT INTO point_transactions (user_id, points, transaction_type, description) VALUES (?, ?, ?, ?)',
+                   [userTask.user_id, questChainReward.chain_points, 'quest_chain_completion', `完成劇情線：${questChainReward.badge_name || '未命名劇情'}`]
+                 );
+               }
+               
+               // 授予稱號
+               if (questChainReward.badge_name) {
+                 // 檢查是否已經擁有該稱號
+                 const [existingBadge] = await conn.execute(
+                   'SELECT id FROM user_badges WHERE user_id = ? AND source_id = ? AND source_type = ?',
+                   [userTask.user_id, userTask.quest_chain_id, 'quest']
+                 );
+                 
+                 if (existingBadge.length === 0) {
+                   await conn.execute(
+                     'INSERT INTO user_badges (user_id, name, image_url, source_type, source_id) VALUES (?, ?, ?, ?, ?)',
+                     [userTask.user_id, questChainReward.badge_name, questChainReward.badge_image || '', 'quest', userTask.quest_chain_id]
+                   );
+                 }
+               }
+               
+               // 標記劇情線為完成
+               await conn.execute(
+                 'UPDATE user_quests SET is_completed = TRUE, completed_at = NOW() WHERE user_id = ? AND quest_chain_id = ?',
+                 [userTask.user_id, userTask.quest_chain_id]
+               );
+             }
+           }
          }
 
          await conn.commit();
@@ -1874,7 +1935,47 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
        await conn.execute('UPDATE user_tasks SET answer = ? WHERE id = ?', [answer, id]);
     }
 
-    res.json({ success: true, message, isCompleted, earnedItemName });
+    res.json({ 
+      success: true, 
+      message, 
+      isCompleted, 
+      earnedItemName,
+      questChainCompleted,
+      questChainReward: questChainCompleted ? questChainReward : null
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) await conn.end();
+  }
+});
+
+// 獲取用戶的所有稱號
+app.get('/api/user/badges', async (req, res) => {
+  const username = req.headers['x-username'];
+  if (!username) {
+    return res.json({ success: true, badges: [] });
+  }
+
+  let conn;
+  try {
+    conn = await mysql.createConnection(dbConfig);
+    
+    // 獲取用戶 ID
+    const [users] = await conn.execute('SELECT id FROM users WHERE username = ?', [username]);
+    if (users.length === 0) {
+      return res.json({ success: true, badges: [] });
+    }
+    const userId = users[0].id;
+
+    // 獲取所有稱號
+    const [badges] = await conn.execute(
+      'SELECT id, name, image_url, obtained_at, source_type, source_id FROM user_badges WHERE user_id = ? ORDER BY obtained_at DESC',
+      [userId]
+    );
+
+    res.json({ success: true, badges });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
