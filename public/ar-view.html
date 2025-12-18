@@ -1564,6 +1564,12 @@
             const btnContinueQuest = document.getElementById('btn-continue-quest');
             const btnBackHome = document.getElementById('btn-back-home');
 
+            // 防禦性檢查
+            if (!completionModal) {
+                console.error('completion-modal not found');
+                return;
+            }
+
             // 顯示獎勵
             let rewardText = '';
             if (earnedItemName) {
@@ -1590,7 +1596,12 @@
 
             // 檢查是否有下一關
             const task = window.currentTask;
-            if (task.type === 'quest' && task.quest_chain_id && task.quest_order) {
+            
+            // 如果完成了劇情線，不顯示下一關選項
+            if (questChainCompleted) {
+                completionNextInfo.style.display = 'none';
+                btnContinueQuest.style.display = 'none';
+            } else if (task && task.type === 'quest' && task.quest_chain_id && task.quest_order) {
                 // 尋找下一關
                 try {
                     const res = await fetch(`${API_BASE}/api/tasks`);
@@ -1616,10 +1627,20 @@
                             }
                             
                             btnContinueQuest.onclick = async () => {
-                                completionModal.style.display = 'none';
-                                const hasNext = await loadNextTask(task);
-                                if (!hasNext) {
-                                    showToast('⚠️ 無法載入下一關', 2000);
+                                try {
+                                    completionModal.style.display = 'none';
+                                    const hasNext = await loadNextTask(task);
+                                    if (!hasNext) {
+                                        showToast('⚠️ 無法載入下一關', 2000);
+                                        // 如果載入失敗，重新顯示完成畫面
+                                        setTimeout(() => {
+                                            completionModal.style.display = 'flex';
+                                        }, 2000);
+                                    }
+                                } catch (e) {
+                                    console.error('載入下一關失敗:', e);
+                                    showToast('❌ 載入失敗，請重試', 2000);
+                                    completionModal.style.display = 'flex';
                                 }
                             };
                         } else {
@@ -1644,7 +1665,14 @@
             };
 
             // 顯示 Modal
-            completionModal.style.display = 'flex';
+            try {
+                completionModal.style.display = 'flex';
+                console.log('✅ 完成畫面已顯示', { earnedItemName, questChainCompleted, questChainReward });
+            } catch (e) {
+                console.error('❌ 顯示完成畫面失敗:', e);
+                // 如果顯示失敗，至少顯示一個提示
+                showToast('✅ 任務完成！', 3000);
+            }
         }
 
         // 綁定答題 Modal 按鈕
