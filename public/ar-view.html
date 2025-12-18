@@ -1556,6 +1556,10 @@
 
         // 顯示完成任務 Modal
         async function showCompletionModal(earnedItemName, questChainCompleted, questChainReward) {
+            // 設置默認值，避免 undefined 錯誤
+            questChainCompleted = questChainCompleted || false;
+            questChainReward = questChainReward || null;
+            
             const completionModal = document.getElementById('completion-modal');
             const completionReward = document.getElementById('completion-reward');
             const completionNextInfo = document.getElementById('completion-next-info');
