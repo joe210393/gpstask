@@ -1780,12 +1780,20 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
     const userTask = rows[0];
 
     if (userTask.status === '完成') {
-       return res.json({ success: true, message: '任務已完成，無需更新' });
+       return res.json({ 
+         success: true, 
+         message: '任務已完成，無需更新',
+         isCompleted: true,
+         questChainCompleted: false,
+         questChainReward: null
+       });
     }
 
     let isCompleted = false;
     let message = '答案已儲存';
     let earnedItemName = null; // 移到外層宣告
+    let questChainCompleted = false; // 移到外層宣告
+    let questChainReward = null; // 移到外層宣告
 
     // 2. 檢查是否為自動驗證題型且答案正確
     if (['multiple_choice', 'number', 'keyword', 'location'].includes(userTask.task_type)) {
@@ -1834,9 +1842,6 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
          }
 
          // 更新劇情任務進度
-         let questChainCompleted = false;
-         let questChainReward = null;
-         
          if (userTask.quest_chain_id && userTask.quest_order) {
            const [userQuests] = await conn.execute(
              'SELECT id, current_step_order FROM user_quests WHERE user_id = ? AND quest_chain_id = ?',
