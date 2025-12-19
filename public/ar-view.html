@@ -1232,7 +1232,8 @@
 
                 const nextTask = data.tasks.find(t => 
                     t.quest_chain_id === completedTask.quest_chain_id && 
-                    t.quest_order === completedTask.quest_order + 1
+                    t.quest_order === completedTask.quest_order + 1 &&
+                    t.task_type === 'quest' // 🔥 強制檢查：下一關必須也是劇情任務，避免錯誤接取到單人任務
                 );
 
                 if (!nextTask) return false; // No next task found
