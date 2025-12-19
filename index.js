@@ -7,13 +7,46 @@ const cookieParser = require('cookie-parser');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const { getDbConfig } = require('./db-config');
 
 // JWT 設定
-const JWT_SECRET = process.env.JWT_SECRET || 'gps-task-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+// 強制生產環境檢查
+if (process.env.NODE_ENV === 'production' && !JWT_SECRET) {
+  console.error('❌ 嚴重錯誤: 生產環境未設定 JWT_SECRET，拒絕啟動。');
+  process.exit(1);
+}
+// 開發環境 fallback
+const FINAL_JWT_SECRET = JWT_SECRET || 'dev-secret-key-do-not-use-in-prod';
 const JWT_EXPIRE = process.env.JWT_EXPIRE || '7d';
 
 const app = express();
+
+// 安全性設定
+app.use(helmet({
+  contentSecurityPolicy: false, // AR.js 需要較寬鬆的 CSP
+  crossOriginEmbedderPolicy: false
+}));
+
+// 全局限流
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 分鐘
+  max: 1000, // 每個 IP 限制 1000 次請求
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(globalLimiter);
+
+// 登入限流 (更嚴格)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 50,
+  message: { success: false, message: '嘗試次數過多，請 15 分鐘後再試' }
+});
+app.use('/api/login', authLimiter);
+app.use('/api/staff-login', authLimiter);
 
 // 設定圖片上傳目錄
 // 如果 /data/public/images 存在 (Zeabur 環境)，就使用該路徑
@@ -93,7 +126,7 @@ function generateToken(user) {
       username: user.username,
       role: user.role
     },
-    JWT_SECRET,
+    FINAL_JWT_SECRET,
     { expiresIn: JWT_EXPIRE }
   );
 }
@@ -141,7 +174,7 @@ async function testDatabaseConnection() {
 
 function verifyToken(token) {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    return jwt.verify(token, FINAL_JWT_SECRET);
   } catch (error) {
     return null;
   }
