@@ -1282,19 +1282,44 @@
                     if (len >= 2 && len <= 8) lockDigits = len;
                 }
 
-                // Reset AR Steps
+                // Reset AR Steps (使用與初始化相同的兼容邏輯)
                 arSteps = [];
                 const steps = [];
-                if (nextTask.ar_order_model && nextTask.ar_model_url) {
-                    steps.push({ type: '3d', order: nextTask.ar_order_model, url: nextTask.ar_model_url, scale: nextTask.ar_model_scale || 3.0 });
+                
+                // 3D 模型
+                if (nextTask.ar_model_url) {
+                    steps.push({ 
+                        type: '3d', 
+                        order: nextTask.ar_order_model || 1, 
+                        url: nextTask.ar_model_url, 
+                        scale: nextTask.ar_model_scale || 3.0 
+                    });
                 }
-                if (nextTask.ar_order_image && nextTask.ar_image_url) {
-                    steps.push({ type: 'image', order: nextTask.ar_order_image, url: nextTask.ar_image_url });
+                
+                // 圖片
+                if (nextTask.ar_image_url) {
+                    steps.push({ 
+                        type: 'image', 
+                        order: nextTask.ar_order_image || (nextTask.ar_model_url ? 2 : 1), 
+                        url: nextTask.ar_image_url 
+                    });
                 }
-                if (nextTask.ar_order_youtube && nextTask.youtubeUrl) {
-                    steps.push({ type: 'youtube', order: nextTask.ar_order_youtube, url: nextTask.youtubeUrl });
+                
+                // YouTube
+                if (nextTask.youtubeUrl) {
+                    steps.push({ 
+                        type: 'youtube', 
+                        order: nextTask.ar_order_youtube || (steps.length + 1), 
+                        url: nextTask.youtubeUrl 
+                    });
                 }
-                arSteps = steps.sort((a, b) => a.order - b.order);
+
+                // 如果步驟都被設為 0 或 null，重新分配順序
+                if (steps.length > 0 && steps.every(s => !s.order)) {
+                    steps.forEach((s, i) => s.order = i + 1);
+                }
+                
+                arSteps = steps.sort((a, b) => (a.order || 99) - (b.order || 99));
                 currentArStep = 0;
 
                 // Check required item
@@ -1305,11 +1330,14 @@
                         image: nextTask.required_item_image,
                         model: nextTask.required_item_model 
                     };
-                    try {
-                        const invRes = await fetch(`${API_BASE}/api/user/inventory`, { headers: { 'x-username': loginUser.username } });
-                        const invData = await invRes.json();
-                        if (invData.success) hasRequiredItem = invData.inventory.some(i => i.item_id === nextTask.required_item_id);
-                    } catch (e) { console.error(e); }
+                    const loginUser = getLoginUser();
+                    if (loginUser) {
+                        try {
+                            const invRes = await fetch(`${API_BASE}/api/user/inventory`, { headers: { 'x-username': loginUser.username } });
+                            const invData = await invRes.json();
+                            if (invData.success) hasRequiredItem = invData.inventory.some(i => i.item_id === nextTask.required_item_id);
+                        } catch (e) { console.error(e); }
+                    }
                 }
 
                 // UI Updates
@@ -1318,10 +1346,13 @@
                 
                 // Handle Scene Transition
                 const container = document.getElementById('aframe-scene-container');
-                container.innerHTML = '';
+                container.innerHTML = ''; // 清空舊場景
                 
+                // 判斷是否進入 3D 模式 (第一步是 3D)
                 const firstStep = arSteps.length > 0 && arSteps[0].type === '3d';
+                
                 if (firstStep) {
+                    // === 進入 3D 模式 ===
                     is3DMode = true;
                     document.getElementById('ar-world').style.display = 'none';
                     video.style.display = 'none';
@@ -1329,18 +1360,19 @@
                     const btnRotation = document.getElementById('btn-rotation-mode');
                     if (btnRotation) btnRotation.style.display = 'block';
                     
-                    const step = arSteps[0];
-                    init3DScene(step.url, step.scale);
-                } else if (nextTask.ar_model_url && (!arSteps.length || arSteps[0].type === '3d')) {
-                    is3DMode = true;
-                    document.getElementById('ar-world').style.display = 'none';
-                    video.style.display = 'none';
-                    container.style.display = 'block';
-                    const btnRotation = document.getElementById('btn-rotation-mode');
-                    if (btnRotation) btnRotation.style.display = 'block';
-                    init3DScene(nextTask.ar_model_url, nextTask.ar_model_scale || 3.0);
+                    // 停止 2D 相機流以釋放資源給 AR.js
+                    if (video.srcObject) {
+                        video.srcObject.getTracks().forEach(track => track.stop());
+                        video.srcObject = null;
+                    }
+
+                    // 延遲一點點再啟動，確保 DOM 乾淨
+                    setTimeout(() => {
+                        init3DScene(arSteps[0].url, arSteps[0].scale);
+                    }, 100);
+                    
                 } else {
-                    // 切換回 2D 模式
+                    // === 進入 2D 模式 ===
                     is3DMode = false;
                     container.style.display = 'none';
                     document.getElementById('ar-world').style.display = 'block';
@@ -1351,17 +1383,17 @@
                     // 確保相機流正在運行
                     if (!video.srcObject || !video.srcObject.active) {
                         console.log('🎥 重新啟動相機流');
-                        navigator.mediaDevices.getUserMedia({ 
-                            video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }, 
-                            audio: false 
-                        })
-                        .then(stream => {
+                        try {
+                            const stream = await navigator.mediaDevices.getUserMedia({ 
+                                video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }, 
+                                audio: false 
+                            });
                             video.srcObject = stream;
                             video.onloadedmetadata = () => { video.play(); };
-                        })
-                        .catch(err => {
+                        } catch (err) {
                             console.error("相機啟動失敗:", err);
-                        });
+                            showToast("相機啟動失敗，請刷新頁面", 3000);
+                        }
                     } else {
                         // 相機流還在運行，確保 video 正在播放
                         video.play();
