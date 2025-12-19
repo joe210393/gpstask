@@ -728,16 +728,41 @@
                         // 解析 AR 多步驟順序
                         arSteps = [];
                         const steps = [];
-                        if (task.ar_order_model && task.ar_model_url) {
-                            steps.push({ type: '3d', order: task.ar_order_model, url: task.ar_model_url, scale: task.ar_model_scale || 3.0 });
+                        
+                        // 3D 模型 (兼容舊數據：如果有 URL 但沒順序，默認為步驟 1)
+                        if (task.ar_model_url) {
+                            steps.push({ 
+                                type: '3d', 
+                                order: task.ar_order_model || 1, 
+                                url: task.ar_model_url, 
+                                scale: task.ar_model_scale || 3.0 
+                            });
                         }
-                        if (task.ar_order_image && task.ar_image_url) {
-                            steps.push({ type: 'image', order: task.ar_order_image, url: task.ar_image_url });
+                        
+                        // 圖片
+                        if (task.ar_image_url) {
+                            steps.push({ 
+                                type: 'image', 
+                                order: task.ar_order_image || (task.ar_model_url ? 2 : 1), 
+                                url: task.ar_image_url 
+                            });
                         }
-                        if (task.ar_order_youtube && task.youtubeUrl) {
-                            steps.push({ type: 'youtube', order: task.ar_order_youtube, url: task.youtubeUrl });
+                        
+                        // YouTube (兼容舊數據：如果有 URL 但沒順序，自動排在後面)
+                        if (task.youtubeUrl) {
+                            steps.push({ 
+                                type: 'youtube', 
+                                order: task.ar_order_youtube || (steps.length + 1), 
+                                url: task.youtubeUrl 
+                            });
                         }
-                        arSteps = steps.sort((a, b) => a.order - b.order);
+                        
+                        // 如果步驟都被設為 0 或 null，重新分配順序
+                        if (steps.length > 0 && steps.every(s => !s.order)) {
+                            steps.forEach((s, i) => s.order = i + 1);
+                        }
+                        
+                        arSteps = steps.sort((a, b) => (a.order || 99) - (b.order || 99));
                         currentArStep = 0;
                         console.log('📋 AR 步驟:', arSteps);
                         
