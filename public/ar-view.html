@@ -1348,6 +1348,13 @@
                 const container = document.getElementById('aframe-scene-container');
                 container.innerHTML = ''; // 清空舊場景
                 
+                // 強制清理 AR.js 可能殘留的 video 元素 (ID通常是 arjs-video)
+                const arjsVideo = document.getElementById('arjs-video');
+                if (arjsVideo) {
+                    arjsVideo.srcObject = null;
+                    arjsVideo.remove();
+                }
+
                 // 判斷是否進入 3D 模式 (第一步是 3D)
                 const firstStep = arSteps.length > 0 && arSteps[0].type === '3d';
                 
@@ -1856,14 +1863,20 @@
             }, true);
         }
         function updateAR() {
-            if (is3DMode) return; 
             if (!userLat || !targetLat) { status.innerText = `GPS 定位中...`; return; }
+            
+            // 1. 無論 3D/2D 模式，始終更新頂部數據
             const dist = haversineDistance(userLat, userLng, targetLat, targetLng);
             const bearing = calculateBearing(userLat, userLng, targetLat, targetLng);
             status.innerText = `距離目標: ${dist.toFixed(0)}m`;
+            
             let delta = bearing - deviceHeading;
             while (delta < -180) delta += 360; while (delta > 180) delta -= 360;
             debug.innerText = `方位:${bearing.toFixed(0)}° 手機:${deviceHeading.toFixed(0)}° 差:${delta.toFixed(0)}°`;
+            
+            // 2. 如果是 3D 模式，停止更新 2D DOM 元素（寶箱、箭頭等），避免干擾 A-Frame
+            if (is3DMode) return; 
+
             const VISIBLE_DISTANCE = 15; 
             if (dist > VISIBLE_DISTANCE) {
                 if (isObjectVisible) { isObjectVisible = false; chest.style.display = 'none'; lockedObj.style.display = 'none'; itemUseObj.style.display = 'none'; locationObj.style.display = 'none'; }
