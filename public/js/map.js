@@ -1005,7 +1005,10 @@ function watchPosition() {
       // 計算與上一次位置的距離
       const moveDist = haversineDistance(lastUserLat, lastUserLng, latitude, longitude);
       
-      // 只有當移動距離超過 MIN_UPDATE_DISTANCE (3公尺) 時才更新地圖上的 Marker
+      // 🔥 優化：每次 GPS 更新都檢查任務觸發，確保邊緣判定的即時性
+      checkProximity(latitude, longitude);
+      
+      // 只有當移動距離超過 MIN_UPDATE_DISTANCE (3公尺) 時才更新地圖上的 Marker (節省渲染資源)
       if (moveDist > MIN_UPDATE_DISTANCE) {
           lastUserLat = latitude;
           lastUserLng = longitude;
@@ -1061,15 +1064,6 @@ function watchPosition() {
           tasksList.forEach(task => {
             updateTaskDistance(task);
           });
-
-          // 檢查任務 proximity
-          checkProximity(latitude, longitude);
-      }
-      
-      // 無論有沒有大幅移動，只要定位成功就檢查一次 proximity
-      if (Math.abs(latitude - lastUserLat) > 0.00001 || Math.abs(longitude - lastUserLng) > 0.00001) {
-         // 微小移動也檢查
-         checkProximity(latitude, longitude);
       }
     },
     err => handleGeoError(err),

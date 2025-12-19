@@ -302,6 +302,51 @@
             const answerDiv = document.getElementById('answerSection');
             answerDiv.innerHTML = '';
 
+            // --- GPS 圍欄監控 (防止作弊) ---
+            if (window.gpsWatchId) navigator.geolocation.clearWatch(window.gpsWatchId);
+            const existingWarning = document.getElementById('gpsWarning');
+            if (existingWarning) existingWarning.remove();
+
+            // 對於非 location 類型的任務，也需要持續監控
+            if (t.task_type !== 'location') {
+                const limit = (t.radius || 50) + 50; // 寬容 50 公尺
+                const warningEl = document.createElement('div');
+                warningEl.id = 'gpsWarning';
+                warningEl.style.cssText = 'display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); color:white; z-index:9999; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:20px;';
+                warningEl.innerHTML = `
+                    <div style="font-size:4rem; margin-bottom:20px;">📡</div>
+                    <h2 style="color:#ffc107; margin-bottom:10px;">訊號中斷</h2>
+                    <p style="font-size:1.1rem; line-height:1.6;">您已離開任務有效範圍<br>請回到任務地點以繼續作答</p>
+                    <div id="distDisplay" style="margin-top:20px; font-weight:bold; font-size:1.2rem;"></div>
+                `;
+                document.body.appendChild(warningEl);
+
+                if (navigator.geolocation) {
+                    window.gpsWatchId = navigator.geolocation.watchPosition(
+                        (pos) => {
+                            const distKm = haversineDistance(pos.coords.latitude, pos.coords.longitude, t.lat, t.lng);
+                            const distM = distKm * 1000;
+                            
+                            // 檢查距離
+                            if (distM > limit) {
+                                warningEl.style.display = 'flex';
+                                document.getElementById('distDisplay').textContent = `目前距離：${Math.round(distM)} 公尺`;
+                                // 模糊化答題區
+                                answerDiv.style.filter = 'blur(5px)';
+                                answerDiv.style.pointerEvents = 'none';
+                            } else {
+                                warningEl.style.display = 'none';
+                                answerDiv.style.filter = 'none';
+                                answerDiv.style.pointerEvents = 'auto';
+                            }
+                        },
+                        (err) => console.error('GPS 監控失敗:', err),
+                        { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+                    );
+                }
+            }
+            // ---------------------------
+
             const container = document.createElement('div');
             container.style.padding = '15px';
             container.style.background = '#f8f9fa';
