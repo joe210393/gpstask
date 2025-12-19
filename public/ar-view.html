@@ -1688,7 +1688,8 @@
                     if (data.success) {
                         const nextTask = data.tasks.find(t => 
                             t.quest_chain_id === task.quest_chain_id && 
-                            t.quest_order === task.quest_order + 1
+                            t.quest_order === task.quest_order + 1 &&
+                            t.task_type === 'quest' // 🔥 強制檢查：下一關必須也是劇情任務
                         );
                         
                         if (nextTask) {
