@@ -116,6 +116,16 @@ app.use((req, res, next) => {
 // IMPORTANT: DB config must come from env vars only. No hardcoded defaults.
 const dbConfig = getDbConfig();
 
+// 建立連接池
+const pool = mysql.createPool({
+  ...dbConfig,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 0
+});
+
 const ALLOWED_TASK_TYPES = ['qa', 'multiple_choice', 'photo', 'number', 'keyword', 'location'];
 
 // JWT 工具函數
@@ -143,13 +153,10 @@ async function testDatabaseConnection() {
     console.log(`   - User: ${dbConfig.user}`);
     console.log(`   - Database: ${dbConfig.database}`);
     console.log(`   - Password: ${dbConfig.password ? (dbConfig.password.length > 0 ? `[已設定，長度: ${dbConfig.password.length}]` : '[空字串]') : '[未設定]'}`);
-    // 檢查密碼是否包含未展開的變數
-    if (dbConfig.password && (dbConfig.password.includes('${') || dbConfig.password.includes('$'))) {
-      console.error('   ⚠️  警告: 密碼可能包含未展開的變數語法！');
-      console.error(`   密碼前 20 個字元: ${dbConfig.password.substring(0, 20)}...`);
-    }
-    conn = await mysql.createConnection(dbConfig);
-    console.log('✅ 資料庫連接成功');
+    
+    // 使用連接池獲取連接
+    conn = await pool.getConnection();
+    console.log('✅ 資料庫連接成功 (Connection Pool Active)');
     return true;
   } catch (error) {
     console.error('❌ 資料庫連接失敗:', error.message);
@@ -158,17 +165,11 @@ async function testDatabaseConnection() {
       console.error('   1. 密碼不正確');
       console.error('   2. 環境變數包含未展開的變數語法（如 ${PASSWORD}）');
       console.error('   3. 用戶權限不足');
-      if (dbConfig.password) {
-        const pwdPreview = dbConfig.password.substring(0, 30);
-        if (pwdPreview.includes('${') || pwdPreview.includes('$')) {
-          console.error('   ⚠️  發現問題: 密碼開頭包含 "$" 或 "${" 字元，可能是未展開的變數！');
-        }
-      }
     }
     console.error('   錯誤詳情:', error.message);
     return false;
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release(); // 釋放連接回池
   }
 }
 
@@ -210,21 +211,7 @@ function authenticateTokenCompat(req, res, next) {
     }
   }
 
-  // 如果沒有JWT token，檢查是否有臨時的用戶資訊
-  const tempUser = req.headers['x-user-info'];
-  if (tempUser) {
-    try {
-      const userInfo = JSON.parse(tempUser);
-      if (userInfo && userInfo.id && userInfo.username && userInfo.role) {
-        req.user = userInfo;
-        return next();
-      }
-    } catch (e) {
-      // 解析失敗，繼續到錯誤處理
-    }
-  }
-
-  return res.status(401).json({ success: false, message: '未認證' });
+  return res.status(401).json({ success: false, message: '認證失敗：無效的令牌' });
 }
 
 // RBAC 角色授權中間層
@@ -305,7 +292,7 @@ app.post('/api/login', async (req, res) => {
   }
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     if (role === 'user') {
       // 手機門號登入 - 不需要密碼驗證
       const [users] = await conn.execute(
@@ -397,7 +384,7 @@ app.post('/api/login', async (req, res) => {
     }
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -437,7 +424,7 @@ app.post('/api/register', async (req, res) => {
   }
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     // 檢查帳號是否已存在
     const [exist] = await conn.execute('SELECT id FROM users WHERE username = ?', [username]);
     if (exist.length > 0) {
@@ -453,7 +440,7 @@ app.post('/api/register', async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -470,7 +457,7 @@ app.post('/api/admin/accounts', authenticateToken, requireRole('admin'), async (
   }
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     const [exist] = await conn.execute('SELECT id FROM users WHERE username = ?', [username]);
     if (exist.length > 0) return res.status(400).json({ success: false, message: '帳號已存在' });
 
@@ -484,7 +471,7 @@ app.post('/api/admin/accounts', authenticateToken, requireRole('admin'), async (
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -494,7 +481,7 @@ app.post('/api/staff/assign', authenticateToken, requireRole('admin', 'shop'), a
   if (!username) return res.status(400).json({ success: false, message: '缺少 username' });
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     const [rows] = await conn.execute('SELECT id, role FROM users WHERE username = ?', [username]);
     if (rows.length === 0) return res.status(404).json({ success: false, message: '找不到使用者' });
     const u = rows[0];
@@ -509,7 +496,7 @@ app.post('/api/staff/assign', authenticateToken, requireRole('admin', 'shop'), a
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -519,7 +506,7 @@ app.post('/api/staff/revoke', authenticateToken, requireRole('admin', 'shop'), a
   if (!username) return res.status(400).json({ success: false, message: '缺少 username' });
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     const [rows] = await conn.execute('SELECT id, role, managed_by FROM users WHERE username = ?', [username]);
     if (rows.length === 0) return res.status(404).json({ success: false, message: '找不到使用者' });
     const u = rows[0];
@@ -533,7 +520,7 @@ app.post('/api/staff/revoke', authenticateToken, requireRole('admin', 'shop'), a
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -544,7 +531,7 @@ app.post('/api/change-password', authenticateToken, requireRole('admin', 'shop')
   if (String(newPassword).length < 6) return res.status(400).json({ success: false, message: '新密碼至少 6 碼' });
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     const [rows] = await conn.execute('SELECT id, password FROM users WHERE username = ?', [req.user.username]);
     if (rows.length === 0) return res.status(404).json({ success: false, message: '找不到使用者' });
     const stored = rows[0].password;
@@ -557,7 +544,7 @@ app.post('/api/change-password', authenticateToken, requireRole('admin', 'shop')
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -565,7 +552,7 @@ app.post('/api/change-password', authenticateToken, requireRole('admin', 'shop')
 app.get('/api/shop/profile', authenticateToken, requireRole('shop', 'admin'), async (req, res) => {
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     const [rows] = await conn.execute(
       'SELECT username, role, shop_name, shop_address, shop_description FROM users WHERE username = ?',
       [req.user.username]
@@ -576,7 +563,7 @@ app.get('/api/shop/profile', authenticateToken, requireRole('shop', 'admin'), as
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -584,7 +571,7 @@ app.put('/api/shop/profile', authenticateToken, requireRole('shop', 'admin'), as
   const { shop_name, shop_address, shop_description } = req.body;
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     await conn.execute(
       'UPDATE users SET shop_name = ?, shop_address = ?, shop_description = ? WHERE username = ?',
       [shop_name || null, shop_address || null, shop_description || null, req.user.username]
@@ -594,7 +581,7 @@ app.put('/api/shop/profile', authenticateToken, requireRole('shop', 'admin'), as
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -603,7 +590,7 @@ app.put('/api/shop/profile', authenticateToken, requireRole('shop', 'admin'), as
 app.get('/api/tasks', async (req, res) => {
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     // Join items 表格以獲取道具名稱，Join ar_models 獲取 3D 模型
     const [rows] = await conn.execute(`
       SELECT t.*, 
@@ -621,7 +608,7 @@ app.get('/api/tasks', async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -629,7 +616,7 @@ app.get('/api/tasks', async (req, res) => {
 app.get('/api/tasks/admin', authenticateToken, requireRole('shop', 'admin'), async (req, res) => {
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     const username = req.user.username;
     const userRole = req.user.role;
 
@@ -651,7 +638,7 @@ app.get('/api/tasks/admin', authenticateToken, requireRole('shop', 'admin'), asy
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -661,7 +648,7 @@ app.get('/api/tasks/admin', authenticateToken, requireRole('shop', 'admin'), asy
 app.get('/api/quest-chains', staffOrAdminAuth, async (req, res) => {
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     const { username, role } = req.user || {};
     // admin 看全部；shop 只看自己建立的劇情
     const [rows] = await conn.execute(
@@ -675,7 +662,7 @@ app.get('/api/quest-chains', staffOrAdminAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -697,7 +684,7 @@ app.post('/api/quest-chains', staffOrAdminAuth, upload.single('badge_image'), as
 
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     await conn.execute(
       'INSERT INTO quest_chains (title, description, chain_points, badge_name, badge_image, created_by) VALUES (?, ?, ?, ?, ?, ?)',
       [title, description, chain_points || 0, badge_name || null, badge_image || null, creator]
@@ -707,7 +694,7 @@ app.post('/api/quest-chains', staffOrAdminAuth, upload.single('badge_image'), as
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -719,7 +706,7 @@ app.delete('/api/quest-chains/:id', staffOrAdminAuth, async (req, res) => {
 
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     
     // 1. 檢查權限與擁有者
     const [quests] = await conn.execute('SELECT created_by FROM quest_chains WHERE id = ?', [id]);
@@ -752,7 +739,7 @@ app.delete('/api/quest-chains/:id', staffOrAdminAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -762,14 +749,14 @@ app.delete('/api/quest-chains/:id', staffOrAdminAuth, async (req, res) => {
 app.get('/api/ar-models', async (req, res) => {
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     const [rows] = await conn.execute('SELECT * FROM ar_models ORDER BY id DESC');
     res.json({ success: true, models: rows });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -785,7 +772,7 @@ app.post('/api/ar-models', staffOrAdminAuth, upload.single('model'), async (req,
 
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     await conn.execute(
       'INSERT INTO ar_models (name, url, scale, created_by) VALUES (?, ?, ?, ?)',
       [name, modelUrl, modelScale, username]
@@ -795,7 +782,7 @@ app.post('/api/ar-models', staffOrAdminAuth, upload.single('model'), async (req,
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -804,7 +791,7 @@ app.delete('/api/ar-models/:id', staffOrAdminAuth, async (req, res) => {
   const { id } = req.params;
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     
     // 檢查是否有任務引用
     const [tasks] = await conn.execute('SELECT id FROM tasks WHERE ar_model_id = ?', [id]);
@@ -819,7 +806,7 @@ app.delete('/api/ar-models/:id', staffOrAdminAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -829,14 +816,14 @@ app.delete('/api/ar-models/:id', staffOrAdminAuth, async (req, res) => {
 app.get('/api/items', async (req, res) => {
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     const [rows] = await conn.execute('SELECT * FROM items ORDER BY id DESC');
     res.json({ success: true, items: rows });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -854,7 +841,7 @@ app.post('/api/items', staffOrAdminAuth, upload.single('image'), async (req, res
 
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     await conn.execute(
       'INSERT INTO items (name, description, image_url, model_url) VALUES (?, ?, ?, ?)',
       [name, description || '', image_url, model_url || null]
@@ -864,7 +851,7 @@ app.post('/api/items', staffOrAdminAuth, upload.single('image'), async (req, res
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -876,7 +863,7 @@ app.put('/api/items/:id', staffOrAdminAuth, upload.single('image'), async (req, 
 
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     
     // 如果有上傳新圖片就更新，否則保留原圖
     let sql, params;
@@ -898,7 +885,7 @@ app.put('/api/items/:id', staffOrAdminAuth, upload.single('image'), async (req, 
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -907,7 +894,7 @@ app.delete('/api/items/:id', staffOrAdminAuth, async (req, res) => {
   const { id } = req.params;
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     
     // 檢查是否有任務使用了此道具
     const [tasks] = await conn.execute(
@@ -924,7 +911,7 @@ app.delete('/api/items/:id', staffOrAdminAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -936,7 +923,7 @@ app.post('/api/admin/grant-item', staffOrAdminAuth, async (req, res) => {
 
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     
     // 檢查玩家是否存在
     const [users] = await conn.execute('SELECT id FROM users WHERE username = ?', [username]);
@@ -966,7 +953,7 @@ app.post('/api/admin/grant-item', staffOrAdminAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -977,7 +964,7 @@ app.get('/api/user/inventory', async (req, res) => {
 
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     const [users] = await conn.execute('SELECT id FROM users WHERE username = ?', [username]);
     if (users.length === 0) return res.json({ success: true, inventory: [] });
     const userId = users[0].id;
@@ -994,7 +981,7 @@ app.get('/api/user/inventory', async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -1028,7 +1015,7 @@ app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
   if (requesterRole === 'shop' && quest_chain_id) {
     let connCheck;
     try {
-      connCheck = await mysql.createConnection(dbConfig);
+      connCheck = await pool.getConnection();
       const [chains] = await connCheck.execute(
         'SELECT id FROM quest_chains WHERE id = ? AND created_by = ?',
         [quest_chain_id, requesterName]
@@ -1040,13 +1027,13 @@ app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
       console.error(err);
       return res.status(500).json({ success: false, message: '伺服器錯誤' });
     } finally {
-      if (connCheck) await connCheck.end();
+      if (connCheck) connCheck.release();
     }
   }
 
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     const username = req.headers['x-username'];
     const pts = Number(points) || 0;
     
@@ -1094,7 +1081,7 @@ app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -1140,7 +1127,7 @@ app.get('/api/user-tasks', async (req, res) => {
   if (!username) return res.status(400).json({ success: false, message: '缺少 username' });
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     // 取得 user_id
     const [users] = await conn.execute('SELECT id FROM users WHERE username = ?', [username]);
     if (users.length === 0) return res.json({ success: true, tasks: [] });
@@ -1158,7 +1145,7 @@ app.get('/api/user-tasks', async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -1168,7 +1155,7 @@ app.post('/api/user-tasks', async (req, res) => {
   if (!username || !task_id) return res.status(400).json({ success: false, message: '缺少參數' });
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     // 取得 user_id 與 role
     const [users] = await conn.execute('SELECT id, role FROM users WHERE username = ?', [username]);
     if (users.length === 0) return res.status(400).json({ success: false, message: '找不到使用者' });
@@ -1194,7 +1181,7 @@ app.post('/api/user-tasks', async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -1203,7 +1190,7 @@ app.delete('/api/user-tasks/:id', authenticateToken, requireRole('admin'), async
   const { id } = req.params;
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     // 檢查該紀錄是否存在
     const [rows] = await conn.execute('SELECT id FROM user_tasks WHERE id = ?', [id]);
     if (rows.length === 0) return res.status(404).json({ success: false, message: '找不到該任務紀錄' });
@@ -1214,7 +1201,7 @@ app.delete('/api/user-tasks/:id', authenticateToken, requireRole('admin'), async
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -1224,7 +1211,7 @@ app.post('/api/user-tasks/finish', reviewerAuth, async (req, res) => {
   if (!username || !task_id) return res.status(400).json({ success: false, message: '缺少參數' });
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
 
     // 取得 user_id
     const [users] = await conn.execute('SELECT id FROM users WHERE username = ?', [username]);
@@ -1313,7 +1300,7 @@ app.post('/api/user-tasks/finish', reviewerAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -1322,7 +1309,7 @@ app.get('/api/tasks/:id', async (req, res) => {
   const { id } = req.params;
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     // Join items 表格以獲取道具名稱，Join ar_models 獲取 3D 模型
     const [rows] = await conn.execute(`
       SELECT t.*, 
@@ -1342,7 +1329,7 @@ app.get('/api/tasks/:id', async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -1368,7 +1355,7 @@ app.put('/api/tasks/:id', staffOrAdminAuth, async (req, res) => {
 
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     const username = req.headers['x-username'];
 
     // 獲取用戶角色
@@ -1442,7 +1429,7 @@ app.put('/api/tasks/:id', staffOrAdminAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -1451,7 +1438,7 @@ app.delete('/api/tasks/:id', staffOrAdminAuth, async (req, res) => {
   const { id } = req.params;
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     const username = req.headers['x-username'];
 
     // 獲取用戶角色
@@ -1490,7 +1477,7 @@ app.delete('/api/tasks/:id', staffOrAdminAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -1517,7 +1504,7 @@ app.get('/api/user/quest-progress', async (req, res) => {
 
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     
     // 取得 user_id
     const [users] = await conn.execute('SELECT id FROM users WHERE username = ?', [username]);
@@ -1584,7 +1571,7 @@ app.get('/api/user/quest-progress', async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -1594,7 +1581,7 @@ app.get('/api/user-tasks/all', async (req, res) => {
   if (!username) return res.status(400).json({ success: false, message: '缺少 username' });
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     // 取得 user_id
     const [users] = await conn.execute('SELECT id FROM users WHERE username = ?', [username]);
     if (users.length === 0) return res.json({ success: true, tasks: [] });
@@ -1618,7 +1605,7 @@ app.get('/api/user-tasks/all', async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -1626,17 +1613,17 @@ app.get('/api/user-tasks/all', async (req, res) => {
 function adminAuth(req, res, next) {
   const username = req.headers['x-username'];
   if (!username) return res.status(401).json({ success: false, message: '未登入' });
-  mysql.createConnection(dbConfig).then(conn => {
+  pool.getConnection().then(conn => {
     conn.execute('SELECT role FROM users WHERE username = ?', [username])
       .then(([rows]) => {
-        conn.end();
+        conn.release();
         if (rows.length === 0 || rows[0].role !== 'admin') {
           return res.status(403).json({ success: false, message: '無權限' });
         }
         next();
       })
       .catch(err => {
-        conn.end();
+        conn.release();
         res.status(500).json({ success: false, message: '伺服器錯誤' });
       });
   });
@@ -1647,10 +1634,10 @@ function adminAuth(req, res, next) {
 function staffOrAdminAuth(req, res, next) {
   const username = req.headers['x-username'];
   if (!username) return res.status(401).json({ success: false, message: '未登入' });
-  mysql.createConnection(dbConfig).then(conn => {
+  pool.getConnection().then(conn => {
     conn.execute('SELECT role FROM users WHERE username = ?', [username])
       .then(([rows]) => {
-        conn.end();
+        conn.release();
         if (rows.length === 0 || (rows[0].role !== 'shop' && rows[0].role !== 'admin')) {
           return res.status(403).json({ success: false, message: '無權限' });
         }
@@ -1659,7 +1646,7 @@ function staffOrAdminAuth(req, res, next) {
         next();
       })
       .catch(err => {
-        conn.end();
+        conn.release();
         res.status(500).json({ success: false, message: '伺服器錯誤' });
       });
   });
@@ -1670,9 +1657,9 @@ function reviewerAuth(req, res, next) {
   authenticateTokenCompat(req, res, async () => {
     if (!req.user || !req.user.username) return res.status(401).json({ success: false, message: '未認證' });
     try {
-      const conn = await mysql.createConnection(dbConfig);
+      const conn = await pool.getConnection();
       const [rows] = await conn.execute('SELECT role, managed_by FROM users WHERE username = ?', [req.user.username]);
-      await conn.end();
+      conn.release();
       if (rows.length === 0) return res.status(401).json({ success: false, message: '用戶不存在' });
       const role = rows[0].role;
       if (!['admin', 'shop', 'staff'].includes(role)) {
@@ -1695,7 +1682,7 @@ app.post('/api/user-tasks/:id/redeem', reviewerAuth, async (req, res) => {
   const staffUser = req.user.username;
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     // 只能兌換已完成且未兌換的（同時做任務建立者權限範圍判斷）
     const [rows] = await conn.execute(
       `SELECT ut.*, t.created_by
@@ -1714,7 +1701,7 @@ app.post('/api/user-tasks/:id/redeem', reviewerAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -1723,7 +1710,7 @@ app.get('/api/user-tasks/in-progress', reviewerAuth, async (req, res) => {
   const { taskName, username } = req.query;
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     const userRole = req.user.role;
     const reqUsername = req.user.username;
     const reviewerOwner = reqUsername;
@@ -1751,7 +1738,7 @@ app.get('/api/user-tasks/in-progress', reviewerAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -1760,7 +1747,7 @@ app.get('/api/user-tasks/to-redeem', reviewerAuth, async (req, res) => {
   const { taskName, username } = req.query;
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     const userRole = req.user.role;
     const reqUsername = req.user.username;
     const reviewerOwner = reqUsername;
@@ -1788,7 +1775,7 @@ app.get('/api/user-tasks/to-redeem', reviewerAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -1799,7 +1786,7 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
   if (!answer) return res.status(400).json({ success: false, message: '缺少答案' });
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
 
     // 1. 取得任務資訊
     const [rows] = await conn.execute(`
@@ -1964,7 +1951,7 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -1977,7 +1964,7 @@ app.get('/api/user/badges', async (req, res) => {
 
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     
     // 獲取用戶 ID
     const [users] = await conn.execute('SELECT id FROM users WHERE username = ?', [username]);
@@ -2007,7 +1994,7 @@ app.get('/api/user/badges', async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -2017,7 +2004,7 @@ app.get('/api/user/badges', async (req, res) => {
 app.get('/api/products', async (req, res) => {
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     const [rows] = await conn.execute(`
       SELECT p.*, u.username as creator_username
       FROM products p
@@ -2030,7 +2017,7 @@ app.get('/api/products', async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -2038,7 +2025,7 @@ app.get('/api/products', async (req, res) => {
 app.get('/api/products/admin', staffOrAdminAuth, async (req, res) => {
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     const username = req.headers['x-username'];
 
     // 獲取用戶角色
@@ -2070,7 +2057,7 @@ app.get('/api/products/admin', staffOrAdminAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -2083,7 +2070,7 @@ app.post('/api/products', staffOrAdminAuth, async (req, res) => {
 
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     const username = req.headers['x-username'];
 
     const [result] = await conn.execute(
@@ -2095,7 +2082,7 @@ app.post('/api/products', staffOrAdminAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -2109,7 +2096,7 @@ app.put('/api/products/:id', staffOrAdminAuth, async (req, res) => {
 
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     const username = req.headers['x-username'];
 
     // 獲取用戶角色
@@ -2148,7 +2135,7 @@ app.put('/api/products/:id', staffOrAdminAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -2157,7 +2144,7 @@ app.delete('/api/products/:id', staffOrAdminAuth, async (req, res) => {
   const { id } = req.params;
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     const username = req.headers['x-username'];
 
     // 獲取用戶角色
@@ -2196,7 +2183,7 @@ app.delete('/api/products/:id', staffOrAdminAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -2209,7 +2196,7 @@ app.get('/api/products/redemptions', async (req, res) => {
 
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     // 獲取用戶ID
     const [users] = await conn.execute('SELECT id FROM users WHERE username = ?', [username]);
     if (users.length === 0) {
@@ -2231,7 +2218,7 @@ app.get('/api/products/redemptions', async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -2245,7 +2232,7 @@ app.post('/api/products/:id/redeem', async (req, res) => {
 
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
 
     // 獲取用戶ID
     const [users] = await conn.execute('SELECT id FROM users WHERE username = ?', [username]);
@@ -2313,7 +2300,7 @@ app.post('/api/products/:id/redeem', async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -2326,7 +2313,7 @@ app.get('/api/user/points', async (req, res) => {
 
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
 
     // 獲取用戶ID
     const [users] = await conn.execute('SELECT id FROM users WHERE username = ?', [username]);
@@ -2350,7 +2337,7 @@ app.get('/api/user/points', async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -2360,7 +2347,7 @@ app.get('/api/user/points', async (req, res) => {
 app.get('/api/product-redemptions/admin', staffOrAdminAuth, async (req, res) => {
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     const username = req.headers['x-username'];
 
     // 獲取用戶角色
@@ -2405,7 +2392,7 @@ app.get('/api/product-redemptions/admin', staffOrAdminAuth, async (req, res) => 
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -2420,7 +2407,7 @@ app.put('/api/product-redemptions/:id/status', staffOrAdminAuth, async (req, res
 
   let conn;
   try {
-    conn = await mysql.createConnection(dbConfig);
+    conn = await pool.getConnection();
     const username = req.headers['x-username'];
 
     // 獲取用戶角色
@@ -2501,7 +2488,7 @@ app.put('/api/product-redemptions/:id/status', staffOrAdminAuth, async (req, res
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   } finally {
-    if (conn) await conn.end();
+    if (conn) conn.release();
   }
 });
 
@@ -2556,7 +2543,7 @@ console.log('==================');
   } else {
     // 自動執行 AR 系統資料庫遷移
     try {
-        const conn = await mysql.createConnection(dbConfig);
+        const conn = await pool.getConnection();
         
         // 1. 建立 ar_models 表
         await conn.execute(`
@@ -2595,10 +2582,10 @@ console.log('==================');
             }
         }
         
-        await conn.end();
+        conn.release();
         console.log('✅ AR 多步驟系統資料庫結構檢查完成');
         
-        await conn.end();
+        conn.release();
         console.log('✅ AR 系統資料庫結構檢查完成');
     } catch (err) {
         console.error('❌ AR 系統資料庫遷移失敗:', err);
