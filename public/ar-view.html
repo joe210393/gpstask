@@ -1233,7 +1233,7 @@
                 const nextTask = data.tasks.find(t => 
                     t.quest_chain_id === completedTask.quest_chain_id && 
                     t.quest_order === completedTask.quest_order + 1 &&
-                    t.task_type === 'quest' // 🔥 強制檢查：下一關必須也是劇情任務，避免錯誤接取到單人任務
+                    t.type === 'quest' // 🔥 修正：正確欄位是 type (single/quest)，而非 task_type (qa/photo)
                 );
 
                 if (!nextTask) return false; // No next task found
@@ -1689,7 +1689,7 @@
                         const nextTask = data.tasks.find(t => 
                             t.quest_chain_id === task.quest_chain_id && 
                             t.quest_order === task.quest_order + 1 &&
-                            t.task_type === 'quest' // 🔥 強制檢查：下一關必須也是劇情任務
+                            t.type === 'quest' // 🔥 修正：正確欄位是 type (single/quest)，而非 task_type (qa/photo)
                         );
                         
                         if (nextTask) {
