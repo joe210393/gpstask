@@ -1698,6 +1698,28 @@
                             }
                             
                             btnContinueQuest.onclick = async () => {
+                                // 🔥 關鍵修正：在任何 fetch 之前先請求相機，保留 User Gesture
+                                // 這能解決 iOS/Android 瀏覽器在 await fetch 後禁止啟動相機的問題
+                                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                                    try {
+                                        console.log("👆 用戶點擊繼續，預先確保相機權限...");
+                                        const video = document.getElementById('camera-feed');
+                                        // 只有在沒有活躍流的時候才請求
+                                        if (!video.srcObject || !video.srcObject.active) {
+                                            const stream = await navigator.mediaDevices.getUserMedia({ 
+                                                video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }, 
+                                                audio: false 
+                                            });
+                                            if (video) {
+                                                video.srcObject = stream;
+                                                video.play();
+                                            }
+                                        }
+                                    } catch (e) {
+                                        console.warn("預先請求相機失敗:", e);
+                                    }
+                                }
+
                                 try {
                                     completionModal.style.display = 'none';
                                     const hasNext = await loadNextTask(task);
