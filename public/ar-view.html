@@ -1841,8 +1841,14 @@
             return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
         }
         function extractYouTubeId(url) {
-            const match = url.match(/^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/);
-            return (match && match[7].length == 11) ? match[7] : null;
+            if (!url) return null;
+            try {
+                const match = url.match(/^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/);
+                return (match && match[7].length == 11) ? match[7] : null;
+            } catch (e) {
+                console.warn('YouTube URL 解析失敗:', url);
+                return null;
+            }
         }
     </script>
 </body>

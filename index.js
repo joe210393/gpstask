@@ -1796,12 +1796,12 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
     let questChainReward = null; // 移到外層宣告
 
     // 2. 檢查是否為自動驗證題型且答案正確
-    if (['multiple_choice', 'number', 'keyword', 'location'].includes(userTask.task_type)) {
-      if (userTask.task_type === 'location') {
-        // 地理圍欄任務：只要前端送出請求，且距離檢核通過（前端已做），後端即視為完成
-        // 這裡可以選擇性地再做一次後端經緯度檢核，但為了流暢度，暫時信任前端的打卡動作
+    if (['multiple_choice', 'number', 'keyword', 'location', 'photo'].includes(userTask.task_type)) {
+      if (userTask.task_type === 'location' || userTask.task_type === 'photo') {
+        // 地理圍欄任務 & 拍照任務：只要前端送出請求，即視為完成
+        // (拍照任務目前視為自動通過，若需人工審核可改為不設 isCompleted)
         isCompleted = true;
-        message = '📍 打卡成功！';
+        message = userTask.task_type === 'location' ? '📍 打卡成功！' : '📸 照片上傳成功！';
       } else if (userTask.correct_answer && answer.trim().toLowerCase() === userTask.correct_answer.trim().toLowerCase()) {
         isCompleted = true;
         message = '答對了！任務完成！';
