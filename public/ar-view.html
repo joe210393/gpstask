@@ -1836,22 +1836,24 @@
             });
         }
         function initSensors() {
-            if (!is3DMode) {
-                if ('geolocation' in navigator) {
-                    navigator.geolocation.watchPosition(
-                        pos => { userLat = pos.coords.latitude; userLng = pos.coords.longitude; updateAR(); },
-                        err => { status.innerText = "GPS 錯誤: " + err.message; },
-                        { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 }
-                    );
-                }
-                window.addEventListener('deviceorientation', event => {
-                    let currentHeading = event.webkitCompassHeading || (360 - event.alpha);
-                    let diff = currentHeading - lastHeading;
-                    if (diff > 180) diff -= 360; if (diff < -180) diff += 360;
-                    lastHeading += diff * 0.15; deviceHeading = (lastHeading + 360) % 360;
-                    updateAR();
-                }, true);
+            // 🔥 關鍵修正：無論 3D 或 2D 模式，都要啟動傳感器監聽
+            // 這樣在從 3D 切換回 2D 時，updateAR 才能正常運作
+            if ('geolocation' in navigator) {
+                navigator.geolocation.watchPosition(
+                    pos => { userLat = pos.coords.latitude; userLng = pos.coords.longitude; updateAR(); },
+                    err => { console.error("GPS Error:", err); },
+                    { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 }
+                );
             }
+            window.addEventListener('deviceorientation', event => {
+                let currentHeading = event.webkitCompassHeading || (360 - event.alpha);
+                if (currentHeading === undefined || currentHeading === null) return;
+                
+                let diff = currentHeading - lastHeading;
+                if (diff > 180) diff -= 360; if (diff < -180) diff += 360;
+                lastHeading += diff * 0.15; deviceHeading = (lastHeading + 360) % 360;
+                updateAR();
+            }, true);
         }
         function updateAR() {
             if (is3DMode) return; 
