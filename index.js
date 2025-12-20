@@ -151,13 +151,16 @@ async function testDatabaseConnection() {
   let conn;
   try {
     console.log('🔄 測試資料庫連接...');
-    // 診斷資訊：檢查配置（不顯示敏感資訊）
-    console.log('   連接資訊:');
-    console.log(`   - Host: ${dbConfig.host}`);
-    console.log(`   - Port: ${dbConfig.port}`);
-    console.log(`   - User: ${dbConfig.user}`);
-    console.log(`   - Database: ${dbConfig.database}`);
-    console.log(`   - Password: ${dbConfig.password ? (dbConfig.password.length > 0 ? `[已設定，長度: ${dbConfig.password.length}]` : '[空字串]') : '[未設定]'}`);
+    
+    // 開發環境：顯示詳細診斷資訊（不包含密碼）
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('   連接資訊:');
+      console.log(`   - Host: ${dbConfig.host}`);
+      console.log(`   - Port: ${dbConfig.port}`);
+      console.log(`   - User: ${dbConfig.user}`);
+      console.log(`   - Database: ${dbConfig.database}`);
+      console.log(`   - Password: ${dbConfig.password ? (dbConfig.password.length > 0 ? `[已設定，長度: ${dbConfig.password.length}]` : '[空字串]') : '[未設定]'}`);
+    }
     
     // 使用連接池獲取連接
     conn = await pool.getConnection();
@@ -165,13 +168,16 @@ async function testDatabaseConnection() {
     return true;
   } catch (error) {
     console.error('❌ 資料庫連接失敗:', error.message);
-    if (error.code === 'ER_ACCESS_DENIED_ERROR') {
+    
+    // 開發環境：顯示詳細診斷資訊
+    if (process.env.NODE_ENV !== 'production' && error.code === 'ER_ACCESS_DENIED_ERROR') {
       console.error('   診斷: 這通常是因為：');
       console.error('   1. 密碼不正確');
       console.error('   2. 環境變數包含未展開的變數語法（如 ${PASSWORD}）');
       console.error('   3. 用戶權限不足');
     }
-    console.error('   錯誤詳情:', error.message);
+    
+    // 生產環境：僅顯示錯誤訊息，不顯示詳細診斷
     return false;
   } finally {
     if (conn) conn.release(); // 釋放連接回池
@@ -2516,24 +2522,26 @@ app.get(/^\/(?!api\/).*/, (req, res, next) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// 輸出環境變數檢查（用於診斷）
-console.log('=== 環境變數檢查 ===');
-if (process.env.DATABASE_URL) {
-  const dbUrl = process.env.DATABASE_URL;
-  // 只顯示前 30 個字元，隱藏敏感資訊
-  const displayUrl = dbUrl.length > 30 ? dbUrl.substring(0, 30) + '...' : dbUrl;
-  console.log('DATABASE_URL:', displayUrl, '[已設定 - 將優先使用]');
+// 輸出環境變數檢查（僅在開發環境顯示詳細資訊，生產環境僅顯示必要狀態）
+if (process.env.NODE_ENV !== 'production') {
+  console.log('=== 環境變數檢查 (開發模式) ===');
+  if (process.env.DATABASE_URL) {
+    console.log('DATABASE_URL:', '[已設定 - 將優先使用]');
+  } else {
+    console.log('DATABASE_URL:', '[未設定]');
+    console.log('MYSQL_HOST:', process.env.MYSQL_HOST || '[未設定]');
+    console.log('MYSQL_PORT:', process.env.MYSQL_PORT || '[未設定]');
+    console.log('MYSQL_USERNAME:', process.env.MYSQL_USERNAME || '[未設定]');
+    console.log('MYSQL_DATABASE:', process.env.MYSQL_DATABASE || '[未設定]');
+    console.log('MYSQL_ROOT_PASSWORD:', process.env.MYSQL_ROOT_PASSWORD ? '[已設定]' : '[未設定]');
+    console.log('MYSQL_PASSWORD:', process.env.MYSQL_PASSWORD ? '[已設定]' : '[未設定]');
+  }
+  console.log('ALLOWED_ORIGINS:', process.env.ALLOWED_ORIGINS || '[未設定]');
+  console.log('==================');
 } else {
-  console.log('DATABASE_URL:', '[未設定]');
-  console.log('MYSQL_HOST:', process.env.MYSQL_HOST || '[未設定]');
-  console.log('MYSQL_PORT:', process.env.MYSQL_PORT || '[未設定]');
-  console.log('MYSQL_USERNAME:', process.env.MYSQL_USERNAME || '[未設定]');
-  console.log('MYSQL_DATABASE:', process.env.MYSQL_DATABASE || '[未設定]');
-  console.log('MYSQL_ROOT_PASSWORD:', process.env.MYSQL_ROOT_PASSWORD ? '[已設定]' : '[未設定]');
-  console.log('MYSQL_PASSWORD:', process.env.MYSQL_PASSWORD ? '[已設定]' : '[未設定]');
+  // 生產環境：僅顯示必要狀態，不輸出任何敏感資訊
+  console.log('✅ 環境變數已載入（生產模式，詳細資訊已隱藏）');
 }
-console.log('ALLOWED_ORIGINS:', process.env.ALLOWED_ORIGINS || '[未設定]');
-console.log('==================');
 
 // 啟動時測試資料庫連接
 (async () => {
