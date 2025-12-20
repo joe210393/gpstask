@@ -198,20 +198,10 @@ function authenticateToken(req, res, next) {
   next();
 }
 
-// 兼容性認證中間層 - 同時支持JWT和臨時用戶資訊（用於遷移期間）
+// 兼容性認證中間層 - 現在與 authenticateToken 功能完全相同
+// 保留此函數以維持向後兼容性，實際上是 authenticateToken 的別名
 function authenticateTokenCompat(req, res, next) {
-  // 首先嘗試JWT認證
-  const token = req.cookies.token || req.headers.authorization?.replace('Bearer ', '');
-
-  if (token) {
-    const decoded = verifyToken(token);
-    if (decoded) {
-      req.user = decoded;
-      return next();
-    }
-  }
-
-  return res.status(401).json({ success: false, message: '認證失敗：無效的令牌' });
+  return authenticateToken(req, res, next);
 }
 
 // RBAC 角色授權中間層
