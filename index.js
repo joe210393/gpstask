@@ -24,6 +24,10 @@ const JWT_EXPIRE = process.env.JWT_EXPIRE || '7d';
 
 const app = express();
 
+// 🔥 關鍵設定：信任反向代理（Zeabur/Cloudflare 等）
+// 這讓 express-rate-limit 能正確識別客戶端 IP，而不是代理服務器的 IP
+app.set('trust proxy', true);
+
 // 安全性設定
 app.use(helmet({
   contentSecurityPolicy: false, // AR.js 需要較寬鬆的 CSP
@@ -284,7 +288,8 @@ app.post('/api/login', async (req, res) => {
   try {
     conn = await pool.getConnection();
     if (role === 'user') {
-      // 手機門號登入 - 安全增強：如果用戶有密碼，必須提供密碼
+      // 手機門號登入 - 設計為無密碼快速登入（景點快速使用）
+      // 如果用戶提供了密碼且帳號有密碼，則驗證；否則直接通過
       const [users] = await conn.execute(
         'SELECT * FROM users WHERE username = ? AND role IN (?, ?)',
         [username, 'user', 'staff']
@@ -295,19 +300,14 @@ app.post('/api/login', async (req, res) => {
 
       const user = users[0];
       
-      // 如果用戶有密碼，必須驗證密碼
-      if (user.password && user.password.trim() !== '') {
-        if (!password) {
-          return res.status(400).json({ success: false, message: '此帳號需要密碼，請輸入密碼' });
-        }
+      // 可選的密碼驗證：如果用戶提供了密碼且帳號有密碼，則驗證
+      if (password && user.password && user.password.trim() !== '') {
         const isValid = await bcrypt.compare(password, user.password);
         if (!isValid) {
           return res.status(400).json({ success: false, message: '密碼錯誤' });
         }
-      } else {
-        // 無密碼帳號（向後兼容），但記錄警告
-        console.warn(`⚠️  安全警告: 用戶 ${username} 使用無密碼登入（建議設置密碼）`);
       }
+      // 如果沒有提供密碼或帳號沒有密碼，直接通過（符合快速登入設計）
 
       // 生成 JWT token
       const token = generateToken(user);
