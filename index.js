@@ -294,7 +294,7 @@ app.post('/api/login', async (req, res) => {
   try {
     conn = await pool.getConnection();
     if (role === 'user') {
-      // 手機門號登入 - 不需要密碼驗證
+      // 手機門號登入 - 安全增強：如果用戶有密碼，必須提供密碼
       const [users] = await conn.execute(
         'SELECT * FROM users WHERE username = ? AND role IN (?, ?)',
         [username, 'user', 'staff']
@@ -303,8 +303,24 @@ app.post('/api/login', async (req, res) => {
         return res.status(400).json({ success: false, message: '查無此用戶' });
       }
 
+      const user = users[0];
+      
+      // 如果用戶有密碼，必須驗證密碼
+      if (user.password && user.password.trim() !== '') {
+        if (!password) {
+          return res.status(400).json({ success: false, message: '此帳號需要密碼，請輸入密碼' });
+        }
+        const isValid = await bcrypt.compare(password, user.password);
+        if (!isValid) {
+          return res.status(400).json({ success: false, message: '密碼錯誤' });
+        }
+      } else {
+        // 無密碼帳號（向後兼容），但記錄警告
+        console.warn(`⚠️  安全警告: 用戶 ${username} 使用無密碼登入（建議設置密碼）`);
+      }
+
       // 生成 JWT token
-      const token = generateToken(users[0]);
+      const token = generateToken(user);
 
       // 設置 httpOnly cookie
       res.cookie('token', token, {
@@ -671,7 +687,7 @@ app.post('/api/quest-chains', staffOrAdminAuth, upload.single('badge_image'), as
   const { title, description, chain_points, badge_name } = req.body;
   if (!title) return res.status(400).json({ success: false, message: '缺少標題' });
 
-  const creator = req.user?.username || req.headers['x-username'];
+  const creator = req.user?.username || req.user?.username;
   
   // 處理上傳的圖片
   let badge_image = null;
@@ -701,7 +717,7 @@ app.post('/api/quest-chains', staffOrAdminAuth, upload.single('badge_image'), as
 // 刪除劇情
 app.delete('/api/quest-chains/:id', staffOrAdminAuth, async (req, res) => {
   const { id } = req.params;
-  const username = req.user?.username || req.headers['x-username'];
+  const username = req.user?.username || req.user?.username;
   const userRole = req.user?.role;
 
   let conn;
@@ -768,7 +784,7 @@ app.post('/api/ar-models', staffOrAdminAuth, upload.single('model'), async (req,
 
   const modelUrl = '/images/' + req.file.filename; // 因為我們還是存在 /images 目錄下 (雖然是 .glb)
   const modelScale = parseFloat(scale) || 1.0;
-  const username = req.headers['x-username'] || req.user?.username;
+  const username = req.user?.username || req.user?.username;
 
   let conn;
   try {
@@ -959,7 +975,7 @@ app.post('/api/admin/grant-item', staffOrAdminAuth, async (req, res) => {
 
 // 取得使用者背包
 app.get('/api/user/inventory', async (req, res) => {
-  const username = req.headers['x-username'];
+  const username = req.user?.username;
   if (!username) return res.status(400).json({ success: false, message: '未登入' });
 
   let conn;
@@ -1034,7 +1050,7 @@ app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
   let conn;
   try {
     conn = await pool.getConnection();
-    const username = req.headers['x-username'];
+    const username = req.user?.username;
     const pts = Number(points) || 0;
     
     // 檢查 task_type (問答/選擇/拍照)
@@ -1356,7 +1372,7 @@ app.put('/api/tasks/:id', staffOrAdminAuth, async (req, res) => {
   let conn;
   try {
     conn = await pool.getConnection();
-    const username = req.headers['x-username'];
+    const username = req.user?.username;
 
     // 獲取用戶角色
     const [userRows] = await conn.execute(
@@ -1439,7 +1455,7 @@ app.delete('/api/tasks/:id', staffOrAdminAuth, async (req, res) => {
   let conn;
   try {
     conn = await pool.getConnection();
-    const username = req.headers['x-username'];
+    const username = req.user?.username;
 
     // 獲取用戶角色
     const [userRows] = await conn.execute(
@@ -1499,7 +1515,7 @@ function getRank(started, finished) {
 
 // 查詢使用者在各劇情任務線的目前進度 (具備自我修復功能)
 app.get('/api/user/quest-progress', async (req, res) => {
-  const username = req.headers['x-username'];
+  const username = req.user?.username;
   if (!username) return res.json({ success: true, progress: {} }); 
 
   let conn;
@@ -1609,46 +1625,26 @@ app.get('/api/user-tasks/all', async (req, res) => {
   }
 });
 
-// ===== Admin 權限驗證中介層 =====
+// ===== Admin 權限驗證中介層 (安全性修復：基於 JWT) =====
 function adminAuth(req, res, next) {
-  const username = req.headers['x-username'];
-  if (!username) return res.status(401).json({ success: false, message: '未登入' });
-  pool.getConnection().then(conn => {
-    conn.execute('SELECT role FROM users WHERE username = ?', [username])
-      .then(([rows]) => {
-        conn.release();
-        if (rows.length === 0 || rows[0].role !== 'admin') {
-          return res.status(403).json({ success: false, message: '無權限' });
-        }
-        next();
-      })
-      .catch(err => {
-        conn.release();
-        res.status(500).json({ success: false, message: '伺服器錯誤' });
-      });
+  authenticateTokenCompat(req, res, () => {
+    if (req.user && req.user.role === 'admin') {
+      next();
+    } else {
+      return res.status(403).json({ success: false, message: '無權限：需要管理員身分' });
+    }
   });
 }
 
-// ===== Staff 或 Admin 權限驗證中介層 =====
-// 舊的中間層 - 為了向後兼容保留，但建議使用新的 JWT 中間層
+// ===== Staff 或 Admin 權限驗證中介層 (安全性修復：基於 JWT) =====
 function staffOrAdminAuth(req, res, next) {
-  const username = req.headers['x-username'];
-  if (!username) return res.status(401).json({ success: false, message: '未登入' });
-  pool.getConnection().then(conn => {
-    conn.execute('SELECT role FROM users WHERE username = ?', [username])
-      .then(([rows]) => {
-        conn.release();
-        if (rows.length === 0 || (rows[0].role !== 'shop' && rows[0].role !== 'admin')) {
-          return res.status(403).json({ success: false, message: '無權限' });
-        }
-        // 將角色附加到請求，方便後續判斷
-        req.user = { username, role: rows[0].role };
-        next();
-      })
-      .catch(err => {
-        conn.release();
-        res.status(500).json({ success: false, message: '伺服器錯誤' });
-      });
+  authenticateTokenCompat(req, res, () => {
+    const role = req.user?.role;
+    if (role === 'admin' || role === 'shop' || role === 'staff') {
+      next();
+    } else {
+      return res.status(403).json({ success: false, message: '無權限' });
+    }
   });
 }
 
@@ -1816,12 +1812,11 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
     let questChainReward = null; // 移到外層宣告
 
     // 2. 檢查是否為自動驗證題型且答案正確
-    if (['multiple_choice', 'number', 'keyword', 'location', 'photo'].includes(userTask.task_type)) {
-      if (userTask.task_type === 'location' || userTask.task_type === 'photo') {
-        // 地理圍欄任務 & 拍照任務：只要前端送出請求，即視為完成
-        // (拍照任務目前視為自動通過，若需人工審核可改為不設 isCompleted)
+    if (['multiple_choice', 'number', 'keyword', 'location'].includes(userTask.task_type)) {
+      if (userTask.task_type === 'location') {
+        // 地理圍欄任務：只要前端送出請求，即視為完成
         isCompleted = true;
-        message = userTask.task_type === 'location' ? '📍 打卡成功！' : '📸 照片上傳成功！';
+        message = '📍 打卡成功！';
       } else if (userTask.correct_answer && answer.trim().toLowerCase() === userTask.correct_answer.trim().toLowerCase()) {
         isCompleted = true;
         message = '答對了！任務完成！';
@@ -1957,7 +1952,7 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
 
 // 獲取用戶的所有稱號
 app.get('/api/user/badges', async (req, res) => {
-  const username = req.headers['x-username'];
+  const username = req.user?.username;
   if (!username) {
     return res.json({ success: true, badges: [] });
   }
@@ -2026,7 +2021,7 @@ app.get('/api/products/admin', staffOrAdminAuth, async (req, res) => {
   let conn;
   try {
     conn = await pool.getConnection();
-    const username = req.headers['x-username'];
+    const username = req.user?.username;
 
     // 獲取用戶角色
     const [userRows] = await conn.execute(
@@ -2071,7 +2066,7 @@ app.post('/api/products', staffOrAdminAuth, async (req, res) => {
   let conn;
   try {
     conn = await pool.getConnection();
-    const username = req.headers['x-username'];
+    const username = req.user?.username;
 
     const [result] = await conn.execute(
       'INSERT INTO products (name, description, image_url, points_required, stock, created_by) VALUES (?, ?, ?, ?, ?, ?)',
@@ -2097,7 +2092,7 @@ app.put('/api/products/:id', staffOrAdminAuth, async (req, res) => {
   let conn;
   try {
     conn = await pool.getConnection();
-    const username = req.headers['x-username'];
+    const username = req.user?.username;
 
     // 獲取用戶角色
     const [userRows] = await conn.execute(
@@ -2145,7 +2140,7 @@ app.delete('/api/products/:id', staffOrAdminAuth, async (req, res) => {
   let conn;
   try {
     conn = await pool.getConnection();
-    const username = req.headers['x-username'];
+    const username = req.user?.username;
 
     // 獲取用戶角色
     const [userRows] = await conn.execute(
@@ -2189,7 +2184,7 @@ app.delete('/api/products/:id', staffOrAdminAuth, async (req, res) => {
 
 // 獲取用戶的商品兌換記錄
 app.get('/api/products/redemptions', async (req, res) => {
-  const username = req.headers['x-username'];
+  const username = req.user?.username;
   if (!username) {
     return res.status(400).json({ success: false, message: '缺少用戶名稱' });
   }
@@ -2225,7 +2220,7 @@ app.get('/api/products/redemptions', async (req, res) => {
 // 兌換商品
 app.post('/api/products/:id/redeem', async (req, res) => {
   const { id } = req.params;
-  const username = req.headers['x-username'];
+  const username = req.user?.username;
   if (!username) {
     return res.status(400).json({ success: false, message: '缺少用戶名稱' });
   }
@@ -2306,7 +2301,7 @@ app.post('/api/products/:id/redeem', async (req, res) => {
 
 // 獲取用戶總積分
 app.get('/api/user/points', async (req, res) => {
-  const username = req.headers['x-username'];
+  const username = req.user?.username;
   if (!username) {
     return res.status(400).json({ success: false, message: '缺少用戶名稱' });
   }
@@ -2348,7 +2343,7 @@ app.get('/api/product-redemptions/admin', staffOrAdminAuth, async (req, res) => 
   let conn;
   try {
     conn = await pool.getConnection();
-    const username = req.headers['x-username'];
+    const username = req.user?.username;
 
     // 獲取用戶角色
     const [userRows] = await conn.execute(
@@ -2408,7 +2403,7 @@ app.put('/api/product-redemptions/:id/status', staffOrAdminAuth, async (req, res
   let conn;
   try {
     conn = await pool.getConnection();
-    const username = req.headers['x-username'];
+    const username = req.user?.username;
 
     // 獲取用戶角色
     const [userRows] = await conn.execute(
@@ -2584,9 +2579,6 @@ console.log('==================');
         
         conn.release();
         console.log('✅ AR 多步驟系統資料庫結構檢查完成');
-        
-        conn.release();
-        console.log('✅ AR 系統資料庫結構檢查完成');
     } catch (err) {
         console.error('❌ AR 系統資料庫遷移失敗:', err);
     }
