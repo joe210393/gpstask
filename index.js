@@ -25,8 +25,9 @@ const JWT_EXPIRE = process.env.JWT_EXPIRE || '7d';
 const app = express();
 
 // 🔥 關鍵設定：信任反向代理（Zeabur/Cloudflare 等）
-// 這讓 express-rate-limit 能正確識別客戶端 IP，而不是代理服務器的 IP
-app.set('trust proxy', true);
+// 設定為 1 表示只信任第一層代理（Zeabur 通常只有一層負載均衡器）
+// 這比 trust proxy: true 更安全，避免信任過多代理層導致 IP 偽造風險
+app.set('trust proxy', 1);
 
 // 安全性設定
 app.use(helmet({
