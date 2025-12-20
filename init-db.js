@@ -115,11 +115,16 @@ async function initDb() {
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT NOT NULL,
         task_id INT NOT NULL,
-        status VARCHAR(20) DEFAULT 'completed',
+        status VARCHAR(20) DEFAULT '進行中',
         answer TEXT,
-        completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        finished_at TIMESTAMP NULL,
+        redeemed BOOLEAN DEFAULT FALSE,
+        redeemed_at TIMESTAMP NULL,
+        redeemed_by VARCHAR(100) NULL,
         FOREIGN KEY (user_id) REFERENCES users(id),
-        FOREIGN KEY (task_id) REFERENCES tasks(id)
+        FOREIGN KEY (task_id) REFERENCES tasks(id),
+        UNIQUE KEY unique_user_task (user_id, task_id)
       )
     `);
 

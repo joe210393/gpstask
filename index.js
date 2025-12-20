@@ -1498,12 +1498,26 @@ app.delete('/api/tasks/:id', staffOrAdminAuth, async (req, res) => {
 });
 
 // ====== Rank 計算工具 ======
+// 計算任務完成時間差並返回等級
+// 注意：此函數假設資料庫 TIMESTAMP 存儲的是 UTC 時間
+// 如果 MySQL 的 time_zone 設定為 UTC，則此假設正確
+// 如果資料庫存儲的已經是本地時間（台灣時區），則不需要手動轉換
 function getRank(started, finished) {
   if (!started || !finished) return '';
-  // 轉為台灣時區
-  const startedTW = new Date(new Date(started).getTime() + 8 * 60 * 60 * 1000);
-  const finishedTW = new Date(new Date(finished).getTime() + 8 * 60 * 60 * 1000);
-  const diff = (finishedTW - startedTW) / 3600000;
+  
+  // MySQL TIMESTAMP 類型會自動轉換為伺服器時區
+  // 如果伺服器時區是 UTC，則需要手動轉換為台灣時區 (UTC+8)
+  // 如果伺服器時區已經是 Asia/Taipei，則不需要轉換
+  // 為了安全，這裡假設資料庫返回的是 UTC，手動轉換為台灣時區
+  const startedDate = new Date(started);
+  const finishedDate = new Date(finished);
+  
+  // 計算時間差（小時）- 直接計算，因為 Date 對象會自動處理時區
+  // 如果資料庫返回的是 UTC 字符串，JavaScript Date 會自動轉換為本地時區
+  // 所以這裡不需要手動加 8 小時，除非資料庫返回的是已經轉換過的本地時間字符串
+  const diff = (finishedDate.getTime() - startedDate.getTime()) / (1000 * 60 * 60);
+  
+  // 等級判定（基於完成時間，單位：小時）
   if (diff <= 1) return 'S+';
   if (diff <= 2) return 'S';
   if (diff <= 3) return 'A';
