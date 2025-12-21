@@ -85,29 +85,113 @@ if (document.readyState === 'loading') {
   showIOSInstallPrompt();
 }
 
-// ===== 推送通知訂閱管理（預留接口，待後端實作） =====
+// ===== 推送通知訂閱管理 =====
 async function subscribeToPushNotifications() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    console.warn('瀏覽器不支援推送通知');
+    console.warn('⚠️ 瀏覽器不支援推送通知');
     return null;
   }
 
   try {
-    const registration = await navigator.serviceWorker.ready;
+    // 1. 獲取 VAPID 公鑰
+    const vapidRes = await fetch('/api/push/vapid-public-key');
+    const vapidData = await vapidRes.json();
     
-    // 請求通知權限
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      console.warn('用戶拒絕了通知權限');
+    if (!vapidData.success || !vapidData.publicKey) {
+      console.warn('⚠️ 推送服務未配置');
       return null;
     }
 
-    // 這裡需要後端提供 VAPID 公鑰
-    // 暫時返回 null，等待後端實作
-    console.log('✅ 通知權限已授予，等待後端推送服務配置');
-    return null;
+    const publicKey = vapidData.publicKey;
+
+    // 2. 等待 Service Worker 就緒
+    const registration = await navigator.serviceWorker.ready;
+    
+    // 3. 請求通知權限
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      console.warn('⚠️ 用戶拒絕了通知權限');
+      return null;
+    }
+
+    // 4. 訂閱推送
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey)
+    });
+
+    // 5. 發送訂閱資訊到後端
+    const loginUser = getLoginUser();
+    if (!loginUser) {
+      console.warn('⚠️ 未登入，無法訂閱推送');
+      return null;
+    }
+
+    const subscribeRes = await fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include', // 發送 cookies (JWT)
+      body: JSON.stringify({ subscription })
+    });
+
+    const subscribeData = await subscribeRes.json();
+    if (subscribeData.success) {
+      console.log('✅ 推送通知訂閱成功');
+      return subscription;
+    } else {
+      console.error('❌ 推送訂閱失敗:', subscribeData.message);
+      return null;
+    }
   } catch (error) {
-    console.error('訂閱推送通知失敗:', error);
+    console.error('❌ 訂閱推送通知失敗:', error);
     return null;
   }
+}
+
+// 輔助函數：將 VAPID 公鑰從 Base64 URL 轉換為 Uint8Array
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/\-/g, '+')
+    .replace(/_/g, '/');
+
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+// 獲取登入用戶資訊（從 localStorage）
+function getLoginUser() {
+  try {
+    return JSON.parse(localStorage.getItem('loginUser') || 'null');
+  } catch (e) {
+    return null;
+  }
+}
+
+// 頁面載入時自動嘗試訂閱（如果用戶已登入）
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    // 延遲訂閱，等待用戶可能的手動操作
+    setTimeout(() => {
+      const loginUser = getLoginUser();
+      if (loginUser) {
+        // 檢查是否已經訂閱過（避免重複提示）
+        const hasSubscribed = localStorage.getItem('push-subscribed');
+        if (!hasSubscribed) {
+          subscribeToPushNotifications().then(subscription => {
+            if (subscription) {
+              localStorage.setItem('push-subscribed', 'true');
+            }
+          });
+        }
+      }
+    }, 3000); // 3 秒後自動嘗試訂閱
+  });
 }

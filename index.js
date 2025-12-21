@@ -9,6 +9,7 @@ const path = require('path');
 const fs = require('fs');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const webpush = require('web-push');
 const { getDbConfig } = require('./db-config');
 
 // JWT 設定
@@ -21,6 +22,21 @@ if (process.env.NODE_ENV === 'production' && !JWT_SECRET) {
 // 開發環境 fallback
 const FINAL_JWT_SECRET = JWT_SECRET || 'dev-secret-key-do-not-use-in-prod';
 const JWT_EXPIRE = process.env.JWT_EXPIRE || '7d';
+
+// Web Push (VAPID) 設定
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:admin@gpstask.app';
+
+// 初始化 webpush（如果提供了 VAPID 金鑰）
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+  console.log('✅ Web Push (VAPID) 已初始化');
+} else {
+  console.warn('⚠️  警告: 未設定 VAPID 金鑰，推送通知功能將無法使用');
+  console.warn('   請設定環境變數: VAPID_PUBLIC_KEY 和 VAPID_PRIVATE_KEY');
+  console.warn('   可以使用以下命令生成: npx web-push generate-vapid-keys');
+}
 
 const app = express();
 
@@ -1945,6 +1961,37 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
        await conn.execute('UPDATE user_tasks SET answer = ? WHERE id = ?', [answer, id]);
     }
 
+    // 如果任務完成，發送推送通知
+    if (isCompleted) {
+      const pushTitle = questChainCompleted 
+        ? '🎉 劇情線完成！' 
+        : '✅ 任務完成！';
+      
+      let pushBody = `恭喜完成「${userTask.task_name}」`;
+      if (earnedItemName) {
+        pushBody += `，獲得道具：${earnedItemName}`;
+      }
+      if (questChainCompleted && questChainReward) {
+        pushBody += `\n獲得稱號：${questChainReward.badge_name || '未命名稱號'}`;
+        if (questChainReward.chain_points > 0) {
+          pushBody += `\n額外積分：${questChainReward.chain_points}`;
+        }
+      }
+
+      // 非阻塞方式發送推送（不等待完成）
+      sendPushNotification(
+        userTask.user_id,
+        pushTitle,
+        pushBody,
+        {
+          url: `/task-detail.html?id=${userTask.task_id}`,
+          taskId: userTask.task_id
+        }
+      ).catch(err => {
+        console.error('推送通知發送失敗（非阻塞）:', err);
+      });
+    }
+
     res.json({ 
       success: true, 
       message, 
@@ -2003,6 +2050,172 @@ app.get('/api/user/badges', async (req, res) => {
     if (conn) conn.release();
   }
 });
+
+// ===== 推送通知 API =====
+
+// 獲取 VAPID 公鑰（前端訂閱時需要）
+app.get('/api/push/vapid-public-key', (req, res) => {
+  if (!VAPID_PUBLIC_KEY) {
+    return res.status(503).json({ 
+      success: false, 
+      message: '推送通知服務未配置，請聯繫管理員' 
+    });
+  }
+  res.json({ success: true, publicKey: VAPID_PUBLIC_KEY });
+});
+
+// 訂閱推送通知
+app.post('/api/push/subscribe', authenticateTokenCompat, async (req, res) => {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+    return res.status(503).json({ 
+      success: false, 
+      message: '推送通知服務未配置' 
+    });
+  }
+
+  const username = req.user?.username;
+  if (!username) {
+    return res.status(401).json({ success: false, message: '未登入' });
+  }
+
+  const { subscription } = req.body;
+  if (!subscription || !subscription.endpoint || !subscription.keys) {
+    return res.status(400).json({ success: false, message: '無效的訂閱資訊' });
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    
+    // 獲取用戶 ID
+    const [users] = await conn.execute('SELECT id FROM users WHERE username = ?', [username]);
+    if (users.length === 0) {
+      return res.status(404).json({ success: false, message: '用戶不存在' });
+    }
+    const userId = users[0].id;
+
+    // 儲存或更新訂閱資訊
+    await conn.execute(
+      `INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
+       VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE 
+         p256dh = VALUES(p256dh),
+         auth = VALUES(auth),
+         updated_at = NOW()`,
+      [userId, subscription.endpoint, subscription.keys.p256dh, subscription.keys.auth]
+    );
+
+    res.json({ success: true, message: '推送訂閱成功' });
+  } catch (err) {
+    console.error('推送訂閱失敗:', err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+// 取消推送訂閱
+app.post('/api/push/unsubscribe', authenticateTokenCompat, async (req, res) => {
+  const username = req.user?.username;
+  if (!username) {
+    return res.status(401).json({ success: false, message: '未登入' });
+  }
+
+  const { endpoint } = req.body;
+  if (!endpoint) {
+    return res.status(400).json({ success: false, message: '缺少 endpoint' });
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    
+    // 獲取用戶 ID
+    const [users] = await conn.execute('SELECT id FROM users WHERE username = ?', [username]);
+    if (users.length === 0) {
+      return res.status(404).json({ success: false, message: '用戶不存在' });
+    }
+    const userId = users[0].id;
+
+    // 刪除訂閱
+    await conn.execute(
+      'DELETE FROM push_subscriptions WHERE user_id = ? AND endpoint = ?',
+      [userId, endpoint]
+    );
+
+    res.json({ success: true, message: '已取消推送訂閱' });
+  } catch (err) {
+    console.error('取消訂閱失敗:', err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+// 推送通知發送函數（內部使用）
+async function sendPushNotification(userId, title, body, data = {}) {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+    console.warn('⚠️  無法發送推送通知: VAPID 金鑰未配置');
+    return;
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    
+    // 獲取用戶的所有訂閱
+    const [subscriptions] = await conn.execute(
+      'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ?',
+      [userId]
+    );
+
+    if (subscriptions.length === 0) {
+      return; // 用戶未訂閱，靜默失敗
+    }
+
+    // 發送推送給所有訂閱
+    const promises = subscriptions.map(async (sub) => {
+      try {
+        const subscription = {
+          endpoint: sub.endpoint,
+          keys: {
+            p256dh: sub.p256dh,
+            auth: sub.auth
+          }
+        };
+
+        const payload = JSON.stringify({
+          title,
+          body,
+          icon: '/images/mascot.png',
+          badge: '/images/flag-red.png',
+          vibrate: [100, 50, 100],
+          ...data
+        });
+
+        await webpush.sendNotification(subscription, payload);
+        console.log(`✅ 推送通知已發送給用戶 ${userId}`);
+      } catch (err) {
+        console.error(`❌ 推送通知發送失敗 (用戶 ${userId}):`, err);
+        
+        // 如果訂閱已失效（410 Gone），刪除它
+        if (err.statusCode === 410) {
+          await conn.execute(
+            'DELETE FROM push_subscriptions WHERE endpoint = ?',
+            [sub.endpoint]
+          );
+          console.log(`🗑️  已刪除失效的推送訂閱: ${sub.endpoint}`);
+        }
+      }
+    });
+
+    await Promise.allSettled(promises);
+  } catch (err) {
+    console.error('發送推送通知時發生錯誤:', err);
+  } finally {
+    if (conn) conn.release();
+  }
+}
 
 // ===== 商品管理 API =====
 
@@ -2589,6 +2802,22 @@ if (process.env.NODE_ENV !== 'production') {
                 console.log(`✅ 資料庫遷移: tasks 表已新增 ${col}`);
             }
         }
+
+        // 5. 建立推送訂閱表
+        await conn.execute(`
+          CREATE TABLE IF NOT EXISTS push_subscriptions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            endpoint TEXT NOT NULL,
+            p256dh VARCHAR(255) NOT NULL,
+            auth VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            UNIQUE KEY unique_user_endpoint (user_id, endpoint(255))
+          )
+        `);
+        console.log('✅ 資料庫遷移: push_subscriptions 表已建立');
         
         conn.release();
         console.log('✅ AR 多步驟系統資料庫結構檢查完成');

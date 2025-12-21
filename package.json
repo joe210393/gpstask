@@ -20,7 +20,8 @@
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
-    "mysql2": "^3.15.1"
+    "mysql2": "^3.15.1",
+    "web-push": "^3.6.7"
   },
   "engines": {
     "node": "18.x"
