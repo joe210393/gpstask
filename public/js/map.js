@@ -157,7 +157,8 @@ function initMap(lat, lng, zoom) {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
 
-  loadTasks();
+  // 強制刷新進度後載入任務（確保顯示最新進度的任務）
+  loadTasks(true);
 }
 
 // 顯示手動定位選項
@@ -396,16 +397,22 @@ function updateUserMarkerRotation() {
   }
 }
 
-// 取得使用者劇情進度
-function fetchQuestProgress() {
+// 取得使用者劇情進度（強制刷新，破壞快取）
+function fetchQuestProgress(forceRefresh = false) {
   const userJson = localStorage.getItem('loginUser');
   if (!userJson) return Promise.resolve({});
   try {
     const loginUser = JSON.parse(userJson);
     if (!loginUser || !loginUser.username) return Promise.resolve({});
     
-    return fetch(`${API_BASE}/api/user/quest-progress`, {
-      headers: { 'x-username': loginUser.username }
+    // 添加時間戳參數破壞快取，確保每次獲取最新進度
+    const url = forceRefresh 
+      ? `${API_BASE}/api/user/quest-progress?_t=${Date.now()}`
+      : `${API_BASE}/api/user/quest-progress`;
+    
+    return fetch(url, {
+      headers: { 'x-username': loginUser.username },
+      cache: 'no-cache' // 強制不從快取讀取
     })
     .then(res => res.json())
     .then(data => {
@@ -423,12 +430,13 @@ function fetchQuestProgress() {
 }
 
 // 載入任務並顯示在地圖上
-async function loadTasks() {
+async function loadTasks(forceRefreshProgress = false) {
   try {
-    const [tasksRes, progress] = await Promise.all([
-      fetch(`${API_BASE}/api/tasks`).then(r => r.json()),
-      fetchQuestProgress()
-    ]);
+    // 優先獲取最新進度，確保進度是最新的
+    const progress = await fetchQuestProgress(forceRefreshProgress);
+    
+    // 然後獲取任務列表
+    const tasksRes = await fetch(`${API_BASE}/api/tasks`).then(r => r.json());
 
     if (!tasksRes.success) return;
 
@@ -1158,15 +1166,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
   globalLoginUser = JSON.parse(localStorage.getItem('loginUser') || 'null');
   const loginUser = globalLoginUser;
+  
+  // 優先強制刷新劇情進度，確保獲取最新狀態
   if (loginUser && loginUser.username) {
-    fetch(`${API_BASE}/api/user-tasks/all?username=${encodeURIComponent(loginUser.username)}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          completedTaskIds = new Set(data.tasks.filter(t => t.status === '完成').map(t => t.id));
-        }
-        initMapWithUserLocation();
-      });
+    // 先強制刷新進度，然後載入已完成任務列表，最後初始化地圖
+    Promise.all([
+      fetchQuestProgress(true), // 強制刷新進度
+      fetch(`${API_BASE}/api/user-tasks/all?username=${encodeURIComponent(loginUser.username)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            completedTaskIds = new Set(data.tasks.filter(t => t.status === '完成').map(t => t.id));
+          }
+          return data;
+        })
+    ]).then(() => {
+      initMapWithUserLocation();
+    });
   } else {
     initMapWithUserLocation();
   }

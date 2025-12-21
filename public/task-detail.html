@@ -233,8 +233,77 @@
                     startTaskBtn.textContent = '任務已完成';
                     startTaskBtn.disabled = true;
                     startTaskBtn.style.backgroundColor = '#6c757d';
-                    taskMsgEl.textContent = '您已完成此任務';
-                    taskMsgEl.style.color = '#28a745';
+                    
+                    // 如果是劇情任務，檢查是否有下一關並引導用戶
+                    if (t.type === 'quest' && t.quest_chain_id && t.quest_order) {
+                      // 獲取劇情進度
+                      fetch(`${API_BASE}/api/user/quest-progress`, {
+                        headers: { 'x-username': loginUser.username }
+                      })
+                      .then(res => res.json())
+                      .then(progressData => {
+                        if (progressData.success) {
+                          const progress = progressData.progress || {};
+                          const chainId = String(t.quest_chain_id);
+                          const currentStep = progress[chainId];
+                          
+                          // 如果有下一關（currentStep > 當前關卡），引導用戶到下一關
+                          if (currentStep && Number(currentStep) > Number(t.quest_order)) {
+                            // 獲取所有任務，找到下一關
+                            fetch(`${API_BASE}/api/tasks`)
+                              .then(res => res.json())
+                              .then(tasksData => {
+                                if (tasksData.success) {
+                                  const nextTask = tasksData.tasks.find(task => 
+                                    String(task.quest_chain_id) === chainId &&
+                                    Number(task.quest_order) === Number(currentStep) &&
+                                    task.type === 'quest'
+                                  );
+                                  
+                                  if (nextTask) {
+                                    taskMsgEl.innerHTML = `
+                                      <div style="color:#28a745; margin-bottom:10px;">✅ 您已完成此任務</div>
+                                      <div style="color:var(--text-secondary); margin-bottom:15px;">📚 這是劇情任務的第 ${t.quest_order} 關，下一關已解鎖！</div>
+                                      <button id="goToNextTaskBtn" class="btn btn-primary" style="width:100%;">前往下一關：${nextTask.name}</button>
+                                    `;
+                                    
+                                    document.getElementById('goToNextTaskBtn').onclick = function() {
+                                      window.location.href = `/task-detail.html?id=${nextTask.id}`;
+                                    };
+                                  } else {
+                                    taskMsgEl.textContent = '您已完成此任務';
+                                    taskMsgEl.style.color = '#28a745';
+                                  }
+                                } else {
+                                  taskMsgEl.textContent = '您已完成此任務';
+                                  taskMsgEl.style.color = '#28a745';
+                                }
+                              })
+                              .catch(err => {
+                                console.error('獲取下一關失敗:', err);
+                                taskMsgEl.textContent = '您已完成此任務';
+                                taskMsgEl.style.color = '#28a745';
+                              });
+                          } else {
+                            // 沒有下一關或已完成所有關卡
+                            taskMsgEl.textContent = '您已完成此任務';
+                            taskMsgEl.style.color = '#28a745';
+                          }
+                        } else {
+                          taskMsgEl.textContent = '您已完成此任務';
+                          taskMsgEl.style.color = '#28a745';
+                        }
+                      })
+                      .catch(err => {
+                        console.error('獲取劇情進度失敗:', err);
+                        taskMsgEl.textContent = '您已完成此任務';
+                        taskMsgEl.style.color = '#28a745';
+                      });
+                    } else {
+                      // 不是劇情任務，直接顯示完成訊息
+                      taskMsgEl.textContent = '您已完成此任務';
+                      taskMsgEl.style.color = '#28a745';
+                    }
                     return;
                   }
                   // 進行中
