@@ -455,19 +455,19 @@ async function loadTasks() {
         return true; // 資料異常時預設顯示
       }
       
-      // 3. 獲取當前進度：如果用戶還沒開始這個劇情線，進度為 1（顯示第一關）
-      // 如果用戶已經開始，顯示當前進度關卡
-      const currentStep = progress[task.quest_chain_id];
+      // 3. 強制轉換為字串以確保類型匹配（解決 MySQL 數字類型與 JSON 字串類型的問題）
+      const chainId = String(task.quest_chain_id);
+      const currentStep = progress[chainId];
       
       if (currentStep === undefined) {
         // 用戶還沒開始這個劇情線，顯示第一關
-        const shouldShow = task.quest_order === 1;
-        console.log(`[loadTasks] 任務 ${task.id} (劇情線 ${task.quest_chain_id}, 關卡 ${task.quest_order}): 未開始，${shouldShow ? '顯示第一關' : '不顯示'}`);
+        const shouldShow = Number(task.quest_order) === 1;
+        console.log(`[loadTasks] 任務 ${task.id} (劇情線 ${chainId}, 關卡 ${task.quest_order}): 未開始，${shouldShow ? '顯示第一關' : '不顯示'}`);
         return shouldShow;
       } else {
         // 用戶已經開始這個劇情線，顯示當前進度關卡
-        const shouldShow = task.quest_order === currentStep;
-        console.log(`[loadTasks] 任務 ${task.id} (劇情線 ${task.quest_chain_id}, 關卡 ${task.quest_order}): 當前進度=${currentStep}, ${shouldShow ? '顯示' : '不顯示'}`);
+        const shouldShow = Number(task.quest_order) === Number(currentStep);
+        console.log(`[loadTasks] 任務 ${task.id} (劇情線 ${chainId}, 關卡 ${task.quest_order}): 當前進度=${currentStep}, ${shouldShow ? '顯示' : '不顯示'}`);
         return shouldShow;
       }
     });

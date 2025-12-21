@@ -1561,7 +1561,9 @@ app.get('/api/user/quest-progress', async (req, res) => {
     );
     const currentProgress = {};
     questRows.forEach(row => {
-      currentProgress[row.quest_chain_id] = row.current_step_order;
+      // 確保 quest_chain_id 作為字串 key，避免類型不匹配問題
+      const chainId = String(row.quest_chain_id);
+      currentProgress[chainId] = row.current_step_order;
     });
 
     // 2. 自我修復邏輯：檢查 user_tasks 中實際完成的任務
@@ -1578,7 +1580,8 @@ app.get('/api/user/quest-progress', async (req, res) => {
 
     // 比對並修復
     for (const row of completedRows) {
-      const chainId = row.quest_chain_id;
+      // 確保 chainId 作為字串，與 currentProgress 的 key 類型一致
+      const chainId = String(row.quest_chain_id);
       const maxCompleted = row.max_completed_order;
       // 理論上，如果完成了第 N 關，當前進度應該是 N + 1
       const correctNextStep = maxCompleted + 1;
@@ -1588,7 +1591,7 @@ app.get('/api/user/quest-progress', async (req, res) => {
         updates.push(
           conn.execute(
             'INSERT INTO user_quests (user_id, quest_chain_id, current_step_order) VALUES (?, ?, ?)',
-            [userId, chainId, correctNextStep]
+            [userId, row.quest_chain_id, correctNextStep] // 資料庫插入時使用原始數字類型
           )
         );
         currentProgress[chainId] = correctNextStep;
@@ -1597,7 +1600,7 @@ app.get('/api/user/quest-progress', async (req, res) => {
         updates.push(
           conn.execute(
             'UPDATE user_quests SET current_step_order = ? WHERE user_id = ? AND quest_chain_id = ?',
-            [correctNextStep, userId, chainId]
+            [correctNextStep, userId, row.quest_chain_id] // 資料庫更新時使用原始數字類型
           )
         );
         currentProgress[chainId] = correctNextStep;
