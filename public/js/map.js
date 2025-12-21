@@ -412,6 +412,7 @@ function fetchQuestProgress(forceRefresh = false) {
     
     return fetch(url, {
       headers: { 'x-username': loginUser.username },
+      credentials: 'include', // 發送 cookies (JWT)，確保認證資訊傳遞
       cache: 'no-cache' // 強制不從快取讀取
     })
     .then(res => res.json())

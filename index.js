@@ -1542,8 +1542,12 @@ function getRank(started, finished) {
 
 // 查詢使用者在各劇情任務線的目前進度 (具備自我修復功能)
 app.get('/api/user/quest-progress', async (req, res) => {
-  const username = req.user?.username;
-  if (!username) return res.json({ success: true, progress: {} }); 
+  // 支援多種方式獲取用戶名：JWT 認證或 x-username header（兼容模式）
+  const username = req.user?.username || req.headers['x-username'];
+  if (!username) {
+    console.warn('[quest-progress] 未提供用戶名');
+    return res.json({ success: true, progress: {} });
+  } 
 
   let conn;
   try {
@@ -1609,9 +1613,10 @@ app.get('/api/user/quest-progress', async (req, res) => {
 
     if (updates.length > 0) {
       await Promise.all(updates);
-      console.log(`已自動修復使用者 ${username} 的 ${updates.length} 條劇情進度`);
+      console.log(`[quest-progress] 已自動修復使用者 ${username} 的 ${updates.length} 條劇情進度`);
     }
 
+    console.log(`[quest-progress] 使用者 ${username} 的劇情進度:`, currentProgress);
     res.json({ success: true, progress: currentProgress });
   } catch (err) {
     console.error(err);
