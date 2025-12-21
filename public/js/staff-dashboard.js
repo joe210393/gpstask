@@ -991,6 +991,7 @@ document.getElementById('addTaskForm').addEventListener('submit', async function
   const reward_item_id = form.reward_item_id?.value || null;
   
   // AR 內容設定 (多步驟)
+  const ar_type = document.querySelector('input[name="ar_type"]:checked')?.value || 'none';
   const finalYoutubeUrl = form.youtubeUrl.value.trim() || null;
   const finalArModelId = form.ar_model_id.value || null;
   const ar_order_model = form.ar_order_model.value || null;
