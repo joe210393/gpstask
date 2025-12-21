@@ -1,0 +1,43 @@
+{
+  "name": "GPS 任務系統",
+  "short_name": "GPSTask",
+  "description": "實境導覽與 GPS 任務尋寶系統",
+  "start_url": "/map.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2196f3",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/images/mascot.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/mascot.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["games", "travel", "navigation"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "地圖頁",
+      "short_name": "地圖",
+      "description": "查看任務地圖",
+      "url": "/map.html",
+      "icons": [{ "src": "/images/mascot.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "任務列表",
+      "short_name": "任務",
+      "description": "查看所有任務",
+      "url": "/tasks-list.html",
+      "icons": [{ "src": "/images/mascot.png", "sizes": "192x192" }]
+    }
+  ]
+}
+
