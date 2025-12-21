@@ -1542,8 +1542,29 @@ function getRank(started, finished) {
 
 // 查詢使用者在各劇情任務線的目前進度 (具備自我修復功能)
 app.get('/api/user/quest-progress', async (req, res) => {
-  // 支援多種方式獲取用戶名：JWT 認證或 x-username header（兼容模式）
-  const username = req.user?.username || req.headers['x-username'];
+  // 安全性優先：優先使用 JWT 認證
+  let username = req.user?.username;
+  
+  // 如果沒有 JWT 認證，嘗試從 header 獲取（僅作為兼容方案）
+  // ⚠️ 安全風險：header 可以被偽造，但考慮到：
+  // 1. 這是只讀查詢操作（GET），不修改數據
+  // 2. 返回的數據（劇情進度）相對不敏感
+  // 3. 僅用於地圖顯示，不涉及財務或個人隱私
+  // 暫時允許，但建議未來遷移到完整的 JWT 認證
+  if (!username) {
+    const headerUsername = req.headers['x-username'];
+    if (headerUsername) {
+      // 驗證：確保 header 中的用戶名格式正確（手機號格式：09xxxxxxxx）
+      if (/^09\d{8}$/.test(headerUsername)) {
+        console.warn(`[quest-progress] ⚠️ 使用 x-username header（未使用 JWT 認證）: ${headerUsername}`);
+        username = headerUsername;
+      } else {
+        console.warn(`[quest-progress] ⚠️ 無效的用戶名格式: ${headerUsername}`);
+        return res.json({ success: true, progress: {} });
+      }
+    }
+  }
+  
   if (!username) {
     console.warn('[quest-progress] 未提供用戶名');
     return res.json({ success: true, progress: {} });
