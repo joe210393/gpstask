@@ -436,6 +436,13 @@ async function loadTasks() {
     console.log('[loadTasks] 獲取的進度:', progress);
     console.log('[loadTasks] 所有任務數量:', allTasks.length);
 
+    // 統計劇情任務資訊
+    const questTasks = allTasks.filter(t => t.type === 'quest');
+    const questChains = new Set(questTasks.map(t => t.quest_chain_id).filter(id => id));
+    console.log('[loadTasks] 劇情任務總數:', questTasks.length);
+    console.log('[loadTasks] 劇情線數量:', questChains.size);
+    console.log('[loadTasks] 劇情線 ID 列表:', Array.from(questChains));
+
     // 過濾邏輯：劇情任務只顯示目前進度的關卡
     tasksList = allTasks.filter(task => {
       // 1. 如果不是劇情任務，直接顯示
@@ -448,13 +455,32 @@ async function loadTasks() {
         return true; // 資料異常時預設顯示
       }
       
-      const currentStep = progress[task.quest_chain_id] || 1;
-      const shouldShow = task.quest_order === currentStep;
-      console.log(`[loadTasks] 任務 ${task.id} (劇情 ${task.quest_chain_id}, 關卡 ${task.quest_order}): 當前進度=${currentStep}, 是否顯示=${shouldShow}`);
-      return shouldShow;
+      // 3. 獲取當前進度：如果用戶還沒開始這個劇情線，進度為 1（顯示第一關）
+      // 如果用戶已經開始，顯示當前進度關卡
+      const currentStep = progress[task.quest_chain_id];
+      
+      if (currentStep === undefined) {
+        // 用戶還沒開始這個劇情線，顯示第一關
+        const shouldShow = task.quest_order === 1;
+        console.log(`[loadTasks] 任務 ${task.id} (劇情線 ${task.quest_chain_id}, 關卡 ${task.quest_order}): 未開始，${shouldShow ? '顯示第一關' : '不顯示'}`);
+        return shouldShow;
+      } else {
+        // 用戶已經開始這個劇情線，顯示當前進度關卡
+        const shouldShow = task.quest_order === currentStep;
+        console.log(`[loadTasks] 任務 ${task.id} (劇情線 ${task.quest_chain_id}, 關卡 ${task.quest_order}): 當前進度=${currentStep}, ${shouldShow ? '顯示' : '不顯示'}`);
+        return shouldShow;
+      }
     });
 
     console.log('[loadTasks] 過濾後的任務數量:', tasksList.length);
+    const displayedQuestTasks = tasksList.filter(t => t.type === 'quest');
+    console.log('[loadTasks] 顯示的劇情任務數量:', displayedQuestTasks.length);
+    console.log('[loadTasks] 顯示的劇情任務:', displayedQuestTasks.map(t => ({
+      id: t.id,
+      name: t.name,
+      quest_chain_id: t.quest_chain_id,
+      quest_order: t.quest_order
+    })));
 
     tasksList.forEach(task => {
       // 創建任務標記
