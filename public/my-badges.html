@@ -222,8 +222,6 @@
     <nav class="main-nav">
       <a href="/user-dashboard.html">📊 任務中心</a>
       <a href="/map.html">🗺️ 地圖</a>
-      <a href="/shop.html">🛒 商店</a>
-      <a href="/inventory.html">🎒 背包</a>
       <a href="/my-badges.html" style="background:#f0f0f0; color:#007bff;">🏆 稱號</a>
       <span id="user-greeting"></span>
       <button id="logout-btn">登出</button>
@@ -280,7 +278,8 @@
 
       try {
         const res = await fetch(`${API_BASE}/api/user/badges`, {
-          headers: { 'x-username': loginUser.username }
+          headers: { 'x-username': loginUser.username },
+          credentials: 'include' // 發送 cookies (JWT)，確保認證資訊傳遞
         });
         const data = await res.json();
 
