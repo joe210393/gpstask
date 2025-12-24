@@ -988,8 +988,16 @@ app.post('/api/admin/grant-item', staffOrAdminAuth, async (req, res) => {
 
 // 取得使用者背包
 app.get('/api/user/inventory', async (req, res) => {
-  const username = req.user?.username;
-  if (!username) return res.status(400).json({ success: false, message: '未登入' });
+  // 優先使用 JWT 認證，如果沒有則嘗試從 header 獲取（兼容方案）
+  let username = req.user?.username;
+  if (!username) {
+    const headerUsername = req.headers['x-username'];
+    if (headerUsername && /^09\d{8}$/.test(headerUsername)) {
+      username = headerUsername;
+    } else {
+      return res.status(400).json({ success: false, message: '未登入' });
+    }
+  }
 
   let conn;
   try {
@@ -2039,9 +2047,15 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
 
 // 獲取用戶的所有稱號
 app.get('/api/user/badges', async (req, res) => {
-  const username = req.user?.username;
+  // 優先使用 JWT 認證，如果沒有則嘗試從 header 獲取（兼容方案）
+  let username = req.user?.username;
   if (!username) {
-    return res.json({ success: true, badges: [] });
+    const headerUsername = req.headers['x-username'];
+    if (headerUsername && /^09\d{8}$/.test(headerUsername)) {
+      username = headerUsername;
+    } else {
+      return res.json({ success: true, badges: [] });
+    }
   }
 
   let conn;
@@ -2554,9 +2568,15 @@ app.post('/api/products/:id/redeem', async (req, res) => {
 
 // 獲取用戶總積分
 app.get('/api/user/points', async (req, res) => {
-  const username = req.user?.username;
+  // 優先使用 JWT 認證，如果沒有則嘗試從 header 獲取（兼容方案）
+  let username = req.user?.username;
   if (!username) {
-    return res.status(400).json({ success: false, message: '缺少用戶名稱' });
+    const headerUsername = req.headers['x-username'];
+    if (headerUsername && /^09\d{8}$/.test(headerUsername)) {
+      username = headerUsername;
+    } else {
+      return res.status(400).json({ success: false, message: '缺少用戶名稱' });
+    }
   }
 
   let conn;
