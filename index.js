@@ -2267,17 +2267,28 @@ app.get('/api/products', async (req, res) => {
   let conn;
   try {
     conn = await pool.getConnection();
-    const [rows] = await conn.execute(`
-      SELECT p.*, u.username as creator_username
-      FROM products p
-      LEFT JOIN users u ON p.created_by = u.username
-      WHERE p.is_active = TRUE
-      ORDER BY p.points_required ASC
-    `);
+    
+    // 檢查 products 表是否有 is_active 欄位
+    const [columns] = await conn.execute("SHOW COLUMNS FROM products LIKE 'is_active'");
+    const hasIsActive = columns.length > 0;
+    
+    // 根據欄位存在與否構建查詢
+    const query = hasIsActive
+      ? `SELECT p.*, u.username as creator_username
+         FROM products p
+         LEFT JOIN users u ON p.created_by = u.username
+         WHERE p.is_active = TRUE
+         ORDER BY p.points_required ASC`
+      : `SELECT p.*, u.username as creator_username
+         FROM products p
+         LEFT JOIN users u ON p.created_by = u.username
+         ORDER BY p.points_required ASC`;
+    
+    const [rows] = await conn.execute(query);
     res.json({ success: true, products: rows });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: '伺服器錯誤' });
+    console.error('[/api/products] 錯誤:', err);
+    res.status(500).json({ success: false, message: '伺服器錯誤', error: err.message });
   } finally {
     if (conn) conn.release();
   }
@@ -2451,9 +2462,15 @@ app.delete('/api/products/:id', staffOrAdminAuth, async (req, res) => {
 
 // 獲取用戶的商品兌換記錄
 app.get('/api/products/redemptions', async (req, res) => {
-  const username = req.user?.username;
+  // 優先使用 JWT 認證，如果沒有則嘗試從 header 獲取（兼容方案）
+  let username = req.user?.username;
   if (!username) {
-    return res.status(400).json({ success: false, message: '缺少用戶名稱' });
+    const headerUsername = req.headers['x-username'];
+    if (headerUsername && /^09\d{8}$/.test(headerUsername)) {
+      username = headerUsername;
+    } else {
+      return res.status(400).json({ success: false, message: '缺少用戶名稱' });
+    }
   }
 
   let conn;
