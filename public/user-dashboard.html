@@ -112,6 +112,98 @@
       color: var(--text-secondary);
     }
 
+    /* 稱號樣式 */
+    .badges-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .badge-card {
+      background: white;
+      border-radius: 16px;
+      padding: 2rem;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .badge-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .badge-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    }
+
+    .badge-image {
+      width: 120px;
+      height: 120px;
+      object-fit: contain;
+      margin: 0 auto 1rem;
+      border-radius: 50%;
+      border: 4px solid #f0f0f0;
+      background: #fafafa;
+    }
+
+    .badge-name {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 0.5rem;
+    }
+
+    .badge-source {
+      font-size: 0.9rem;
+      color: #666;
+      margin-bottom: 0.5rem;
+    }
+
+    .badge-date {
+      font-size: 0.85rem;
+      color: #999;
+    }
+
+    .badge-date::before {
+      content: '🗓️ ';
+    }
+
+    .badges-empty-state {
+      text-align: center;
+      padding: 4rem 2rem;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    .badges-empty-state-icon {
+      font-size: 5rem;
+      margin-bottom: 1rem;
+    }
+
+    .badges-empty-state-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 0.5rem;
+    }
+
+    .badges-empty-state-text {
+      font-size: 1rem;
+      color: #666;
+      margin-bottom: 1.5rem;
+    }
+
     .task-filter-bar {
       background: #fff;
       border: 1px solid #e5e7eb;
@@ -315,7 +407,6 @@
         <a href="/map.html">地圖頁</a>
         <a href="/tasks-list.html" id="navTasksList">任務列表</a>
         <a href="/user-dashboard.html" class="current-page">用戶任務管理</a>
-        <a href="/my-badges.html">🏆 我的稱號</a>
         <a href="/staff-dashboard.html" id="navStaff" style="display:none;">新增任務</a>
         <a href="/role-management.html" id="navRoleMgmt" style="display:none;">權限管理</a>
         <a href="/products.html" id="navProducts">商品兌換</a>
@@ -349,6 +440,14 @@
       <h2 style="font-size: 1.25rem; margin-bottom: 1rem; color: #333;">🎒 我的背包</h2>
       <div id="inventoryList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 1rem;">
         <div style="color: #888; font-size: 0.9rem;">載入中...</div>
+      </div>
+    </section>
+
+    <!-- 稱號區塊 -->
+    <section class="mb-4" style="margin-bottom: 2rem;">
+      <h2 style="font-size: 1.25rem; margin-bottom: 1rem; color: #333;">🏆 我的稱號</h2>
+      <div id="badges-content" style="min-height: 200px;">
+        <div style="text-align: center; padding: 2rem; color: #888;">載入中...</div>
       </div>
     </section>
 

@@ -39,6 +39,7 @@ function initDashboard() {
   bindFilters();
   loadPoints();
   loadInventory();
+  loadBadges();
   loadTasks();
 }
 
@@ -48,7 +49,8 @@ async function loadInventory() {
 
   try {
     const res = await fetch(`${API_BASE}/api/user/inventory`, {
-      headers: { 'x-username': dashboardUser.username }
+      headers: { 'x-username': dashboardUser.username },
+      credentials: 'include'
     });
     const data = await res.json();
     inventoryListEl.innerHTML = '';
@@ -78,6 +80,87 @@ async function loadInventory() {
     console.error('載入背包失敗', err);
     inventoryListEl.innerHTML = '<div style="color:red;">載入失敗</div>';
   }
+}
+
+async function loadBadges() {
+  const badgesContentEl = document.getElementById('badges-content');
+  if (!badgesContentEl) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/user/badges`, {
+      headers: { 'x-username': dashboardUser.username },
+      credentials: 'include'
+    });
+    const data = await res.json();
+
+    if (!data.success) {
+      badgesContentEl.innerHTML = '<div class="badges-empty-state"><div class="badges-empty-state-icon">😢</div><div class="badges-empty-state-title">載入失敗</div></div>';
+      return;
+    }
+
+    displayBadges(data.badges || []);
+
+  } catch (err) {
+    console.error('載入稱號失敗', err);
+    badgesContentEl.innerHTML = '<div class="badges-empty-state"><div class="badges-empty-state-icon">❌</div><div class="badges-empty-state-title">連線錯誤</div></div>';
+  }
+}
+
+function displayBadges(badges) {
+  const content = document.getElementById('badges-content');
+  
+  if (badges.length === 0) {
+    content.innerHTML = `
+      <div class="badges-empty-state">
+        <div class="badges-empty-state-icon">🎖️</div>
+        <div class="badges-empty-state-title">還沒有稱號</div>
+        <div class="badges-empty-state-text">完成劇情任務即可獲得專屬稱號！</div>
+        <a href="/map.html" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 30px; border-radius: 30px; text-decoration: none; display: inline-block; font-weight: 600;">開始冒險</a>
+      </div>
+    `;
+    return;
+  }
+
+  // 顯示稱號列表
+  const grid = document.createElement('div');
+  grid.className = 'badges-grid';
+
+  badges.forEach(badge => {
+    const card = document.createElement('div');
+    card.className = 'badge-card';
+
+    const img = document.createElement('img');
+    img.className = 'badge-image';
+    img.src = badge.image_url || '/images/mascot.png';
+    img.alt = badge.name;
+    img.onerror = () => { img.src = '/images/mascot.png'; };
+
+    const name = document.createElement('div');
+    name.className = 'badge-name';
+    name.textContent = badge.name;
+
+    const source = document.createElement('div');
+    source.className = 'badge-source';
+    source.textContent = badge.source_type === 'quest' ? '🗺️ 劇情任務' : 
+                         badge.source_type === 'event' ? '🎉 特殊活動' : '✨ 特殊獎勵';
+
+    const date = document.createElement('div');
+    date.className = 'badge-date';
+    date.textContent = new Date(badge.obtained_at).toLocaleDateString('zh-TW', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    card.appendChild(img);
+    card.appendChild(name);
+    card.appendChild(source);
+    card.appendChild(date);
+    grid.appendChild(card);
+  });
+
+  content.innerHTML = '';
+  content.appendChild(grid);
 }
 
 function bindFilters() {
