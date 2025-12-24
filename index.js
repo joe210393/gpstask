@@ -2859,6 +2859,13 @@ if (process.env.NODE_ENV !== 'production') {
             console.log('✅ 資料庫遷移: items 表已新增 model_url');
         }
 
+        // 4. 修改 products 表 - 添加 is_active 欄位
+        const [productCols] = await conn.execute("SHOW COLUMNS FROM products LIKE 'is_active'");
+        if (productCols.length === 0) {
+            await conn.execute("ALTER TABLE products ADD COLUMN is_active BOOLEAN DEFAULT TRUE");
+            console.log('✅ 資料庫遷移: products 表已新增 is_active');
+        }
+
         // 4. 新增 AR 順序欄位 (tasks 表)
         const arOrderCols = ['ar_order_model', 'ar_order_image', 'ar_order_youtube'];
         for (const col of arOrderCols) {
