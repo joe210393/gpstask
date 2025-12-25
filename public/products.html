@@ -284,7 +284,12 @@
       // 顯示處理中的兌換
       if (pendingRedemptions.length > 0) {
         const pendingSection = document.createElement('div');
-        pendingSection.innerHTML = '<h3 style="font-size:1.1rem; color:#f59e0b; margin:0 0 1rem 0; padding-top:1rem; font-weight:600;">⏳ 處理中</h3>';
+        pendingSection.style.marginTop = '1rem';
+        pendingSection.style.marginBottom = '0.5rem';
+        const h3 = document.createElement('h3');
+        h3.textContent = '⏳ 處理中';
+        h3.style.cssText = 'font-size:1.2rem; color:#f59e0b; margin:0; padding:0.5rem 0; font-weight:700; border-bottom:2px solid #f59e0b; display:block;';
+        pendingSection.appendChild(h3);
         container.appendChild(pendingSection);
         pendingRedemptions.forEach(redemption => {
           container.appendChild(createRedemptionCard(redemption, 'pending'));
@@ -294,8 +299,12 @@
       // 顯示已完成的兌換（我的兌換商品）
       if (completedRedemptions.length > 0) {
         const completedSection = document.createElement('div');
-        const topMargin = pendingRedemptions.length > 0 ? '1.5rem' : '0';
-        completedSection.innerHTML = `<h3 style="font-size:1.1rem; color:#10b981; margin:${topMargin} 0 1rem 0; padding-top:${topMargin === '0' ? '1rem' : '0'}; font-weight:600;">✅ 我的兌換商品</h3>`;
+        completedSection.style.marginTop = pendingRedemptions.length > 0 ? '2rem' : '1rem';
+        completedSection.style.marginBottom = '0.5rem';
+        const h3 = document.createElement('h3');
+        h3.textContent = '✅ 我的兌換商品';
+        h3.style.cssText = 'font-size:1.2rem; color:#10b981; margin:0; padding:0.5rem 0; font-weight:700; border-bottom:2px solid #10b981; display:block;';
+        completedSection.appendChild(h3);
         container.appendChild(completedSection);
         completedRedemptions.forEach(redemption => {
           container.appendChild(createRedemptionCard(redemption, 'completed'));
@@ -305,8 +314,12 @@
       // 顯示已取消的兌換
       if (cancelledRedemptions.length > 0) {
         const cancelledSection = document.createElement('div');
-        const topMargin = (pendingRedemptions.length > 0 || completedRedemptions.length > 0) ? '1.5rem' : '0';
-        cancelledSection.innerHTML = `<h3 style="font-size:1.1rem; color:#ef4444; margin:${topMargin} 0 1rem 0; padding-top:${topMargin === '0' ? '1rem' : '0'}; font-weight:600;">❌ 已取消</h3>`;
+        cancelledSection.style.marginTop = (pendingRedemptions.length > 0 || completedRedemptions.length > 0) ? '2rem' : '1rem';
+        cancelledSection.style.marginBottom = '0.5rem';
+        const h3 = document.createElement('h3');
+        h3.textContent = '❌ 已取消';
+        h3.style.cssText = 'font-size:1.2rem; color:#ef4444; margin:0; padding:0.5rem 0; font-weight:700; border-bottom:2px solid #ef4444; display:block;';
+        cancelledSection.appendChild(h3);
         container.appendChild(cancelledSection);
         cancelledRedemptions.forEach(redemption => {
           container.appendChild(createRedemptionCard(redemption, 'cancelled'));
