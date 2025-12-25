@@ -263,7 +263,7 @@
     function displayRedemptionHistory(redemptions) {
       const container = document.getElementById('redemptionHistory');
 
-      if (redemptions.length === 0) {
+      if (!redemptions || redemptions.length === 0) {
         container.innerHTML = '<div class="text-center text-secondary" style="padding: 2rem;">還沒有兌換記錄</div>';
         return;
       }
@@ -274,6 +274,12 @@
       const pendingRedemptions = redemptions.filter(r => r.status === 'pending');
       const completedRedemptions = redemptions.filter(r => r.status === 'completed');
       const cancelledRedemptions = redemptions.filter(r => r.status === 'cancelled');
+      
+      console.log('兌換記錄分類:', { 
+        pending: pendingRedemptions.length, 
+        completed: completedRedemptions.length, 
+        cancelled: cancelledRedemptions.length 
+      });
 
       // 顯示處理中的兌換
       if (pendingRedemptions.length > 0) {
