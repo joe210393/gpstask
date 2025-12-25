@@ -284,7 +284,7 @@
       // 顯示處理中的兌換
       if (pendingRedemptions.length > 0) {
         const pendingSection = document.createElement('div');
-        pendingSection.innerHTML = '<h3 style="font-size:1.1rem; color:#f59e0b; margin:1.5rem 0 1rem 0; font-weight:600;">⏳ 處理中</h3>';
+        pendingSection.innerHTML = '<h3 style="font-size:1.1rem; color:#f59e0b; margin:0 0 1rem 0; padding-top:1rem; font-weight:600;">⏳ 處理中</h3>';
         container.appendChild(pendingSection);
         pendingRedemptions.forEach(redemption => {
           container.appendChild(createRedemptionCard(redemption, 'pending'));
@@ -294,7 +294,8 @@
       // 顯示已完成的兌換（我的兌換商品）
       if (completedRedemptions.length > 0) {
         const completedSection = document.createElement('div');
-        completedSection.innerHTML = '<h3 style="font-size:1.1rem; color:#10b981; margin:1.5rem 0 1rem 0; font-weight:600;">✅ 我的兌換商品</h3>';
+        const topMargin = pendingRedemptions.length > 0 ? '1.5rem' : '0';
+        completedSection.innerHTML = `<h3 style="font-size:1.1rem; color:#10b981; margin:${topMargin} 0 1rem 0; padding-top:${topMargin === '0' ? '1rem' : '0'}; font-weight:600;">✅ 我的兌換商品</h3>`;
         container.appendChild(completedSection);
         completedRedemptions.forEach(redemption => {
           container.appendChild(createRedemptionCard(redemption, 'completed'));
@@ -304,7 +305,8 @@
       // 顯示已取消的兌換
       if (cancelledRedemptions.length > 0) {
         const cancelledSection = document.createElement('div');
-        cancelledSection.innerHTML = '<h3 style="font-size:1.1rem; color:#ef4444; margin:1.5rem 0 1rem 0; font-weight:600;">❌ 已取消</h3>';
+        const topMargin = (pendingRedemptions.length > 0 || completedRedemptions.length > 0) ? '1.5rem' : '0';
+        cancelledSection.innerHTML = `<h3 style="font-size:1.1rem; color:#ef4444; margin:${topMargin} 0 1rem 0; padding-top:${topMargin === '0' ? '1rem' : '0'}; font-weight:600;">❌ 已取消</h3>`;
         container.appendChild(cancelledSection);
         cancelledRedemptions.forEach(redemption => {
           container.appendChild(createRedemptionCard(redemption, 'cancelled'));
