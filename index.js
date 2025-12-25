@@ -2560,9 +2560,15 @@ app.get('/api/products/redemptions', async (req, res) => {
 // 兌換商品
 app.post('/api/products/:id/redeem', async (req, res) => {
   const { id } = req.params;
-  const username = req.user?.username;
+  // 優先使用 JWT 認證，如果沒有則嘗試從 header 獲取（兼容方案）
+  let username = req.user?.username;
   if (!username) {
-    return res.status(400).json({ success: false, message: '缺少用戶名稱' });
+    const headerUsername = req.headers['x-username'];
+    if (headerUsername && /^09\d{8}$/.test(headerUsername)) {
+      username = headerUsername;
+    } else {
+      return res.status(400).json({ success: false, message: '缺少用戶名稱' });
+    }
   }
 
   let conn;
@@ -2576,8 +2582,17 @@ app.post('/api/products/:id/redeem', async (req, res) => {
     }
     const userId = users[0].id;
 
+    // 檢查 products 表是否有 is_active 欄位
+    const [isActiveCols] = await conn.execute("SHOW COLUMNS FROM products LIKE 'is_active'");
+    const hasIsActive = isActiveCols.length > 0;
+    
     // 獲取商品資訊
-    const [products] = await conn.execute('SELECT * FROM products WHERE id = ? AND is_active = TRUE', [id]);
+    let products;
+    if (hasIsActive) {
+      [products] = await conn.execute('SELECT * FROM products WHERE id = ? AND is_active = TRUE', [id]);
+    } else {
+      [products] = await conn.execute('SELECT * FROM products WHERE id = ?', [id]);
+    }
     if (products.length === 0) {
       return res.status(400).json({ success: false, message: '商品不存在或已下架' });
     }

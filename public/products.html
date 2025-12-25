@@ -225,7 +225,8 @@
 
       fetch(`${API_BASE}/api/products/${productId}/redeem`, {
         method: 'POST',
-        headers: { 'x-username': loginUser.username }
+        headers: { 'x-username': loginUser.username },
+        credentials: 'include' // 發送 cookies (JWT)，確保認證資訊傳遞
       })
       .then(res => res.json())
       .then(data => {
