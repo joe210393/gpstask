@@ -173,7 +173,8 @@ function bindFilters() {
 async function loadPoints() {
   try {
     const res = await fetch(`${API_BASE}/api/user/points`, {
-      headers: { 'x-username': dashboardUser.username }
+      headers: { 'x-username': dashboardUser.username },
+      credentials: 'include' // 發送 cookies (JWT)，確保認證資訊傳遞
     });
     const data = await res.json();
     if (data.success) {
@@ -186,7 +187,9 @@ async function loadPoints() {
 
 async function loadTasks() {
   try {
-    const res = await fetch(`${API_BASE}/api/user-tasks/all?username=${encodeURIComponent(dashboardUser.username)}`);
+    const res = await fetch(`${API_BASE}/api/user-tasks/all?username=${encodeURIComponent(dashboardUser.username)}`, {
+      credentials: 'include' // 發送 cookies (JWT)，確保認證資訊傳遞
+    });
     const data = await res.json();
     if (!data.success) {
       throw new Error(data.message || '載入任務失敗');

@@ -173,7 +173,9 @@ const API_BASE = '';
       allTasks = [...tasks]; // 存儲所有任務數據
 
       if (loginUser && loginUser.username) {
-        fetch(`${API_BASE}/api/user-tasks/all?username=${encodeURIComponent(loginUser.username)}`)
+        fetch(`${API_BASE}/api/user-tasks/all?username=${encodeURIComponent(loginUser.username)}`, {
+          credentials: 'include' // 發送 cookies (JWT)，確保認證資訊傳遞
+        })
           .then(res => res.json())
           .then(userData => {
             if (userData.success) {
