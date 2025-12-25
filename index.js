@@ -2268,21 +2268,35 @@ app.get('/api/products', async (req, res) => {
   try {
     conn = await pool.getConnection();
     
-    // 檢查 products 表是否有 is_active 欄位
-    const [columns] = await conn.execute("SHOW COLUMNS FROM products LIKE 'is_active'");
-    const hasIsActive = columns.length > 0;
+    // 檢查 products 表是否有 is_active 和 created_by 欄位
+    const [isActiveCols] = await conn.execute("SHOW COLUMNS FROM products LIKE 'is_active'");
+    const [createdByCols] = await conn.execute("SHOW COLUMNS FROM products LIKE 'created_by'");
+    const hasIsActive = isActiveCols.length > 0;
+    const hasCreatedBy = createdByCols.length > 0;
     
     // 根據欄位存在與否構建查詢
-    const query = hasIsActive
-      ? `SELECT p.*, u.username as creator_username
+    let query;
+    if (hasIsActive && hasCreatedBy) {
+      query = `SELECT p.*, u.username as creator_username
          FROM products p
          LEFT JOIN users u ON p.created_by = u.username
          WHERE p.is_active = TRUE
-         ORDER BY p.points_required ASC`
-      : `SELECT p.*, u.username as creator_username
+         ORDER BY p.points_required ASC`;
+    } else if (hasIsActive) {
+      query = `SELECT p.*, NULL as creator_username
+         FROM products p
+         WHERE p.is_active = TRUE
+         ORDER BY p.points_required ASC`;
+    } else if (hasCreatedBy) {
+      query = `SELECT p.*, u.username as creator_username
          FROM products p
          LEFT JOIN users u ON p.created_by = u.username
          ORDER BY p.points_required ASC`;
+    } else {
+      query = `SELECT p.*, NULL as creator_username
+         FROM products p
+         ORDER BY p.points_required ASC`;
+    }
     
     const [rows] = await conn.execute(query);
     res.json({ success: true, products: rows });
@@ -2312,16 +2326,26 @@ app.get('/api/products/admin', staffOrAdminAuth, async (req, res) => {
     }
 
     const userRole = userRows[0].role;
+    
+    // 檢查 products 表是否有 created_by 欄位
+    const [createdByCols] = await conn.execute("SHOW COLUMNS FROM products LIKE 'created_by'");
+    const hasCreatedBy = createdByCols.length > 0;
+    
     let query, params;
-
     if (userRole === 'admin') {
       // 管理員可以看到所有商品
       query = 'SELECT * FROM products ORDER BY created_at DESC';
       params = [];
     } else {
-      // 工作人員只能看到自己創建的商品
-      query = 'SELECT * FROM products WHERE created_by = ? ORDER BY created_at DESC';
-      params = [username];
+      // 工作人員只能看到自己創建的商品（如果有 created_by 欄位）
+      if (hasCreatedBy) {
+        query = 'SELECT * FROM products WHERE created_by = ? ORDER BY created_at DESC';
+        params = [username];
+      } else {
+        // 如果沒有 created_by 欄位，工作人員可以看到所有商品（向後兼容）
+        query = 'SELECT * FROM products ORDER BY created_at DESC';
+        params = [];
+      }
     }
 
     const [rows] = await conn.execute(query, params);
@@ -2346,22 +2370,30 @@ app.post('/api/products', staffOrAdminAuth, async (req, res) => {
     conn = await pool.getConnection();
     const username = req.user?.username;
 
-    // 檢查 products 表是否有 is_active 欄位
-    const [columns] = await conn.execute("SHOW COLUMNS FROM products LIKE 'is_active'");
-    const hasIsActive = columns.length > 0;
+    // 檢查 products 表是否有 is_active 和 created_by 欄位
+    const [isActiveCols] = await conn.execute("SHOW COLUMNS FROM products LIKE 'is_active'");
+    const [createdByCols] = await conn.execute("SHOW COLUMNS FROM products LIKE 'created_by'");
+    const hasIsActive = isActiveCols.length > 0;
+    const hasCreatedBy = createdByCols.length > 0;
 
     let result;
-    if (hasIsActive) {
-      // 如果有 is_active 欄位，包含在 INSERT 中
+    if (hasIsActive && hasCreatedBy) {
+      // 如果有 is_active 和 created_by 欄位，包含在 INSERT 中
       [result] = await conn.execute(
         'INSERT INTO products (name, description, image_url, points_required, stock, created_by, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [name, description || '', image_url || '', points_required, stock, username, is_active !== undefined ? is_active : true]
       );
-    } else {
-      // 如果沒有 is_active 欄位，使用舊的 INSERT 語句
+    } else if (hasCreatedBy) {
+      // 如果只有 created_by 欄位，不包含 is_active
       [result] = await conn.execute(
         'INSERT INTO products (name, description, image_url, points_required, stock, created_by) VALUES (?, ?, ?, ?, ?, ?)',
         [name, description || '', image_url || '', points_required, stock, username]
+      );
+    } else {
+      // 如果都沒有，使用最簡單的 INSERT 語句
+      [result] = await conn.execute(
+        'INSERT INTO products (name, description, image_url, points_required, stock) VALUES (?, ?, ?, ?, ?)',
+        [name, description || '', image_url || '', points_required, stock]
       );
     }
     res.json({ success: true, message: '商品新增成功', productId: result.insertId });
@@ -2398,14 +2430,24 @@ app.put('/api/products/:id', staffOrAdminAuth, async (req, res) => {
 
     const userRole = userRows[0].role;
 
+    // 檢查 products 表是否有 created_by 欄位
+    const [createdByCols] = await conn.execute("SHOW COLUMNS FROM products LIKE 'created_by'");
+    const hasCreatedBy = createdByCols.length > 0;
+
     // 檢查商品是否存在，並確認權限
     let productQuery, productParams;
     if (userRole === 'admin') {
       productQuery = 'SELECT id FROM products WHERE id = ?';
       productParams = [id];
     } else {
-      productQuery = 'SELECT id FROM products WHERE id = ? AND created_by = ?';
-      productParams = [id, username];
+      if (hasCreatedBy) {
+        productQuery = 'SELECT id FROM products WHERE id = ? AND created_by = ?';
+        productParams = [id, username];
+      } else {
+        // 如果沒有 created_by 欄位，工作人員可以編輯任何商品（向後兼容）
+        productQuery = 'SELECT id FROM products WHERE id = ?';
+        productParams = [id];
+      }
     }
 
     const [productRows] = await conn.execute(productQuery, productParams);
@@ -2660,29 +2702,56 @@ app.get('/api/product-redemptions/admin', staffOrAdminAuth, async (req, res) => 
     }
 
     const userRole = userRows[0].role;
+    
+    // 檢查 products 表是否有 created_by 欄位
+    const [createdByCols] = await conn.execute("SHOW COLUMNS FROM products LIKE 'created_by'");
+    const hasCreatedBy = createdByCols.length > 0;
+    
     let query, params;
 
     if (userRole === 'admin') {
       // 管理員可以看到所有兌換記錄
-      query = `
-        SELECT pr.*, p.name as product_name, p.image_url, p.created_by as merchant_name, u.username
-        FROM product_redemptions pr
-        JOIN products p ON pr.product_id = p.id
-        JOIN users u ON pr.user_id = u.id
-        ORDER BY pr.redeemed_at DESC
-      `;
+      if (hasCreatedBy) {
+        query = `
+          SELECT pr.*, p.name as product_name, p.image_url, p.created_by as merchant_name, u.username
+          FROM product_redemptions pr
+          JOIN products p ON pr.product_id = p.id
+          JOIN users u ON pr.user_id = u.id
+          ORDER BY pr.redeemed_at DESC
+        `;
+      } else {
+        query = `
+          SELECT pr.*, p.name as product_name, p.image_url, NULL as merchant_name, u.username
+          FROM product_redemptions pr
+          JOIN products p ON pr.product_id = p.id
+          JOIN users u ON pr.user_id = u.id
+          ORDER BY pr.redeemed_at DESC
+        `;
+      }
       params = [];
     } else {
       // 工作人員只能看到自己管理的商品的兌換記錄
-      query = `
-        SELECT pr.*, p.name as product_name, p.image_url, p.created_by as merchant_name, u.username
-        FROM product_redemptions pr
-        JOIN products p ON pr.product_id = p.id
-        JOIN users u ON pr.user_id = u.id
-        WHERE p.created_by = ?
-        ORDER BY pr.redeemed_at DESC
-      `;
-      params = [username];
+      if (hasCreatedBy) {
+        query = `
+          SELECT pr.*, p.name as product_name, p.image_url, p.created_by as merchant_name, u.username
+          FROM product_redemptions pr
+          JOIN products p ON pr.product_id = p.id
+          JOIN users u ON pr.user_id = u.id
+          WHERE p.created_by = ?
+          ORDER BY pr.redeemed_at DESC
+        `;
+        params = [username];
+      } else {
+        // 如果沒有 created_by 欄位，工作人員可以看到所有記錄（向後兼容）
+        query = `
+          SELECT pr.*, p.name as product_name, p.image_url, NULL as merchant_name, u.username
+          FROM product_redemptions pr
+          JOIN products p ON pr.product_id = p.id
+          JOIN users u ON pr.user_id = u.id
+          ORDER BY pr.redeemed_at DESC
+        `;
+        params = [];
+      }
     }
 
     const [rows] = await conn.execute(query, params);
@@ -2721,24 +2790,48 @@ app.put('/api/product-redemptions/:id/status', staffOrAdminAuth, async (req, res
 
     const userRole = userRows[0].role;
 
+    // 檢查 products 表是否有 created_by 欄位
+    const [createdByCols] = await conn.execute("SHOW COLUMNS FROM products LIKE 'created_by'");
+    const hasCreatedBy = createdByCols.length > 0;
+
     // 獲取兌換記錄詳情和商品名稱
     let query, params;
     if (userRole === 'admin') {
-      query = `
-        SELECT pr.*, p.name as product_name, p.created_by
-        FROM product_redemptions pr
-        JOIN products p ON pr.product_id = p.id
-        WHERE pr.id = ?
-      `;
+      if (hasCreatedBy) {
+        query = `
+          SELECT pr.*, p.name as product_name, p.created_by
+          FROM product_redemptions pr
+          JOIN products p ON pr.product_id = p.id
+          WHERE pr.id = ?
+        `;
+      } else {
+        query = `
+          SELECT pr.*, p.name as product_name, NULL as created_by
+          FROM product_redemptions pr
+          JOIN products p ON pr.product_id = p.id
+          WHERE pr.id = ?
+        `;
+      }
       params = [id];
     } else {
-      query = `
-        SELECT pr.*, p.name as product_name, p.created_by
-        FROM product_redemptions pr
-        JOIN products p ON pr.product_id = p.id
-        WHERE pr.id = ? AND p.created_by = ?
-      `;
-      params = [id, username];
+      if (hasCreatedBy) {
+        query = `
+          SELECT pr.*, p.name as product_name, p.created_by
+          FROM product_redemptions pr
+          JOIN products p ON pr.product_id = p.id
+          WHERE pr.id = ? AND p.created_by = ?
+        `;
+        params = [id, username];
+      } else {
+        // 如果沒有 created_by 欄位，工作人員可以處理任何兌換記錄（向後兼容）
+        query = `
+          SELECT pr.*, p.name as product_name, NULL as created_by
+          FROM product_redemptions pr
+          JOIN products p ON pr.product_id = p.id
+          WHERE pr.id = ?
+        `;
+        params = [id];
+      }
     }
 
     const [redemptions] = await conn.execute(query, params);
@@ -2878,6 +2971,13 @@ if (process.env.NODE_ENV !== 'production') {
         if (productCols.length === 0) {
             await conn.execute("ALTER TABLE products ADD COLUMN is_active BOOLEAN DEFAULT TRUE");
             console.log('✅ 資料庫遷移: products 表已新增 is_active');
+        }
+
+        // 5. 修改 products 表 - 添加 created_by 欄位
+        const [productCreatedByCols] = await conn.execute("SHOW COLUMNS FROM products LIKE 'created_by'");
+        if (productCreatedByCols.length === 0) {
+            await conn.execute("ALTER TABLE products ADD COLUMN created_by VARCHAR(255) DEFAULT NULL");
+            console.log('✅ 資料庫遷移: products 表已新增 created_by');
         }
 
         // 4. 新增 AR 順序欄位 (tasks 表)
