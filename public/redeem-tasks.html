@@ -952,6 +952,7 @@
           'Content-Type': 'application/json',
           'x-username': encodeURIComponent(window.loginUser.username)
         },
+        credentials: 'include', // 發送 cookies (JWT)，確保認證資訊傳遞
         body: JSON.stringify(productData)
       })
       .then(res => res.json())
@@ -1037,7 +1038,8 @@
       }
 
       fetch(`${API_BASE}/api/product-redemptions/admin`, {
-        headers: { 'x-username': encodeURIComponent(window.loginUser.username) }
+        headers: { 'x-username': encodeURIComponent(window.loginUser.username) },
+        credentials: 'include' // 發送 cookies (JWT)，確保認證資訊傳遞
       })
       .then(res => res.json())
       .then(data => {

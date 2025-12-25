@@ -2336,7 +2336,7 @@ app.get('/api/products/admin', staffOrAdminAuth, async (req, res) => {
 
 // 新增商品
 app.post('/api/products', staffOrAdminAuth, async (req, res) => {
-  const { name, description, image_url, points_required, stock } = req.body;
+  const { name, description, image_url, points_required, stock, is_active } = req.body;
   if (!name || !points_required || stock === undefined) {
     return res.status(400).json({ success: false, message: '缺少必要參數' });
   }
@@ -2346,14 +2346,28 @@ app.post('/api/products', staffOrAdminAuth, async (req, res) => {
     conn = await pool.getConnection();
     const username = req.user?.username;
 
-    const [result] = await conn.execute(
-      'INSERT INTO products (name, description, image_url, points_required, stock, created_by) VALUES (?, ?, ?, ?, ?, ?)',
-      [name, description || '', image_url || '', points_required, stock, username]
-    );
+    // 檢查 products 表是否有 is_active 欄位
+    const [columns] = await conn.execute("SHOW COLUMNS FROM products LIKE 'is_active'");
+    const hasIsActive = columns.length > 0;
+
+    let result;
+    if (hasIsActive) {
+      // 如果有 is_active 欄位，包含在 INSERT 中
+      [result] = await conn.execute(
+        'INSERT INTO products (name, description, image_url, points_required, stock, created_by, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [name, description || '', image_url || '', points_required, stock, username, is_active !== undefined ? is_active : true]
+      );
+    } else {
+      // 如果沒有 is_active 欄位，使用舊的 INSERT 語句
+      [result] = await conn.execute(
+        'INSERT INTO products (name, description, image_url, points_required, stock, created_by) VALUES (?, ?, ?, ?, ?, ?)',
+        [name, description || '', image_url || '', points_required, stock, username]
+      );
+    }
     res.json({ success: true, message: '商品新增成功', productId: result.insertId });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: '伺服器錯誤' });
+    console.error('[/api/products POST] 錯誤:', err);
+    res.status(500).json({ success: false, message: '伺服器錯誤', error: err.message });
   } finally {
     if (conn) conn.release();
   }
