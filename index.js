@@ -1160,12 +1160,21 @@ app.post('/api/upload', authenticateToken, requireRole('user', 'shop', 'admin'),
 
 // 查詢目前登入者進行中的任務（需傳 username）
 app.get('/api/user-tasks', async (req, res) => {
-  const { username } = req.query;
-  if (!username) return res.status(400).json({ success: false, message: '缺少 username' });
+  // 優先使用 JWT 認證，如果沒有則嘗試從 header 獲取（兼容方案）
+  let username = req.user?.username;
+  if (!username) {
+    const headerUsername = req.headers['x-username'] || req.query.username;
+    if (headerUsername && /^09\d{8}$/.test(headerUsername)) {
+      username = headerUsername;
+    } else {
+      return res.status(401).json({ success: false, message: '未認證' });
+    }
+  }
+  
   let conn;
   try {
     conn = await pool.getConnection();
-    // 取得 user_id
+    // 取得 user_id（使用認證的 username）
     const [users] = await conn.execute('SELECT id FROM users WHERE username = ?', [username]);
     if (users.length === 0) return res.json({ success: true, tasks: [] });
     const userId = users[0].id;
@@ -1188,12 +1197,23 @@ app.get('/api/user-tasks', async (req, res) => {
 
 // 加入任務（需傳 username, task_id）
 app.post('/api/user-tasks', async (req, res) => {
-  const { username, task_id } = req.body;
-  if (!username || !task_id) return res.status(400).json({ success: false, message: '缺少參數' });
+  // 優先使用 JWT 認證，如果沒有則嘗試從 header 獲取（兼容方案）
+  let username = req.user?.username;
+  if (!username) {
+    const headerUsername = req.headers['x-username'];
+    if (headerUsername && /^09\d{8}$/.test(headerUsername)) {
+      username = headerUsername;
+    } else {
+      return res.status(401).json({ success: false, message: '未認證' });
+    }
+  }
+
+  const { task_id } = req.body;
+  if (!task_id) return res.status(400).json({ success: false, message: '缺少參數' });
   let conn;
   try {
     conn = await pool.getConnection();
-    // 取得 user_id 與 role
+    // 取得 user_id 與 role（使用認證的 username，而不是請求中的 username）
     const [users] = await conn.execute('SELECT id, role FROM users WHERE username = ?', [username]);
     if (users.length === 0) return res.status(400).json({ success: false, message: '找不到使用者' });
     
@@ -1657,12 +1677,21 @@ app.get('/api/user/quest-progress', async (req, res) => {
 
 // 查詢所有（進行中＋完成）任務
 app.get('/api/user-tasks/all', async (req, res) => {
-  const { username } = req.query;
-  if (!username) return res.status(400).json({ success: false, message: '缺少 username' });
+  // 優先使用 JWT 認證，如果沒有則嘗試從 header 獲取（兼容方案）
+  let username = req.user?.username;
+  if (!username) {
+    const headerUsername = req.headers['x-username'] || req.query.username;
+    if (headerUsername && /^09\d{8}$/.test(headerUsername)) {
+      username = headerUsername;
+    } else {
+      return res.status(401).json({ success: false, message: '未認證' });
+    }
+  }
+  
   let conn;
   try {
     conn = await pool.getConnection();
-    // 取得 user_id
+    // 取得 user_id（使用認證的 username）
     const [users] = await conn.execute('SELECT id FROM users WHERE username = ?', [username]);
     if (users.length === 0) return res.json({ success: true, tasks: [] });
     const userId = users[0].id;
@@ -1844,6 +1873,18 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
   const { id } = req.params;
   const { answer } = req.body;
   if (!answer) return res.status(400).json({ success: false, message: '缺少答案' });
+  
+  // 優先使用 JWT 認證，如果沒有則嘗試從 header 獲取（兼容方案）
+  let username = req.user?.username;
+  if (!username) {
+    const headerUsername = req.headers['x-username'];
+    if (headerUsername && /^09\d{8}$/.test(headerUsername)) {
+      username = headerUsername;
+    } else {
+      return res.status(401).json({ success: false, message: '未認證' });
+    }
+  }
+  
   let conn;
   try {
     conn = await pool.getConnection();
@@ -1858,6 +1899,15 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
 
     if (rows.length === 0) return res.status(404).json({ success: false, message: '任務不存在' });
     const userTask = rows[0];
+    
+    // 2. 驗證任務屬於當前用戶
+    const [users] = await conn.execute('SELECT id FROM users WHERE username = ?', [username]);
+    if (users.length === 0) return res.status(401).json({ success: false, message: '用戶不存在' });
+    const userId = users[0].id;
+    
+    if (userTask.user_id !== userId) {
+      return res.status(403).json({ success: false, message: '無權限：此任務不屬於您' });
+    }
 
     if (userTask.status === '完成') {
        return res.json({ 
