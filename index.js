@@ -2541,7 +2541,7 @@ app.get('/api/products/redemptions', async (req, res) => {
 
     // 獲取兌換記錄
     const [rows] = await conn.execute(`
-      SELECT pr.*, p.name as product_name, p.image_url
+      SELECT pr.*, p.id as product_id, p.name as product_name, p.image_url
       FROM product_redemptions pr
       JOIN products p ON pr.product_id = p.id
       WHERE pr.user_id = ?
