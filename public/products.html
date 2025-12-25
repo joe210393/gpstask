@@ -248,7 +248,8 @@
     // 載入兌換記錄
     function loadRedemptionHistory() {
       fetch(`${API_BASE}/api/products/redemptions`, {
-        headers: { 'x-username': loginUser.username }
+        headers: { 'x-username': loginUser.username },
+        credentials: 'include' // 發送 cookies (JWT)，確保認證資訊傳遞
       })
       .then(res => res.json())
       .then(data => {
@@ -269,51 +270,130 @@
 
       container.innerHTML = '';
 
-      redemptions.forEach(redemption => {
-        const card = document.createElement('div');
-        card.style.background = 'white';
-        card.style.borderRadius = '0.8rem';
-        card.style.padding = '1.2rem';
-        card.style.marginBottom = '1rem';
-        card.style.boxShadow = 'var(--shadow-sm)';
-        card.style.borderLeft = '4px solid #e5e7eb';
+      // 分類兌換記錄
+      const pendingRedemptions = redemptions.filter(r => r.status === 'pending');
+      const completedRedemptions = redemptions.filter(r => r.status === 'completed');
+      const cancelledRedemptions = redemptions.filter(r => r.status === 'cancelled');
 
-        let statusText = '狀態未知';
-        let statusColor = '#6b7280';
-        
-        switch(redemption.status) {
-          case 'pending': 
-            statusText = '處理中'; 
-            statusColor = '#f59e0b'; 
-            card.style.borderLeftColor = statusColor;
-            break;
-          case 'completed': 
-            statusText = '已完成'; 
-            statusColor = '#10b981'; 
-            card.style.borderLeftColor = statusColor;
-            break;
-          case 'cancelled': 
-            statusText = '已取消'; 
-            statusColor = '#ef4444'; 
-            card.style.borderLeftColor = statusColor;
-            break;
-        }
+      // 顯示處理中的兌換
+      if (pendingRedemptions.length > 0) {
+        const pendingSection = document.createElement('div');
+        pendingSection.innerHTML = '<h3 style="font-size:1.1rem; color:#f59e0b; margin:1.5rem 0 1rem 0; font-weight:600;">⏳ 處理中</h3>';
+        container.appendChild(pendingSection);
+        pendingRedemptions.forEach(redemption => {
+          container.appendChild(createRedemptionCard(redemption, 'pending'));
+        });
+      }
 
-        card.innerHTML = `
-          <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
-            <div style="font-weight:600; font-size:1.1rem;">${redemption.product_name}</div>
-            <div style="color:${statusColor}; font-weight:600; font-size:0.9rem;">${statusText}</div>
+      // 顯示已完成的兌換（我的兌換商品）
+      if (completedRedemptions.length > 0) {
+        const completedSection = document.createElement('div');
+        completedSection.innerHTML = '<h3 style="font-size:1.1rem; color:#10b981; margin:1.5rem 0 1rem 0; font-weight:600;">✅ 我的兌換商品</h3>';
+        container.appendChild(completedSection);
+        completedRedemptions.forEach(redemption => {
+          container.appendChild(createRedemptionCard(redemption, 'completed'));
+        });
+      }
+
+      // 顯示已取消的兌換
+      if (cancelledRedemptions.length > 0) {
+        const cancelledSection = document.createElement('div');
+        cancelledSection.innerHTML = '<h3 style="font-size:1.1rem; color:#ef4444; margin:1.5rem 0 1rem 0; font-weight:600;">❌ 已取消</h3>';
+        container.appendChild(cancelledSection);
+        cancelledRedemptions.forEach(redemption => {
+          container.appendChild(createRedemptionCard(redemption, 'cancelled'));
+        });
+      }
+    }
+
+    function createRedemptionCard(redemption, status) {
+      const card = document.createElement('div');
+      card.style.background = 'white';
+      card.style.borderRadius = '0.8rem';
+      card.style.padding = '1.2rem';
+      card.style.marginBottom = '1rem';
+      card.style.boxShadow = 'var(--shadow-sm)';
+      card.style.borderLeft = '4px solid #e5e7eb';
+      card.style.display = 'flex';
+      card.style.gap = '1rem';
+      card.style.alignItems = 'flex-start';
+
+      let statusText = '狀態未知';
+      let statusColor = '#6b7280';
+      
+      switch(status) {
+        case 'pending': 
+          statusText = '處理中'; 
+          statusColor = '#f59e0b'; 
+          break;
+        case 'completed': 
+          statusText = '已完成'; 
+          statusColor = '#10b981'; 
+          break;
+        case 'cancelled': 
+          statusText = '已取消'; 
+          statusColor = '#ef4444'; 
+          break;
+      }
+      card.style.borderLeftColor = statusColor;
+
+      // 商品圖片
+      const imageHtml = redemption.image_url 
+        ? `<img src="${redemption.image_url}" alt="${redemption.product_name}" style="width:80px; height:80px; object-fit:cover; border-radius:0.5rem; flex-shrink:0;">`
+        : `<div style="width:80px; height:80px; background:#f3f4f6; border-radius:0.5rem; display:flex; align-items:center; justify-content:center; font-size:2rem; flex-shrink:0;">🎁</div>`;
+
+      // 再次兌換按鈕（僅限已完成的兌換）
+      let redeemAgainBtn = '';
+      if (status === 'completed') {
+        // 需要檢查商品是否還有庫存（這裡先顯示按鈕，點擊時再檢查）
+        redeemAgainBtn = `<button class="btn btn-sm btn-outline-primary" onclick="redeemProductAgain(${redemption.product_id}, '${redemption.product_name}')" style="margin-top:0.5rem; font-size:0.85rem; padding:0.4rem 0.8rem;">🔄 再次兌換</button>`;
+      }
+
+      card.innerHTML = `
+        ${imageHtml}
+        <div style="flex:1; min-width:0;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.5rem;">
+            <div style="font-weight:600; font-size:1.1rem; color:#333;">${redemption.product_name}</div>
+            <div style="color:${statusColor}; font-weight:600; font-size:0.9rem; white-space:nowrap; margin-left:1rem;">${statusText}</div>
           </div>
-          <div style="color:var(--text-secondary); font-size:0.9rem; display:flex; gap:1rem;">
-            <div>📅 ${new Date(redemption.redeemed_at).toLocaleDateString()}</div>
+          <div style="color:var(--text-secondary); font-size:0.9rem; display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:0.5rem;">
+            <div>📅 ${new Date(redemption.redeemed_at).toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
             <div>💎 -${redemption.points_used} 積分</div>
           </div>
-          ${redemption.notes ? `<div style="margin-top:0.5rem; font-size:0.9rem; color:#666; font-style:italic;">備註：${redemption.notes}</div>` : ''}
-        `;
+          ${redemption.notes ? `<div style="margin-top:0.5rem; font-size:0.9rem; color:#666; font-style:italic; background:#f9fafb; padding:0.5rem; border-radius:0.4rem;">📝 備註：${redemption.notes}</div>` : ''}
+          ${redeemAgainBtn}
+        </div>
+      `;
 
-        container.appendChild(card);
-      });
+      return card;
     }
+
+    // 再次兌換商品
+    window.redeemProductAgain = function(productId, productName) {
+      if (!confirm(`確定要再次兌換「${productName}」嗎？`)) {
+        return;
+      }
+      // 使用現有的 redeemProduct 函數
+      // 需要先獲取商品的積分和庫存信息
+      fetch(`${API_BASE}/api/products`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            const product = data.products.find(p => p.id === productId);
+            if (product) {
+              redeemProduct(productId, product.points_required, product.stock);
+            } else {
+              alert('找不到該商品');
+            }
+          } else {
+            alert('載入商品資訊失敗');
+          }
+        })
+        .catch(err => {
+          console.error('載入商品資訊失敗:', err);
+          alert('載入商品資訊失敗');
+        });
+    };
 
     // 初始化
     loadUserPoints();
