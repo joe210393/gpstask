@@ -323,14 +323,19 @@ app.post('/api/login', async (req, res) => {
 
       const user = users[0];
       
-      // 可選的密碼驗證：如果用戶提供了密碼且帳號有密碼，則驗證
-      if (password && user.password && user.password.trim() !== '') {
+      // 安全修復：如果帳號有密碼，必須提供並驗證密碼
+      // 只有當帳號沒有密碼時，才允許無密碼登入（快速登入設計）
+      if (user.password && user.password.trim() !== '') {
+        // 帳號有密碼，必須提供密碼並驗證
+        if (!password) {
+          return res.status(400).json({ success: false, message: '此帳號需要密碼，請輸入密碼' });
+        }
         const isValid = await bcrypt.compare(password, user.password);
         if (!isValid) {
           return res.status(400).json({ success: false, message: '密碼錯誤' });
         }
       }
-      // 如果沒有提供密碼或帳號沒有密碼，直接通過（符合快速登入設計）
+      // 如果帳號沒有密碼，允許無密碼登入（符合快速登入設計）
 
       // 生成 JWT token
       const token = generateToken(user);
@@ -987,17 +992,12 @@ app.post('/api/admin/grant-item', staffOrAdminAuth, async (req, res) => {
 });
 
 // 取得使用者背包
-app.get('/api/user/inventory', async (req, res) => {
-  // 優先使用 JWT 認證，如果沒有則嘗試從 header 獲取（兼容方案）
-  let username = req.user?.username;
-  if (!username) {
-    const headerUsername = req.headers['x-username'];
-    if (headerUsername && /^09\d{8}$/.test(headerUsername)) {
-      username = headerUsername;
-    } else {
-      return res.status(400).json({ success: false, message: '未登入' });
-    }
+app.get('/api/user/inventory', authenticateToken, async (req, res) => {
+  // 強制使用 JWT 認證
+  if (!req.user || !req.user.username) {
+    return res.status(401).json({ success: false, message: '未認證' });
   }
+  const username = req.user.username;
 
   let conn;
   try {
@@ -1159,17 +1159,12 @@ app.post('/api/upload', authenticateToken, requireRole('user', 'shop', 'admin'),
 });
 
 // 查詢目前登入者進行中的任務（需傳 username）
-app.get('/api/user-tasks', async (req, res) => {
-  // 優先使用 JWT 認證，如果沒有則嘗試從 header 獲取（兼容方案）
-  let username = req.user?.username;
-  if (!username) {
-    const headerUsername = req.headers['x-username'] || req.query.username;
-    if (headerUsername && /^09\d{8}$/.test(headerUsername)) {
-      username = headerUsername;
-    } else {
-      return res.status(401).json({ success: false, message: '未認證' });
-    }
+app.get('/api/user-tasks', authenticateToken, async (req, res) => {
+  // 強制使用 JWT 認證
+  if (!req.user || !req.user.username) {
+    return res.status(401).json({ success: false, message: '未認證' });
   }
+  const username = req.user.username;
   
   let conn;
   try {
@@ -1196,17 +1191,12 @@ app.get('/api/user-tasks', async (req, res) => {
 });
 
 // 加入任務（需傳 username, task_id）
-app.post('/api/user-tasks', async (req, res) => {
-  // 優先使用 JWT 認證，如果沒有則嘗試從 header 獲取（兼容方案）
-  let username = req.user?.username;
-  if (!username) {
-    const headerUsername = req.headers['x-username'];
-    if (headerUsername && /^09\d{8}$/.test(headerUsername)) {
-      username = headerUsername;
-    } else {
-      return res.status(401).json({ success: false, message: '未認證' });
-    }
+app.post('/api/user-tasks', authenticateToken, async (req, res) => {
+  // 強制使用 JWT 認證
+  if (!req.user || !req.user.username) {
+    return res.status(401).json({ success: false, message: '未認證' });
   }
+  const username = req.user.username;
 
   const { task_id } = req.body;
   if (!task_id) return res.status(400).json({ success: false, message: '缺少參數' });
@@ -1569,29 +1559,12 @@ function getRank(started, finished) {
 }
 
 // 查詢使用者在各劇情任務線的目前進度 (具備自我修復功能)
-app.get('/api/user/quest-progress', async (req, res) => {
-  // 安全性優先：優先使用 JWT 認證
-  let username = req.user?.username;
-  
-  // 如果沒有 JWT 認證，嘗試從 header 獲取（僅作為兼容方案）
-  // ⚠️ 安全風險：header 可以被偽造，但考慮到：
-  // 1. 這是只讀查詢操作（GET），不修改數據
-  // 2. 返回的數據（劇情進度）相對不敏感
-  // 3. 僅用於地圖顯示，不涉及財務或個人隱私
-  // 暫時允許，但建議未來遷移到完整的 JWT 認證
-  if (!username) {
-    const headerUsername = req.headers['x-username'];
-    if (headerUsername) {
-      // 驗證：確保 header 中的用戶名格式正確（手機號格式：09xxxxxxxx）
-      if (/^09\d{8}$/.test(headerUsername)) {
-        console.warn(`[quest-progress] ⚠️ 使用 x-username header（未使用 JWT 認證）: ${headerUsername}`);
-        username = headerUsername;
-      } else {
-        console.warn(`[quest-progress] ⚠️ 無效的用戶名格式: ${headerUsername}`);
-        return res.json({ success: true, progress: {} });
-      }
-    }
+app.get('/api/user/quest-progress', authenticateToken, async (req, res) => {
+  // 強制使用 JWT 認證
+  if (!req.user || !req.user.username) {
+    return res.status(401).json({ success: false, message: '未認證' });
   }
+  const username = req.user.username;
   
   if (!username) {
     console.warn('[quest-progress] 未提供用戶名');
@@ -1676,17 +1649,12 @@ app.get('/api/user/quest-progress', async (req, res) => {
 });
 
 // 查詢所有（進行中＋完成）任務
-app.get('/api/user-tasks/all', async (req, res) => {
-  // 優先使用 JWT 認證，如果沒有則嘗試從 header 獲取（兼容方案）
-  let username = req.user?.username;
-  if (!username) {
-    const headerUsername = req.headers['x-username'] || req.query.username;
-    if (headerUsername && /^09\d{8}$/.test(headerUsername)) {
-      username = headerUsername;
-    } else {
-      return res.status(401).json({ success: false, message: '未認證' });
-    }
+app.get('/api/user-tasks/all', authenticateToken, async (req, res) => {
+  // 強制使用 JWT 認證
+  if (!req.user || !req.user.username) {
+    return res.status(401).json({ success: false, message: '未認證' });
   }
+  const username = req.user.username;
   
   let conn;
   try {
@@ -1869,21 +1837,16 @@ app.get('/api/user-tasks/to-redeem', reviewerAuth, async (req, res) => {
 });
 
 // 儲存/更新猜謎答案或提交選擇題答案
-app.patch('/api/user-tasks/:id/answer', async (req, res) => {
+app.patch('/api/user-tasks/:id/answer', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { answer } = req.body;
   if (!answer) return res.status(400).json({ success: false, message: '缺少答案' });
   
-  // 優先使用 JWT 認證，如果沒有則嘗試從 header 獲取（兼容方案）
-  let username = req.user?.username;
-  if (!username) {
-    const headerUsername = req.headers['x-username'];
-    if (headerUsername && /^09\d{8}$/.test(headerUsername)) {
-      username = headerUsername;
-    } else {
-      return res.status(401).json({ success: false, message: '未認證' });
-    }
+  // 強制使用 JWT 認證
+  if (!req.user || !req.user.username) {
+    return res.status(401).json({ success: false, message: '未認證' });
   }
+  const username = req.user.username;
   
   let conn;
   try {
@@ -2096,17 +2059,12 @@ app.patch('/api/user-tasks/:id/answer', async (req, res) => {
 });
 
 // 獲取用戶的所有稱號
-app.get('/api/user/badges', async (req, res) => {
-  // 優先使用 JWT 認證，如果沒有則嘗試從 header 獲取（兼容方案）
-  let username = req.user?.username;
-  if (!username) {
-    const headerUsername = req.headers['x-username'];
-    if (headerUsername && /^09\d{8}$/.test(headerUsername)) {
-      username = headerUsername;
-    } else {
-      return res.json({ success: true, badges: [] });
-    }
+app.get('/api/user/badges', authenticateToken, async (req, res) => {
+  // 強制使用 JWT 認證
+  if (!req.user || !req.user.username) {
+    return res.status(401).json({ success: false, message: '未認證' });
   }
+  const username = req.user.username;
 
   let conn;
   try {
@@ -2567,17 +2525,12 @@ app.delete('/api/products/:id', staffOrAdminAuth, async (req, res) => {
 });
 
 // 獲取用戶的商品兌換記錄
-app.get('/api/products/redemptions', async (req, res) => {
-  // 優先使用 JWT 認證，如果沒有則嘗試從 header 獲取（兼容方案）
-  let username = req.user?.username;
-  if (!username) {
-    const headerUsername = req.headers['x-username'];
-    if (headerUsername && /^09\d{8}$/.test(headerUsername)) {
-      username = headerUsername;
-    } else {
-      return res.status(400).json({ success: false, message: '缺少用戶名稱' });
-    }
+app.get('/api/products/redemptions', authenticateToken, async (req, res) => {
+  // 強制使用 JWT 認證
+  if (!req.user || !req.user.username) {
+    return res.status(401).json({ success: false, message: '未認證' });
   }
+  const username = req.user.username;
 
   let conn;
   try {
@@ -2608,18 +2561,13 @@ app.get('/api/products/redemptions', async (req, res) => {
 });
 
 // 兌換商品
-app.post('/api/products/:id/redeem', async (req, res) => {
+app.post('/api/products/:id/redeem', authenticateToken, async (req, res) => {
   const { id } = req.params;
-  // 優先使用 JWT 認證，如果沒有則嘗試從 header 獲取（兼容方案）
-  let username = req.user?.username;
-  if (!username) {
-    const headerUsername = req.headers['x-username'];
-    if (headerUsername && /^09\d{8}$/.test(headerUsername)) {
-      username = headerUsername;
-    } else {
-      return res.status(400).json({ success: false, message: '缺少用戶名稱' });
-    }
+  // 強制使用 JWT 認證
+  if (!req.user || !req.user.username) {
+    return res.status(401).json({ success: false, message: '未認證' });
   }
+  const username = req.user.username;
 
   let conn;
   try {
@@ -2705,17 +2653,12 @@ app.post('/api/products/:id/redeem', async (req, res) => {
 });
 
 // 獲取用戶總積分
-app.get('/api/user/points', async (req, res) => {
-  // 優先使用 JWT 認證，如果沒有則嘗試從 header 獲取（兼容方案）
-  let username = req.user?.username;
-  if (!username) {
-    const headerUsername = req.headers['x-username'];
-    if (headerUsername && /^09\d{8}$/.test(headerUsername)) {
-      username = headerUsername;
-    } else {
-      return res.status(400).json({ success: false, message: '缺少用戶名稱' });
-    }
+app.get('/api/user/points', authenticateToken, async (req, res) => {
+  // 強制使用 JWT 認證
+  if (!req.user || !req.user.username) {
+    return res.status(401).json({ success: false, message: '未認證' });
   }
+  const username = req.user.username;
 
   let conn;
   try {
