@@ -246,57 +246,61 @@ function requireRole(...allowedRoles) {
   };
 }
 
-// 安全的檔案上傳配置
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => {
-      // 確保目錄存在
-      if (!fs.existsSync(UPLOAD_DIR)) {
-        try {
-          fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-        } catch (err) {
-          console.error('建立上傳目錄失敗:', err);
-        }
+// 共享的存儲配置
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    // 確保目錄存在
+    if (!fs.existsSync(UPLOAD_DIR)) {
+      try {
+        fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+      } catch (err) {
+        console.error('建立上傳目錄失敗:', err);
       }
-      cb(null, UPLOAD_DIR);
-    },
-    filename: (req, file, cb) => {
-      // 生成安全的檔案名稱：時間戳 + 隨機字串 + 副檔名
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      const extension = path.extname(file.originalname).toLowerCase();
-      cb(null, uniqueSuffix + extension);
     }
-  }),
-  limits: {
-    fileSize: 100 * 1024 * 1024, // 100MB 限制 (為了支援 GLB 模型)
-    files: 1 // 一次只能上傳一個檔案
+    cb(null, UPLOAD_DIR);
   },
-  fileFilter: (req, file, cb) => {
-    // 允許的檔案類型和 MIME types
-    const allowedTypes = [
-      'image/jpeg',
-      'image/jpg',
-      'image/png',
-      'image/gif',
-      'image/webp',
-      'model/gltf-binary', // .glb
-      'model/gltf+json',   // .gltf
-      'application/octet-stream' // 有些瀏覽器會把 .glb 視為 octet-stream
-    ];
-
-    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.glb', '.gltf'];
-
-    const fileExtension = path.extname(file.originalname).toLowerCase();
-
-    // 檢查 MIME type 和副檔名
-    // 注意：對於 .glb，mimetype 檢查可能不準確，主要依賴副檔名
-    if (allowedExtensions.includes(fileExtension)) {
-      cb(null, true);
-    } else {
-      cb(new Error('不支援的檔案類型。只允許 JPG, PNG, GIF, WebP, GLB, GLTF。'), false);
-    }
+  filename: (req, file, cb) => {
+    // 生成安全的檔案名稱：時間戳 + 隨機字串 + 副檔名
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const extension = path.extname(file.originalname).toLowerCase();
+    cb(null, uniqueSuffix + extension);
   }
 });
+
+// 共享的檔案類型過濾器
+const fileFilter = (req, file, cb) => {
+  const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.glb', '.gltf'];
+  const fileExtension = path.extname(file.originalname).toLowerCase();
+
+  if (allowedExtensions.includes(fileExtension)) {
+    cb(null, true);
+  } else {
+    cb(new Error('不支援的檔案類型。只允許 JPG, PNG, GIF, WebP, GLB, GLTF。'), false);
+  }
+};
+
+// 一般圖片上傳配置（5MB 限制）- 用於用戶上傳照片答案、道具圖片、徽章圖片等
+const uploadImage = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB 限制
+    files: 1
+  },
+  fileFilter: fileFilter
+});
+
+// 3D 模型上傳配置（100MB 限制）- 用於 AR 模型上傳
+const uploadModel = multer({
+  storage: storage,
+  limits: {
+    fileSize: 100 * 1024 * 1024, // 100MB 限制 (為了支援 GLB 模型)
+    files: 1
+  },
+  fileFilter: fileFilter
+});
+
+// 向後兼容：保留 upload 作為 uploadImage 的別名（用於舊代碼）
+const upload = uploadImage;
 
 // 登入 API
 // - role=user：一般用戶登入（手機門號，不需密碼），同時允許 staff 也用此入口登入
@@ -701,7 +705,7 @@ app.get('/api/quest-chains', staffOrAdminAuth, async (req, res) => {
 });
 
 // 新增劇情 (支援圖片上傳)
-app.post('/api/quest-chains', staffOrAdminAuth, upload.single('badge_image'), async (req, res) => {
+app.post('/api/quest-chains', staffOrAdminAuth, uploadImage.single('badge_image'), async (req, res) => {
   const { title, description, chain_points, badge_name } = req.body;
   if (!title) return res.status(400).json({ success: false, message: '缺少標題' });
 
@@ -762,11 +766,28 @@ app.delete('/api/quest-chains/:id', staffOrAdminAuth, async (req, res) => {
       });
     }
 
-    // 3. 執行刪除
-    // 先刪除用戶的劇情進度 (user_quests) - 雖然理論上沒有任務應該就沒有進度，但保險起見
-    await conn.execute('DELETE FROM user_quests WHERE quest_chain_id = ?', [id]);
-    // 刪除劇情
-    await conn.execute('DELETE FROM quest_chains WHERE id = ?', [id]);
+    // 3. 執行刪除（使用事務確保數據一致性）
+    await conn.beginTransaction();
+    try {
+      // 先刪除用戶的劇情進度 (user_quests) - 雖然理論上沒有任務應該就沒有進度，但保險起見
+      await conn.execute('DELETE FROM user_quests WHERE quest_chain_id = ?', [id]);
+      
+      // 清理 point_transactions 中的關聯紀錄
+      // 將 reference_type 為 'quest_chain_completion' 且 reference_id 為此劇情 ID 的紀錄標記為已刪除
+      // 注意：不直接刪除積分紀錄，而是將 reference_id 設為 NULL，保留歷史記錄
+      await conn.execute(
+        'UPDATE point_transactions SET reference_id = NULL, description = CONCAT(description, " (劇情已刪除)") WHERE reference_type = "quest_chain_completion" AND reference_id = ?',
+        [id]
+      );
+      
+      // 刪除劇情
+      await conn.execute('DELETE FROM quest_chains WHERE id = ?', [id]);
+      
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    }
 
     res.json({ success: true, message: '劇情已刪除' });
   } catch (err) {
@@ -795,7 +816,7 @@ app.get('/api/ar-models', async (req, res) => {
 });
 
 // 上傳模型 (Admin/Shop)
-app.post('/api/ar-models', staffOrAdminAuth, upload.single('model'), async (req, res) => {
+app.post('/api/ar-models', staffOrAdminAuth, uploadModel.single('model'), async (req, res) => {
   const { name, scale } = req.body;
   if (!name) return res.status(400).json({ success: false, message: '缺少模型名稱' });
   if (!req.file) return res.status(400).json({ success: false, message: '未選擇檔案' });
@@ -862,7 +883,7 @@ app.get('/api/items', async (req, res) => {
 });
 
 // 新增道具 (Admin/Shop)
-app.post('/api/items', staffOrAdminAuth, upload.single('image'), async (req, res) => {
+app.post('/api/items', staffOrAdminAuth, uploadImage.single('image'), async (req, res) => {
   const { name, description, model_url } = req.body;
   if (!name) return res.status(400).json({ success: false, message: '缺少道具名稱' });
 
@@ -890,7 +911,7 @@ app.post('/api/items', staffOrAdminAuth, upload.single('image'), async (req, res
 });
 
 // 編輯道具
-app.put('/api/items/:id', staffOrAdminAuth, upload.single('image'), async (req, res) => {
+app.put('/api/items/:id', staffOrAdminAuth, uploadImage.single('image'), async (req, res) => {
   const { id } = req.params;
   const { name, description, model_url } = req.body;
   if (!name) return res.status(400).json({ success: false, message: '缺少道具名稱' });
@@ -1124,8 +1145,8 @@ app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
 
 // 安全的檔案上傳 API
 app.post('/api/upload', authenticateToken, requireRole('user', 'shop', 'admin'), (req, res) => {
-  // 使用 multer 中間層處理檔案上傳
-  upload.single('photo')(req, res, (err) => {
+  // 使用一般圖片上傳配置（5MB 限制）
+  uploadImage.single('photo')(req, res, (err) => {
     if (err) {
       // 處理上傳錯誤
       if (err instanceof multer.MulterError) {
