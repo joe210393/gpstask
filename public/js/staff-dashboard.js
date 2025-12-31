@@ -1376,3 +1376,126 @@ if (editPhotoInput) {
     editPhotoUrlInput.disabled = false;
   });
 }
+
+// 背景音樂上傳按鈕事件處理
+const uploadBgmBtn = document.getElementById('uploadBgmBtn');
+if (uploadBgmBtn) {
+  uploadBgmBtn.addEventListener('click', async () => {
+    const bgmFileInput = document.getElementById('bgmFileInput');
+    const bgmUrlInput = document.getElementById('bgmUrlInput');
+    const bgmPreview = document.getElementById('bgmPreview');
+    const bgmPreviewAudio = document.getElementById('bgmPreviewAudio');
+    
+    if (!bgmFileInput.files[0]) {
+      alert('請先選擇音樂文件');
+      return;
+    }
+    
+    try {
+      uploadBgmBtn.disabled = true;
+      uploadBgmBtn.textContent = '上傳中...';
+      
+      const fd = new FormData();
+      fd.append('photo', bgmFileInput.files[0]); // 使用相同的上傳 API
+      
+      const res = await fetch(`${API_BASE}/api/upload`, {
+        method: 'POST',
+        headers: { 'x-username': loginUser.username },
+        body: fd,
+        credentials: 'include'
+      });
+      
+      const data = await res.json();
+      if (data.success) {
+        bgmUrlInput.value = data.url;
+        bgmPreview.style.display = 'block';
+        bgmPreviewAudio.src = data.url;
+        alert('音樂上傳成功！');
+      } else {
+        alert('上傳失敗: ' + (data.message || '未知錯誤'));
+      }
+    } catch (err) {
+      console.error(err);
+      alert('上傳錯誤');
+    } finally {
+      uploadBgmBtn.disabled = false;
+      uploadBgmBtn.textContent = '上傳';
+    }
+  });
+}
+
+// 編輯表單背景音樂上傳按鈕事件處理
+const editUploadBgmBtn = document.getElementById('editUploadBgmBtn');
+if (editUploadBgmBtn) {
+  editUploadBgmBtn.addEventListener('click', async () => {
+    const editBgmFileInput = document.getElementById('editBgmFileInput');
+    const editBgmUrlInput = document.getElementById('editBgmUrlInput');
+    const editBgmPreview = document.getElementById('editBgmPreview');
+    const editBgmPreviewAudio = document.getElementById('editBgmPreviewAudio');
+    
+    if (!editBgmFileInput.files[0]) {
+      alert('請先選擇音樂文件');
+      return;
+    }
+    
+    try {
+      editUploadBgmBtn.disabled = true;
+      editUploadBgmBtn.textContent = '上傳中...';
+      
+      const fd = new FormData();
+      fd.append('photo', editBgmFileInput.files[0]); // 使用相同的上傳 API
+      
+      const res = await fetch(`${API_BASE}/api/upload`, {
+        method: 'POST',
+        headers: { 'x-username': loginUser.username },
+        body: fd,
+        credentials: 'include'
+      });
+      
+      const data = await res.json();
+      if (data.success) {
+        editBgmUrlInput.value = data.url;
+        editBgmPreview.style.display = 'block';
+        editBgmPreviewAudio.src = data.url;
+        alert('音樂上傳成功！');
+      } else {
+        alert('上傳失敗: ' + (data.message || '未知錯誤'));
+      }
+    } catch (err) {
+      console.error(err);
+      alert('上傳錯誤');
+    } finally {
+      editUploadBgmBtn.disabled = false;
+      editUploadBgmBtn.textContent = '上傳';
+    }
+  });
+}
+
+// 音樂 URL 輸入框變化時更新預覽
+const bgmUrlInput = document.getElementById('bgmUrlInput');
+if (bgmUrlInput) {
+  bgmUrlInput.addEventListener('input', () => {
+    const bgmPreview = document.getElementById('bgmPreview');
+    const bgmPreviewAudio = document.getElementById('bgmPreviewAudio');
+    if (bgmUrlInput.value.trim()) {
+      bgmPreview.style.display = 'block';
+      bgmPreviewAudio.src = bgmUrlInput.value.trim();
+    } else {
+      bgmPreview.style.display = 'none';
+    }
+  });
+}
+
+const editBgmUrlInput = document.getElementById('editBgmUrlInput');
+if (editBgmUrlInput) {
+  editBgmUrlInput.addEventListener('input', () => {
+    const editBgmPreview = document.getElementById('editBgmPreview');
+    const editBgmPreviewAudio = document.getElementById('editBgmPreviewAudio');
+    if (editBgmUrlInput.value.trim()) {
+      editBgmPreview.style.display = 'block';
+      editBgmPreviewAudio.src = editBgmUrlInput.value.trim();
+    } else {
+      editBgmPreview.style.display = 'none';
+    }
+  });
+}
