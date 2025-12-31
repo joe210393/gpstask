@@ -13,6 +13,7 @@ if (formUser) {
     const res = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ username, role: 'user' })
     });
     const data = await res.json();
@@ -64,6 +65,7 @@ if (formStaff) {
     const res = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ username, password, role: 'staff_portal' })
     });
 

@@ -370,8 +370,9 @@ app.post('/api/login', async (req, res) => {
       res.cookie('token', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000
+        sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax', // 開發環境使用 lax 以支持跨域
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        path: '/' // 確保 cookie 在所有路徑下都可用
       });
 
       // 返回用戶信息
