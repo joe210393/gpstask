@@ -1105,26 +1105,76 @@ document.getElementById('addTaskForm').addEventListener('submit', async function
       }
     }
     
-    // 2.5. 上傳背景音樂（如果有）
+    // 2.5. 上傳背景音樂（如果有）- 使用 XMLHttpRequest 追蹤進度
     let bgmUrl = form.bgm_url?.value.trim() || null;
     const bgmFile = form.bgmFile?.files[0];
     if (bgmFile) {
       document.getElementById('addTaskMsg').textContent = '背景音樂上傳中...';
-      const bgmFd = new FormData();
-      bgmFd.append('audio', bgmFile); // 使用音頻上傳 API
-      const bgmUploadRes = await fetch(`${API_BASE}/api/upload-audio`, {
-        method: 'POST',
-        headers: { 'x-username': loginUser.username },
-        body: bgmFd,
-        credentials: 'include'
-      });
-      const bgmUploadData = await bgmUploadRes.json();
-      if (bgmUploadData.success) {
-        bgmUrl = bgmUploadData.url;
-      } else {
-        document.getElementById('addTaskMsg').textContent = '背景音樂上傳失敗: ' + (bgmUploadData.message || '未知錯誤');
-        return;
+      
+      // 顯示進度條（如果存在）
+      const bgmUploadProgress = document.getElementById('bgmUploadProgress');
+      const bgmUploadProgressBar = document.getElementById('bgmUploadProgressBar');
+      const bgmUploadPercent = document.getElementById('bgmUploadPercent');
+      if (bgmUploadProgress) {
+        bgmUploadProgress.style.display = 'block';
+        bgmUploadProgressBar.style.width = '0%';
+        bgmUploadPercent.textContent = '0%';
       }
+      
+      const bgmFd = new FormData();
+      bgmFd.append('audio', bgmFile);
+      
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        
+        // 追蹤上傳進度
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable && bgmUploadProgress) {
+            const percentComplete = Math.round((e.loaded / e.total) * 100);
+            bgmUploadProgressBar.style.width = percentComplete + '%';
+            bgmUploadPercent.textContent = percentComplete + '%';
+          }
+        });
+        
+        // 上傳完成
+        xhr.addEventListener('load', () => {
+          if (xhr.status === 200) {
+            try {
+              const bgmUploadData = JSON.parse(xhr.responseText);
+              if (bgmUploadData.success) {
+                bgmUrl = bgmUploadData.url;
+                if (bgmUploadProgress) bgmUploadProgress.style.display = 'none';
+                resolve();
+              } else {
+                if (bgmUploadProgress) bgmUploadProgress.style.display = 'none';
+                document.getElementById('addTaskMsg').textContent = '背景音樂上傳失敗: ' + (bgmUploadData.message || '未知錯誤');
+                reject(new Error(bgmUploadData.message || '上傳失敗'));
+              }
+            } catch (err) {
+              if (bgmUploadProgress) bgmUploadProgress.style.display = 'none';
+              document.getElementById('addTaskMsg').textContent = '背景音樂上傳失敗: 解析回應錯誤';
+              reject(err);
+            }
+          } else {
+            if (bgmUploadProgress) bgmUploadProgress.style.display = 'none';
+            document.getElementById('addTaskMsg').textContent = '背景音樂上傳失敗: HTTP ' + xhr.status;
+            reject(new Error('HTTP ' + xhr.status));
+          }
+        });
+        
+        // 上傳錯誤
+        xhr.addEventListener('error', () => {
+          if (bgmUploadProgress) bgmUploadProgress.style.display = 'none';
+          document.getElementById('addTaskMsg').textContent = '背景音樂上傳失敗: 網路連線失敗';
+          reject(new Error('網路連線失敗'));
+        });
+        
+        // 發送請求
+        xhr.open('POST', `${API_BASE}/api/upload-audio`);
+        xhr.setRequestHeader('x-username', loginUser.username);
+        xhr.withCredentials = true;
+        xhr.send(bgmFd);
+      });
     }
     
     // 3. 新增任務
