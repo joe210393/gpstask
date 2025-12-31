@@ -1285,8 +1285,8 @@ document.getElementById('editTaskForm').addEventListener('submit', async functio
       try {
         document.getElementById('editTaskMsg').textContent = '背景音樂上傳中...';
         const bgmFd = new FormData();
-        bgmFd.append('photo', editBgmFile); // 使用相同的上傳 API
-        const bgmUploadRes = await fetch(`${API_BASE}/api/upload`, {
+        bgmFd.append('audio', editBgmFile); // 使用音頻上傳 API
+        const bgmUploadRes = await fetch(`${API_BASE}/api/upload-audio`, {
           method: 'POST',
           headers: { 'x-username': loginUser.username },
           body: bgmFd,
