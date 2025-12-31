@@ -858,6 +858,21 @@ function loadTasks() {
               }
               document.getElementById('editArImageInput').value = '';
 
+              // 填入背景音樂
+              const editBgmUrlInput = document.getElementById('editBgmUrlInput');
+              const editBgmPreview = document.getElementById('editBgmPreview');
+              const editBgmPreviewAudio = document.getElementById('editBgmPreviewAudio');
+              if (editBgmUrlInput) {
+                editBgmUrlInput.value = t.bgm_url || '';
+                if (t.bgm_url) {
+                  editBgmPreview.style.display = 'block';
+                  editBgmPreviewAudio.src = t.bgm_url;
+                } else {
+                  editBgmPreview.style.display = 'none';
+                }
+              }
+              document.getElementById('editBgmFileInput').value = '';
+
               // 設置任務分類 (Single/Timed/Quest)
               const typeSelect = document.getElementById('editTaskCategorySelect');
               typeSelect.value = t.type || 'single';
@@ -1090,6 +1105,28 @@ document.getElementById('addTaskForm').addEventListener('submit', async function
       }
     }
     
+    // 2.5. 上傳背景音樂（如果有）
+    let bgmUrl = form.bgm_url?.value.trim() || null;
+    const bgmFile = form.bgmFile?.files[0];
+    if (bgmFile) {
+      document.getElementById('addTaskMsg').textContent = '背景音樂上傳中...';
+      const bgmFd = new FormData();
+      bgmFd.append('photo', bgmFile); // 使用相同的上傳 API
+      const bgmUploadRes = await fetch(`${API_BASE}/api/upload`, {
+        method: 'POST',
+        headers: { 'x-username': loginUser.username },
+        body: bgmFd,
+        credentials: 'include'
+      });
+      const bgmUploadData = await bgmUploadRes.json();
+      if (bgmUploadData.success) {
+        bgmUrl = bgmUploadData.url;
+      } else {
+        document.getElementById('addTaskMsg').textContent = '背景音樂上傳失敗: ' + (bgmUploadData.message || '未知錯誤');
+        return;
+      }
+    }
+    
     // 3. 新增任務
     document.getElementById('addTaskMsg').textContent = '任務建立中...';
     const photoUrl = uploadData.url;
@@ -1107,7 +1144,8 @@ document.getElementById('addTaskForm').addEventListener('submit', async function
         ar_order_model, ar_order_image, ar_order_youtube,
         task_type, options, correct_answer,
         type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants,
-        is_final_step, required_item_id, reward_item_id
+        is_final_step, required_item_id, reward_item_id,
+        bgm_url: bgmUrl
       })
     });
     const data = await res.json();
@@ -1213,6 +1251,10 @@ document.getElementById('editTaskForm').addEventListener('submit', async functio
 
   document.getElementById('editTaskMsg').textContent = '更新中...';
   
+  // 背景音樂處理
+  let bgmUrl = form.bgm_url?.value.trim() || null;
+  const editBgmFile = form.editBgmFile?.files[0];
+  
   // 如果有上傳新的 AR 圖片，先上傳
   (async () => {
     if (editArImageFile) {
@@ -1238,6 +1280,31 @@ document.getElementById('editTaskForm').addEventListener('submit', async functio
       }
     }
     
+    // 如果有上傳新的背景音樂，先上傳
+    if (editBgmFile) {
+      try {
+        document.getElementById('editTaskMsg').textContent = '背景音樂上傳中...';
+        const bgmFd = new FormData();
+        bgmFd.append('photo', editBgmFile); // 使用相同的上傳 API
+        const bgmUploadRes = await fetch(`${API_BASE}/api/upload`, {
+          method: 'POST',
+          headers: { 'x-username': loginUser.username },
+          body: bgmFd,
+          credentials: 'include'
+        });
+        const bgmUploadData = await bgmUploadRes.json();
+        if (bgmUploadData.success) {
+          bgmUrl = bgmUploadData.url;
+        } else {
+          document.getElementById('editTaskMsg').textContent = '背景音樂上傳失敗: ' + (bgmUploadData.message || '未知錯誤');
+          return;
+        }
+      } catch (err) {
+        document.getElementById('editTaskMsg').textContent = '背景音樂上傳錯誤';
+        return;
+      }
+    }
+    
     // 更新任務
     fetch(`${API_BASE}/api/tasks/${id}`, {
       method: 'PUT',
@@ -1250,7 +1317,8 @@ document.getElementById('editTaskForm').addEventListener('submit', async functio
         ar_order_model, ar_order_image, ar_order_youtube,
         task_type, options, correct_answer,
         type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants,
-        is_final_step, required_item_id, reward_item_id
+        is_final_step, required_item_id, reward_item_id,
+        bgm_url: bgmUrl
       })
     })
     .then(res => res.json())

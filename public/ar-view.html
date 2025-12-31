@@ -2118,6 +2118,15 @@
             if (Math.abs(delta) < fov) {
                 if (!isObjectVisible) {
                     isObjectVisible = true; arrow.style.display = 'none';
+                    
+                    // 到達任務地點時，自動播放背景音樂（如果任務有配置）
+                    if (bgmAudio.src && !bgmIsPlaying) {
+                        bgmAudio.play().catch(err => {
+                            // 如果自動播放失敗（需要用戶交互），靜默處理
+                            console.log('音樂自動播放需要用戶交互');
+                        });
+                    }
+                    
                     if (isLocationTask) { locationObj.style.display = 'block'; chest.style.display = 'none'; lockedObj.style.display = 'none'; itemUseObj.style.display = 'none'; }
                     else if (requiredItem) {
                         if (hasRequiredItem) { 

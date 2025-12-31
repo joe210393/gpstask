@@ -1056,7 +1056,9 @@ app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
     is_final_step,
     // AR 模型 ID 與 順序
     ar_model_id,
-    ar_order_model, ar_order_image, ar_order_youtube
+    ar_order_model, ar_order_image, ar_order_youtube,
+    // 背景音樂
+    bgm_url
   } = req.body;
 
   console.log('[POST /api/tasks] Received:', req.body);
@@ -1118,22 +1120,47 @@ app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
     const orderImage = ar_order_image ? Number(ar_order_image) : null;
     const orderYoutube = ar_order_youtube ? Number(ar_order_youtube) : null;
 
-    await conn.execute(
-      `INSERT INTO tasks (
-        name, lat, lng, radius, description, photoUrl, iconUrl, youtubeUrl, ar_image_url, points, created_by, 
-        task_type, options, correct_answer,
-        type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants,
-        required_item_id, reward_item_id, is_final_step, ar_model_id,
-        ar_order_model, ar_order_image, ar_order_youtube
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        name, lat, lng, radius, description, photoUrl, '/images/flag-red.png', youtubeUrl || null, ar_image_url || null, pts, username, 
-        tType, opts, correct_answer || null,
-        mainType, qId, qOrder, tStart, tEnd, maxP,
-        reqItemId, rewItemId, isFinal, arModelId,
-        orderModel, orderImage, orderYoutube
-      ]
-    );
+    // 動態檢查 bgm_url 欄位是否存在
+    const [bgmColCheck] = await conn.execute("SHOW COLUMNS FROM tasks LIKE 'bgm_url'");
+    const hasBgmUrl = bgmColCheck.length > 0;
+    
+    const bgmUrlValue = bgm_url || null;
+    
+    if (hasBgmUrl) {
+      await conn.execute(
+        `INSERT INTO tasks (
+          name, lat, lng, radius, description, photoUrl, iconUrl, youtubeUrl, ar_image_url, points, created_by, 
+          task_type, options, correct_answer,
+          type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants,
+          required_item_id, reward_item_id, is_final_step, ar_model_id,
+          ar_order_model, ar_order_image, ar_order_youtube, bgm_url
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          name, lat, lng, radius, description, photoUrl, '/images/flag-red.png', youtubeUrl || null, ar_image_url || null, pts, username, 
+          tType, opts, correct_answer || null,
+          mainType, qId, qOrder, tStart, tEnd, maxP,
+          reqItemId, rewItemId, isFinal, arModelId,
+          orderModel, orderImage, orderYoutube, bgmUrlValue
+        ]
+      );
+    } else {
+      await conn.execute(
+        `INSERT INTO tasks (
+          name, lat, lng, radius, description, photoUrl, iconUrl, youtubeUrl, ar_image_url, points, created_by, 
+          task_type, options, correct_answer,
+          type, quest_chain_id, quest_order, time_limit_start, time_limit_end, max_participants,
+          required_item_id, reward_item_id, is_final_step, ar_model_id,
+          ar_order_model, ar_order_image, ar_order_youtube
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          name, lat, lng, radius, description, photoUrl, '/images/flag-red.png', youtubeUrl || null, ar_image_url || null, pts, username, 
+          tType, opts, correct_answer || null,
+          mainType, qId, qOrder, tStart, tEnd, maxP,
+          reqItemId, rewItemId, isFinal, arModelId,
+          orderModel, orderImage, orderYoutube
+        ]
+      );
+    }
     res.json({ success: true, message: '新增成功' });
   } catch (err) {
     console.error(err);
@@ -1414,7 +1441,9 @@ app.put('/api/tasks/:id', staffOrAdminAuth, async (req, res) => {
     is_final_step,
     // AR 模型 ID 與 順序
     ar_model_id,
-    ar_order_model, ar_order_image, ar_order_youtube
+    ar_order_model, ar_order_image, ar_order_youtube,
+    // 背景音樂
+    bgm_url
   } = req.body;
 
   if (!name || !lat || !lng || !radius || !description || !photoUrl) {
@@ -1474,24 +1503,49 @@ app.put('/api/tasks/:id', staffOrAdminAuth, async (req, res) => {
     const orderModel = ar_order_model ? Number(ar_order_model) : null;
     const orderImage = ar_order_image ? Number(ar_order_image) : null;
     const orderYoutube = ar_order_youtube ? Number(ar_order_youtube) : null;
+    const bgmUrlValue = bgm_url || null;
 
-    await conn.execute(
-      `UPDATE tasks SET 
-        name=?, lat=?, lng=?, radius=?, description=?, photoUrl=?, youtubeUrl=?, ar_image_url=?, points=?, 
-        task_type=?, options=?, correct_answer=?,
-        type=?, quest_chain_id=?, quest_order=?, time_limit_start=?, time_limit_end=?, max_participants=?,
-        required_item_id=?, reward_item_id=?, is_final_step=?, ar_model_id=?,
-        ar_order_model=?, ar_order_image=?, ar_order_youtube=?
-       WHERE id=?`,
-      [
-        name, lat, lng, radius, description, photoUrl, youtubeUrl || null, ar_image_url || null, pts, 
-        tType, opts, correct_answer || null, 
-        mainType, qId, qOrder, tStart, tEnd, maxP,
-        reqItemId, rewItemId, isFinal, arModelId,
-        orderModel, orderImage, orderYoutube,
-        id
-      ]
-    );
+    // 動態檢查 bgm_url 欄位是否存在
+    const [bgmColCheck] = await conn.execute("SHOW COLUMNS FROM tasks LIKE 'bgm_url'");
+    const hasBgmUrl = bgmColCheck.length > 0;
+
+    if (hasBgmUrl) {
+      await conn.execute(
+        `UPDATE tasks SET 
+          name=?, lat=?, lng=?, radius=?, description=?, photoUrl=?, youtubeUrl=?, ar_image_url=?, points=?, 
+          task_type=?, options=?, correct_answer=?,
+          type=?, quest_chain_id=?, quest_order=?, time_limit_start=?, time_limit_end=?, max_participants=?,
+          required_item_id=?, reward_item_id=?, is_final_step=?, ar_model_id=?,
+          ar_order_model=?, ar_order_image=?, ar_order_youtube=?, bgm_url=?
+         WHERE id=?`,
+        [
+          name, lat, lng, radius, description, photoUrl, youtubeUrl || null, ar_image_url || null, pts, 
+          tType, opts, correct_answer || null, 
+          mainType, qId, qOrder, tStart, tEnd, maxP,
+          reqItemId, rewItemId, isFinal, arModelId,
+          orderModel, orderImage, orderYoutube, bgmUrlValue,
+          id
+        ]
+      );
+    } else {
+      await conn.execute(
+        `UPDATE tasks SET 
+          name=?, lat=?, lng=?, radius=?, description=?, photoUrl=?, youtubeUrl=?, ar_image_url=?, points=?, 
+          task_type=?, options=?, correct_answer=?,
+          type=?, quest_chain_id=?, quest_order=?, time_limit_start=?, time_limit_end=?, max_participants=?,
+          required_item_id=?, reward_item_id=?, is_final_step=?, ar_model_id=?,
+          ar_order_model=?, ar_order_image=?, ar_order_youtube=?
+         WHERE id=?`,
+        [
+          name, lat, lng, radius, description, photoUrl, youtubeUrl || null, ar_image_url || null, pts, 
+          tType, opts, correct_answer || null, 
+          mainType, qId, qOrder, tStart, tEnd, maxP,
+          reqItemId, rewItemId, isFinal, arModelId,
+          orderModel, orderImage, orderYoutube,
+          id
+        ]
+      );
+    }
     res.json({ success: true, message: '更新成功' });
   } catch (err) {
     console.error(err);
@@ -3017,6 +3071,13 @@ if (process.env.NODE_ENV !== 'production') {
                 await conn.execute(`ALTER TABLE tasks ADD COLUMN ${col} INT DEFAULT NULL`);
                 console.log(`✅ 資料庫遷移: tasks 表已新增 ${col}`);
             }
+        }
+
+        // 6. 新增背景音樂欄位 (tasks 表)
+        const [bgmCols] = await conn.execute("SHOW COLUMNS FROM tasks LIKE 'bgm_url'");
+        if (bgmCols.length === 0) {
+            await conn.execute("ALTER TABLE tasks ADD COLUMN bgm_url VARCHAR(512) DEFAULT NULL");
+            console.log('✅ 資料庫遷移: tasks 表已新增 bgm_url');
         }
 
         // 5. 建立推送訂閱表

@@ -248,6 +248,20 @@
                 <input class="form-input" type="text" name="youtubeUrl" placeholder="https://youtu.be/..." />
                 <small style="color:#666;">將在 AR 中播放影片</small>
               </div>
+
+              <!-- 背景音樂 -->
+              <div style="margin-top:15px; padding:10px; background:white; border-radius:6px; border:1px solid #ddd;">
+                <label class="form-label" style="margin-bottom:8px;">🎵 背景音樂 (到達任務地點後自動播放)</label>
+                <div style="display:flex; gap:10px; align-items:center; margin-bottom:8px;">
+                  <input class="form-input" type="file" name="bgmFile" id="bgmFileInput" accept="audio/*" style="flex:1; padding:5px;" />
+                  <button type="button" id="uploadBgmBtn" class="btn btn-sm" style="background:#007bff; color:white; padding:8px 16px; border:none; border-radius:4px; cursor:pointer;">上傳</button>
+                </div>
+                <input class="form-input" type="text" name="bgm_url" id="bgmUrlInput" placeholder="或直接輸入音樂 URL (例如: /audio/task1.mp3)" style="margin-top:8px;" />
+                <div id="bgmPreview" style="margin-top:8px; display:none;">
+                  <audio id="bgmPreviewAudio" controls style="width:100%; max-width:400px;"></audio>
+                </div>
+                <small style="color:#666;">支援 MP3, WAV, OGG 等格式。到達任務地點後會自動播放。</small>
+              </div>
             </div>
             
             <button type="submit" class="btn btn-primary w-100">新增任務</button>
@@ -509,6 +523,20 @@
                 </div>
                 <input class="form-input" type="text" name="youtubeUrl" placeholder="https://youtu.be/..." />
                 <small style="color:#666;">將在 AR 中播放影片</small>
+              </div>
+
+              <!-- 背景音樂 (編輯) -->
+              <div style="margin-top:15px; padding:10px; background:white; border-radius:6px; border:1px solid #ddd;">
+                <label class="form-label" style="margin-bottom:8px;">🎵 背景音樂 (到達任務地點後自動播放)</label>
+                <div style="display:flex; gap:10px; align-items:center; margin-bottom:8px;">
+                  <input class="form-input" type="file" name="editBgmFile" id="editBgmFileInput" accept="audio/*" style="flex:1; padding:5px;" />
+                  <button type="button" id="editUploadBgmBtn" class="btn btn-sm" style="background:#007bff; color:white; padding:8px 16px; border:none; border-radius:4px; cursor:pointer;">上傳</button>
+                </div>
+                <input class="form-input" type="text" name="bgm_url" id="editBgmUrlInput" placeholder="或直接輸入音樂 URL (例如: /audio/task1.mp3)" style="margin-top:8px;" />
+                <div id="editBgmPreview" style="margin-top:8px; display:none;">
+                  <audio id="editBgmPreviewAudio" controls style="width:100%; max-width:400px;"></audio>
+                </div>
+                <small style="color:#666;">支援 MP3, WAV, OGG 等格式。到達任務地點後會自動播放。</small>
               </div>
             </div>
             
