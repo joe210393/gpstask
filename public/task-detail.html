@@ -689,6 +689,7 @@
               const res = await fetch(`${API_BASE}/api/user-tasks/${userTaskId}/answer`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({ answer: val })
               });
               const data = await res.json();
