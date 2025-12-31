@@ -97,8 +97,8 @@ const corsOptions = {
     }
   },
   credentials: true, // 允許 cookies
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-username'],
   maxAge: 86400 // 預檢請求快取 24 小時
 };
 
@@ -418,8 +418,9 @@ app.post('/api/login', async (req, res) => {
       res.cookie('token', token, {
         httpOnly: true, // 防止 XSS 攻擊
         secure: process.env.NODE_ENV === 'production', // 生產環境使用 HTTPS
-        sameSite: 'strict', // 防止 CSRF 攻擊
-        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 天
+        sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax', // 開發環境使用 lax 以支持跨域
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 天
+        path: '/' // 確保 cookie 在所有路徑下都可用
       });
 
       // 返回用戶信息（不包含敏感數據）
