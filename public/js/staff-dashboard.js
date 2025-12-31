@@ -1280,27 +1280,77 @@ document.getElementById('editTaskForm').addEventListener('submit', async functio
       }
     }
     
-    // 如果有上傳新的背景音樂，先上傳
+    // 如果有上傳新的背景音樂，先上傳 - 使用 XMLHttpRequest 追蹤進度
     if (editBgmFile) {
       try {
         document.getElementById('editTaskMsg').textContent = '背景音樂上傳中...';
-        const bgmFd = new FormData();
-        bgmFd.append('audio', editBgmFile); // 使用音頻上傳 API
-        const bgmUploadRes = await fetch(`${API_BASE}/api/upload-audio`, {
-          method: 'POST',
-          headers: { 'x-username': loginUser.username },
-          body: bgmFd,
-          credentials: 'include'
-        });
-        const bgmUploadData = await bgmUploadRes.json();
-        if (bgmUploadData.success) {
-          bgmUrl = bgmUploadData.url;
-        } else {
-          document.getElementById('editTaskMsg').textContent = '背景音樂上傳失敗: ' + (bgmUploadData.message || '未知錯誤');
-          return;
+        
+        // 顯示進度條（如果存在）
+        const editBgmUploadProgress = document.getElementById('editBgmUploadProgress');
+        const editBgmUploadProgressBar = document.getElementById('editBgmUploadProgressBar');
+        const editBgmUploadPercent = document.getElementById('editBgmUploadPercent');
+        if (editBgmUploadProgress) {
+          editBgmUploadProgress.style.display = 'block';
+          editBgmUploadProgressBar.style.width = '0%';
+          editBgmUploadPercent.textContent = '0%';
         }
+        
+        const bgmFd = new FormData();
+        bgmFd.append('audio', editBgmFile);
+        
+        await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          
+          // 追蹤上傳進度
+          xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable && editBgmUploadProgress) {
+              const percentComplete = Math.round((e.loaded / e.total) * 100);
+              editBgmUploadProgressBar.style.width = percentComplete + '%';
+              editBgmUploadPercent.textContent = percentComplete + '%';
+            }
+          });
+          
+          // 上傳完成
+          xhr.addEventListener('load', () => {
+            if (xhr.status === 200) {
+              try {
+                const bgmUploadData = JSON.parse(xhr.responseText);
+                if (bgmUploadData.success) {
+                  bgmUrl = bgmUploadData.url;
+                  if (editBgmUploadProgress) editBgmUploadProgress.style.display = 'none';
+                  resolve();
+                } else {
+                  if (editBgmUploadProgress) editBgmUploadProgress.style.display = 'none';
+                  document.getElementById('editTaskMsg').textContent = '背景音樂上傳失敗: ' + (bgmUploadData.message || '未知錯誤');
+                  reject(new Error(bgmUploadData.message || '上傳失敗'));
+                }
+              } catch (err) {
+                if (editBgmUploadProgress) editBgmUploadProgress.style.display = 'none';
+                document.getElementById('editTaskMsg').textContent = '背景音樂上傳失敗: 解析回應錯誤';
+                reject(err);
+              }
+            } else {
+              if (editBgmUploadProgress) editBgmUploadProgress.style.display = 'none';
+              document.getElementById('editTaskMsg').textContent = '背景音樂上傳失敗: HTTP ' + xhr.status;
+              reject(new Error('HTTP ' + xhr.status));
+            }
+          });
+          
+          // 上傳錯誤
+          xhr.addEventListener('error', () => {
+            if (editBgmUploadProgress) editBgmUploadProgress.style.display = 'none';
+            document.getElementById('editTaskMsg').textContent = '背景音樂上傳失敗: 網路連線失敗';
+            reject(new Error('網路連線失敗'));
+          });
+          
+          // 發送請求
+          xhr.open('POST', `${API_BASE}/api/upload-audio`);
+          xhr.setRequestHeader('x-username', loginUser.username);
+          xhr.withCredentials = true;
+          xhr.send(bgmFd);
+        });
       } catch (err) {
-        document.getElementById('editTaskMsg').textContent = '背景音樂上傳錯誤';
+        document.getElementById('editTaskMsg').textContent = '背景音樂上傳錯誤: ' + err.message;
         return;
       }
     }
@@ -1377,97 +1427,183 @@ if (editPhotoInput) {
   });
 }
 
-// 背景音樂上傳按鈕事件處理
+// 背景音樂上傳按鈕事件處理（使用 XMLHttpRequest 追蹤進度）
 const uploadBgmBtn = document.getElementById('uploadBgmBtn');
 if (uploadBgmBtn) {
-  uploadBgmBtn.addEventListener('click', async () => {
+  uploadBgmBtn.addEventListener('click', () => {
     const bgmFileInput = document.getElementById('bgmFileInput');
     const bgmUrlInput = document.getElementById('bgmUrlInput');
     const bgmPreview = document.getElementById('bgmPreview');
     const bgmPreviewAudio = document.getElementById('bgmPreviewAudio');
+    const bgmUploadProgress = document.getElementById('bgmUploadProgress');
+    const bgmUploadProgressBar = document.getElementById('bgmUploadProgressBar');
+    const bgmUploadPercent = document.getElementById('bgmUploadPercent');
     
     if (!bgmFileInput.files[0]) {
       alert('請先選擇音樂文件');
       return;
     }
     
-    try {
-      uploadBgmBtn.disabled = true;
-      uploadBgmBtn.textContent = '上傳中...';
-      
-      const fd = new FormData();
-      fd.append('audio', bgmFileInput.files[0]); // 使用音頻上傳 API
-      
-      const res = await fetch(`${API_BASE}/api/upload-audio`, {
-        method: 'POST',
-        headers: { 'x-username': loginUser.username },
-        body: fd,
-        credentials: 'include'
-      });
-      
-      const data = await res.json();
-      if (data.success) {
-        bgmUrlInput.value = data.url;
-        bgmPreview.style.display = 'block';
-        bgmPreviewAudio.src = data.url;
-        alert('音樂上傳成功！');
-      } else {
-        alert('上傳失敗: ' + (data.message || '未知錯誤'));
+    const file = bgmFileInput.files[0];
+    const fd = new FormData();
+    fd.append('audio', file);
+    
+    const xhr = new XMLHttpRequest();
+    
+    // 顯示進度條
+    bgmUploadProgress.style.display = 'block';
+    bgmUploadProgressBar.style.width = '0%';
+    bgmUploadPercent.textContent = '0%';
+    uploadBgmBtn.disabled = true;
+    uploadBgmBtn.textContent = '上傳中...';
+    
+    // 追蹤上傳進度
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable) {
+        const percentComplete = Math.round((e.loaded / e.total) * 100);
+        bgmUploadProgressBar.style.width = percentComplete + '%';
+        bgmUploadPercent.textContent = percentComplete + '%';
       }
-    } catch (err) {
-      console.error(err);
-      alert('上傳錯誤');
-    } finally {
+    });
+    
+    // 上傳完成
+    xhr.addEventListener('load', () => {
+      if (xhr.status === 200) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (data.success) {
+            bgmUrlInput.value = data.url;
+            bgmPreview.style.display = 'block';
+            bgmPreviewAudio.src = data.url;
+            bgmUploadProgress.style.display = 'none';
+            alert('音樂上傳成功！');
+          } else {
+            bgmUploadProgress.style.display = 'none';
+            alert('上傳失敗: ' + (data.message || '未知錯誤'));
+          }
+        } catch (err) {
+          console.error(err);
+          bgmUploadProgress.style.display = 'none';
+          alert('解析回應失敗');
+        }
+      } else {
+        bgmUploadProgress.style.display = 'none';
+        alert('上傳失敗: HTTP ' + xhr.status);
+      }
       uploadBgmBtn.disabled = false;
       uploadBgmBtn.textContent = '上傳';
-    }
+    });
+    
+    // 上傳錯誤
+    xhr.addEventListener('error', () => {
+      bgmUploadProgress.style.display = 'none';
+      alert('上傳錯誤：網路連線失敗');
+      uploadBgmBtn.disabled = false;
+      uploadBgmBtn.textContent = '上傳';
+    });
+    
+    // 上傳中止
+    xhr.addEventListener('abort', () => {
+      bgmUploadProgress.style.display = 'none';
+      uploadBgmBtn.disabled = false;
+      uploadBgmBtn.textContent = '上傳';
+    });
+    
+    // 發送請求
+    xhr.open('POST', `${API_BASE}/api/upload-audio`);
+    xhr.setRequestHeader('x-username', loginUser.username);
+    xhr.withCredentials = true; // 發送 cookies
+    xhr.send(fd);
   });
 }
 
-// 編輯表單背景音樂上傳按鈕事件處理
+// 編輯表單背景音樂上傳按鈕事件處理（使用 XMLHttpRequest 追蹤進度）
 const editUploadBgmBtn = document.getElementById('editUploadBgmBtn');
 if (editUploadBgmBtn) {
-  editUploadBgmBtn.addEventListener('click', async () => {
+  editUploadBgmBtn.addEventListener('click', () => {
     const editBgmFileInput = document.getElementById('editBgmFileInput');
     const editBgmUrlInput = document.getElementById('editBgmUrlInput');
     const editBgmPreview = document.getElementById('editBgmPreview');
     const editBgmPreviewAudio = document.getElementById('editBgmPreviewAudio');
+    const editBgmUploadProgress = document.getElementById('editBgmUploadProgress');
+    const editBgmUploadProgressBar = document.getElementById('editBgmUploadProgressBar');
+    const editBgmUploadPercent = document.getElementById('editBgmUploadPercent');
     
     if (!editBgmFileInput.files[0]) {
       alert('請先選擇音樂文件');
       return;
     }
     
-    try {
-      editUploadBgmBtn.disabled = true;
-      editUploadBgmBtn.textContent = '上傳中...';
-      
-      const fd = new FormData();
-      fd.append('audio', editBgmFileInput.files[0]); // 使用音頻上傳 API
-      
-      const res = await fetch(`${API_BASE}/api/upload-audio`, {
-        method: 'POST',
-        headers: { 'x-username': loginUser.username },
-        body: fd,
-        credentials: 'include'
-      });
-      
-      const data = await res.json();
-      if (data.success) {
-        editBgmUrlInput.value = data.url;
-        editBgmPreview.style.display = 'block';
-        editBgmPreviewAudio.src = data.url;
-        alert('音樂上傳成功！');
-      } else {
-        alert('上傳失敗: ' + (data.message || '未知錯誤'));
+    const file = editBgmFileInput.files[0];
+    const fd = new FormData();
+    fd.append('audio', file);
+    
+    const xhr = new XMLHttpRequest();
+    
+    // 顯示進度條
+    editBgmUploadProgress.style.display = 'block';
+    editBgmUploadProgressBar.style.width = '0%';
+    editBgmUploadPercent.textContent = '0%';
+    editUploadBgmBtn.disabled = true;
+    editUploadBgmBtn.textContent = '上傳中...';
+    
+    // 追蹤上傳進度
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable) {
+        const percentComplete = Math.round((e.loaded / e.total) * 100);
+        editBgmUploadProgressBar.style.width = percentComplete + '%';
+        editBgmUploadPercent.textContent = percentComplete + '%';
       }
-    } catch (err) {
-      console.error(err);
-      alert('上傳錯誤');
-    } finally {
+    });
+    
+    // 上傳完成
+    xhr.addEventListener('load', () => {
+      if (xhr.status === 200) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (data.success) {
+            editBgmUrlInput.value = data.url;
+            editBgmPreview.style.display = 'block';
+            editBgmPreviewAudio.src = data.url;
+            editBgmUploadProgress.style.display = 'none';
+            alert('音樂上傳成功！');
+          } else {
+            editBgmUploadProgress.style.display = 'none';
+            alert('上傳失敗: ' + (data.message || '未知錯誤'));
+          }
+        } catch (err) {
+          console.error(err);
+          editBgmUploadProgress.style.display = 'none';
+          alert('解析回應失敗');
+        }
+      } else {
+        editBgmUploadProgress.style.display = 'none';
+        alert('上傳失敗: HTTP ' + xhr.status);
+      }
       editUploadBgmBtn.disabled = false;
       editUploadBgmBtn.textContent = '上傳';
-    }
+    });
+    
+    // 上傳錯誤
+    xhr.addEventListener('error', () => {
+      editBgmUploadProgress.style.display = 'none';
+      alert('上傳錯誤：網路連線失敗');
+      editUploadBgmBtn.disabled = false;
+      editUploadBgmBtn.textContent = '上傳';
+    });
+    
+    // 上傳中止
+    xhr.addEventListener('abort', () => {
+      editBgmUploadProgress.style.display = 'none';
+      editUploadBgmBtn.disabled = false;
+      editUploadBgmBtn.textContent = '上傳';
+    });
+    
+    // 發送請求
+    xhr.open('POST', `${API_BASE}/api/upload-audio`);
+    xhr.setRequestHeader('x-username', loginUser.username);
+    xhr.withCredentials = true; // 發送 cookies
+    xhr.send(fd);
   });
 }
 
