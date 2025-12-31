@@ -164,7 +164,9 @@
     if (!id) {
       taskDetailEl.innerHTML = '<div class="text-center text-danger">未指定任務 ID</div>';
     } else {
-      fetch(`${API_BASE}/api/tasks/${id}`)
+      fetch(`${API_BASE}/api/tasks/${id}`, {
+        credentials: 'include'
+      })
         .then(res => res.json())
         .then(data => {
           if (!data.success || !data.task) {
@@ -223,7 +225,9 @@
           }
 
           if (loginUser && loginUser.username) {
-            fetch(`${API_BASE}/api/user-tasks/all?username=${encodeURIComponent(loginUser.username)}`)
+            fetch(`${API_BASE}/api/user-tasks/all?username=${encodeURIComponent(loginUser.username)}`, {
+              credentials: 'include'
+            })
               .then(res => res.json())
               .then(udata => {
                 if (udata.success && Array.isArray(udata.tasks)) {
@@ -238,7 +242,8 @@
                     if (t.type === 'quest' && t.quest_chain_id && t.quest_order) {
                       // 獲取劇情進度
                       fetch(`${API_BASE}/api/user/quest-progress`, {
-                        headers: { 'x-username': loginUser.username }
+                        headers: { 'x-username': loginUser.username },
+                        credentials: 'include'
                       })
                       .then(res => res.json())
                       .then(progressData => {
@@ -327,6 +332,7 @@
             fetch(`${API_BASE}/api/user-tasks`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
               body: JSON.stringify({ username: loginUser.username, task_id: t.id })
             })
             .then(res => res.json())
@@ -335,7 +341,9 @@
                 taskMsgEl.textContent = '任務進行中！';
                 taskMsgEl.style.color = 'var(--primary-color)';
                 startTaskBtn.disabled = true;
-                fetch(`${API_BASE}/api/user-tasks/all?username=${encodeURIComponent(loginUser.username)}`)
+                fetch(`${API_BASE}/api/user-tasks/all?username=${encodeURIComponent(loginUser.username)}`, {
+                  credentials: 'include'
+                })
                   .then(res => res.json())
                   .then(udata => {
                     if (udata.success && Array.isArray(udata.tasks)) {
