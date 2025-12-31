@@ -267,7 +267,7 @@ const storage = multer.diskStorage({
   }
 });
 
-// 共享的檔案類型過濾器
+// 共享的檔案類型過濾器（圖片和 3D 模型）
 const fileFilter = (req, file, cb) => {
   const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.glb', '.gltf'];
   const fileExtension = path.extname(file.originalname).toLowerCase();
@@ -276,6 +276,18 @@ const fileFilter = (req, file, cb) => {
     cb(null, true);
   } else {
     cb(new Error('不支援的檔案類型。只允許 JPG, PNG, GIF, WebP, GLB, GLTF。'), false);
+  }
+};
+
+// 音頻文件過濾器
+const audioFileFilter = (req, file, cb) => {
+  const allowedExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac', '.webm'];
+  const fileExtension = path.extname(file.originalname).toLowerCase();
+
+  if (allowedExtensions.includes(fileExtension)) {
+    cb(null, true);
+  } else {
+    cb(new Error('不支援的檔案類型。只允許 MP3, WAV, OGG, M4A, AAC, FLAC, WebM。'), false);
   }
 };
 
@@ -297,6 +309,16 @@ const uploadModel = multer({
     files: 1
   },
   fileFilter: fileFilter
+});
+
+// 音頻文件上傳配置（100MB 限制）- 用於背景音樂上傳
+const uploadAudio = multer({
+  storage: storage,
+  limits: {
+    fileSize: 100 * 1024 * 1024, // 100MB 限制 (為了支援高品質音頻)
+    files: 1
+  },
+  fileFilter: audioFileFilter
 });
 
 // 向後兼容：保留 upload 作為 uploadImage 的別名（用於舊代碼）
@@ -1170,7 +1192,7 @@ app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
   }
 });
 
-// 安全的檔案上傳 API
+// 安全的檔案上傳 API（圖片，5MB 限制）
 app.post('/api/upload', authenticateToken, requireRole('user', 'shop', 'admin'), (req, res) => {
   // 使用一般圖片上傳配置（5MB 限制）
   uploadImage.single('photo')(req, res, (err) => {
@@ -1203,6 +1225,42 @@ app.post('/api/upload', authenticateToken, requireRole('user', 'shop', 'admin'),
     const imageUrl = '/images/' + req.file.filename;
     console.log(`✅ 檔案上傳成功: ${req.file.originalname} -> ${req.file.filename}`);
     res.json({ success: true, url: imageUrl, filename: req.file.filename });
+  });
+});
+
+// 音頻文件上傳 API（100MB 限制）
+app.post('/api/upload-audio', authenticateToken, requireRole('shop', 'admin'), (req, res) => {
+  // 使用音頻上傳配置（100MB 限制）
+  uploadAudio.single('audio')(req, res, (err) => {
+    if (err) {
+      // 處理上傳錯誤
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ success: false, message: '檔案大小超過 100MB 限制' });
+        }
+        if (err.code === 'LIMIT_FILE_COUNT') {
+          return res.status(400).json({ success: false, message: '一次只能上傳一個檔案' });
+        }
+      }
+
+      // 處理自定義錯誤（檔案類型不支援）
+      if (err.message.includes('不支援的檔案類型')) {
+        return res.status(400).json({ success: false, message: err.message });
+      }
+
+      // 其他錯誤
+      console.error('音頻上傳錯誤:', err);
+      return res.status(500).json({ success: false, message: '音頻上傳失敗' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: '未選擇檔案' });
+    }
+
+    // 回傳安全的音頻路徑（使用新的檔案名稱）
+    const audioUrl = '/images/' + req.file.filename;
+    console.log(`✅ 音頻上傳成功: ${req.file.originalname} -> ${req.file.filename}`);
+    res.json({ success: true, url: audioUrl, filename: req.file.filename });
   });
 });
 

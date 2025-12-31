@@ -329,34 +329,34 @@
     }
 
     function createRedemptionCard(redemption, status) {
-      const card = document.createElement('div');
-      card.style.background = 'white';
-      card.style.borderRadius = '0.8rem';
-      card.style.padding = '1.2rem';
-      card.style.marginBottom = '1rem';
-      card.style.boxShadow = 'var(--shadow-sm)';
-      card.style.borderLeft = '4px solid #e5e7eb';
+        const card = document.createElement('div');
+        card.style.background = 'white';
+        card.style.borderRadius = '0.8rem';
+        card.style.padding = '1.2rem';
+        card.style.marginBottom = '1rem';
+        card.style.boxShadow = 'var(--shadow-sm)';
+        card.style.borderLeft = '4px solid #e5e7eb';
       card.style.display = 'flex';
       card.style.gap = '1rem';
       card.style.alignItems = 'flex-start';
 
-      let statusText = '狀態未知';
-      let statusColor = '#6b7280';
-      
+        let statusText = '狀態未知';
+        let statusColor = '#6b7280';
+        
       switch(status) {
-        case 'pending': 
-          statusText = '處理中'; 
-          statusColor = '#f59e0b'; 
-          break;
-        case 'completed': 
-          statusText = '已完成'; 
-          statusColor = '#10b981'; 
-          break;
-        case 'cancelled': 
-          statusText = '已取消'; 
-          statusColor = '#ef4444'; 
-          break;
-      }
+          case 'pending': 
+            statusText = '處理中'; 
+            statusColor = '#f59e0b'; 
+            break;
+          case 'completed': 
+            statusText = '已完成'; 
+            statusColor = '#10b981'; 
+            break;
+          case 'cancelled': 
+            statusText = '已取消'; 
+            statusColor = '#ef4444'; 
+            break;
+        }
       card.style.borderLeftColor = statusColor;
 
       // 商品圖片
@@ -371,7 +371,7 @@
         redeemAgainBtn = `<button class="btn btn-sm btn-outline-primary" onclick="redeemProductAgain(${redemption.product_id}, '${redemption.product_name}')" style="margin-top:0.5rem; font-size:0.85rem; padding:0.4rem 0.8rem;">🔄 再次兌換</button>`;
       }
 
-      card.innerHTML = `
+        card.innerHTML = `
         ${imageHtml}
         <div style="flex:1; min-width:0;">
           <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.5rem;">
@@ -406,7 +406,7 @@
               redeemProduct(productId, product.points_required, product.stock);
             } else {
               alert('找不到該商品');
-            }
+    }
           } else {
             alert('載入商品資訊失敗');
           }

@@ -1396,9 +1396,9 @@ if (uploadBgmBtn) {
       uploadBgmBtn.textContent = '上傳中...';
       
       const fd = new FormData();
-      fd.append('photo', bgmFileInput.files[0]); // 使用相同的上傳 API
+      fd.append('audio', bgmFileInput.files[0]); // 使用音頻上傳 API
       
-      const res = await fetch(`${API_BASE}/api/upload`, {
+      const res = await fetch(`${API_BASE}/api/upload-audio`, {
         method: 'POST',
         headers: { 'x-username': loginUser.username },
         body: fd,
@@ -1443,9 +1443,9 @@ if (editUploadBgmBtn) {
       editUploadBgmBtn.textContent = '上傳中...';
       
       const fd = new FormData();
-      fd.append('photo', editBgmFileInput.files[0]); // 使用相同的上傳 API
+      fd.append('audio', editBgmFileInput.files[0]); // 使用音頻上傳 API
       
-      const res = await fetch(`${API_BASE}/api/upload`, {
+      const res = await fetch(`${API_BASE}/api/upload-audio`, {
         method: 'POST',
         headers: { 'x-username': loginUser.username },
         body: fd,
