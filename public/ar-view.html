@@ -255,6 +255,88 @@
         @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
         #guide-arrow { position: absolute; top: 50%; left: 50%; width: 60px; height: 60px; margin-left: -30px; margin-top: -30px; display: none; }
         #guide-arrow::after { content: ''; display: block; width: 100%; height: 100%; border-top: 10px solid #ff3b30; border-right: 10px solid #ff3b30; transform: rotate(45deg); box-shadow: 2px -2px 2px rgba(0,0,0,0.2); }
+        
+        /* 背景音樂控制 */
+        #bgm-controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: flex-end;
+            pointer-events: auto;
+        }
+        #bgm-toggle-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
+        #bgm-toggle-btn:hover {
+            background: rgba(0, 0, 0, 0.9);
+            transform: scale(1.1);
+        }
+        #bgm-toggle-btn.playing {
+            background: rgba(34, 197, 94, 0.8);
+        }
+        #bgm-volume-control {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 12px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+        }
+        #bgm-volume-control.show {
+            display: flex;
+        }
+        #bgm-volume-slider {
+            width: 100px;
+            height: 4px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 2px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        #bgm-volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: white;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        #bgm-volume-slider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: white;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+        #bgm-volume-label {
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        #bgm-audio {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -320,6 +402,16 @@
         </div>
     </div>
     
+    <!-- 背景音樂控制 -->
+    <div id="bgm-controls">
+        <button id="bgm-toggle-btn" title="背景音樂">🎵</button>
+        <div id="bgm-volume-control">
+            <input type="range" id="bgm-volume-slider" min="0" max="100" value="50">
+            <div id="bgm-volume-label">音量: 50%</div>
+        </div>
+    </div>
+    <audio id="bgm-audio" loop preload="auto"></audio>
+    
     <div class="ui-layer">
         <div id="start-overlay" style="position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:2000; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white; pointer-events:auto;">
             <div style="font-size:1.5rem; font-weight:bold; margin-bottom:20px; text-align:center;">準備好了嗎？</div>
@@ -343,6 +435,119 @@
         let is3DMode = false;
         let gpsLocked = false;
         window.rotationMode = false; // 旋轉模式開關（全局變量，供組件使用）
+        
+        // === 背景音樂控制 ===
+        const bgmAudio = document.getElementById('bgm-audio');
+        const bgmToggleBtn = document.getElementById('bgm-toggle-btn');
+        const bgmVolumeControl = document.getElementById('bgm-volume-control');
+        const bgmVolumeSlider = document.getElementById('bgm-volume-slider');
+        const bgmVolumeLabel = document.getElementById('bgm-volume-label');
+        let bgmIsPlaying = false;
+        
+        // 初始化音樂音量
+        bgmAudio.volume = 0.5; // 預設 50% 音量
+        bgmVolumeSlider.value = 50;
+        
+        // 音樂播放/暫停切換
+        bgmToggleBtn.addEventListener('click', () => {
+            if (bgmIsPlaying) {
+                bgmAudio.pause();
+                bgmToggleBtn.textContent = '🎵';
+                bgmToggleBtn.classList.remove('playing');
+                bgmIsPlaying = false;
+            } else {
+                // 如果音樂 URL 存在，嘗試播放
+                if (bgmAudio.src) {
+                    bgmAudio.play().catch(err => {
+                        console.warn('音樂播放失敗:', err);
+                        // 某些瀏覽器需要用戶交互才能播放音頻
+                        showToast('請點擊頁面任意位置以啟用音樂播放', 3000);
+                    });
+                    bgmToggleBtn.textContent = '🔊';
+                    bgmToggleBtn.classList.add('playing');
+                    bgmIsPlaying = true;
+                } else {
+                    showToast('此任務沒有背景音樂', 2000);
+                }
+            }
+        });
+        
+        // 音量控制
+        bgmVolumeSlider.addEventListener('input', (e) => {
+            const volume = e.target.value / 100;
+            bgmAudio.volume = volume;
+            bgmVolumeLabel.textContent = `音量: ${e.target.value}%`;
+        });
+        
+        // 顯示/隱藏音量控制
+        bgmToggleBtn.addEventListener('longpress', () => {
+            bgmVolumeControl.classList.toggle('show');
+        });
+        
+        // 長按檢測（用於顯示音量控制）
+        let longPressTimer;
+        bgmToggleBtn.addEventListener('mousedown', () => {
+            longPressTimer = setTimeout(() => {
+                bgmVolumeControl.classList.toggle('show');
+            }, 500);
+        });
+        bgmToggleBtn.addEventListener('mouseup', () => {
+            clearTimeout(longPressTimer);
+        });
+        bgmToggleBtn.addEventListener('mouseleave', () => {
+            clearTimeout(longPressTimer);
+        });
+        bgmToggleBtn.addEventListener('touchstart', () => {
+            longPressTimer = setTimeout(() => {
+                bgmVolumeControl.classList.toggle('show');
+            }, 500);
+        });
+        bgmToggleBtn.addEventListener('touchend', () => {
+            clearTimeout(longPressTimer);
+        });
+        
+        // 載入任務音樂（如果任務有配置音樂 URL）
+        function loadTaskBGM(task) {
+            // 優先使用任務配置的音樂 URL（如果未來添加此欄位）
+            // 例如：task.bgm_url 或 task.audio_url
+            const musicUrl = task?.bgm_url || task?.audio_url || null;
+            
+            if (musicUrl) {
+                bgmAudio.src = musicUrl;
+                bgmAudio.load();
+                console.log('✅ 已載入任務背景音樂:', musicUrl);
+            } else {
+                // 如果沒有配置音樂，可以設置默認音樂或保持靜音
+                // 這裡先清空，用戶可以手動添加音樂
+                bgmAudio.src = '';
+                console.log('ℹ️ 此任務沒有配置背景音樂');
+            }
+        }
+        
+        // 音樂播放狀態監聽
+        bgmAudio.addEventListener('play', () => {
+            bgmIsPlaying = true;
+            bgmToggleBtn.textContent = '🔊';
+            bgmToggleBtn.classList.add('playing');
+        });
+        
+        bgmAudio.addEventListener('pause', () => {
+            bgmIsPlaying = false;
+            bgmToggleBtn.textContent = '🎵';
+            bgmToggleBtn.classList.remove('playing');
+        });
+        
+        bgmAudio.addEventListener('ended', () => {
+            // 如果設置了 loop，這個事件不會觸發
+            bgmIsPlaying = false;
+            bgmToggleBtn.textContent = '🎵';
+            bgmToggleBtn.classList.remove('playing');
+        });
+        
+        bgmAudio.addEventListener('error', (e) => {
+            console.error('音樂載入錯誤:', e);
+            showToast('音樂載入失敗', 2000);
+        });
         
         // === 自定義旋轉控制組件 ===
         AFRAME.registerComponent('rotation-control', {
@@ -724,6 +929,8 @@
                         const task = data.task;
                         currentTask = task;
                         window.currentTask = task;
+                        // 載入任務背景音樂
+                        loadTaskBGM(task);
                         
                         // 解析 AR 多步驟順序
                         arSteps = [];
@@ -1835,7 +2042,19 @@
                     }
                     status.innerText = '啟動相機畫面...';
                     video.srcObject = stream;
-                    video.onloadedmetadata = () => { video.play(); };
+                    video.onloadedmetadata = () => { 
+                        video.play();
+                        // AR 啟動後，如果音樂已載入，自動嘗試播放（需要用戶交互）
+                        if (bgmAudio.src && !bgmIsPlaying) {
+                            // 延遲一點播放，確保用戶交互已完成
+                            setTimeout(() => {
+                                bgmAudio.play().catch(err => {
+                                    // 如果自動播放失敗（需要用戶交互），不顯示錯誤
+                                    console.log('音樂需要用戶手動播放');
+                                });
+                            }, 500);
+                        }
+                    };
                 }
             })
             .catch(err => { 
