@@ -1111,8 +1111,8 @@ document.getElementById('addTaskForm').addEventListener('submit', async function
     if (bgmFile) {
       document.getElementById('addTaskMsg').textContent = '背景音樂上傳中...';
       const bgmFd = new FormData();
-      bgmFd.append('photo', bgmFile); // 使用相同的上傳 API
-      const bgmUploadRes = await fetch(`${API_BASE}/api/upload`, {
+      bgmFd.append('audio', bgmFile); // 使用音頻上傳 API
+      const bgmUploadRes = await fetch(`${API_BASE}/api/upload-audio`, {
         method: 'POST',
         headers: { 'x-username': loginUser.username },
         body: bgmFd,
