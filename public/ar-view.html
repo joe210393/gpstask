@@ -2034,6 +2034,16 @@
                     if (btnRotation) {
                         btnRotation.style.display = 'block';
                     }
+                    
+                    // AR 啟動後，如果音樂已載入，自動嘗試播放（需要用戶交互）
+                    if (bgmAudio.src && !bgmIsPlaying) {
+                        setTimeout(() => {
+                            bgmAudio.play().catch(err => {
+                                // 如果自動播放失敗（需要用戶交互），不顯示錯誤
+                                console.log('音樂需要用戶手動播放');
+                            });
+                        }, 500);
+                    }
                 } else {
                     // 隱藏旋轉模式按鈕（非 3D 模式）
                     const btnRotation = document.getElementById('btn-rotation-mode');
