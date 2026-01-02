@@ -2963,7 +2963,13 @@ app.get('/api/admin/users', adminAuth, async (req, res) => {
     });
   } catch (err) {
     console.error('獲取用戶列表失敗:', err);
-    res.status(500).json({ success: false, message: '伺服器錯誤' });
+    console.error('錯誤詳情:', err.message);
+    console.error('錯誤堆疊:', err.stack);
+    res.status(500).json({ 
+      success: false, 
+      message: '伺服器錯誤',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   } finally {
     if (conn) conn.release();
   }
