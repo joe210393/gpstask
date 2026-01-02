@@ -2927,24 +2927,22 @@ app.get('/api/admin/users', adminAuth, async (req, res) => {
     );
     const totalUsers = totalCount[0].total;
 
-    // 獲取用戶列表 + 統計資訊
+    // 獲取用戶列表 + 統計資訊（使用 JOIN 提高性能）
     const [users] = await conn.execute(`
       SELECT 
         u.id,
         u.username,
         u.role,
         u.created_at,
-        COALESCE(
-          (SELECT 
-            SUM(CASE WHEN pt.type = 'earned' THEN pt.points ELSE 0 END) -
-            SUM(CASE WHEN pt.type = 'spent' THEN pt.points ELSE 0 END)
-           FROM point_transactions pt
-           WHERE pt.user_id = u.id), 0
-        ) as total_points,
-        (SELECT COUNT(*) FROM user_tasks ut WHERE ut.user_id = u.id AND ut.status = '完成') as completed_tasks,
-        (SELECT COUNT(*) FROM user_tasks ut WHERE ut.user_id = u.id AND ut.status = '進行中') as in_progress_tasks
+        COALESCE(SUM(CASE WHEN pt.type = 'earned' THEN pt.points ELSE 0 END), 0) -
+        COALESCE(SUM(CASE WHEN pt.type = 'spent' THEN pt.points ELSE 0 END), 0) as total_points,
+        SUM(CASE WHEN ut.status = '完成' THEN 1 ELSE 0 END) as completed_tasks,
+        SUM(CASE WHEN ut.status = '進行中' THEN 1 ELSE 0 END) as in_progress_tasks
       FROM users u
+      LEFT JOIN point_transactions pt ON pt.user_id = u.id
+      LEFT JOIN user_tasks ut ON ut.user_id = u.id
       WHERE u.role = 'user'
+      GROUP BY u.id, u.username, u.role, u.created_at
       ORDER BY u.id DESC
       LIMIT ? OFFSET ?
     `, [limit, offset]);
