@@ -2992,7 +2992,7 @@ app.get('/api/admin/users/:userId/tasks', adminAuth, async (req, res) => {
     }
 
     // 獲取用戶的所有任務
-    const [tasks] = await conn.execute(`
+    const [tasks] = await conn.query(`
       SELECT 
         ut.id as user_task_id,
         ut.status,
