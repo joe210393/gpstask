@@ -2927,8 +2927,8 @@ app.get('/api/admin/users', adminAuth, async (req, res) => {
     );
     const totalUsers = totalCount[0].total;
 
-    // 獲取用戶列表 + 統計資訊（使用 JOIN 提高性能）
-    const [users] = await conn.execute(`
+    // 獲取用戶列表 + 統計資訊（改用 query 以避免 Prepared Statement 在 LIMIT 參數上的相容性問題）
+    const [users] = await conn.query(`
       SELECT 
         u.id,
         u.username,
