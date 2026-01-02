@@ -10,6 +10,7 @@ const fs = require('fs');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const webpush = require('web-push');
+const XLSX = require('xlsx');
 const { getDbConfig } = require('./db-config');
 
 // JWT 設定
@@ -2902,6 +2903,176 @@ app.get('/api/product-redemptions/admin', staffOrAdminAuth, async (req, res) => 
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+// ===== Admin 會員管理 API =====
+
+// 獲取所有用戶列表（含統計資訊，支持分頁）- 僅 admin
+app.get('/api/admin/users', adminAuth, async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 50;
+  const offset = (page - 1) * limit;
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    // 獲取總用戶數
+    const [totalCount] = await conn.execute(
+      'SELECT COUNT(*) as total FROM users WHERE role = ?',
+      ['user']
+    );
+    const totalUsers = totalCount[0].total;
+
+    // 獲取用戶列表 + 統計資訊
+    const [users] = await conn.execute(`
+      SELECT 
+        u.id,
+        u.username,
+        u.role,
+        u.created_at,
+        COALESCE(
+          (SELECT 
+            SUM(CASE WHEN pt.type = 'earned' THEN pt.points ELSE 0 END) -
+            SUM(CASE WHEN pt.type = 'spent' THEN pt.points ELSE 0 END)
+           FROM point_transactions pt
+           WHERE pt.user_id = u.id), 0
+        ) as total_points,
+        (SELECT COUNT(*) FROM user_tasks ut WHERE ut.user_id = u.id AND ut.status = '完成') as completed_tasks,
+        (SELECT COUNT(*) FROM user_tasks ut WHERE ut.user_id = u.id AND ut.status = '進行中') as in_progress_tasks
+      FROM users u
+      WHERE u.role = 'user'
+      ORDER BY u.id DESC
+      LIMIT ? OFFSET ?
+    `, [limit, offset]);
+
+    const totalPages = Math.ceil(totalUsers / limit);
+
+    res.json({
+      success: true,
+      users,
+      pagination: {
+        page,
+        limit,
+        totalUsers,
+        totalPages
+      }
+    });
+  } catch (err) {
+    console.error('獲取用戶列表失敗:', err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+// 獲取單個用戶的任務詳情 - 僅 admin
+app.get('/api/admin/users/:userId/tasks', adminAuth, async (req, res) => {
+  const { userId } = req.params;
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    // 驗證用戶是否存在且為一般用戶
+    const [userCheck] = await conn.execute(
+      'SELECT id, username FROM users WHERE id = ? AND role = ?',
+      [userId, 'user']
+    );
+
+    if (userCheck.length === 0) {
+      return res.status(404).json({ success: false, message: '用戶不存在' });
+    }
+
+    // 獲取用戶的所有任務
+    const [tasks] = await conn.execute(`
+      SELECT 
+        ut.id as user_task_id,
+        ut.status,
+        ut.started_at,
+        ut.finished_at,
+        ut.answer,
+        t.id as task_id,
+        t.name as task_name,
+        t.points,
+        t.type as task_type
+      FROM user_tasks ut
+      INNER JOIN tasks t ON ut.task_id = t.id
+      WHERE ut.user_id = ?
+      ORDER BY ut.started_at DESC
+    `, [userId]);
+
+    res.json({
+      success: true,
+      user: userCheck[0],
+      tasks
+    });
+  } catch (err) {
+    console.error('獲取用戶任務詳情失敗:', err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+// 導出所有用戶資料為 Excel - 僅 admin
+app.get('/api/admin/users/export', adminAuth, async (req, res) => {
+  let conn;
+  try {
+    conn = await pool.getConnection();
+
+    // 獲取所有用戶 + 統計資訊
+    const [users] = await conn.execute(`
+      SELECT 
+        u.id,
+        u.username,
+        u.role,
+        DATE_FORMAT(u.created_at, '%Y-%m-%d %H:%i:%s') as created_at,
+        COALESCE(
+          (SELECT 
+            SUM(CASE WHEN pt.type = 'earned' THEN pt.points ELSE 0 END) -
+            SUM(CASE WHEN pt.type = 'spent' THEN pt.points ELSE 0 END)
+           FROM point_transactions pt
+           WHERE pt.user_id = u.id), 0
+        ) as total_points,
+        (SELECT COUNT(*) FROM user_tasks ut WHERE ut.user_id = u.id AND ut.status = '完成') as completed_tasks,
+        (SELECT COUNT(*) FROM user_tasks ut WHERE ut.user_id = u.id AND ut.status = '進行中') as in_progress_tasks
+      FROM users u
+      WHERE u.role = 'user'
+      ORDER BY u.id DESC
+    `);
+
+    // 準備 Excel 資料
+    const wsData = users.map(user => ({
+      '用戶ID': user.id,
+      '帳號': user.username,
+      '角色': user.role,
+      '註冊時間': user.created_at,
+      '總積分': user.total_points,
+      '已完成任務數': user.completed_tasks,
+      '進行中任務數': user.in_progress_tasks
+    }));
+
+    // 創建工作表
+    const ws = XLSX.utils.json_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '會員列表');
+
+    // 生成 Excel 緩衝區
+    const excelBuffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    // 設置響應頭
+    const filename = `會員資料_${new Date().toISOString().split('T')[0]}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+
+    res.send(excelBuffer);
+  } catch (err) {
+    console.error('導出 Excel 失敗:', err);
+    res.status(500).json({ success: false, message: '導出失敗' });
   } finally {
     if (conn) conn.release();
   }

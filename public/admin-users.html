@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>會員管理 | GPS 觸發任務系統</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="icon" type="image/png" href="/images/mascot.png" />
+  <style>
+    .users-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+    }
+    .stats-header {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .stats-item {
+      text-align: center;
+    }
+    .stats-number {
+      font-size: 2rem;
+      font-weight: bold;
+      color: var(--primary-color);
+    }
+    .stats-label {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      margin-top: 0.5rem;
+    }
+    .user-card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+      box-shadow: var(--shadow-sm);
+    }
+    .user-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .user-info {
+      flex: 1;
+    }
+    .user-username {
+      font-size: 1.25rem;
+      font-weight: bold;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+    }
+    .user-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .meta-label {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      margin-bottom: 0.25rem;
+    }
+    .meta-value {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .tasks-section {
+      margin-top: 1rem;
+      border-top: 1px solid var(--glass-border);
+      padding-top: 1rem;
+    }
+    .tasks-toggle {
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      font-size: 0.9rem;
+      margin-right: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .tasks-toggle:hover {
+      opacity: 0.9;
+    }
+    .tasks-list {
+      display: none;
+      margin-top: 1rem;
+      padding: 1rem;
+      background: #f8f9fa;
+      border-radius: 0.5rem;
+    }
+    .tasks-list.show {
+      display: block;
+    }
+    .task-item {
+      padding: 0.75rem;
+      background: white;
+      border-radius: 0.5rem;
+      margin-bottom: 0.5rem;
+      border-left: 3px solid var(--primary-color);
+    }
+    .task-item.completed {
+      border-left-color: #28a745;
+    }
+    .task-item.in-progress {
+      border-left-color: #ffc107;
+    }
+    .task-name {
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    .task-meta {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+    .pagination {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 2rem;
+      flex-wrap: wrap;
+    }
+    .pagination button {
+      padding: 0.5rem 1rem;
+      border: 1px solid var(--glass-border);
+      background: white;
+      border-radius: 0.5rem;
+      cursor: pointer;
+    }
+    .pagination button:hover:not(:disabled) {
+      background: var(--primary-color);
+      color: white;
+    }
+    .pagination button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .pagination .current-page {
+      background: var(--primary-color);
+      color: white;
+      border-color: var(--primary-color);
+    }
+    .export-btn {
+      background: #28a745;
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+    .export-btn:hover {
+      background: #218838;
+    }
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-secondary);
+    }
+    .empty-state {
+      text-align: center;
+      padding: 3rem;
+      color: var(--text-secondary);
+    }
+  </style>
+</head>
+<body>
+  <header id="mainHeader">
+    <div class="header-content" id="headerContent">
+      <h1 id="pageTitle">會員管理</h1>
+      <button id="hamburgerBtn" class="hamburger" aria-label="展開選單">&#9776;</button>
+      <nav class="main-nav">
+        <a href="/index.html">首頁</a>
+        <a href="/map.html">地圖頁</a>
+        <a href="/user-tasks.html">任務審核</a>
+        <a href="/staff-dashboard.html" id="navStaff">新增任務</a>
+        <a href="/role-management.html" id="navRoleMgmt">權限管理</a>
+        <a href="/admin-users.html" class="current-page" id="navAdminUsers">會員管理</a>
+        <a href="/user-dashboard.html" id="navUserTasks" style="display:none;">用戶任務管理</a>
+        <a href="/products.html" id="navProducts">商品兌換</a>
+        <a href="/redeem-tasks.html" id="navRedeem">兌換商品管理</a>
+        <span id="loginUserInfo" style="display:none; color:var(--text-secondary); padding:0.5rem 1rem;"></span>
+        <button id="logoutBtn" style="display:none;">登出</button>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="users-container">
+      <!-- 統計資訊 -->
+      <div class="stats-header">
+        <div class="stats-item">
+          <div class="stats-number" id="totalUsers">0</div>
+          <div class="stats-label">會員總數</div>
+        </div>
+        <div>
+          <button class="export-btn" id="exportBtn">📥 下載 Excel</button>
+        </div>
+      </div>
+
+      <!-- 用戶列表 -->
+      <div id="usersList">
+        <div class="loading">載入中...</div>
+      </div>
+
+      <!-- 分頁 -->
+      <div class="pagination" id="pagination" style="display:none;"></div>
+    </div>
+  </main>
+
+  <footer>
+    &copy; 2025 GPS 任務系統 - 地方開箱任務遊戲
+  </footer>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/admin-users.js"></script>
+</body>
+</html>
+
