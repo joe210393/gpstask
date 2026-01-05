@@ -3127,7 +3127,10 @@ app.post('/api/admin/seed-special-users', adminAuth, async (req, res) => {
   let conn;
   try {
     conn = await pool.getConnection();
-    const hashedPassword = await bcrypt.hash('123456', 10);
+    // 您的使用者不需要密碼，因此密碼欄位設為 NULL 或空字串
+    // 若資料庫欄位不允許 NULL，請保留空字串
+    const password = ''; 
+    
     let successCount = 0;
     let failCount = 0;
 
@@ -3144,7 +3147,7 @@ app.post('/api/admin/seed-special-users', adminAuth, async (req, res) => {
 
         await conn.execute(
           'INSERT INTO users (username, password, role, created_at) VALUES (?, ?, ?, ?)',
-          [phone, hashedPassword, 'user', formattedDate]
+          [phone, password, 'user', formattedDate]
         );
         successCount++;
       } catch (err) {
