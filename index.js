@@ -3081,6 +3081,91 @@ app.get('/api/admin/users/export', adminAuth, async (req, res) => {
   }
 });
 
+// 批量新增特定用戶（一次性功能）
+app.post('/api/admin/seed-special-users', adminAuth, async (req, res) => {
+  const phoneNumbers = [
+    '0911759403', '0912168927', '0913540286', '0914893715', '0915327064',
+    '0916608492', '0917471850', '0918935126', '0919284570', '0920716398',
+    '0921450821', '0922639174', '0923802456', '0924371985', '0925164720',
+    '0926598431', '0927740269', '0928315684', '0929871052', '0930496173',
+    '0931758204', '0932619845', '0933072391', '0934584267', '0935910438',
+    '0936346709', '0937821654', '0938197520', '0939460832', '0940785196',
+    '0941302579', '0942618034', '0943927480', '0944153862', '0945749321',
+    '0946086915', '0947538274', '0948621709', '0949870436', '0950394182',
+    '0951758064', '0952219870', '0953640598', '0954831247', '0955176903',
+    '0956402785', '0957963128', '0958507364', '0959284719', '0960651840',
+    '0961038527', '0962794163', '0963480952', '0964615738', '0965827094',
+    '0966349216', '0967908571', '0968132649', '0969574803', '0970261985'
+  ];
+
+  const START_DATE = new Date('2025-11-01');
+  const END_DATE = new Date('2025-12-29');
+  const START_HOUR = 7;
+  const END_HOUR = 23;
+
+  function getRandomDate(start, end) {
+    const startTime = start.getTime();
+    const endTime = end.getTime();
+    const diff = endTime - startTime;
+    let randomTime = startTime + Math.random() * diff;
+    let date = new Date(randomTime);
+    
+    // 調整時間到 07:00 ~ 23:00 之間
+    const randomHour = Math.floor(Math.random() * (END_HOUR - START_HOUR + 1)) + START_HOUR;
+    const randomMinute = Math.floor(Math.random() * 60);
+    const randomSecond = Math.floor(Math.random() * 60);
+    
+    date.setHours(randomHour, randomMinute, randomSecond);
+    return date;
+  }
+  
+  function formatDateTime(date) {
+    const pad = (n) => n.toString().padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    const hashedPassword = await bcrypt.hash('123456', 10);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const phone of phoneNumbers) {
+      const createdAt = getRandomDate(START_DATE, END_DATE);
+      const formattedDate = formatDateTime(createdAt);
+
+      try {
+        const [existing] = await conn.execute('SELECT id FROM users WHERE username = ?', [phone]);
+        if (existing.length > 0) {
+          failCount++;
+          continue;
+        }
+
+        await conn.execute(
+          'INSERT INTO users (username, password, role, created_at) VALUES (?, ?, ?, ?)',
+          [phone, hashedPassword, 'user', formattedDate]
+        );
+        successCount++;
+      } catch (err) {
+        console.error(`新增用戶失敗: ${phone}`, err);
+        failCount++;
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `匯入完成。成功: ${successCount}, 重複/失敗: ${failCount}`,
+      details: { successCount, failCount }
+    });
+  } catch (err) {
+    console.error('批量新增用戶失敗:', err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
 // 更新兌換記錄狀態
 app.put('/api/product-redemptions/:id/status', staffOrAdminAuth, async (req, res) => {
   const { id } = req.params;

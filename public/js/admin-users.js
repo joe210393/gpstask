@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initHeader();
   loadUsers(currentPage);
   setupExportButton();
+  setupSeedButton();
 });
 
 // 初始化 Header
@@ -365,6 +366,44 @@ function setupExportButton() {
         exportBtn.textContent = '📥 下載 Excel';
       } finally {
         exportBtn.disabled = false;
+      }
+    };
+  }
+}
+
+// 設置匯入按鈕
+function setupSeedButton() {
+  const seedBtn = document.getElementById('seedUsersBtn');
+  if (seedBtn) {
+    seedBtn.onclick = async () => {
+      if (!confirm('確定要匯入特定的 60 位會員名單嗎？\n這將會新增不存在的號碼，已存在的會自動跳過。')) {
+        return;
+      }
+      
+      seedBtn.disabled = true;
+      seedBtn.textContent = '匯入中...';
+      
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/seed-special-users`, {
+          method: 'POST',
+          credentials: 'include'
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          alert(data.message);
+          // 重新載入列表
+          loadUsers(currentPage);
+        } else {
+          alert('匯入失敗: ' + data.message);
+        }
+      } catch (err) {
+        console.error('匯入請求錯誤:', err);
+        alert('匯入發生錯誤，請稍後再試');
+      } finally {
+        seedBtn.disabled = false;
+        seedBtn.textContent = '👥 匯入特定會員';
       }
     };
   }
