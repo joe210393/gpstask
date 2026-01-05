@@ -2944,7 +2944,7 @@ app.get('/api/admin/users', adminAuth, async (req, res) => {
       LEFT JOIN user_tasks ut ON ut.user_id = u.id
       WHERE u.role = 'user'
       GROUP BY u.id, u.username, u.role, u.created_at
-      ORDER BY u.id DESC
+      ORDER BY u.created_at DESC
       LIMIT ${limit} OFFSET ${offset}
     `);
 
@@ -3045,7 +3045,7 @@ app.get('/api/admin/users/export', adminAuth, async (req, res) => {
       LEFT JOIN user_tasks ut ON ut.user_id = u.id
       WHERE u.role = 'user'
       GROUP BY u.id, u.username, u.role, u.created_at
-      ORDER BY u.id DESC
+      ORDER BY u.created_at DESC
     `);
 
     // 準備 Excel 資料
