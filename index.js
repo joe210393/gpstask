@@ -3085,7 +3085,7 @@ app.get('/api/admin/users/export', adminAuth, async (req, res) => {
 const uploadExcel = multer({ storage: multer.memoryStorage() });
 
 app.post('/api/admin/import-users', adminAuth, uploadExcel.single('file'), async (req, res) => {
-  const { simulateActivity } = req.body;
+  const { simulateActivity, startDate, endDate } = req.body;
   const isSimulationEnabled = simulateActivity === 'true';
 
   if (!req.file) {
@@ -3138,9 +3138,13 @@ app.post('/api/admin/import-users', adminAuth, uploadExcel.single('file'), async
     let skipCount = 0;
     const password = ''; // 無密碼
     
-    // 設定註冊時間範圍 (2025/11/01 ~ 2025/12/29)
-    const START_DATE = new Date('2025-11-01');
-    const END_DATE = new Date('2025-12-29');
+    // 設定註冊時間範圍 (使用前端傳來的參數，或預設值)
+    const START_DATE = startDate ? new Date(startDate) : new Date('2025-11-01');
+    const END_DATE = endDate ? new Date(endDate) : new Date('2025-12-29');
+    
+    // 確保結束時間包含了當天的最後一刻
+    END_DATE.setHours(23, 59, 59, 999);
+
     const START_HOUR = 7;
     const END_HOUR = 23;
 

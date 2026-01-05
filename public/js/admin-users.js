@@ -378,25 +378,28 @@ function setupSeedButton() {
 
   if (seedBtn && fileInput) {
     seedBtn.onclick = () => {
-      fileInput.click(); // 觸發檔案選擇
+      // 顯示自定義對話框
+      showImportDialog();
     };
 
+    // 處理檔案選擇
     fileInput.onchange = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
 
-      // 詢問是否生成隨機數據
-      const simulateActivity = confirm(
-        '【匯入選項】\n\n' +
-        '是否要為這些新會員自動生成隨機遊玩紀錄？\n' +
-        '(包含隨機完成一般任務，以及按順序推進劇情任務)\n\n' +
-        '按「確定」：匯入並生成數據 (看起來像真實玩家)\n' +
-        '按「取消」：僅匯入帳號 (完全空白的新帳號)'
-      );
+      // 取得設定值
+      const simulateActivity = document.getElementById('simulateCheck').checked;
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value;
+
+      // 關閉對話框
+      closeImportDialog();
 
       const formData = new FormData();
       formData.append('file', file);
       formData.append('simulateActivity', simulateActivity);
+      formData.append('startDate', startDate);
+      formData.append('endDate', endDate);
 
       seedBtn.disabled = true;
       seedBtn.textContent = '匯入中...';
@@ -426,6 +429,63 @@ function setupSeedButton() {
       }
     };
   }
+}
+
+// 匯入對話框相關
+function showImportDialog() {
+  let dialog = document.getElementById('importDialog');
+  if (!dialog) {
+    // 創建對話框 HTML
+    const dialogHtml = `
+      <div id="importDialog" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
+        <div style="background:white; padding:2rem; border-radius:8px; width:90%; max-width:500px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+          <h3 style="margin-top:0; margin-bottom:1rem;">匯入會員設定</h3>
+          
+          <div style="margin-bottom:1.5rem;">
+            <label style="display:flex; align-items:center; cursor:pointer;">
+              <input type="checkbox" id="simulateCheck" checked style="margin-right:10px; width:20px; height:20px;">
+              <span style="font-weight:bold;">自動生成隨機遊玩紀錄</span>
+            </label>
+            <div style="margin-top:0.5rem; color:#666; font-size:0.9rem; padding-left:30px;">
+              勾選後，系統將為新會員隨機生成：
+              <ul style="margin:5px 0 0 20px; padding:0;">
+                <li>隨機完成一般任務</li>
+                <li>按順序推進劇情任務</li>
+                <li>對應的積分紀錄</li>
+              </ul>
+            </div>
+          </div>
+
+          <div style="margin-bottom:1rem;">
+            <label style="display:block; margin-bottom:0.5rem; font-weight:bold;">註冊時間範圍：</label>
+            <div style="display:flex; gap:10px; align-items:center;">
+              <input type="date" id="startDate" class="form-input" value="2025-11-01" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:4px;">
+              <span>至</span>
+              <input type="date" id="endDate" class="form-input" value="2025-12-29" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:4px;">
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:2rem;">
+            <button onclick="closeImportDialog()" style="padding:8px 16px; border:1px solid #ddd; background:white; border-radius:4px; cursor:pointer;">取消</button>
+            <button onclick="triggerFileSelect()" style="padding:8px 16px; background:#28a745; color:white; border:none; border-radius:4px; cursor:pointer;">下一步：選擇檔案</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', dialogHtml);
+    dialog = document.getElementById('importDialog');
+  }
+  dialog.style.display = 'flex';
+}
+
+function closeImportDialog() {
+  const dialog = document.getElementById('importDialog');
+  if (dialog) dialog.style.display = 'none';
+}
+
+function triggerFileSelect() {
+  const fileInput = document.getElementById('fileInput');
+  if (fileInput) fileInput.click();
 }
 
 // 工具函數
