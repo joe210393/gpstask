@@ -2927,7 +2927,8 @@ app.get('/api/admin/users', adminAuth, async (req, res) => {
     );
     const totalUsers = totalCount[0].total;
 
-    // 獲取用戶列表 + 統計資訊（改用 query 以避免 Prepared Statement 在 LIMIT 參數上的相容性問題）
+    // 獲取用戶列表 + 統計資訊
+    // 注意：直接將 limit 和 offset 放入查詢字串，避免 prepared statement 參數問題
     const [users] = await conn.query(`
       SELECT 
         u.id,
@@ -2944,8 +2945,8 @@ app.get('/api/admin/users', adminAuth, async (req, res) => {
       WHERE u.role = 'user'
       GROUP BY u.id, u.username, u.role, u.created_at
       ORDER BY u.id DESC
-      LIMIT ? OFFSET ?
-    `, [limit, offset]);
+      LIMIT ${limit} OFFSET ${offset}
+    `);
 
     const totalPages = Math.ceil(totalUsers / limit);
 
