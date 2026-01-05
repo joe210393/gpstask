@@ -3081,93 +3081,204 @@ app.get('/api/admin/users/export', adminAuth, async (req, res) => {
   }
 });
 
-// 批量新增特定用戶（一次性功能）
-app.post('/api/admin/seed-special-users', adminAuth, async (req, res) => {
-  const phoneNumbers = [
-    '0911759403', '0912168927', '0913540286', '0914893715', '0915327064',
-    '0916608492', '0917471850', '0918935126', '0919284570', '0920716398',
-    '0921450821', '0922639174', '0923802456', '0924371985', '0925164720',
-    '0926598431', '0927740269', '0928315684', '0929871052', '0930496173',
-    '0931758204', '0932619845', '0933072391', '0934584267', '0935910438',
-    '0936346709', '0937821654', '0938197520', '0939460832', '0940785196',
-    '0941302579', '0942618034', '0943927480', '0944153862', '0945749321',
-    '0946086915', '0947538274', '0948621709', '0949870436', '0950394182',
-    '0951758064', '0952219870', '0953640598', '0954831247', '0955176903',
-    '0956402785', '0957963128', '0958507364', '0959284719', '0960651840',
-    '0961038527', '0962794163', '0963480952', '0964615738', '0965827094',
-    '0966349216', '0967908571', '0968132649', '0969574803', '0970261985'
-  ];
+// 批量匯入會員 API
+const uploadExcel = multer({ storage: multer.memoryStorage() });
 
-  const START_DATE = new Date('2025-11-01');
-  const END_DATE = new Date('2025-12-29');
-  const START_HOUR = 7;
-  const END_HOUR = 23;
+app.post('/api/admin/import-users', adminAuth, uploadExcel.single('file'), async (req, res) => {
+  const { simulateActivity } = req.body;
+  const isSimulationEnabled = simulateActivity === 'true';
 
-  function getRandomDate(start, end) {
-    const startTime = start.getTime();
-    const endTime = end.getTime();
-    const diff = endTime - startTime;
-    let randomTime = startTime + Math.random() * diff;
-    let date = new Date(randomTime);
-    
-    // 調整時間到 07:00 ~ 23:00 之間
-    const randomHour = Math.floor(Math.random() * (END_HOUR - START_HOUR + 1)) + START_HOUR;
-    const randomMinute = Math.floor(Math.random() * 60);
-    const randomSecond = Math.floor(Math.random() * 60);
-    
-    date.setHours(randomHour, randomMinute, randomSecond);
-    return date;
-  }
-  
-  function formatDateTime(date) {
-    const pad = (n) => n.toString().padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: '請上傳 Excel 檔案' });
   }
 
   let conn;
   try {
-    conn = await pool.getConnection();
-    // 您的使用者不需要密碼，因此密碼欄位設為 NULL 或空字串
-    // 若資料庫欄位不允許 NULL，請保留空字串
-    const password = ''; 
-    
-    let successCount = 0;
-    let failCount = 0;
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(sheet);
 
-    for (const phone of phoneNumbers) {
-      const createdAt = getRandomDate(START_DATE, END_DATE);
-      const formattedDate = formatDateTime(createdAt);
+    if (data.length === 0) {
+      return res.status(400).json({ success: false, message: 'Excel 檔案內容為空' });
+    }
+
+    // 檢查欄位 (支援 'phone' 或 '手機號碼')
+    const phoneKey = data[0].phone ? 'phone' : (data[0]['手機號碼'] ? '手機號碼' : null);
+    if (!phoneKey) {
+      return res.status(400).json({ success: false, message: '找不到手機號碼欄位 (請使用 "phone" 或 "手機號碼")' });
+    }
+
+    conn = await pool.getConnection();
+    
+    // 預先抓取所有任務資料供模擬使用
+    let independentTasks = [];
+    let questChains = [];
+    
+    if (isSimulationEnabled) {
+      const [tasks] = await conn.execute('SELECT id, points, quest_chain_id, quest_order FROM tasks');
+      const [chains] = await conn.execute('SELECT id FROM quest_chains');
+      
+      independentTasks = tasks.filter(t => !t.quest_chain_id);
+      
+      // 整理劇情任務結構
+      const questTasks = tasks.filter(t => t.quest_chain_id);
+      chains.forEach(chain => {
+        const chainTasks = questTasks.filter(t => t.quest_chain_id === chain.id).sort((a, b) => a.quest_order - b.quest_order);
+        if (chainTasks.length > 0) {
+          questChains.push({
+            id: chain.id,
+            tasks: chainTasks
+          });
+        }
+      });
+    }
+
+    let successCount = 0;
+    let skipCount = 0;
+    const password = ''; // 無密碼
+    
+    // 設定註冊時間範圍 (2025/11/01 ~ 2025/12/29)
+    const START_DATE = new Date('2025-11-01');
+    const END_DATE = new Date('2025-12-29');
+    const START_HOUR = 7;
+    const END_HOUR = 23;
+
+    function getRandomDate(start, end) {
+        const startTime = start.getTime();
+        const endTime = end.getTime();
+        const diff = endTime - startTime;
+        let randomTime = startTime + Math.random() * diff;
+        let date = new Date(randomTime);
+        const randomHour = Math.floor(Math.random() * (END_HOUR - START_HOUR + 1)) + START_HOUR;
+        const randomMinute = Math.floor(Math.random() * 60);
+        const randomSecond = Math.floor(Math.random() * 60);
+        date.setHours(randomHour, randomMinute, randomSecond);
+        return date;
+    }
+
+    for (const row of data) {
+      const phone = String(row[phoneKey]).trim();
+      if (!phone) continue;
 
       try {
+        // 檢查是否已存在
         const [existing] = await conn.execute('SELECT id FROM users WHERE username = ?', [phone]);
         if (existing.length > 0) {
-          failCount++;
+          skipCount++;
           continue;
         }
 
-        await conn.execute(
+        const createdAt = getRandomDate(START_DATE, END_DATE);
+        const formattedDate = createdAt.toISOString().slice(0, 19).replace('T', ' ');
+
+        const [result] = await conn.execute(
           'INSERT INTO users (username, password, role, created_at) VALUES (?, ?, ?, ?)',
           [phone, password, 'user', formattedDate]
         );
+        
+        const userId = result.insertId;
         successCount++;
+
+        // --- 模擬遊玩數據 ---
+        if (isSimulationEnabled) {
+          // 1. 模擬一般任務 (隨機 0~5 個)
+          const numIndependent = Math.floor(Math.random() * 6);
+          const shuffledTasks = independentTasks.sort(() => 0.5 - Math.random());
+          const selectedIndependent = shuffledTasks.slice(0, numIndependent);
+
+          for (const task of selectedIndependent) {
+             // 隨機完成時間：註冊後 1小時 ~ 30天
+             const taskTime = new Date(createdAt.getTime() + (Math.random() * 30 * 24 * 60 * 60 * 1000) + (60 * 60 * 1000));
+             if (taskTime > new Date()) continue; // 不超過現在時間
+
+             const formattedTaskTime = taskTime.toISOString().slice(0, 19).replace('T', ' ');
+             
+             // 寫入 user_tasks
+             await conn.execute(
+               `INSERT INTO user_tasks (user_id, task_id, status, started_at, finished_at, answer) 
+                VALUES (?, ?, '完成', ?, ?, ?)`,
+               [userId, task.id, formattedTaskTime, formattedTaskTime, '模擬作答']
+             );
+
+             // 寫入 point_transactions
+             await conn.execute(
+               `INSERT INTO point_transactions (user_id, type, points, description, reference_type, reference_id, created_at)
+                VALUES (?, 'earned', ?, ?, 'task_completion', ?, ?)`,
+               [userId, task.points, `完成任務 #${task.id}`, task.id, formattedTaskTime]
+             );
+          }
+
+          // 2. 模擬劇情任務
+          // 隨機挑選 0~2 個劇情鏈
+          const numChains = Math.floor(Math.random() * 3);
+          const shuffledChains = questChains.sort(() => 0.5 - Math.random());
+          const selectedChains = shuffledChains.slice(0, numChains);
+
+          for (const chain of selectedChains) {
+            // 隨機決定玩到第幾關 (1 ~ chain.tasks.length)
+            const progress = Math.floor(Math.random() * chain.tasks.length) + 1;
+            
+            // 按順序解鎖
+            let lastTaskTime = new Date(createdAt.getTime() + (Math.random() * 24 * 60 * 60 * 1000)); // 註冊後一天開始玩
+
+            for (let i = 0; i < progress; i++) {
+               const task = chain.tasks[i];
+               // 每一關間隔 10分 ~ 2小時
+               lastTaskTime = new Date(lastTaskTime.getTime() + (Math.random() * 2 * 60 * 60 * 1000) + (10 * 60 * 1000));
+               
+               if (lastTaskTime > new Date()) break;
+
+               const formattedTaskTime = lastTaskTime.toISOString().slice(0, 19).replace('T', ' ');
+
+               // 最後一關有機率是「進行中」而非「完成」
+               // 如果是最後一關且不是整個劇情鏈的最後一關，30% 機率是進行中
+               const isLastInProgress = (i === progress - 1) && (Math.random() < 0.3);
+               
+               if (isLastInProgress) {
+                 await conn.execute(
+                   `INSERT INTO user_tasks (user_id, task_id, status, started_at) 
+                    VALUES (?, ?, '進行中', ?)`,
+                   [userId, task.id, formattedTaskTime]
+                 );
+               } else {
+                 await conn.execute(
+                   `INSERT INTO user_tasks (user_id, task_id, status, started_at, finished_at, answer) 
+                    VALUES (?, ?, '完成', ?, ?, ?)`,
+                   [userId, task.id, formattedTaskTime, formattedTaskTime, '模擬劇情作答']
+                 );
+                 
+                 await conn.execute(
+                   `INSERT INTO point_transactions (user_id, type, points, description, reference_type, reference_id, created_at)
+                    VALUES (?, 'earned', ?, ?, 'task_completion', ?, ?)`,
+                   [userId, task.points, `完成劇情任務 #${task.id}`, task.id, formattedTaskTime]
+                 );
+               }
+            }
+          }
+        }
+
       } catch (err) {
-        console.error(`新增用戶失敗: ${phone}`, err);
-        failCount++;
+        console.error(`匯入失敗: ${phone}`, err);
+        // 不中斷迴圈，繼續下一個
       }
     }
 
     res.json({
       success: true,
-      message: `匯入完成。成功: ${successCount}, 重複/失敗: ${failCount}`,
-      details: { successCount, failCount }
+      message: `匯入完成。成功: ${successCount}, 重複跳過: ${skipCount}`,
+      details: { successCount, skipCount }
     });
+
   } catch (err) {
-    console.error('批量新增用戶失敗:', err);
-    res.status(500).json({ success: false, message: '伺服器錯誤' });
+    console.error('Excel 匯入失敗:', err);
+    res.status(500).json({ success: false, message: '匯入過程發生錯誤: ' + err.message });
   } finally {
     if (conn) conn.release();
   }
 });
+
+// 批量新增特定用戶（一次性功能）
 
 // 更新兌換記錄狀態
 app.put('/api/product-redemptions/:id/status', staffOrAdminAuth, async (req, res) => {

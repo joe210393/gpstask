@@ -374,26 +374,44 @@ function setupExportButton() {
 // 設置匯入按鈕
 function setupSeedButton() {
   const seedBtn = document.getElementById('seedUsersBtn');
-  if (seedBtn) {
-    seedBtn.onclick = async () => {
-      if (!confirm('確定要匯入特定的 60 位會員名單嗎？\n這將會新增不存在的號碼，已存在的會自動跳過。')) {
-        return;
-      }
-      
+  const fileInput = document.getElementById('fileInput');
+
+  if (seedBtn && fileInput) {
+    seedBtn.onclick = () => {
+      fileInput.click(); // 觸發檔案選擇
+    };
+
+    fileInput.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      // 詢問是否生成隨機數據
+      const simulateActivity = confirm(
+        '【匯入選項】\n\n' +
+        '是否要為這些新會員自動生成隨機遊玩紀錄？\n' +
+        '(包含隨機完成一般任務，以及按順序推進劇情任務)\n\n' +
+        '按「確定」：匯入並生成數據 (看起來像真實玩家)\n' +
+        '按「取消」：僅匯入帳號 (完全空白的新帳號)'
+      );
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('simulateActivity', simulateActivity);
+
       seedBtn.disabled = true;
       seedBtn.textContent = '匯入中...';
-      
+
       try {
-        const res = await fetch(`${API_BASE}/api/admin/seed-special-users`, {
+        const res = await fetch(`${API_BASE}/api/admin/import-users`, {
           method: 'POST',
+          body: formData,
           credentials: 'include'
         });
-        
+
         const data = await res.json();
-        
+
         if (data.success) {
           alert(data.message);
-          // 重新載入列表
           loadUsers(currentPage);
         } else {
           alert('匯入失敗: ' + data.message);
@@ -403,7 +421,8 @@ function setupSeedButton() {
         alert('匯入發生錯誤，請稍後再試');
       } finally {
         seedBtn.disabled = false;
-        seedBtn.textContent = '👥 匯入特定會員';
+        seedBtn.textContent = '📂 上傳會員名單 (Excel)';
+        fileInput.value = ''; // 清空選擇
       }
     };
   }
