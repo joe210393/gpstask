@@ -3182,8 +3182,11 @@ app.post('/api/admin/import-users', adminAuth, uploadExcel.single('file'), async
 
         // --- 模擬遊玩數據 ---
         if (isSimulationEnabled) {
-          // 1. 模擬一般任務 (隨機 0~5 個)
-          const numIndependent = Math.floor(Math.random() * 6);
+          // 1. 模擬一般任務
+          // 確保不超過現有任務數量
+          const maxIndependent = Math.min(independentTasks.length, 5); // 最多 5 個，或是全部
+          const numIndependent = Math.floor(Math.random() * (maxIndependent + 1)); // 0 ~ max
+          
           const shuffledTasks = independentTasks.sort(() => 0.5 - Math.random());
           const selectedIndependent = shuffledTasks.slice(0, numIndependent);
 
@@ -3210,13 +3213,16 @@ app.post('/api/admin/import-users', adminAuth, uploadExcel.single('file'), async
           }
 
           // 2. 模擬劇情任務
-          // 隨機挑選 0~2 個劇情鏈
-          const numChains = Math.floor(Math.random() * 3);
+          // 確保不超過現有劇情鏈數量
+          const maxChains = Math.min(questChains.length, 2); // 最多 2 個，或是全部
+          const numChains = Math.floor(Math.random() * (maxChains + 1)); // 0 ~ max
+          
           const shuffledChains = questChains.sort(() => 0.5 - Math.random());
           const selectedChains = shuffledChains.slice(0, numChains);
 
           for (const chain of selectedChains) {
             // 隨機決定玩到第幾關 (1 ~ chain.tasks.length)
+            // 這裡本身就不會超過該劇情鏈的長度
             const progress = Math.floor(Math.random() * chain.tasks.length) + 1;
             
             // 按順序解鎖
