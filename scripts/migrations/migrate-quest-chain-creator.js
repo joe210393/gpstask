@@ -1,5 +1,5 @@
 const mysql = require('mysql2/promise');
-const { getDbConfig } = require('./db-config');
+const { getDbConfig } = require('../../db-config');
 
 function ensureExplicitRun() {
   if (process.env.RUN_DB_SCRIPT !== '1') {

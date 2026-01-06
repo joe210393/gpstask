@@ -1,6 +1,6 @@
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
-const { getDbConfig } = require('./db-config');
+const { getDbConfig } = require('../../db-config');
 
 const dbConfig = getDbConfig();
 
