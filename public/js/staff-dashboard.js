@@ -677,7 +677,7 @@ function loadTasks() {
       if (!data.success) return;
       const container = document.getElementById('allTasks');
       container.innerHTML = '';
-      
+
       const userRole = data.userRole || loginUser.role;
       
       if (data.tasks.length === 0) {
@@ -903,7 +903,7 @@ function loadTasks() {
               // 填入道具欄位
               document.getElementById('editRequiredItemSelect').value = t.required_item_id || '';
               document.getElementById('editRewardItemSelect').value = t.reward_item_id || '';
-
+              
               // 設置任務類型與選項
               form.task_type.value = t.task_type || 'qa';
               const editOptionsDiv = document.getElementById('editMultipleChoiceOptions');
@@ -1012,7 +1012,7 @@ document.getElementById('addTaskForm').addEventListener('submit', async function
   const ar_order_model = form.ar_order_model.value || null;
   const ar_order_image = form.ar_order_image.value || null;
   const ar_order_youtube = form.ar_order_youtube.value || null;
-
+  
   // 處理任務類型與選項
   const task_type = form.task_type.value;
   console.log('新增任務表單 - task_type:', task_type);
@@ -1262,7 +1262,7 @@ document.getElementById('editTaskForm').addEventListener('submit', async functio
   // 道具欄位
   const required_item_id = document.getElementById('editRequiredItemSelect').value || null;
   const reward_item_id = document.getElementById('editRewardItemSelect').value || null;
-
+  
   // 處理任務類型與選項
   const task_type = form.task_type.value;
   console.log('正在提交編輯表單，任務類型:', task_type); // Debug Log
@@ -1406,9 +1406,9 @@ document.getElementById('editTaskForm').addEventListener('submit', async functio
     }
     
     // 更新任務
-    fetch(`${API_BASE}/api/tasks/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'x-username': loginUser.username },
+  fetch(`${API_BASE}/api/tasks/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'x-username': loginUser.username },
       body: JSON.stringify({ 
         name, lat, lng, radius, points, description, photoUrl, 
         youtubeUrl: youtubeUrl, 
@@ -1420,23 +1420,23 @@ document.getElementById('editTaskForm').addEventListener('submit', async functio
         is_final_step, required_item_id, reward_item_id,
         bgm_url: bgmUrl
       })
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.success) {
-        document.getElementById('editTaskMsg').textContent = '更新成功！';
-        setTimeout(() => {
-          closeModal();
-          loadTasks();
-        }, 800);
-      } else {
-        document.getElementById('editTaskMsg').textContent = data.message || '更新失敗';
-      }
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      document.getElementById('editTaskMsg').textContent = '更新成功！';
+      setTimeout(() => {
+        closeModal();
+        loadTasks();
+      }, 800);
+    } else {
+      document.getElementById('editTaskMsg').textContent = data.message || '更新失敗';
+    }
     })
     .catch(err => {
       console.error(err);
       document.getElementById('editTaskMsg').textContent = '更新失敗';
-    });
+  });
   })();
 });
 

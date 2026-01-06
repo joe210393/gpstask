@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "node init-db.js; node fix-db-schema.js; node migrate-ar-image.js; node migrate-task-system.js; node migrate-task-type.js; node migrate-user-roles.js; node migrate-quest-chain-owner.js; node migrate-item-system.js; node migrate-points-table.js; node fix-product-schema.js; node migrate-quest-final-step.js; node index.js",
+    "start": "node scripts/migrations/init-db.js; node scripts/migrations/fix-db-schema.js; node scripts/migrations/migrate-ar-image.js; node scripts/migrations/migrate-task-system.js; node scripts/migrations/migrate-task-type.js; node scripts/migrations/migrate-user-roles.js; node scripts/migrations/migrate-quest-chain-owner.js; node scripts/migrations/migrate-item-system.js; node scripts/migrations/migrate-points-table.js; node scripts/migrations/fix-product-schema.js; node scripts/migrations/migrate-quest-final-step.js; node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
