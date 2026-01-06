@@ -3552,3 +3552,4 @@ app.listen(PORT, () => {
   console.log(`🌐 應用程式運行在: http://localhost:${PORT}`);
   console.log(`🔍 健康檢查端點: http://localhost:${PORT}/api/health`);
 }); 
+// Force redeploy timestamp: Tue Jan  6 12:06:17 CST 2026
