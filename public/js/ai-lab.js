@@ -215,6 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const finalCtx = finalCanvas.getContext('2d');
 
         try {
+            log('正在截圖...');
             finalCtx.drawImage(
                 tempCanvas, 
                 sourceX, sourceY, sourceW, sourceH, 
@@ -224,16 +225,25 @@ document.addEventListener('DOMContentLoaded', () => {
             // 顯示結果
             const dataUrl = finalCanvas.toDataURL('image/jpeg', 0.8);
             croppedImage.src = dataUrl;
+            log('截圖成功，準備顯示面板');
             
             showResultPanel();
         } catch (e) {
             console.error('截圖失敗', e);
-            retry();
+            log('截圖失敗: ' + e.message);
+            // 即使失敗也顯示面板，方便除錯
+            aiResult.innerHTML = '<span style="color:red">截圖失敗: ' + e.message + '</span>';
+            showResultPanel();
         }
     }
 
     function showResultPanel() {
+        log('呼叫 showResultPanel');
+        resultPanel.style.display = 'flex'; // 強制顯示
+        // 強制重繪
+        resultPanel.offsetHeight; 
         resultPanel.classList.add('active');
+        
         aiResult.innerHTML = '準備就緒，點擊「AI 辨識」開始分析';
         analyzeBtn.disabled = false;
         analyzeBtn.textContent = 'AI 辨識';
