@@ -237,18 +237,24 @@ document.addEventListener('DOMContentLoaded', () => {
             const formData = new FormData();
             formData.append('image', blob, 'capture.jpg');
 
-            // 取得 GPS
+            // 取得 GPS (縮短超時時間)
             let gps = null;
             try {
                 const pos = await new Promise((resolve, reject) => {
-                    navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { 
+                        timeout: 2000, // 縮短為 2 秒
+                        enableHighAccuracy: false // 犧牲一點精度換速度
+                    });
                 });
                 gps = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                 formData.append('latitude', gps.lat);
                 formData.append('longitude', gps.lng);
+                console.log('GPS 取得成功:', gps);
             } catch (e) {
-                console.warn('無法取得 GPS，將進行無 GPS 辨識');
+                console.warn('無法取得 GPS (或超時)，將進行無 GPS 辨識', e);
             }
+
+            console.log('正在傳送圖片至後端...');
 
             // 呼叫後端 API
             const apiRes = await fetch('/api/vision-test', {
@@ -256,17 +262,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: formData
             });
 
+            if (!apiRes.ok) {
+                const errText = await apiRes.text();
+                throw new Error(`伺服器回應錯誤 (${apiRes.status}): ${errText}`);
+            }
+
             const data = await apiRes.json();
+            console.log('後端回應:', data);
 
             if (data.success) {
-                aiResult.innerHTML = data.description;
+                // 將換行符號轉換為 HTML 換行
+                const formattedText = data.description.replace(/\n/g, '<br>');
+                aiResult.innerHTML = formattedText;
             } else {
-                aiResult.innerHTML = `<span style="color:red">辨識失敗: ${data.message}</span>`;
+                aiResult.innerHTML = `<span style="color:red">AI 辨識失敗: ${data.message || '未知錯誤'}</span>`;
             }
 
         } catch (err) {
-            console.error(err);
-            aiResult.innerHTML = '<span style="color:red">連線錯誤，請檢查網路</span>';
+            console.error('前端錯誤:', err);
+            aiResult.innerHTML = `<span style="color:red">錯誤: ${err.message}</span>`;
         } finally {
             aiLoading.classList.add('hidden');
             analyzeBtn.disabled = false;
