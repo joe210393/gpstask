@@ -3114,9 +3114,8 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
     如果無法辨識，請幽默地回答「這考倒我了」。`;
 
     // 3. 呼叫 AI API (LM Studio / OpenAI Compatible)
-    // 這裡的 URL 之後會換成您的 ngrok 網址
-    // 預設先留一個 placeholder，等您提供後我再更新
-    const AI_API_URL = process.env.AI_API_URL || 'http://localhost:1234/v1'; 
+    // 使用您的 ngrok 網址
+    const AI_API_URL = process.env.AI_API_URL || 'https://tactually-venerable-inez.ngrok-free.dev/v1'; 
     const AI_MODEL = 'local-model'; // LM Studio 通常不挑模型名稱
 
     console.log('🤖 正在呼叫 AI:', AI_API_URL);
