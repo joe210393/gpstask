@@ -40,17 +40,46 @@ document.addEventListener('DOMContentLoaded', () => {
                 stream.getTracks().forEach(track => track.stop());
             }
             
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: facingMode
-                },
-                audio: false
-            });
+            log('正在啟動相機...');
+            
+            try {
+                // 嘗試 1: 指定模式 (後鏡頭/前鏡頭)
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: facingMode },
+                    audio: false
+                });
+            } catch (err1) {
+                log('指定鏡頭失敗，嘗試通用設定: ' + err1.name);
+                // 嘗試 2: 放棄指定，只要有畫面就好 (Fallback)
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: false
+                });
+            }
             
             video.srcObject = stream;
+            // Android 關鍵：必須明確呼叫 play()，並處理 Promise
+            try {
+                await video.play();
+                log('相機啟動成功');
+            } catch (playErr) {
+                log('播放失敗: ' + playErr.message);
+            }
+            
         } catch (err) {
             console.error('相機啟動失敗:', err);
-            Swal.fire('錯誤', '無法存取相機，請確認權限', 'error');
+            log('相機致命錯誤: ' + err.name + ' - ' + err.message);
+            
+            let msg = '無法存取相機，請確認權限';
+            if (err.name === 'NotAllowedError') msg = '您拒絕了相機權限，請至設定開啟';
+            if (err.name === 'NotFoundError') msg = '找不到相機裝置';
+            
+            Swal.fire({
+                icon: 'error',
+                title: '相機錯誤',
+                text: `${msg} (${err.name})`,
+                footer: '建議使用 Chrome 瀏覽器開啟'
+            });
         }
     }
 
