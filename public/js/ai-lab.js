@@ -114,12 +114,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Event Listeners for Touch/Mouse
+    // 使用 passive: false 來確保可以 preventDefault
     canvas.addEventListener('mousedown', startDraw);
     canvas.addEventListener('mousemove', moveDraw);
     canvas.addEventListener('mouseup', endDraw);
+    
+    // 修正觸控事件綁定
     canvas.addEventListener('touchstart', startDraw, { passive: false });
     canvas.addEventListener('touchmove', moveDraw, { passive: false });
-    canvas.addEventListener('touchend', endDraw);
+    canvas.addEventListener('touchend', (e) => {
+        e.preventDefault(); // 防止觸發 click
+        endDraw();
+    }, { passive: false });
+    canvas.addEventListener('touchcancel', endDraw); // 增加 touchcancel 處理
+
+    // 增加一個強制結束按鈕 (以防滑出邊界)
+    document.body.addEventListener('mouseup', () => {
+        if(isDrawing) endDraw();
+    });
 
     // 3. Image Processing (Crop & Cut)
     function processSelection() {
