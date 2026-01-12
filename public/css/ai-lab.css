@@ -1,0 +1,208 @@
+:root {
+    --primary-color: #007aff;
+    --accent-color: #ffd700;
+    --bg-overlay: rgba(0, 0, 0, 0.6);
+}
+
+* {
+    box-sizing: border-box;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: #000;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.camera-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+video#cameraFeed {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 1;
+}
+
+canvas#drawingCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    touch-action: none; /* 防止滑動頁面 */
+}
+
+.ui-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 3;
+    pointer-events: none; /* 讓點擊穿透到 canvas */
+}
+
+/* 讓按鈕可以被點擊 */
+.ui-layer button, .result-panel {
+    pointer-events: auto;
+}
+
+.header {
+    position: absolute;
+    top: 20px;
+    left: 0;
+    width: 100%;
+    padding: 0 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 10;
+}
+
+.icon-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    font-size: 20px;
+    backdrop-filter: blur(10px);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.status-pill {
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    backdrop-filter: blur(10px);
+}
+
+.instruction {
+    position: absolute;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 30px;
+    font-size: 16px;
+    text-align: center;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+
+/* 結果面板 */
+.result-panel {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: white;
+    border-radius: 20px 20px 0 0;
+    padding: 20px;
+    box-shadow: 0 -5px 20px rgba(0,0,0,0.3);
+    transform: translateY(100%);
+    transition: transform 0.3s ease-out;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.result-panel.active {
+    transform: translateY(0);
+}
+
+.result-content {
+    display: flex;
+    gap: 15px;
+}
+
+img#croppedImage {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 12px;
+    background: #f0f0f0;
+    border: 2px solid #eee;
+}
+
+.analysis-box {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.ai-text {
+    font-size: 15px;
+    color: #333;
+    line-height: 1.4;
+    max-height: 100px;
+    overflow-y: auto;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.btn {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn.primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.btn.secondary {
+    background: #f0f0f0;
+    color: #333;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Loading Spinner */
+.spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #ccc;
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: 8px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}

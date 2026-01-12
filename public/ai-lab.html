@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI 視覺實驗室</title>
+    <link rel="stylesheet" href="css/ai-lab.css">
+    <!-- 引入 SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+    <div class="camera-container">
+        <!-- 相機畫面 -->
+        <video id="cameraFeed" autoplay playsinline muted></video>
+        
+        <!-- 繪圖畫布 (覆蓋在相機上) -->
+        <canvas id="drawingCanvas"></canvas>
+        
+        <!-- UI 介面 -->
+        <div class="ui-layer">
+            <div class="header">
+                <button id="backBtn" class="icon-btn">✕</button>
+                <div class="status-pill">AI Vision Lab</div>
+                <button id="switchCameraBtn" class="icon-btn">↻</button>
+            </div>
+            
+            <div class="instruction">
+                請用手指圈選物體
+            </div>
+
+            <!-- 結果展示區 (隱藏) -->
+            <div id="resultPanel" class="result-panel hidden">
+                <div class="result-content">
+                    <img id="croppedImage" src="" alt="Cropped">
+                    <div class="analysis-box">
+                        <div id="aiLoading" class="hidden">
+                            <div class="spinner"></div> 正在分析...
+                        </div>
+                        <div id="aiResult" class="ai-text"></div>
+                    </div>
+                </div>
+                <div class="action-buttons">
+                    <button id="retryBtn" class="btn secondary">重試</button>
+                    <button id="analyzeBtn" class="btn primary">AI 辨識</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/ai-lab.js"></script>
+</body>
+</html>
