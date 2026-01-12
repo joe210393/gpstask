@@ -114,23 +114,29 @@ canvas#drawingCanvas {
 
 /* 結果面板 */
 .result-panel {
-    position: absolute;
+    position: fixed; /* 改為 fixed 確保浮在最上層 */
     bottom: 0;
     left: 0;
     width: 100%;
     background: white;
     border-radius: 20px 20px 0 0;
     padding: 20px;
-    box-shadow: 0 -5px 20px rgba(0,0,0,0.3);
-    transform: translateY(100%);
-    transition: transform 0.3s ease-out;
-    display: flex;
+    box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
+    /* 暫時移除動畫，預設隱藏改為 display: none */
+    display: none; 
     flex-direction: column;
     gap: 15px;
+    z-index: 10000; /* 超級高的層級 */
 }
 
 .result-panel.active {
-    transform: translateY(0);
+    display: flex !important; /* 強制顯示 */
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
 }
 
 .result-content {
