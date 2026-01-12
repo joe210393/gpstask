@@ -3082,7 +3082,94 @@ app.get('/api/admin/users/export', adminAuth, async (req, res) => {
 });
 
 // 批量匯入會員 API
+// 上傳 Excel 的 Multer 設定 (使用記憶體儲存，不存硬碟)
 const uploadExcel = multer({ storage: multer.memoryStorage() });
+
+// AI 辨識用的暫存上傳 (使用記憶體儲存，快速且不佔空間)
+const uploadTemp = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 } // 限制 10MB
+});
+
+// AI 視覺辨識 API
+app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: '未上傳圖片' });
+    }
+
+    // 1. 將圖片轉為 Base64
+    const base64Image = req.file.buffer.toString('base64');
+    const dataUrl = `data:${req.file.mimetype};base64,${base64Image}`;
+
+    // 2. 準備 AI 提示詞 (Prompt)
+    // 如果有 GPS，加入地點資訊
+    let locationInfo = '';
+    if (req.body.latitude && req.body.longitude) {
+      locationInfo = `(拍攝地點: 緯度 ${req.body.latitude}, 經度 ${req.body.longitude})`;
+    }
+
+    const prompt = `這是一張使用者在${locationInfo}拍攝並圈選的照片。請辨識紅框或圈選範圍內的主體是什麼？
+    請用繁體中文回答，並簡短介紹它的名稱、特色以及相關的趣味冷知識。
+    如果無法辨識，請幽默地回答「這考倒我了」。`;
+
+    // 3. 呼叫 AI API (LM Studio / OpenAI Compatible)
+    // 這裡的 URL 之後會換成您的 ngrok 網址
+    // 預設先留一個 placeholder，等您提供後我再更新
+    const AI_API_URL = process.env.AI_API_URL || 'http://localhost:1234/v1'; 
+    const AI_MODEL = 'local-model'; // LM Studio 通常不挑模型名稱
+
+    console.log('🤖 正在呼叫 AI:', AI_API_URL);
+
+    const aiResponse = await fetch(`${AI_API_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer lm-studio' // 本地通常不需要 Key，但有些 client 需要這個 header
+      },
+      body: JSON.stringify({
+        model: AI_MODEL,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              {
+                type: "image_url",
+                image_url: {
+                  url: dataUrl
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 500
+      })
+    });
+
+    if (!aiResponse.ok) {
+      const errText = await aiResponse.text();
+      console.error('AI API Error:', errText);
+      throw new Error(`AI API 回應錯誤: ${aiResponse.status}`);
+    }
+
+    const aiData = await aiResponse.json();
+    const description = aiData.choices[0].message.content;
+
+    res.json({
+      success: true,
+      description: description
+    });
+
+  } catch (err) {
+    console.error('❌ AI 辨識失敗:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'AI 暫時無法連線，請確認後端設定',
+      error: err.message
+    });
+  }
+});
 
 app.post('/api/admin/import-users', adminAuth, uploadExcel.single('file'), async (req, res) => {
   const { simulateActivity, startDate, endDate } = req.body;
