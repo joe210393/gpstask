@@ -12,6 +12,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const analyzeBtn = document.getElementById('analyzeBtn');
     const aiLoading = document.getElementById('aiLoading');
     const aiResult = document.getElementById('aiResult');
+    const debugEl = document.getElementById('debugConsole');
+
+    function log(msg) {
+        console.log(msg);
+        if (debugEl) debugEl.innerText = msg + '\n' + debugEl.innerText.substring(0, 100);
+    }
 
     // State
     let isDrawing = false;
@@ -77,6 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const pos = getPos(e);
         points.push(pos);
+        log(`Start: ${Math.round(pos.x)}, ${Math.round(pos.y)}`);
         
         ctx.beginPath();
         ctx.moveTo(pos.x, pos.y);
@@ -94,6 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const pos = getPos(e);
         points.push(pos);
+        // log(`Move: ${points.length}`);
         
         ctx.lineTo(pos.x, pos.y);
         ctx.stroke();
@@ -104,10 +112,13 @@ document.addEventListener('DOMContentLoaded', () => {
         isDrawing = false;
         ctx.closePath();
         
-        if (points.length > 10) { // 確保不是誤觸
+        log(`End: points=${points.length}`);
+        
+        if (points.length > 5) { // 放寬限制，原本是 10
             processSelection();
         } else {
             // 清除無效繪圖
+            log('太短了');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             instruction.style.opacity = '1';
         }
@@ -154,12 +165,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const width = maxX - minX;
         const height = maxY - minY;
 
-        if (width < 50 || height < 50) {
-            // 太小了，重來
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            instruction.style.opacity = '1';
-            return;
-        }
+        log(`Size: ${Math.round(width)}x${Math.round(height)}`);
+
+        // if (width < 50 || height < 50) {
+        //     // 太小了，重來
+        //     log('範圍太小');
+        //     ctx.clearRect(0, 0, canvas.width, canvas.height);
+        //     instruction.style.opacity = '1';
+        //     return;
+        // }
 
         // 2. 從 Video 截圖
         // 建立一個臨時 Canvas 來畫 Video
