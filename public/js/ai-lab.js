@@ -13,11 +13,40 @@ document.addEventListener('DOMContentLoaded', () => {
     const aiLoading = document.getElementById('aiLoading');
     const aiResult = document.getElementById('aiResult');
     const debugEl = document.getElementById('debugConsole');
+    const rawOutput = document.getElementById('rawOutput');
+    
+    // Director Panel Elements
+    const directorToggle = document.getElementById('directorToggle');
+    const directorPanel = document.getElementById('directorPanel');
+    const systemPromptInput = document.getElementById('systemPrompt');
+    const userPromptInput = document.getElementById('userPrompt');
 
     function log(msg) {
         console.log(msg);
         if (debugEl) debugEl.innerText = msg + '\n' + debugEl.innerText.substring(0, 100);
     }
+
+    // --- 預設 Prompt 設定 (雙重人格範本) ---
+    const DEFAULT_SYSTEM_PROMPT = 
+`你是一個森林小精靈，個性調皮可愛。
+請依照以下 XML 格式回答：
+<analysis>
+請用嚴謹的植物學角度分析圖片內容，辨識這是什麼植物或物體，並判斷信心度。
+</analysis>
+<reply>
+根據分析結果，用「小精靈」的口吻跟玩家對話。如果發現是人造物(如手機、水瓶)，就假裝沒看過並感到好奇。
+</reply>`;
+
+    const DEFAULT_USER_PROMPT = "這是什麼東西？";
+
+    // 初始化輸入框
+    systemPromptInput.value = DEFAULT_SYSTEM_PROMPT;
+    userPromptInput.value = DEFAULT_USER_PROMPT;
+
+    // Director Panel Toggle
+    directorToggle.addEventListener('click', () => {
+        directorPanel.classList.toggle('open');
+    });
 
     // State
     let isDrawing = false;
@@ -43,14 +72,14 @@ document.addEventListener('DOMContentLoaded', () => {
             log('正在啟動相機...');
             
             try {
-                // 嘗試 1: 指定模式 (後鏡頭/前鏡頭)
+                // 嘗試 1: 指定模式
                 stream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: facingMode },
                     audio: false
                 });
             } catch (err1) {
                 log('指定鏡頭失敗，嘗試通用設定: ' + err1.name);
-                // 嘗試 2: 放棄指定，只要有畫面就好 (Fallback)
+                // 嘗試 2: Fallback
                 stream = await navigator.mediaDevices.getUserMedia({
                     video: true,
                     audio: false
@@ -58,7 +87,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             video.srcObject = stream;
-            // Android 關鍵：必須明確呼叫 play()，並處理 Promise
             try {
                 await video.play();
                 log('相機啟動成功');
@@ -68,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
         } catch (err) {
             console.error('相機啟動失敗:', err);
-            log('相機致命錯誤: ' + err.name + ' - ' + err.message);
+            log('相機致命錯誤: ' + err.name);
             
             let msg = '無法存取相機，請確認權限';
             if (err.name === 'NotAllowedError') msg = '您拒絕了相機權限，請至設定開啟';
@@ -91,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     backBtn.addEventListener('click', () => {
-        window.location.href = '/'; // 回首頁
+        window.location.href = '/'; 
     });
 
     // 2. Drawing Logic
@@ -103,8 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startDraw(e) {
-        // 如果結果面板已經打開，禁止繪畫
-        if (resultPanel.classList.contains('active')) return;
+        if (resultPanel.style.display === 'flex') return;
 
         isDrawing = true;
         points = [];
@@ -117,20 +144,19 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.beginPath();
         ctx.moveTo(pos.x, pos.y);
         ctx.lineWidth = 4;
-        ctx.strokeStyle = '#ffd700'; // 金黃色
+        ctx.strokeStyle = '#ffd700'; 
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        instruction.style.opacity = '0'; // 隱藏提示
+        instruction.style.opacity = '0';
     }
 
     function moveDraw(e) {
         if (!isDrawing) return;
-        e.preventDefault(); // 防止捲動
+        e.preventDefault(); 
         
         const pos = getPos(e);
         points.push(pos);
-        // log(`Move: ${points.length}`);
         
         ctx.lineTo(pos.x, pos.y);
         ctx.stroke();
@@ -143,39 +169,34 @@ document.addEventListener('DOMContentLoaded', () => {
         
         log(`End: points=${points.length}`);
         
-        if (points.length > 5) { // 放寬限制，原本是 10
+        if (points.length > 5) {
             processSelection();
         } else {
-            // 清除無效繪圖
             log('太短了');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             instruction.style.opacity = '1';
         }
     }
 
-    // Event Listeners for Touch/Mouse
-    // 使用 passive: false 來確保可以 preventDefault
+    // Event Listeners
     canvas.addEventListener('mousedown', startDraw);
     canvas.addEventListener('mousemove', moveDraw);
     canvas.addEventListener('mouseup', endDraw);
     
-    // 修正觸控事件綁定
     canvas.addEventListener('touchstart', startDraw, { passive: false });
     canvas.addEventListener('touchmove', moveDraw, { passive: false });
     canvas.addEventListener('touchend', (e) => {
-        e.preventDefault(); // 防止觸發 click
+        e.preventDefault();
         endDraw();
     }, { passive: false });
-    canvas.addEventListener('touchcancel', endDraw); // 增加 touchcancel 處理
+    canvas.addEventListener('touchcancel', endDraw);
 
-    // 增加一個強制結束按鈕 (以防滑出邊界)
     document.body.addEventListener('mouseup', () => {
         if(isDrawing) endDraw();
     });
 
     // 3. Image Processing (Crop & Cut)
     function processSelection() {
-        // 1. 計算 Bounding Box (最小外接矩形)
         let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
         points.forEach(p => {
             if (p.x < minX) minX = p.x;
@@ -184,7 +205,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (p.y > maxY) maxY = p.y;
         });
 
-        // 增加一點 padding
         const padding = 20;
         minX = Math.max(0, minX - padding);
         minY = Math.max(0, minY - padding);
@@ -196,24 +216,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         log(`Size: ${Math.round(width)}x${Math.round(height)}`);
 
-        // if (width < 50 || height < 50) {
-        //     // 太小了，重來
-        //     log('範圍太小');
-        //     ctx.clearRect(0, 0, canvas.width, canvas.height);
-        //     instruction.style.opacity = '1';
-        //     return;
-        // }
-
-        // 2. 從 Video 截圖
-        // 建立一個臨時 Canvas 來畫 Video
+        // Crop Logic
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = video.videoWidth;
         tempCanvas.height = video.videoHeight;
         const tempCtx = tempCanvas.getContext('2d');
         tempCtx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
 
-        // 計算 Video 到 Screen 的比例
-        // 因為 object-fit: cover，需要算裁切偏移
         const screenRatio = canvas.width / canvas.height;
         const videoRatio = video.videoWidth / video.videoHeight;
         
@@ -231,13 +240,11 @@ document.addEventListener('DOMContentLoaded', () => {
             offsetY = 0;
         }
 
-        // 映射座標回 Video 原始尺寸
         const sourceX = (minX - offsetX) * (video.videoWidth / renderWidth);
         const sourceY = (minY - offsetY) * (video.videoHeight / renderHeight);
         const sourceW = width * (video.videoWidth / renderWidth);
         const sourceH = height * (video.videoHeight / renderHeight);
 
-        // 3. 裁切最終圖片
         const finalCanvas = document.createElement('canvas');
         finalCanvas.width = width;
         finalCanvas.height = height;
@@ -251,16 +258,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 0, 0, width, height
             );
             
-            // 顯示結果
             const dataUrl = finalCanvas.toDataURL('image/jpeg', 0.8);
             croppedImage.src = dataUrl;
-            log('截圖成功，準備顯示面板');
+            log('截圖成功');
             
             showResultPanel();
         } catch (e) {
             console.error('截圖失敗', e);
             log('截圖失敗: ' + e.message);
-            // 即使失敗也顯示面板，方便除錯
             aiResult.innerHTML = '<span style="color:red">截圖失敗: ' + e.message + '</span>';
             showResultPanel();
         }
@@ -268,18 +273,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function showResultPanel() {
         log('呼叫 showResultPanel');
-        resultPanel.style.display = 'flex'; // 強制顯示
-        // 強制重繪
+        resultPanel.style.display = 'flex';
         resultPanel.offsetHeight; 
         resultPanel.classList.add('active');
         
-        aiResult.innerHTML = '準備就緒，點擊「AI 辨識」開始分析';
+        // 如果還沒辨識過，清空結果
+        if (!aiResult.innerHTML.includes('辨識結果')) {
+            aiResult.innerHTML = '準備就緒，點擊「AI 辨識」開始分析';
+            rawOutput.style.display = 'none';
+        }
         analyzeBtn.disabled = false;
         analyzeBtn.textContent = 'AI 辨識';
     }
 
     function retry() {
         resultPanel.classList.remove('active');
+        resultPanel.style.display = 'none';
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         instruction.style.opacity = '1';
         aiResult.innerHTML = '';
@@ -293,22 +302,26 @@ document.addEventListener('DOMContentLoaded', () => {
         analyzeBtn.disabled = true;
         aiLoading.classList.remove('hidden');
         aiResult.innerHTML = '';
+        rawOutput.style.display = 'none';
 
         try {
-            // 將 DataURL 轉為 Blob
             const response = await fetch(croppedImage.src);
             const blob = await response.blob();
             
             const formData = new FormData();
             formData.append('image', blob, 'capture.jpg');
+            
+            // 加入使用者自訂的 Prompts
+            formData.append('systemPrompt', systemPromptInput.value);
+            formData.append('userPrompt', userPromptInput.value);
 
-            // 取得 GPS (縮短超時時間)
+            // GPS
             let gps = null;
             try {
                 const pos = await new Promise((resolve, reject) => {
                     navigator.geolocation.getCurrentPosition(resolve, reject, { 
-                        timeout: 2000, // 縮短為 2 秒
-                        enableHighAccuracy: false // 犧牲一點精度換速度
+                        timeout: 2000, 
+                        enableHighAccuracy: false 
                     });
                 });
                 gps = { lat: pos.coords.latitude, lng: pos.coords.longitude };
@@ -316,12 +329,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 formData.append('longitude', gps.lng);
                 console.log('GPS 取得成功:', gps);
             } catch (e) {
-                console.warn('無法取得 GPS (或超時)，將進行無 GPS 辨識', e);
+                console.warn('GPS 失敗', e);
             }
 
-            console.log('正在傳送圖片至後端...');
+            console.log('傳送至後端...');
 
-            // 呼叫後端 API
             const apiRes = await fetch('/api/vision-test', {
                 method: 'POST',
                 body: formData
@@ -329,18 +341,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!apiRes.ok) {
                 const errText = await apiRes.text();
-                throw new Error(`伺服器回應錯誤 (${apiRes.status}): ${errText}`);
+                throw new Error(`伺服器錯誤 (${apiRes.status}): ${errText}`);
             }
 
             const data = await apiRes.json();
             console.log('後端回應:', data);
 
             if (data.success) {
-                // 將換行符號轉換為 HTML 換行
-                const formattedText = data.description.replace(/\n/g, '<br>');
-                aiResult.innerHTML = formattedText;
+                const fullText = data.description;
+                
+                // 嘗試解析 XML
+                const replyMatch = fullText.match(/<reply>([\s\S]*?)<\/reply>/i);
+                
+                if (replyMatch) {
+                    // 找到 reply 標籤，只顯示這部分
+                    aiResult.innerHTML = replyMatch[1].trim().replace(/\n/g, '<br>');
+                    
+                    // 顯示原始 XML 給開發者看
+                    rawOutput.style.display = 'block';
+                    rawOutput.innerText = "--- 原始回傳 (Raw XML) ---\n" + fullText;
+                } else {
+                    // 沒找到標籤，全顯示
+                    aiResult.innerHTML = fullText.replace(/\n/g, '<br>');
+                }
+
             } else {
-                aiResult.innerHTML = `<span style="color:red">AI 辨識失敗: ${data.message || '未知錯誤'}</span>`;
+                aiResult.innerHTML = `<span style="color:red">辨識失敗: ${data.message}</span>`;
             }
 
         } catch (err) {

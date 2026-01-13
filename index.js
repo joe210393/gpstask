@@ -3103,15 +3103,17 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
     const dataUrl = `data:${req.file.mimetype};base64,${base64Image}`;
 
     // 2. 準備 AI 提示詞 (Prompt)
-    // 如果有 GPS，加入地點資訊
+    // 優先使用前端傳來的自訂 Prompt (導演模式)
+    const systemPrompt = req.body.systemPrompt || '你是一個有用的 AI 助手。';
+    const userPromptText = req.body.userPrompt || '請辨識這張圖片的內容。';
+
+    // 如果有 GPS，加入地點資訊到 User Prompt 後面
     let locationInfo = '';
     if (req.body.latitude && req.body.longitude) {
-      locationInfo = `(拍攝地點: 緯度 ${req.body.latitude}, 經度 ${req.body.longitude})`;
+      locationInfo = `\n(拍攝地點: 緯度 ${req.body.latitude}, 經度 ${req.body.longitude})`;
     }
 
-    const prompt = `這是一張使用者在${locationInfo}拍攝並圈選的照片。請辨識紅框或圈選範圍內的主體是什麼？
-    請用繁體中文回答，並簡短介紹它的名稱、特色以及相關的趣味冷知識。
-    如果無法辨識，請幽默地回答「這考倒我了」。`;
+    const finalUserPrompt = userPromptText + locationInfo;
 
     // 3. 呼叫 AI API (LM Studio / OpenAI Compatible)
     // 使用您的 ngrok 網址
@@ -3119,20 +3121,25 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
     const AI_MODEL = 'local-model'; // LM Studio 通常不挑模型名稱
 
     console.log('🤖 正在呼叫 AI:', AI_API_URL);
+    console.log('📝 System Prompt:', systemPrompt.substring(0, 50) + '...');
 
     const aiResponse = await fetch(`${AI_API_URL}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer lm-studio' // 本地通常不需要 Key，但有些 client 需要這個 header
+        'Authorization': 'Bearer lm-studio'
       },
       body: JSON.stringify({
         model: AI_MODEL,
         messages: [
           {
+            role: "system",
+            content: systemPrompt
+          },
+          {
             role: "user",
             content: [
-              { type: "text", text: prompt },
+              { type: "text", text: finalUserPrompt },
               {
                 type: "image_url",
                 image_url: {
@@ -3142,7 +3149,8 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
             ]
           }
         ],
-        max_tokens: 500
+        max_tokens: 800, // 增加 token 數以容納分析過程
+        temperature: 0.7 // 稍微增加創造力
       })
     });
 

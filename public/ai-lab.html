@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 視覺實驗室</title>
+    <title>AI 視覺實驗室 (Director Mode)</title>
     <link rel="stylesheet" href="css/ai-lab.css">
     <!-- 引入 SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -11,7 +11,7 @@
 <body>
     <div class="camera-container">
         <!-- Debug Console -->
-        <div id="debugConsole" style="position:fixed; top:60px; left:10px; z-index:9999; color:#0f0; background:rgba(0,0,0,0.5); font-size:12px; pointer-events:none; max-width:200px; word-break:break-all;">Debug Init...</div>
+        <div id="debugConsole" style="position:fixed; top:20px; left:10px; z-index:9999; color:#0f0; background:rgba(0,0,0,0.5); font-size:12px; pointer-events:none; max-width:200px; word-break:break-all;">Debug Init...</div>
         
         <!-- 相機畫面 -->
         <video id="cameraFeed" autoplay playsinline muted></video>
@@ -26,13 +26,35 @@
                 <div class="status-pill">AI Vision Lab</div>
                 <button id="switchCameraBtn" class="icon-btn">↻</button>
             </div>
+
+            <!-- 導演模式開關 -->
+            <button id="directorToggle" class="director-toggle">🎬 導演設定</button>
+
+            <!-- 導演控制台 -->
+            <div id="directorPanel" class="director-panel">
+                <div class="panel-title">導演控制台 (Prompt Engineering)</div>
+                
+                <div class="input-group">
+                    <label>System Prompt (劇本設定)</label>
+                    <textarea id="systemPrompt" class="director-input"></textarea>
+                </div>
+
+                <div class="input-group">
+                    <label>User Prompt (玩家指令)</label>
+                    <textarea id="userPrompt" class="director-input" style="min-height: 40px;"></textarea>
+                </div>
+                
+                <div style="font-size:10px; color:#aaa; margin-top:5px;">
+                    * 修改後下次辨識生效
+                </div>
+            </div>
             
             <div class="instruction">
                 請用手指圈選物體
             </div>
 
             <!-- 結果展示區 (隱藏) -->
-            <div id="resultPanel" class="result-panel hidden">
+            <div id="resultPanel" class="result-panel">
                 <div class="result-content">
                     <img id="croppedImage" src="" alt="Cropped">
                     <div class="analysis-box">
@@ -40,6 +62,7 @@
                             <div class="spinner"></div> 正在分析...
                         </div>
                         <div id="aiResult" class="ai-text"></div>
+                        <div id="rawOutput" class="raw-output"></div>
                     </div>
                 </div>
                 <div class="action-buttons">
