@@ -30,6 +30,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 預設 Prompt 設定 (劇本庫) ---
     const PROMPTS = {
         free: {
+            title: "🌿 自由探索模式",
+            intro: "這裡沒有任務壓力，你可以隨意拍攝身邊的植物或物品，我會為你介紹它們的小知識。",
             system: `你是一位博學多聞的生態研究員與生活智慧王。
 請依照以下 XML 格式回答：
 <analysis>
@@ -43,6 +45,8 @@ document.addEventListener('DOMContentLoaded', () => {
             user: "請問這是什麼？有什麼特別的嗎？"
         },
         mission: {
+            title: "🛡️ 密室逃脫任務：遙控器之謎",
+            intro: "【劇情前情提要】\n你醒來時發現自己被困在一個陌生的房間，門窗都打不開。\n牆上的電視閃爍著雜訊，旁邊有一張紙條寫著：\n「只有看見真相的人才能離開...」\n\n看來你必須找到【遙控器】並打開電視，才能找到逃脫的線索。\n快看看四周有什麼可疑的東西吧！",
             system: `你是一個性格扭曲、講話陰陽怪氣的密室設計者，正在監視器後面看著玩家。
 玩家被困在房間，必須找到【遙控器】打開電視才能活著出去。
 
@@ -84,10 +88,19 @@ document.addEventListener('DOMContentLoaded', () => {
             systemPromptInput.value = script.system;
             userPromptInput.value = script.user;
             
-            // 視覺回饋：讓輸入框閃一下提示更新
+            // 視覺回饋
             systemPromptInput.style.transition = 'background 0.3s';
             systemPromptInput.style.background = '#333';
             setTimeout(() => { systemPromptInput.style.background = ''; }, 300);
+
+            // 彈出劇情介紹 (Story Intro)
+            Swal.fire({
+                title: script.title,
+                text: script.intro,
+                icon: mode === 'mission' ? 'warning' : 'info',
+                confirmButtonText: '開始',
+                backdrop: `rgba(0,0,0,0.8)`
+            });
         }
     }
 
