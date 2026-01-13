@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AI 視覺實驗室 (Director Mode)</title>
     <link rel="stylesheet" href="css/ai-lab.css">
+    <link rel="stylesheet" href="css/mode-switch.css">
     <!-- 引入 SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
@@ -29,6 +30,12 @@
 
             <!-- 導演模式開關 -->
             <button id="directorToggle" class="director-toggle">🎬 導演設定</button>
+
+            <!-- 模式切換器 -->
+            <div class="mode-switcher">
+                <button class="mode-btn active" data-mode="free">🌿 自由探索</button>
+                <button class="mode-btn" data-mode="mission">🛡️ 任務模式</button>
+            </div>
 
             <!-- 導演控制台 -->
             <div id="directorPanel" class="director-panel">

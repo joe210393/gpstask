@@ -20,28 +20,86 @@ document.addEventListener('DOMContentLoaded', () => {
     const directorPanel = document.getElementById('directorPanel');
     const systemPromptInput = document.getElementById('systemPrompt');
     const userPromptInput = document.getElementById('userPrompt');
+    const modeBtns = document.querySelectorAll('.mode-btn');
 
     function log(msg) {
         console.log(msg);
         if (debugEl) debugEl.innerText = msg + '\n' + debugEl.innerText.substring(0, 100);
     }
 
-    // --- 預設 Prompt 設定 (雙重人格範本) ---
-    const DEFAULT_SYSTEM_PROMPT = 
-`你是一個森林小精靈，個性調皮可愛。
+    // --- 預設 Prompt 設定 (劇本庫) ---
+    const PROMPTS = {
+        free: {
+            system: `你是一位博學多聞的生態研究員與生活智慧王。
 請依照以下 XML 格式回答：
 <analysis>
-請用嚴謹的植物學角度分析圖片內容，辨識這是什麼植物或物體，並判斷信心度。
+客觀辨識圖片中的物體、植物或場景。如果是植物，請分析其特徵。
 </analysis>
 <reply>
-根據分析結果，用「小精靈」的口吻跟玩家對話。如果發現是人造物(如手機、水瓶)，就假裝沒看過並感到好奇。
-</reply>`;
+用親切、專業但通俗的語氣向玩家介紹這個東西。
+- 如果是植物/動物：介紹學名、別名、冷知識或用途。
+- 如果是物品：介紹它的用途，或是提供一個相關的生活小撇步。
+</reply>`,
+            user: "請問這是什麼？有什麼特別的嗎？"
+        },
+        mission: {
+            system: `你是一個性格扭曲、講話陰陽怪氣的密室設計者，正在監視器後面看著玩家。
+玩家被困在房間，必須找到【遙控器】打開電視才能活著出去。
 
-    const DEFAULT_USER_PROMPT = "這是什麼東西？";
+請依照 XML 格式回答：
+<analysis>
+1. 辨識物品。
+2. 聯想：這物品能不能用來破壞場景？
+</analysis>
+<reply>
+請用嘲諷、神秘或令人不安的語氣回應。禁止使用客服用語。
 
-    // 初始化輸入框
-    systemPromptInput.value = DEFAULT_SYSTEM_PROMPT;
-    userPromptInput.value = DEFAULT_USER_PROMPT;
+如果玩家拍到【遙控器】：
+恭喜他，用驚訝且不甘心的語氣說：「切...居然被你找到了。好吧，快打開電視，滾出我的視線！」
+
+如果玩家拍錯東西：
+盡情嘲諷他。例如拍美工刀就說：「想割腕嗎？這救不了你。」
+</reply>`,
+            user: "我找到了這個，這能幫我逃出去嗎？"
+        }
+    };
+
+    // 切換模式邏輯
+    function setMode(mode) {
+        // UI 更新
+        modeBtns.forEach(btn => {
+            if (btn.dataset.mode === mode) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+
+        // Body class 更新 (用於 CSS 特效)
+        document.body.className = `mode-${mode}`;
+
+        // Prompt 更新
+        const script = PROMPTS[mode];
+        if (script) {
+            systemPromptInput.value = script.system;
+            userPromptInput.value = script.user;
+            
+            // 視覺回饋：讓輸入框閃一下提示更新
+            systemPromptInput.style.transition = 'background 0.3s';
+            systemPromptInput.style.background = '#333';
+            setTimeout(() => { systemPromptInput.style.background = ''; }, 300);
+        }
+    }
+
+    // 綁定按鈕事件
+    modeBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            setMode(btn.dataset.mode);
+        });
+    });
+
+    // 初始化預設模式
+    setMode('free');
 
     // Director Panel Toggle
     directorToggle.addEventListener('click', () => {

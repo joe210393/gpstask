@@ -1,0 +1,66 @@
+/* 模式切換器容器 */
+.mode-switcher {
+    position: absolute;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: 25px;
+    padding: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    z-index: 20;
+    backdrop-filter: blur(10px);
+}
+
+.mode-btn {
+    padding: 8px 16px;
+    border-radius: 20px;
+    border: none;
+    background: transparent;
+    color: #aaa;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.mode-btn.active {
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+/* 自由模式激活樣式 */
+.mode-btn[data-mode="free"].active {
+    background: #34c759; /* 綠色 */
+}
+
+/* 任務模式激活樣式 */
+.mode-btn[data-mode="mission"].active {
+    background: #ff3b30; /* 紅色 */
+}
+
+/* 配合模式切換的相機邊框效果 (選做) */
+body.mode-free .camera-container {
+    border: 0px solid transparent;
+}
+
+body.mode-mission .camera-container::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border: 4px solid rgba(255, 59, 48, 0.5);
+    pointer-events: none;
+    z-index: 5;
+    animation: pulse-border 2s infinite;
+}
+
+@keyframes pulse-border {
+    0% { border-color: rgba(255, 59, 48, 0.3); }
+    50% { border-color: rgba(255, 59, 48, 0.7); }
+    100% { border-color: rgba(255, 59, 48, 0.3); }
+}
