@@ -8,29 +8,34 @@ function log(msg) {
 log('JS Loaded. 等待 DOMContentLoaded...');
 
 document.addEventListener('DOMContentLoaded', () => {
-    log('DOM Ready');
-    
-    // DOM Elements
-    const video = document.getElementById('cameraFeed');
-    const canvas = document.getElementById('drawingCanvas');
-    const ctx = canvas.getContext('2d');
-    const instruction = document.querySelector('.instruction');
-    const resultPanel = document.getElementById('resultPanel');
-    const croppedImage = document.getElementById('croppedImage');
-    const backBtn = document.getElementById('backBtn');
-    const switchCameraBtn = document.getElementById('switchCameraBtn');
-    const retryBtn = document.getElementById('retryBtn');
-    const analyzeBtn = document.getElementById('analyzeBtn');
-    const aiLoading = document.getElementById('aiLoading');
-    const aiResult = document.getElementById('aiResult');
-    const rawOutput = document.getElementById('rawOutput');
-    
-    // Director Panel Elements
-    const directorToggle = document.getElementById('directorToggle');
-    const directorPanel = document.getElementById('directorPanel');
-    const systemPromptInput = document.getElementById('systemPrompt');
-    const userPromptInput = document.getElementById('userPrompt');
-    const modeBtns = document.querySelectorAll('.mode-btn');
+    try {
+        log('DOM Ready');
+        
+        // DOM Elements
+        const video = document.getElementById('cameraFeed');
+        if (!video) throw new Error('找不到 cameraFeed 元素');
+        
+        const canvas = document.getElementById('drawingCanvas');
+        const ctx = canvas.getContext('2d');
+        const instruction = document.querySelector('.instruction');
+        const resultPanel = document.getElementById('resultPanel');
+        const croppedImage = document.getElementById('croppedImage');
+        const backBtn = document.getElementById('backBtn');
+        const switchCameraBtn = document.getElementById('switchCameraBtn');
+        const retryBtn = document.getElementById('retryBtn');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const aiLoading = document.getElementById('aiLoading');
+        const aiResult = document.getElementById('aiResult');
+        const rawOutput = document.getElementById('rawOutput');
+        
+        // Director Panel Elements
+        const directorToggle = document.getElementById('directorToggle');
+        const directorPanel = document.getElementById('directorPanel');
+        const systemPromptInput = document.getElementById('systemPrompt');
+        const userPromptInput = document.getElementById('userPrompt');
+        const modeBtns = document.querySelectorAll('.mode-btn');
+
+        log('元素抓取完成，準備初始化...');
 
     // (移除內部的 log 定義)
 
