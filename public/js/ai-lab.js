@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
 2. 比對該物品是否為「電視遙控器」。注意：形狀相似的長方形物體(如藥罐、眼鏡盒)都不是遙控器。
 3. 只有在【100% 確定是遙控器】時，才算成功。
 
-請依照 XML 格式回答：
+請依照 XML 格式回答，**必須完成兩個標籤**：
 <analysis>
 1. 我看到的物品是：(例如：一罐魚油)
 2. 它是不是遙控器：(是/否)
@@ -70,7 +70,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 範例 B (是遙控器)：
 切...居然被你找到了。好吧，快打開電視，滾出我的視線！
-</reply>`,
+</reply>
+
+**重要：必須完成 `<reply>` 標籤才能結束回應，否則任務失敗。**`,
             user: "我找到了這個，這能幫我逃出去嗎？"
         }
     };
@@ -437,21 +439,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (replyMatch) {
                     // 完美格式：只顯示 <reply> 內容
                     aiResult.innerHTML = replyMatch[1].trim().replace(/\n/g, '<br>');
-                    
-                    // rawOutput.style.display = 'block'; // 隱藏除錯資訊
-                    // rawOutput.innerText = "--- 原始回傳 (Standard XML) ---\n" + fullText;
+                    console.log("--- 原始回傳 (Standard XML) ---\n", fullText);
 
                 } else if (analysisEndIndex !== -1) {
                     // 偷懶格式：把 </analysis> 之前的心裡話切掉，顯示剩下的
                     const content = fullText.substring(analysisEndIndex + 11).trim();
                     aiResult.innerHTML = content.replace(/\n/g, '<br>');
-                    
-                    // rawOutput.style.display = 'block'; // 隱藏除錯資訊
-                    // rawOutput.innerText = "--- 原始回傳 (Partial XML) ---\n" + fullText;
+                    console.log("--- 原始回傳 (Partial XML) ---\n", fullText);
 
                 } else {
-                    // 完全沒格式：全顯示
-                    aiResult.innerHTML = fullText.replace(/\n/g, '<br>');
+                    // 3. 極端容錯：AI 只寫了 <analysis> 但沒寫完
+                    const analysisMatch = fullText.match(/<analysis>([\s\S]*)/i);
+                    if (analysisMatch) {
+                        const analysisText = analysisMatch[1];
+                        // 嘗試從分析中提取「是否為遙控器」的答案
+                        const isRemoteMatch = analysisText.match(/它是不是遙控器[：:]\s*(是|否|\(是\)|\(否\))/i);
+                        const isRemote = isRemoteMatch && (isRemoteMatch[1].includes('是') || isRemoteMatch[1].includes('Yes'));
+                        
+                        // 根據答案生成預設回應
+                        if (isRemote) {
+                            aiResult.innerHTML = '切...居然被你找到了。好吧，快打開電視，滾出我的視線！';
+                        } else {
+                            // 提取物品名稱
+                            const itemMatch = analysisText.match(/我看到的物品是[：:]\s*(.+?)(?:\n|$)/i);
+                            const itemName = itemMatch ? itemMatch[1].trim() : '這個東西';
+                            aiResult.innerHTML = `哈？你拿${itemName}想幹嘛？這不是遙控器！快去給我找真正的遙控器！`;
+                        }
+                        console.log("--- 原始回傳 (Incomplete XML) ---\n", fullText);
+                    } else {
+                        // 完全沒格式：全顯示
+                        aiResult.innerHTML = fullText.replace(/\n/g, '<br>');
+                    }
                 }
 
             } else {
