@@ -421,18 +421,29 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.success) {
                 const fullText = data.description;
                 
-                // 嘗試解析 XML
+                // 1. 嘗試標準 XML 解析 (<reply>...</reply>)
                 const replyMatch = fullText.match(/<reply>([\s\S]*?)<\/reply>/i);
                 
+                // 2. 嘗試容錯解析 (如果 AI 忘了寫 <reply>，但有寫 </analysis>)
+                const analysisEndIndex = fullText.indexOf('</analysis>');
+
                 if (replyMatch) {
-                    // 找到 reply 標籤，只顯示這部分
+                    // 完美格式：只顯示 <reply> 內容
                     aiResult.innerHTML = replyMatch[1].trim().replace(/\n/g, '<br>');
                     
-                    // 顯示原始 XML 給開發者看
                     rawOutput.style.display = 'block';
-                    rawOutput.innerText = "--- 原始回傳 (Raw XML) ---\n" + fullText;
+                    rawOutput.innerText = "--- 原始回傳 (Standard XML) ---\n" + fullText;
+
+                } else if (analysisEndIndex !== -1) {
+                    // 偷懶格式：把 </analysis> 之前的心裡話切掉，顯示剩下的
+                    const content = fullText.substring(analysisEndIndex + 11).trim();
+                    aiResult.innerHTML = content.replace(/\n/g, '<br>');
+                    
+                    rawOutput.style.display = 'block';
+                    rawOutput.innerText = "--- 原始回傳 (Partial XML) ---\n" + fullText;
+
                 } else {
-                    // 沒找到標籤，全顯示
+                    // 完全沒格式：全顯示
                     aiResult.innerHTML = fullText.replace(/\n/g, '<br>');
                 }
 
