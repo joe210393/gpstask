@@ -179,15 +179,36 @@ document.addEventListener('DOMContentLoaded', () => {
             log('相機致命錯誤: ' + err.name);
             
             let msg = '無法存取相機，請確認權限';
-            if (err.name === 'NotAllowedError') msg = '您拒絕了相機權限，請至設定開啟';
-            if (err.name === 'NotFoundError') msg = '找不到相機裝置';
+            let showRetry = false;
             
-            Swal.fire({
+            if (err.name === 'NotAllowedError') {
+                msg = '您拒絕了相機權限';
+                showRetry = true;
+            } else if (err.name === 'NotFoundError') {
+                msg = '找不到相機裝置';
+            }
+            
+            const swalConfig = {
                 icon: 'error',
                 title: '相機錯誤',
                 text: `${msg} (${err.name})`,
-                footer: '建議使用 Chrome 瀏覽器開啟'
-            });
+                footer: '建議使用 Chrome 瀏覽器開啟',
+                confirmButtonText: showRetry ? '重新請求權限' : '確定'
+            };
+            
+            if (showRetry) {
+                swalConfig.showCancelButton = true;
+                swalConfig.cancelButtonText = '取消';
+            }
+            
+            const result = await Swal.fire(swalConfig);
+            
+            // 如果用戶點擊「重新請求權限」，再次嘗試啟動相機
+            if (result.isConfirmed && showRetry) {
+                setTimeout(() => {
+                    startCamera();
+                }, 500);
+            }
         }
     }
 
