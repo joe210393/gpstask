@@ -94,6 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 切換模式邏輯
     function setMode(mode) {
+        currentMode = mode;
         // UI 更新
         modeBtns.forEach(btn => {
             if (btn.dataset.mode === mode) {
@@ -148,6 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let points = [];
     let stream = null;
     let facingMode = 'environment'; // 預設使用後鏡頭
+    let currentMode = 'free'; // 追蹤當前模式
 
     // Init Canvas Size
     function resizeCanvas() {
@@ -429,8 +431,16 @@ document.addEventListener('DOMContentLoaded', () => {
             formData.append('image', blob, 'capture.jpg');
             
             // 加入使用者自訂的 Prompts
-            log('Sending System Prompt: ' + systemPromptInput.value.substring(0, 20) + '...');
-            formData.append('systemPrompt', systemPromptInput.value);
+            // 防呆：如果輸入框是空的，強制使用預設值
+            let finalSystemPrompt = systemPromptInput.value;
+            if (!finalSystemPrompt || finalSystemPrompt.length < 10) {
+                log('警告：Prompt 遺失，使用預設值修復');
+                finalSystemPrompt = PROMPTS[currentMode].system;
+                systemPromptInput.value = finalSystemPrompt; // 同步回 UI
+            }
+
+            log('Sending System Prompt: ' + finalSystemPrompt.substring(0, 20) + '...');
+            formData.append('systemPrompt', finalSystemPrompt);
             formData.append('userPrompt', userPromptInput.value);
 
             // GPS
