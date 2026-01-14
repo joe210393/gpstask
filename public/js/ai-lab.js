@@ -519,4 +519,10 @@ document.addEventListener('DOMContentLoaded', () => {
             analyzeBtn.textContent = '再次辨識';
         }
     });
+
+    } catch (criticalErr) {
+        console.error('致命錯誤:', criticalErr);
+        log('致命錯誤: ' + criticalErr.message);
+        alert('程式啟動失敗: ' + criticalErr.message);
+    }
 });
