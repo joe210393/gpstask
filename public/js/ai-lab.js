@@ -429,6 +429,7 @@ document.addEventListener('DOMContentLoaded', () => {
             formData.append('image', blob, 'capture.jpg');
             
             // 加入使用者自訂的 Prompts
+            log('Sending System Prompt: ' + systemPromptInput.value.substring(0, 20) + '...');
             formData.append('systemPrompt', systemPromptInput.value);
             formData.append('userPrompt', userPromptInput.value);
 
