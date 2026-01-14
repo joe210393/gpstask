@@ -438,16 +438,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     // 完美格式：只顯示 <reply> 內容
                     aiResult.innerHTML = replyMatch[1].trim().replace(/\n/g, '<br>');
                     
-                    rawOutput.style.display = 'block';
-                    rawOutput.innerText = "--- 原始回傳 (Standard XML) ---\n" + fullText;
+                    // rawOutput.style.display = 'block'; // 隱藏除錯資訊
+                    // rawOutput.innerText = "--- 原始回傳 (Standard XML) ---\n" + fullText;
 
                 } else if (analysisEndIndex !== -1) {
                     // 偷懶格式：把 </analysis> 之前的心裡話切掉，顯示剩下的
                     const content = fullText.substring(analysisEndIndex + 11).trim();
                     aiResult.innerHTML = content.replace(/\n/g, '<br>');
                     
-                    rawOutput.style.display = 'block';
-                    rawOutput.innerText = "--- 原始回傳 (Partial XML) ---\n" + fullText;
+                    // rawOutput.style.display = 'block'; // 隱藏除錯資訊
+                    // rawOutput.innerText = "--- 原始回傳 (Partial XML) ---\n" + fullText;
 
                 } else {
                     // 完全沒格式：全顯示
