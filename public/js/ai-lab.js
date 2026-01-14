@@ -1,7 +1,16 @@
-    log('JS Loaded. 等待 DOMContentLoaded...');
-    document.addEventListener('DOMContentLoaded', () => {
-        log('DOM Ready');
-        // DOM Elements
+// 1. 定義 log 函數 (Global Scope)
+const debugEl = document.getElementById('debugConsole');
+function log(msg) {
+    console.log(msg);
+    if (debugEl) debugEl.innerText = msg + '\n' + debugEl.innerText.substring(0, 100);
+}
+
+log('JS Loaded. 等待 DOMContentLoaded...');
+
+document.addEventListener('DOMContentLoaded', () => {
+    log('DOM Ready');
+    
+    // DOM Elements
     const video = document.getElementById('cameraFeed');
     const canvas = document.getElementById('drawingCanvas');
     const ctx = canvas.getContext('2d');
@@ -14,7 +23,6 @@
     const analyzeBtn = document.getElementById('analyzeBtn');
     const aiLoading = document.getElementById('aiLoading');
     const aiResult = document.getElementById('aiResult');
-    const debugEl = document.getElementById('debugConsole');
     const rawOutput = document.getElementById('rawOutput');
     
     // Director Panel Elements
@@ -24,10 +32,7 @@
     const userPromptInput = document.getElementById('userPrompt');
     const modeBtns = document.querySelectorAll('.mode-btn');
 
-    function log(msg) {
-        console.log(msg);
-        if (debugEl) debugEl.innerText = msg + '\n' + debugEl.innerText.substring(0, 100);
-    }
+    // (移除內部的 log 定義)
 
     // --- 預設 Prompt 設定 (劇本庫) ---
     const PROMPTS = {
