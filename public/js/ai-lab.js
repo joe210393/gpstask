@@ -1,5 +1,7 @@
-document.addEventListener('DOMContentLoaded', () => {
-    // DOM Elements
+    log('JS Loaded. 等待 DOMContentLoaded...');
+    document.addEventListener('DOMContentLoaded', () => {
+        log('DOM Ready');
+        // DOM Elements
     const video = document.getElementById('cameraFeed');
     const canvas = document.getElementById('drawingCanvas');
     const ctx = canvas.getContext('2d');
@@ -144,6 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 1. Camera Handling
     async function startCamera() {
+        log('startCamera 函數被呼叫');
         try {
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
