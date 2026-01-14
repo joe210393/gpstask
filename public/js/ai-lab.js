@@ -1,5 +1,8 @@
 // 1. 定義 log 函數 (Global Scope)
 const debugEl = document.getElementById('debugConsole');
+// 緊急修復：宣告一個全域 reply 變數，防止未知的 ReferenceError
+let reply = null; 
+
 function log(msg) {
     console.log(msg);
     if (debugEl) debugEl.innerText = msg + '\n' + debugEl.innerText.substring(0, 100);
