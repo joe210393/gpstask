@@ -693,25 +693,33 @@ success 或 fail (只能二選一，小寫)
                         return null;
                     }
 
+                    let finalReplyText = '';
                     if (replyMatch) {
-                        // 完美情況
-                        aiResult.innerHTML = replyMatch[1].trim().replace(/\n/g, '<br>');
+                        finalReplyText = replyMatch[1].trim();
                     } else {
                         // 容錯情況：AI 沒寫好 XML
                         // 嘗試尋找 </analysis> 之後的內容
                         const analysisEndIndex = fullText.indexOf('</analysis>');
                         if (analysisEndIndex !== -1) {
-                            const content = fullText.substring(analysisEndIndex + 11).trim();
-                            aiResult.innerHTML = content.replace(/\n/g, '<br>');
+                            finalReplyText = fullText.substring(analysisEndIndex + 11).trim();
                         } else {
                             const looseReply = extractOpenTagContent(fullText, 'reply');
                             if (looseReply) {
-                                aiResult.innerHTML = looseReply.replace(/\n/g, '<br>');
+                                finalReplyText = looseReply;
                             } else {
-                                // 最慘情況：全顯示
-                                aiResult.innerHTML = fullText.replace(/\n/g, '<br>');
+                                finalReplyText = fullText;
                             }
                         }
+                    }
+
+                    if (!finalReplyText && analysisMatch) {
+                        finalReplyText = analysisMatch[1].trim();
+                    }
+
+                    if (finalReplyText) {
+                        aiResult.innerHTML = finalReplyText.replace(/\n/g, '<br>');
+                    } else {
+                        aiResult.innerHTML = '<span style="color:red">AI 回應為空，請再試一次</span>';
                     }
 
                     // 任務模式：判斷是否過關，進入下一關
