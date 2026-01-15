@@ -181,6 +181,32 @@ canvas#drawingCanvas {
     backdrop-filter: blur(10px);
 }
 
+.lang-selector {
+    position: absolute;
+    top: 120px;
+    left: 20px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid #444;
+    border-radius: 12px;
+    padding: 6px 10px;
+    color: #fff;
+    font-size: 12px;
+    z-index: 20;
+    pointer-events: auto;
+}
+
+.lang-selector select {
+    background: #111;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 8px;
+    padding: 4px 6px;
+    font-size: 12px;
+}
+
 .director-panel.open {
     display: flex;
 }

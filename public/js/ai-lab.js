@@ -160,6 +160,7 @@ success 或 fail (只能二選一，小寫)
         const systemPromptInput = document.getElementById('systemPrompt');
         const userPromptInput = document.getElementById('userPrompt');
         const modeBtns = document.querySelectorAll('.mode-btn');
+        const langSelect = document.getElementById('langSelect');
         const cameraContainer = document.querySelector('.camera-container');
         let miniMapEl = document.getElementById('miniMap');
         let locationInfoEl = document.getElementById('locationInfo');
@@ -209,6 +210,29 @@ success 或 fail (只能二選一，小寫)
                     backdrop: `rgba(0,0,0,0.8)`
                 });
             }
+        }
+
+        function getLanguageInstruction() {
+            const lang = langSelect ? langSelect.value : 'zh';
+            switch (lang) {
+                case 'en':
+                    return 'Please reply in English.';
+                case 'ja':
+                    return '日本語で回答してください。';
+                case 'ko':
+                    return '한국어로 답변해 주세요.';
+                default:
+                    return '請用繁體中文回答。';
+            }
+        }
+
+        function initLanguageSelector() {
+            if (!langSelect) return;
+            const saved = localStorage.getItem('aiLabLang');
+            if (saved) langSelect.value = saved;
+            langSelect.addEventListener('change', () => {
+                localStorage.setItem('aiLabLang', langSelect.value);
+            });
         }
 
         // 切換模式
@@ -625,6 +649,7 @@ success 或 fail (只能二選一，小寫)
                 if (lastLocationText) {
                     finalSystemPrompt += `\n\n【拍攝地點資訊】${lastLocationText}`;
                 }
+                finalSystemPrompt += `\n\n【輸出語言】${getLanguageInstruction()}`;
 
                 log(`發送 Prompt (${currentMode}): ${finalSystemPrompt.substring(0, 15)}...`);
                 formData.append('systemPrompt', finalSystemPrompt);
@@ -765,6 +790,7 @@ success 或 fail (只能二選一，小寫)
         // 6. 初始化 (Initialization)
         // ------------------------------------------------
         resizeCanvas();
+        initLanguageSelector();
         setMode('free'); // 預設模式
         initMiniMap();
         startCamera();
