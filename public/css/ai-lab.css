@@ -56,6 +56,43 @@ canvas#drawingCanvas {
     pointer-events: none; /* 讓點擊穿透到 canvas */
 }
 
+.mini-map-wrap {
+    position: absolute;
+    top: 70px;
+    left: 10px;
+    z-index: 15;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    pointer-events: none;
+}
+
+.mini-map {
+    width: 140px;
+    height: 140px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+    opacity: 0.9;
+}
+
+.location-info {
+    max-width: 180px;
+    font-size: 11px;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.45);
+    padding: 6px 8px;
+    border-radius: 10px;
+    line-height: 1.4;
+    opacity: 0.95;
+}
+
+.mini-map .leaflet-control-container {
+    display: none;
+}
+
 /* 讓按鈕可以被點擊 */
 .ui-layer button, .result-panel, .director-panel, .director-toggle {
     pointer-events: auto;

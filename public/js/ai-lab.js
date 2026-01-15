@@ -132,6 +132,10 @@ success 或 fail (只能二選一，小寫)
         let currentMode = 'free';       // 預設模式
         let missionStepIndex = 0;
         let missionCompleted = false;
+        let mapInstance = null;
+        let mapMarker = null;
+        let lastLocationText = '';
+        let lastLatLng = null;
 
         // ------------------------------------------------
         // 3. DOM 元素選取 (DOM Elements)
@@ -156,6 +160,9 @@ success 或 fail (只能二選一，小寫)
         const systemPromptInput = document.getElementById('systemPrompt');
         const userPromptInput = document.getElementById('userPrompt');
         const modeBtns = document.querySelectorAll('.mode-btn');
+        const cameraContainer = document.querySelector('.camera-container');
+        let miniMapEl = document.getElementById('miniMap');
+        let locationInfoEl = document.getElementById('locationInfo');
 
         if (!video || !canvas) throw new Error('關鍵 DOM 元素遺失');
 
@@ -285,6 +292,118 @@ success 或 fail (只能二選一，小寫)
                 if (result.isConfirmed && showRetry) {
                     setTimeout(startCamera, 500);
                 }
+            }
+        }
+
+        // 位置與地圖
+        function ensureMiniMapElements() {
+            if (miniMapEl && locationInfoEl) return;
+            if (!cameraContainer) {
+                log('找不到 camera-container，無法建立地圖容器');
+                return;
+            }
+            const wrap = document.createElement('div');
+            wrap.className = 'mini-map-wrap';
+
+            const mapDiv = document.createElement('div');
+            mapDiv.id = 'miniMap';
+            mapDiv.className = 'mini-map';
+
+            const infoDiv = document.createElement('div');
+            infoDiv.id = 'locationInfo';
+            infoDiv.className = 'location-info';
+            infoDiv.textContent = '定位中...';
+
+            wrap.appendChild(mapDiv);
+            wrap.appendChild(infoDiv);
+            cameraContainer.appendChild(wrap);
+
+            miniMapEl = mapDiv;
+            locationInfoEl = infoDiv;
+        }
+
+        function initMiniMap() {
+            ensureMiniMapElements();
+            if (!miniMapEl) {
+                log('找不到地圖容器，略過地圖顯示');
+                return;
+            }
+            updateLocationText('定位中...');
+            requestLocation();
+            if (!window.L) {
+                log('Leaflet 未載入，僅顯示位置文字');
+                return;
+            }
+
+            mapInstance = L.map(miniMapEl, {
+                zoomControl: false,
+                attributionControl: false,
+                dragging: false,
+                scrollWheelZoom: false,
+                doubleClickZoom: false,
+                boxZoom: false,
+                keyboard: false,
+                tap: false,
+                touchZoom: false
+            }).setView([25.0330, 121.5654], 13);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 18
+            }).addTo(mapInstance);
+
+            mapMarker = L.marker([25.0330, 121.5654]).addTo(mapInstance);
+            updateLocationText('定位中...');
+            requestLocation();
+        }
+
+        function updateLocationText(text) {
+            lastLocationText = text;
+            if (locationInfoEl) {
+                locationInfoEl.textContent = text;
+            }
+        }
+
+        async function reverseGeocode(lat, lng) {
+            try {
+                const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`;
+                const res = await fetch(url, { headers: { 'Accept-Language': 'zh-TW' } });
+                if (!res.ok) throw new Error('reverse geocode failed');
+                const data = await res.json();
+                const name = data.name || '';
+                const address = data.address || {};
+                const city = address.city || address.town || address.village || '';
+                const suburb = address.suburb || address.neighbourhood || address.hamlet || '';
+                const road = address.road || address.street || '';
+                const display = [name, city, suburb, road].filter(Boolean).join(' ');
+                return display || data.display_name || '';
+            } catch (err) {
+                console.warn('反向地理編碼失敗', err);
+                return '';
+            }
+        }
+
+        async function requestLocation() {
+            if (!navigator.geolocation) {
+                updateLocationText('裝置不支援定位');
+                return;
+            }
+            try {
+                const pos = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        timeout: 4000, enableHighAccuracy: false
+                    });
+                });
+                const { latitude, longitude } = pos.coords;
+                lastLatLng = { latitude, longitude };
+                if (mapInstance && mapMarker) {
+                    mapMarker.setLatLng([latitude, longitude]);
+                    mapInstance.setView([latitude, longitude], 16);
+                }
+                const display = await reverseGeocode(latitude, longitude);
+                updateLocationText(display || `緯度 ${latitude.toFixed(5)}，經度 ${longitude.toFixed(5)}`);
+            } catch (err) {
+                console.warn('定位失敗', err);
+                updateLocationText('定位失敗');
             }
         }
 
@@ -503,6 +622,10 @@ success 或 fail (只能二選一，小寫)
                     finalSystemPrompt += `\n\n【語氣變化指令】\n失敗時請隨機使用一種嘲諷風格，例如：${failHint}\n成功時請隨機使用一種帶刺的肯定，例如：${successHint}`;
                 }
 
+                if (lastLocationText) {
+                    finalSystemPrompt += `\n\n【拍攝地點資訊】${lastLocationText}`;
+                }
+
                 log(`發送 Prompt (${currentMode}): ${finalSystemPrompt.substring(0, 15)}...`);
                 formData.append('systemPrompt', finalSystemPrompt);
                 formData.append('userPrompt', finalUserPrompt);
@@ -516,6 +639,11 @@ success 或 fail (只能二選一，小寫)
                     });
                     formData.append('latitude', pos.coords.latitude);
                     formData.append('longitude', pos.coords.longitude);
+                    lastLatLng = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+                    if (!lastLocationText || lastLocationText === '定位中...' || lastLocationText === '定位失敗') {
+                        const display = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+                        updateLocationText(display || `緯度 ${pos.coords.latitude.toFixed(5)}，經度 ${pos.coords.longitude.toFixed(5)}`);
+                    }
                     log('GPS 附加成功');
                 } catch (gpsErr) {
                     console.warn('GPS 略過', gpsErr);
@@ -630,6 +758,7 @@ success 或 fail (只能二選一，小寫)
         // ------------------------------------------------
         resizeCanvas();
         setMode('free'); // 預設模式
+        initMiniMap();
         startCamera();
         
         log('初始化完成');
