@@ -160,7 +160,8 @@ success 或 fail (只能二選一，小寫)
         const systemPromptInput = document.getElementById('systemPrompt');
         const userPromptInput = document.getElementById('userPrompt');
         const modeBtns = document.querySelectorAll('.mode-btn');
-        const langSelect = document.getElementById('langSelect');
+        const uiLayer = document.querySelector('.ui-layer');
+        let langSelect = document.getElementById('langSelect');
         const cameraContainer = document.querySelector('.camera-container');
         let miniMapEl = document.getElementById('miniMap');
         let locationInfoEl = document.getElementById('locationInfo');
@@ -227,6 +228,23 @@ success 或 fail (只能二選一，小寫)
         }
 
         function initLanguageSelector() {
+            if (!langSelect) {
+                if (!uiLayer) return;
+                const wrap = document.createElement('div');
+                wrap.className = 'lang-selector';
+                wrap.innerHTML = `
+                    <label for="langSelect">語言</label>
+                    <select id="langSelect">
+                        <option value="zh">繁體中文</option>
+                        <option value="en">English</option>
+                        <option value="ja">日本語</option>
+                        <option value="ko">한국어</option>
+                    </select>
+                `;
+                uiLayer.appendChild(wrap);
+                langSelect = wrap.querySelector('#langSelect');
+            }
+
             if (!langSelect) return;
             const saved = localStorage.getItem('aiLabLang');
             if (saved) langSelect.value = saved;
