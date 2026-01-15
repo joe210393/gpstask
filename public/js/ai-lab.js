@@ -18,6 +18,91 @@ document.addEventListener('DOMContentLoaded', () => {
         // ------------------------------------------------
         // 1. 設定與劇本 (Configuration & Prompts)
         // ------------------------------------------------
+        const MISSION_ENABLED = true; // 測試版：可關閉以回到單關卡模式
+        const MISSION_STYLE_POOL = {
+            fail: [
+                "你到底在亂找什麼？這種東西也敢拿來？",
+                "笑死，這跟任務毫無關係，重找。",
+                "這不是遙控器/電池，你是在搞笑嗎？",
+                "別浪費我時間，去找正確的東西。",
+                "你看清楚了嗎？這根本不是我要的。"
+            ],
+            success: [
+                "哼，居然被你找到…別太得意。",
+                "行吧，算你有點用。",
+                "好啊，算你過關，別拖拖拉拉。",
+                "切，運氣不錯，但下一關不會這麼好。",
+                "不錯，但別以為這樣就結束了。"
+            ]
+        };
+
+        const MISSION_STEPS = [
+            {
+                key: 'remote',
+                title: "🛡️ 密室逃脫任務：遙控器之謎",
+                intro: "【劇情前情提要】\n你醒來時發現自己被困在一個陌生的房間，門窗都打不開。\n牆上的電視閃爍著雜訊，旁邊有一張紙條寫著：\n「只有看見真相的人才能離開...」\n\n看來你必須找到【遙控器】並打開電視，才能找到逃脫的線索。\n快看看四周有什麼可疑的東西吧！",
+                system: `你是一個性格扭曲、講話陰陽怪氣的密室設計者。
+任務目標：玩家必須找到【電視遙控器 (TV Remote)】。
+
+請嚴格執行以下思考步驟：
+1. 先客觀辨識圖片中的物品到底是什麼。(例如：瓶子、手機、滑鼠、書本...)
+2. 比對該物品是否為「電視遙控器」。注意：形狀相似的長方形物體(如藥罐、眼鏡盒)都不是遙控器。
+3. 只有在【100% 確定是遙控器】時，才算成功。
+
+請依照 XML 格式回答，**必須完成三個標籤**：
+<analysis>
+1. 我看到的物品是：(例如：一罐魚油)
+2. 它是不是遙控器：(是/否)
+</analysis>
+<reply>
+請嚴格遵守：
+如果不符合任務目標(不是遙控器)，只能進行嘲諷。絕對不可以說出「恭喜」或「找到了」。
+如果符合任務目標(是遙控器)，才能說「恭喜」。
+
+範例 A (不是遙控器)：
+哈？你拿一個電風扇想幹嘛？這能轉台嗎？快去給我找遙控器！
+
+範例 B (是遙控器)：
+切...居然被你找到了。好吧，快打開電視，滾出我的視線！
+</reply>
+<result>
+success 或 fail (只能二選一，小寫)
+</result>
+
+**重要：必須完成 <reply> 與 <result> 標籤才能結束回應，否則任務失敗。**`,
+                user: "我找到了這個，這能幫我逃出去嗎？"
+            },
+            {
+                key: 'battery',
+                title: "🔋 第二關：電力解鎖",
+                intro: "【轉折】雖然你找到了遙控器，但它好像沒有電。\n電視亮了一下又熄掉，你注意到遙控器背蓋鬆動。\n紙條又出現一句話：\n「沒有能量，真相就不會說話。」\n\n看來你得找到【電池】或【遙控器電池蓋】。快找找附近的小物件！",
+                system: `你是一個性格扭曲、講話陰陽怪氣的密室設計者。
+任務目標：玩家必須找到【電池 (Battery)】或【遙控器電池蓋】。
+
+請嚴格執行以下思考步驟：
+1. 先客觀辨識圖片中的物品到底是什麼。(例如：電池、硬幣、鑰匙、眼鏡盒...)
+2. 比對該物品是否為「電池」或「遙控器電池蓋」。
+3. 只有在【100% 確定是電池或電池蓋】時，才算成功。
+
+請依照 XML 格式回答，**必須完成三個標籤**：
+<analysis>
+1. 我看到的物品是：(例如：一顆AA電池)
+2. 它是不是電池或電池蓋：(是/否)
+</analysis>
+<reply>
+請嚴格遵守：
+如果不符合任務目標，只能進行嘲諷。絕對不可以說出「恭喜」或「找到了」。
+如果符合任務目標，才能說「恭喜」。
+</reply>
+<result>
+success 或 fail (只能二選一，小寫)
+</result>
+
+**重要：必須完成 <reply> 與 <result> 標籤才能結束回應，否則任務失敗。**`,
+                user: "我找到這個了，能讓電視開起來嗎？"
+            }
+        ];
+
         const PROMPTS = {
             free: {
                 title: "🌿 自由探索模式",
@@ -34,37 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </reply>`,
                 user: "請問這是什麼？有什麼特別的嗎？"
             },
-            mission: {
-                title: "🛡️ 密室逃脫任務：遙控器之謎",
-                intro: "【劇情前情提要】\n你醒來時發現自己被困在一個陌生的房間，門窗都打不開。\n牆上的電視閃爍著雜訊，旁邊有一張紙條寫著：\n「只有看見真相的人才能離開...」\n\n看來你必須找到【遙控器】並打開電視，才能找到逃脫的線索。\n快看看四周有什麼可疑的東西吧！",
-                system: `你是一個性格扭曲、講話陰陽怪氣的密室設計者。
-任務目標：玩家必須找到【電視遙控器 (TV Remote)】。
-
-請嚴格執行以下思考步驟：
-1. 先客觀辨識圖片中的物品到底是什麼。(例如：瓶子、手機、滑鼠、書本...)
-2. 比對該物品是否為「電視遙控器」。注意：形狀相似的長方形物體(如藥罐、眼鏡盒)都不是遙控器。
-3. 只有在【100% 確定是遙控器】時，才算成功。
-
-請依照 XML 格式回答，**必須完成兩個標籤**：
-<analysis>
-1. 我看到的物品是：(例如：一罐魚油)
-2. 它是不是遙控器：(是/否)
-</analysis>
-<reply>
-請嚴格遵守：
-如果不符合任務目標(不是遙控器)，只能進行嘲諷。絕對不可以說出「恭喜」或「找到了」。
-如果符合任務目標(是遙控器)，才能說「恭喜」。
-
-範例 A (不是遙控器)：
-哈？你拿一個電風扇想幹嘛？這能轉台嗎？快去給我找遙控器！
-
-範例 B (是遙控器)：
-切...居然被你找到了。好吧，快打開電視，滾出我的視線！
-</reply>
-
-**重要：必須完成 <reply> 標籤才能結束回應，否則任務失敗。**`,
-                user: "我找到了這個，這能幫我逃出去嗎？"
-            }
+            mission: null
         };
 
         // ------------------------------------------------
@@ -75,6 +130,8 @@ document.addEventListener('DOMContentLoaded', () => {
         let stream = null;
         let facingMode = 'environment'; // 預設使用後鏡頭
         let currentMode = 'free';       // 預設模式
+        let missionStepIndex = 0;
+        let missionCompleted = false;
 
         // ------------------------------------------------
         // 3. DOM 元素選取 (DOM Elements)
@@ -112,6 +169,41 @@ document.addEventListener('DOMContentLoaded', () => {
             canvas.height = window.innerHeight;
         }
 
+        // 取得當前劇本
+        function getActiveScript() {
+            if (currentMode === 'mission' && MISSION_ENABLED) {
+                return MISSION_STEPS[missionStepIndex] || MISSION_STEPS[0];
+            }
+            return PROMPTS[currentMode];
+        }
+
+        function resetMission() {
+            missionStepIndex = 0;
+            missionCompleted = false;
+        }
+
+        function applyScript(script, showIntro = true) {
+            if (!script) return;
+            if (systemPromptInput) systemPromptInput.value = script.system;
+            if (userPromptInput) userPromptInput.value = script.user;
+            
+            if (systemPromptInput) {
+                systemPromptInput.style.transition = 'background 0.3s';
+                systemPromptInput.style.background = '#333';
+                setTimeout(() => { systemPromptInput.style.background = ''; }, 300);
+            }
+
+            if (showIntro) {
+                Swal.fire({
+                    title: script.title,
+                    text: script.intro,
+                    icon: currentMode === 'mission' ? 'warning' : 'info',
+                    confirmButtonText: '開始',
+                    backdrop: `rgba(0,0,0,0.8)`
+                });
+            }
+        }
+
         // 切換模式
         function setMode(mode) {
             log(`切換模式: ${mode}`);
@@ -129,28 +221,12 @@ document.addEventListener('DOMContentLoaded', () => {
             // Body class 更新 (CSS特效用)
             document.body.className = `mode-${mode}`;
 
-            // 更新 Prompt 輸入框 (作為視覺參考)
-            const script = PROMPTS[mode];
-            if (script) {
-                if (systemPromptInput) systemPromptInput.value = script.system;
-                if (userPromptInput) userPromptInput.value = script.user;
-                
-                // 輸入框閃爍特效
-                if (systemPromptInput) {
-                    systemPromptInput.style.transition = 'background 0.3s';
-                    systemPromptInput.style.background = '#333';
-                    setTimeout(() => { systemPromptInput.style.background = ''; }, 300);
-                }
-
-                // 彈出劇情介紹
-                Swal.fire({
-                    title: script.title,
-                    text: script.intro,
-                    icon: mode === 'mission' ? 'warning' : 'info',
-                    confirmButtonText: '開始',
-                    backdrop: `rgba(0,0,0,0.8)`
-                });
+            if (mode === 'mission' && MISSION_ENABLED) {
+                resetMission();
             }
+
+            const script = getActiveScript();
+            applyScript(script, true);
         }
 
         // 啟動相機
@@ -409,14 +485,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (!finalSystemPrompt || finalSystemPrompt.length < 10) {
                     log('Prompt 空白或過短，強制載入預設劇本');
-                    finalSystemPrompt = PROMPTS[currentMode].system;
+                    const fallbackScript = getActiveScript();
+                    finalSystemPrompt = fallbackScript ? fallbackScript.system : finalSystemPrompt;
                     // 同步回 UI
                     if (systemPromptInput) systemPromptInput.value = finalSystemPrompt;
                 }
                 
                 // User prompt 也要防呆
                 if (!finalUserPrompt) {
-                     finalUserPrompt = PROMPTS[currentMode].user;
+                     const fallbackScript = getActiveScript();
+                     finalUserPrompt = fallbackScript ? fallbackScript.user : finalUserPrompt;
+                }
+
+                if (currentMode === 'mission' && MISSION_ENABLED) {
+                    const failHint = MISSION_STYLE_POOL.fail[Math.floor(Math.random() * MISSION_STYLE_POOL.fail.length)];
+                    const successHint = MISSION_STYLE_POOL.success[Math.floor(Math.random() * MISSION_STYLE_POOL.success.length)];
+                    finalSystemPrompt += `\n\n【語氣變化指令】\n失敗時請隨機使用一種嘲諷風格，例如：${failHint}\n成功時請隨機使用一種帶刺的肯定，例如：${successHint}`;
                 }
 
                 log(`發送 Prompt (${currentMode}): ${finalSystemPrompt.substring(0, 15)}...`);
@@ -459,6 +543,28 @@ document.addEventListener('DOMContentLoaded', () => {
                     const replyMatch = fullText.match(/<reply>([\s\S]*?)<\/reply>/i);
                     const analysisMatch = fullText.match(/<analysis>([\s\S]*?)<\/analysis>/i);
 
+                    function extractTag(text, tag) {
+                        const tagMatch = text.match(new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'i'));
+                        return tagMatch ? tagMatch[1].trim() : null;
+                    }
+                    function extractOpenTagContent(text, tag) {
+                        const openTag = new RegExp(`<${tag}>`, 'i');
+                        const openMatch = text.match(openTag);
+                        if (!openMatch) return null;
+                        const startIdx = openMatch.index + openMatch[0].length;
+                        return text.substring(startIdx).trim();
+                    }
+                    function inferResultFromAnalysis(analysisText) {
+                        if (!analysisText) return null;
+                        if (/是\s*$/m.test(analysisText) && /是不是遙控器|是不是電池|是不是電池蓋|是不是電池或電池蓋/.test(analysisText)) {
+                            return 'success';
+                        }
+                        if (/否\s*$/m.test(analysisText) && /是不是遙控器|是不是電池|是不是電池蓋|是不是電池或電池蓋/.test(analysisText)) {
+                            return 'fail';
+                        }
+                        return null;
+                    }
+
                     if (replyMatch) {
                         // 完美情況
                         aiResult.innerHTML = replyMatch[1].trim().replace(/\n/g, '<br>');
@@ -470,8 +576,39 @@ document.addEventListener('DOMContentLoaded', () => {
                             const content = fullText.substring(analysisEndIndex + 11).trim();
                             aiResult.innerHTML = content.replace(/\n/g, '<br>');
                         } else {
-                            // 最慘情況：全顯示
-                            aiResult.innerHTML = fullText.replace(/\n/g, '<br>');
+                            const looseReply = extractOpenTagContent(fullText, 'reply');
+                            if (looseReply) {
+                                aiResult.innerHTML = looseReply.replace(/\n/g, '<br>');
+                            } else {
+                                // 最慘情況：全顯示
+                                aiResult.innerHTML = fullText.replace(/\n/g, '<br>');
+                            }
+                        }
+                    }
+
+                    // 任務模式：判斷是否過關，進入下一關
+                    if (currentMode === 'mission' && MISSION_ENABLED && !missionCompleted) {
+                        let resultTag = extractTag(fullText, 'result');
+                        if (!resultTag) {
+                            resultTag = inferResultFromAnalysis(extractTag(fullText, 'analysis'));
+                        }
+                        if (resultTag && resultTag.toLowerCase() === 'success') {
+                            if (missionStepIndex < MISSION_STEPS.length - 1) {
+                                missionStepIndex += 1;
+                                const nextScript = getActiveScript();
+                                applyScript(nextScript, true);
+                                log(`任務進度前進到第 ${missionStepIndex + 1} 關`);
+                            } else {
+                                missionCompleted = true;
+                                Swal.fire({
+                                    title: '🎉 任務完成',
+                                    text: '你已完成所有測試關卡！',
+                                    icon: 'success',
+                                    confirmButtonText: '太好了',
+                                    backdrop: `rgba(0,0,0,0.8)`
+                                });
+                                log('任務完成');
+                            }
                         }
                     }
                 } else {
