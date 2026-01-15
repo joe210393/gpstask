@@ -232,6 +232,20 @@ success 或 fail (只能二選一，小寫)
                 if (!uiLayer) return;
                 const wrap = document.createElement('div');
                 wrap.className = 'lang-selector';
+                wrap.style.position = 'absolute';
+                wrap.style.top = '120px';
+                wrap.style.left = '20px';
+                wrap.style.zIndex = '9999';
+                wrap.style.display = 'flex';
+                wrap.style.alignItems = 'center';
+                wrap.style.gap = '6px';
+                wrap.style.background = 'rgba(0,0,0,0.7)';
+                wrap.style.border = '1px solid #444';
+                wrap.style.borderRadius = '12px';
+                wrap.style.padding = '6px 10px';
+                wrap.style.color = '#fff';
+                wrap.style.fontSize = '12px';
+                wrap.style.pointerEvents = 'auto';
                 wrap.innerHTML = `
                     <label for="langSelect">語言</label>
                     <select id="langSelect">
@@ -243,6 +257,14 @@ success 或 fail (只能二選一，小寫)
                 `;
                 uiLayer.appendChild(wrap);
                 langSelect = wrap.querySelector('#langSelect');
+                if (langSelect) {
+                    langSelect.style.background = '#111';
+                    langSelect.style.color = '#fff';
+                    langSelect.style.border = '1px solid #555';
+                    langSelect.style.borderRadius = '8px';
+                    langSelect.style.padding = '4px 6px';
+                    langSelect.style.fontSize = '12px';
+                }
             }
 
             if (!langSelect) return;
