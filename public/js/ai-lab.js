@@ -254,45 +254,6 @@ success 或 fail (只能二選一，小寫)
         }
 
         function initLanguageSelector() {
-            if (!langSelect) {
-                if (!uiLayer) return;
-                const wrap = document.createElement('div');
-                wrap.className = 'lang-selector';
-                wrap.style.position = 'absolute';
-                wrap.style.top = '120px';
-                wrap.style.left = '20px';
-                wrap.style.zIndex = '9999';
-                wrap.style.display = 'flex';
-                wrap.style.alignItems = 'center';
-                wrap.style.gap = '6px';
-                wrap.style.background = 'rgba(0,0,0,0.7)';
-                wrap.style.border = '1px solid #444';
-                wrap.style.borderRadius = '12px';
-                wrap.style.padding = '6px 10px';
-                wrap.style.color = '#fff';
-                wrap.style.fontSize = '12px';
-                wrap.style.pointerEvents = 'auto';
-                wrap.innerHTML = `
-                    <label for="langSelect">語言</label>
-                    <select id="langSelect">
-                        <option value="zh">繁體中文</option>
-                        <option value="en">English</option>
-                        <option value="ja">日本語</option>
-                        <option value="ko">한국어</option>
-                    </select>
-                `;
-                uiLayer.appendChild(wrap);
-                langSelect = wrap.querySelector('#langSelect');
-                if (langSelect) {
-                    langSelect.style.background = '#111';
-                    langSelect.style.color = '#fff';
-                    langSelect.style.border = '1px solid #555';
-                    langSelect.style.borderRadius = '8px';
-                    langSelect.style.padding = '4px 6px';
-                    langSelect.style.fontSize = '12px';
-                }
-            }
-
             if (!langSelect) return;
             const saved = localStorage.getItem('aiLabLang');
             if (saved) langSelect.value = saved;
@@ -307,6 +268,22 @@ success 或 fail (只能二選一，小寫)
             if (voiceUser && userText !== undefined) voiceUser.textContent = userText || '—';
             if (voiceAi && aiText !== undefined) voiceAi.textContent = aiText || '—';
             if (voiceStatus && statusText !== undefined) voiceStatus.textContent = statusText;
+        }
+
+        let speechRecognition = null;
+        let isRecording = false;
+
+        function stopVoiceRecognition() {
+            if (speechRecognition && isRecording) {
+                try {
+                    speechRecognition.stop();
+                } catch (err) {
+                    console.warn('停止語音辨識失敗', err);
+                }
+            }
+            isRecording = false;
+            if (micBtn) micBtn.classList.remove('active');
+            if (voiceStatus) voiceStatus.textContent = '語音待命';
         }
 
         async function sendVoiceChat(userText) {
@@ -327,11 +304,6 @@ success 或 fail (只能二選一，小寫)
                     || (lastLatLng
                         ? `緯度 ${lastLatLng.latitude.toFixed(5)}，經度 ${lastLatLng.longitude.toFixed(5)}`
                         : '');
-                if (locationTextForPrompt) {
-                    finalSystemPrompt += `\n\n【拍攝地點資訊】${locationTextForPrompt}`;
-                }
-                finalSystemPrompt += `\n\n【輸出語言】${getLanguageInstruction()}`;
-                finalSystemPrompt += `\n\n【回答規範】請不要在回覆中提及「我根據地點資訊/位置資訊推斷」或引用地名作為判斷依據。地點僅作為背景參考，回答要自然。`;
                 if (locationTextForPrompt) {
                     finalSystemPrompt += `\n\n【拍攝地點資訊】${locationTextForPrompt}`;
                 }
@@ -407,11 +379,10 @@ success 或 fail (只能二選一，小寫)
             }
 
             const recognition = new SpeechRecognition();
+            speechRecognition = recognition;
             recognition.lang = getSpeechLocale();
             recognition.interimResults = true;
             recognition.continuous = false;
-
-            let isRecording = false;
 
             micBtn.addEventListener('click', () => {
                 if (!isRecording) {
@@ -421,9 +392,7 @@ success 或 fail (只能二選一，小寫)
                     isRecording = true;
                     micBtn.classList.add('active');
                 } else {
-                    recognition.stop();
-                    isRecording = false;
-                    micBtn.classList.remove('active');
+                    stopVoiceRecognition();
                 }
             });
 
@@ -444,8 +413,7 @@ success 或 fail (只能二選一，小寫)
                 }
                 updateVoicePanel(finalTranscript || interim, '...', '辨識中...');
                 if (finalTranscript) {
-                    isRecording = false;
-                    micBtn.classList.remove('active');
+                    stopVoiceRecognition();
                     sendVoiceChat(finalTranscript.trim());
                 }
             };
@@ -642,6 +610,9 @@ success 或 fail (只能二選一，小寫)
                 log('找不到地圖容器，略過地圖顯示');
                 return;
             }
+            if (miniMapWrap && miniMapToggle) {
+                initMiniMapToggle();
+            }
             updateLocationText('定位中...');
             requestLocation();
             if (!window.L) {
@@ -730,6 +701,7 @@ success 或 fail (只能二選一，小寫)
         }
 
         function startDraw(e) {
+            stopVoiceRecognition();
             if (resultPanel.style.display === 'flex') return;
             isDrawing = true;
             points = [];
@@ -954,6 +926,7 @@ success 或 fail (只能二選一，小寫)
 
         // AI 辨識按鈕 (核心邏輯)
         analyzeBtn.addEventListener('click', async () => {
+            stopVoiceRecognition();
             analyzeBtn.disabled = true;
             aiLoading.classList.remove('hidden');
             aiResult.innerHTML = '';
@@ -1142,7 +1115,6 @@ success 或 fail (只能二選一，小寫)
         // ------------------------------------------------
         resizeCanvas();
         initLanguageSelector();
-        initMiniMapToggle();
         initSpeechChat();
         setMode('free'); // 預設模式
         initMiniMap();

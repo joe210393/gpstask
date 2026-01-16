@@ -255,7 +255,17 @@ canvas#drawingCanvas {
     color: #fff;
     font-size: 12px;
     z-index: 20;
-    pointer-events: none;
+    pointer-events: auto;
+}
+
+.voice-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    color: #fff;
+    font-size: 12px;
+    pointer-events: auto;
 }
 
 .voice-row {
