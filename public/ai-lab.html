@@ -29,6 +29,7 @@
         <!-- 透明地圖與位置資訊 -->
         <div class="mini-map-wrap">
             <button id="miniMapToggle" class="mini-map-toggle" title="切換地圖">🗺️</button>
+            <button id="miniMapRefresh" class="mini-map-refresh" title="定位更新">📍</button>
             <div id="miniMap" class="mini-map"></div>
             <div id="locationInfo" class="location-info">定位中...</div>
         </div>
@@ -44,6 +45,7 @@
                     <button id="switchCameraBtn" class="icon-btn">↻</button>
                 </div>
             </div>
+            <div id="locationBar" class="location-bar">目前位置：定位中...</div>
 
             <!-- 導演模式開關 -->
             <button id="directorToggle" class="director-toggle">🎬 導演設定</button>
@@ -97,6 +99,10 @@
 
             <!-- 語音聊天面板 -->
             <div id="voicePanel" class="voice-panel hidden">
+                <label class="voice-toggle">
+                    <input id="voiceSpeakToggle" type="checkbox" checked>
+                    AI 語音回覆
+                </label>
                 <div class="voice-row">
                     <div class="voice-label">你說</div>
                     <div id="voiceUser" class="voice-text">—</div>

@@ -177,6 +177,8 @@ success 或 fail (只能二選一，小寫)
         let locationInfoEl = document.getElementById('locationInfo');
         let miniMapWrap = document.querySelector('.mini-map-wrap');
         let miniMapToggle = document.getElementById('miniMapToggle');
+        let miniMapRefresh = document.getElementById('miniMapRefresh');
+        const locationBar = document.getElementById('locationBar');
 
         if (!video || !canvas) throw new Error('關鍵 DOM 元素遺失');
 
@@ -279,11 +281,17 @@ success 或 fail (只能二選一，小寫)
                     speechRecognition.stop();
                 } catch (err) {
                     console.warn('停止語音辨識失敗', err);
+                    try {
+                        speechRecognition.abort();
+                    } catch (abortErr) {
+                        console.warn('中止語音辨識失敗', abortErr);
+                    }
                 }
             }
             isRecording = false;
             if (micBtn) micBtn.classList.remove('active');
             if (voiceStatus) voiceStatus.textContent = '語音待命';
+            if (voicePanel) voicePanel.classList.add('hidden');
         }
 
         async function sendVoiceChat(userText) {
@@ -434,6 +442,7 @@ success 或 fail (只能二選一，小寫)
             recognition.onend = () => {
                 isRecording = false;
                 micBtn.classList.remove('active');
+                if (voiceStatus) voiceStatus.textContent = '語音待命';
             };
         }
 
@@ -447,7 +456,20 @@ success 或 fail (只能二選一，小寫)
                 miniMapWrap.classList.toggle('collapsed');
                 const isCollapsed = miniMapWrap.classList.contains('collapsed');
                 localStorage.setItem('aiLabMiniMapCollapsed', isCollapsed ? '1' : '0');
+                if (!isCollapsed && mapInstance) {
+                    setTimeout(() => {
+                        mapInstance.invalidateSize();
+                        if (lastLatLng) {
+                            mapInstance.setView([lastLatLng.latitude, lastLatLng.longitude], 16);
+                        }
+                    }, 200);
+                }
             });
+            if (miniMapRefresh) {
+                miniMapRefresh.addEventListener('click', () => {
+                    requestLocation();
+                });
+            }
         }
 
         // 切換模式
@@ -584,6 +606,12 @@ success 或 fail (只能二選一，小寫)
             toggleBtn.title = '切換地圖';
             toggleBtn.textContent = '🗺️';
 
+            const refreshBtn = document.createElement('button');
+            refreshBtn.id = 'miniMapRefresh';
+            refreshBtn.className = 'mini-map-refresh';
+            refreshBtn.title = '定位更新';
+            refreshBtn.textContent = '📍';
+
             const mapDiv = document.createElement('div');
             mapDiv.id = 'miniMap';
             mapDiv.className = 'mini-map';
@@ -594,6 +622,7 @@ success 或 fail (只能二選一，小寫)
             infoDiv.textContent = '定位中...';
 
             wrap.appendChild(toggleBtn);
+            wrap.appendChild(refreshBtn);
             wrap.appendChild(mapDiv);
             wrap.appendChild(infoDiv);
             cameraContainer.appendChild(wrap);
@@ -602,6 +631,7 @@ success 或 fail (只能二選一，小寫)
             locationInfoEl = infoDiv;
             miniMapWrap = wrap;
             miniMapToggle = toggleBtn;
+            miniMapRefresh = refreshBtn;
         }
 
         function initMiniMap() {
@@ -645,6 +675,9 @@ success 或 fail (只能二選一，小寫)
             lastLocationText = text;
             if (locationInfoEl) {
                 locationInfoEl.textContent = text;
+            }
+            if (locationBar) {
+                locationBar.textContent = `目前位置：${text}`;
             }
         }
 

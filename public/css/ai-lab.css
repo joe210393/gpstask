@@ -79,6 +79,18 @@ canvas#drawingCanvas {
     pointer-events: auto;
 }
 
+.mini-map-refresh {
+    align-self: flex-end;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #fff;
+    border-radius: 12px;
+    font-size: 12px;
+    padding: 4px 8px;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
 .mini-map {
     width: 96px;
     height: 96px;
@@ -104,6 +116,91 @@ canvas#drawingCanvas {
 .mini-map-wrap.collapsed .mini-map,
 .mini-map-wrap.collapsed .location-info {
     display: none;
+}
+
+.location-bar {
+    position: absolute;
+    top: 64px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 90%;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 12px;
+    z-index: 20;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+}
+
+@media (max-width: 480px) {
+    .header {
+        top: 8px;
+        padding: 0 12px;
+    }
+
+    .status-pill {
+        font-size: 12px;
+        padding: 4px 10px;
+    }
+
+    .icon-btn {
+        width: 34px;
+        height: 34px;
+        font-size: 16px;
+    }
+
+    .location-bar {
+        top: 54px;
+        font-size: 11px;
+        max-width: 92%;
+    }
+
+    .mode-switcher {
+        top: 86px;
+        width: 92%;
+    }
+
+    .mode-btn {
+        padding: 6px 10px;
+        font-size: 12px;
+    }
+
+    .director-toggle {
+        top: 110px;
+        right: 12px;
+        font-size: 11px;
+    }
+
+    .lang-selector {
+        top: 110px;
+        left: 12px;
+        font-size: 11px;
+        padding: 4px 8px;
+    }
+
+    .zoom-control {
+        top: 150px;
+        width: 92%;
+        justify-content: space-between;
+    }
+
+    .instruction {
+        bottom: 110px;
+    }
+
+    .voice-panel {
+        bottom: 120px;
+    }
+
+    .mini-map-wrap {
+        right: 8px;
+        bottom: 140px;
+    }
 }
 
 .mini-map .leaflet-control-container {
