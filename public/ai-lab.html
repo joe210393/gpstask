@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AI 視覺實驗室 (Director Mode)</title>
-    <link rel="stylesheet" href="css/ai-lab.css?v=3">
+    <link rel="stylesheet" href="css/ai-lab.css?v=4">
     <link rel="stylesheet" href="css/mode-switch.css?v=2">
     <link
         rel="stylesheet"
@@ -38,7 +38,10 @@
             <div class="header">
                 <button id="backBtn" class="icon-btn">✕</button>
                 <div class="status-pill">AI Vision Lab</div>
-                <button id="switchCameraBtn" class="icon-btn">↻</button>
+                <div class="header-actions">
+                    <button id="captureBtn" class="icon-btn" title="拍照">📸</button>
+                    <button id="switchCameraBtn" class="icon-btn">↻</button>
+                </div>
             </div>
 
             <!-- 導演模式開關 -->
@@ -48,6 +51,13 @@
             <div class="mode-switcher">
                 <button class="mode-btn active" data-mode="free">🌿 自由探索</button>
                 <button class="mode-btn" data-mode="mission">🛡️ 任務模式</button>
+            </div>
+
+            <!-- 縮放控制 -->
+            <div id="zoomControl" class="zoom-control hidden">
+                <label for="zoomRange">Zoom</label>
+                <input id="zoomRange" type="range" min="1" max="1" step="0.1" value="1">
+                <span id="zoomValue">1.0x</span>
             </div>
 
             <!-- 語言選擇 -->
@@ -107,6 +117,6 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
         crossorigin=""></script>
-    <script src="js/ai-lab.js?v=3"></script>
+    <script src="js/ai-lab.js?v=4"></script>
 </body>
 </html>

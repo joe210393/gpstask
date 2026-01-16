@@ -148,6 +148,7 @@ success 或 fail (只能二選一，小寫)
         const croppedImage = document.getElementById('croppedImage');
         const backBtn = document.getElementById('backBtn');
         const switchCameraBtn = document.getElementById('switchCameraBtn');
+        const captureBtn = document.getElementById('captureBtn');
         const retryBtn = document.getElementById('retryBtn');
         const analyzeBtn = document.getElementById('analyzeBtn');
         const aiLoading = document.getElementById('aiLoading');
@@ -162,6 +163,9 @@ success 或 fail (只能二選一，小寫)
         const modeBtns = document.querySelectorAll('.mode-btn');
         const uiLayer = document.querySelector('.ui-layer');
         let langSelect = document.getElementById('langSelect');
+        const zoomControl = document.getElementById('zoomControl');
+        const zoomRange = document.getElementById('zoomRange');
+        const zoomValue = document.getElementById('zoomValue');
         const cameraContainer = document.querySelector('.camera-container');
         let miniMapEl = document.getElementById('miniMap');
         let locationInfoEl = document.getElementById('locationInfo');
@@ -344,6 +348,8 @@ success 或 fail (只能二選一，小寫)
                 } catch (playErr) {
                     log('播放失敗: ' + playErr.message);
                 }
+
+                setupZoomControl();
                 
             } catch (err) {
                 console.error('相機啟動失敗:', err);
@@ -372,6 +378,38 @@ success 或 fail (只能二選一，小寫)
                     setTimeout(startCamera, 500);
                 }
             }
+        }
+
+        function setupZoomControl() {
+            if (!stream || !zoomControl || !zoomRange || !zoomValue) return;
+            const [track] = stream.getVideoTracks();
+            if (!track || !track.getCapabilities) {
+                zoomControl.classList.add('hidden');
+                return;
+            }
+            const caps = track.getCapabilities();
+            if (!caps.zoom) {
+                zoomControl.classList.add('hidden');
+                return;
+            }
+            zoomControl.classList.remove('hidden');
+            zoomRange.min = caps.zoom.min;
+            zoomRange.max = caps.zoom.max;
+            zoomRange.step = caps.zoom.step || 0.1;
+            const settings = track.getSettings();
+            const currentZoom = settings.zoom || caps.zoom.min;
+            zoomRange.value = currentZoom;
+            zoomValue.textContent = `${Number(currentZoom).toFixed(1)}x`;
+
+            zoomRange.oninput = async () => {
+                const zoom = Number(zoomRange.value);
+                zoomValue.textContent = `${zoom.toFixed(1)}x`;
+                try {
+                    await track.applyConstraints({ advanced: [{ zoom }] });
+                } catch (zoomErr) {
+                    console.warn('Zoom 不支援或設定失敗', zoomErr);
+                }
+            };
         }
 
         // 位置與地圖
@@ -533,7 +571,7 @@ success 或 fail (只能二選一，小寫)
             isDrawing = false;
             ctx.closePath();
             if (points.length > 5) {
-                processSelection();
+                processSelection()
             } else {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 instruction.style.opacity = '1';
@@ -639,6 +677,31 @@ success 或 fail (只能二選一，小寫)
         switchCameraBtn.addEventListener('click', () => {
             facingMode = facingMode === 'environment' ? 'user' : 'environment';
             startCamera();
+        });
+
+        // 拍照
+        captureBtn.addEventListener('click', () => {
+            try {
+                const photoCanvas = document.createElement('canvas');
+                photoCanvas.width = video.videoWidth;
+                photoCanvas.height = video.videoHeight;
+                const photoCtx = photoCanvas.getContext('2d');
+                photoCtx.drawImage(video, 0, 0, photoCanvas.width, photoCanvas.height);
+                const dataUrl = photoCanvas.toDataURL('image/jpeg', 0.95);
+                const link = document.createElement('a');
+                link.href = dataUrl;
+                link.download = `ai-lab-${Date.now()}.jpg`;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+            } catch (err) {
+                console.error('拍照失敗', err);
+                Swal.fire({
+                    icon: 'error',
+                    title: '拍照失敗',
+                    text: err.message
+                });
+            }
         });
 
         // 返回

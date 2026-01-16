@@ -127,6 +127,11 @@ canvas#drawingCanvas {
     z-index: 10;
 }
 
+.header-actions {
+    display: flex;
+    gap: 8px;
+}
+
 .icon-btn {
     background: rgba(255, 255, 255, 0.2);
     border: none;
@@ -213,6 +218,28 @@ canvas#drawingCanvas {
     font-size: 12px;
     z-index: 20;
     pointer-events: auto;
+}
+
+.zoom-control {
+    position: absolute;
+    top: 120px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid #444;
+    border-radius: 14px;
+    padding: 6px 10px;
+    color: #fff;
+    font-size: 12px;
+    z-index: 20;
+    pointer-events: auto;
+}
+
+.zoom-control input[type="range"] {
+    width: 120px;
 }
 
 .lang-selector select {
