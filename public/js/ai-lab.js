@@ -165,8 +165,8 @@ success 或 fail (只能二選一，小寫)
         const uiLayer = document.querySelector('.ui-layer');
         let langSelect = document.getElementById('langSelect');
         const zoomControl = document.getElementById('zoomControl');
-        const zoomRange = document.getElementById('zoomRange');
         const zoomValue = document.getElementById('zoomValue');
+        const zoomButtons = document.querySelectorAll('.zoom-btn');
         const voicePanel = document.getElementById('voicePanel');
         const voiceUser = document.getElementById('voiceUser');
         const voiceAi = document.getElementById('voiceAi');
@@ -558,8 +558,21 @@ success 或 fail (只能二選一，小寫)
             }
         }
 
+        function setZoomLevel(track, targetZoom, caps) {
+            const minZoom = caps.zoom.min;
+            const maxZoom = caps.zoom.max;
+            const zoom = Math.max(minZoom, Math.min(maxZoom, targetZoom));
+            if (zoomValue) zoomValue.textContent = `${Number(zoom).toFixed(1)}x`;
+            zoomButtons.forEach(btn => {
+                btn.classList.toggle('active', Number(btn.dataset.zoom) === Math.round(zoom));
+            });
+            return track.applyConstraints({ advanced: [{ zoom }] }).catch((err) => {
+                console.warn('Zoom 設定失敗', err);
+            });
+        }
+
         function setupZoomControl() {
-            if (!stream || !zoomControl || !zoomRange || !zoomValue) return;
+            if (!stream || !zoomControl || !zoomValue || !zoomButtons.length) return;
             const [track] = stream.getVideoTracks();
             if (!track || !track.getCapabilities) {
                 zoomControl.classList.add('hidden');
@@ -571,23 +584,12 @@ success 或 fail (只能二選一，小寫)
                 return;
             }
             zoomControl.classList.remove('hidden');
-            zoomRange.min = caps.zoom.min;
-            zoomRange.max = caps.zoom.max;
-            zoomRange.step = caps.zoom.step || 0.1;
             const settings = track.getSettings();
             const currentZoom = settings.zoom || caps.zoom.min;
-            zoomRange.value = currentZoom;
             zoomValue.textContent = `${Number(currentZoom).toFixed(1)}x`;
-
-            zoomRange.oninput = async () => {
-                const zoom = Number(zoomRange.value);
-                zoomValue.textContent = `${zoom.toFixed(1)}x`;
-                try {
-                    await track.applyConstraints({ advanced: [{ zoom }] });
-                } catch (zoomErr) {
-                    console.warn('Zoom 不支援或設定失敗', zoomErr);
-                }
-            };
+            zoomButtons.forEach((btn) => {
+                btn.onclick = () => setZoomLevel(track, Number(btn.dataset.zoom), caps);
+            });
         }
 
         // 位置與地圖
@@ -943,9 +945,11 @@ success 或 fail (只能二選一，小寫)
         canvas.addEventListener('touchcancel', endDraw);
 
         // 導演面板開關
-        directorToggle.addEventListener('click', () => {
-            directorPanel.classList.toggle('open');
-        });
+        if (directorToggle && directorPanel) {
+            directorToggle.addEventListener('click', () => {
+                directorPanel.classList.toggle('open');
+            });
+        }
 
         // 模式按鈕
         modeBtns.forEach(btn => {

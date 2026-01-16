@@ -48,7 +48,7 @@
             <div id="locationBar" class="location-bar">目前位置：定位中...</div>
 
             <!-- 導演模式開關 -->
-            <button id="directorToggle" class="director-toggle">🎬 導演設定</button>
+            <button id="directorToggle" class="director-toggle hidden">🎬 導演設定</button>
 
             <!-- 模式切換器 -->
             <div class="mode-switcher">
@@ -58,8 +58,9 @@
 
             <!-- 縮放控制 -->
             <div id="zoomControl" class="zoom-control hidden">
-                <label for="zoomRange">Zoom</label>
-                <input id="zoomRange" type="range" min="1" max="1" step="0.1" value="1">
+                <button class="zoom-btn" data-zoom="2">2x</button>
+                <button class="zoom-btn" data-zoom="5">5x</button>
+                <button class="zoom-btn" data-zoom="10">10x</button>
                 <span id="zoomValue">1.0x</span>
             </div>
 
@@ -75,7 +76,7 @@
             </div>
 
             <!-- 導演控制台 -->
-            <div id="directorPanel" class="director-panel">
+            <div id="directorPanel" class="director-panel hidden">
                 <div class="panel-title">導演控制台 (Prompt Engineering)</div>
                 
                 <div class="input-group">

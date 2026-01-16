@@ -300,6 +300,11 @@ canvas#drawingCanvas {
     backdrop-filter: blur(10px);
 }
 
+.director-toggle.hidden,
+.director-panel.hidden {
+    display: none !important;
+}
+
 .lang-selector {
     position: absolute;
     top: 120px;
@@ -335,8 +340,19 @@ canvas#drawingCanvas {
     pointer-events: auto;
 }
 
-.zoom-control input[type="range"] {
-    width: 120px;
+.zoom-btn {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #fff;
+    border-radius: 10px;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.zoom-btn.active {
+    background: #ffd700;
+    color: #000;
 }
 
 .voice-panel {
