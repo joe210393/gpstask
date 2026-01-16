@@ -368,13 +368,26 @@ success 或 fail (只能二選一，小寫)
         function initSpeechChat() {
             if (!micBtn) return;
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+            const showTextFallback = async () => {
+                const result = await Swal.fire({
+                    title: '改用文字輸入',
+                    input: 'text',
+                    inputPlaceholder: '請輸入你要問的內容',
+                    showCancelButton: true,
+                    confirmButtonText: '送出'
+                });
+                if (result.isConfirmed && result.value) {
+                    sendVoiceChat(result.value.trim());
+                }
+            };
             if (!SpeechRecognition) {
                 micBtn.addEventListener('click', () => {
                     Swal.fire({
                         icon: 'info',
                         title: '語音辨識不可用',
-                        text: '此裝置或瀏覽器不支援語音辨識'
-                    });
+                        text: isIOS ? 'iOS Safari 不支援語音辨識，請改用文字輸入或使用支援的瀏覽器' : '此裝置或瀏覽器不支援語音辨識'
+                    }).then(showTextFallback);
                 });
                 return;
             }
@@ -400,6 +413,10 @@ success 或 fail (只能二選一，小寫)
                 }
             });
 
+            recognition.onstart = () => {
+                updateVoicePanel('', '', '聆聽中...');
+            };
+
             recognition.onresult = (event) => {
                 let finalTranscript = '';
                 let interim = '';
@@ -421,9 +438,15 @@ success 或 fail (只能二選一，小寫)
 
             recognition.onerror = (event) => {
                 console.warn('語音辨識錯誤', event);
+                const reason = event.error || 'unknown';
                 updateVoicePanel('', '語音辨識失敗', '失敗');
                 isRecording = false;
                 micBtn.classList.remove('active');
+                Swal.fire({
+                    icon: 'error',
+                    title: '語音辨識失敗',
+                    text: isIOS ? 'iOS Safari 常會失敗，建議改用文字輸入' : `錯誤：${reason}`
+                }).then(showTextFallback);
             };
 
             recognition.onend = () => {
@@ -833,18 +856,49 @@ success 或 fail (只能二選一，小寫)
         // 拍照
         captureBtn.addEventListener('click', () => {
             try {
+                if (!video.videoWidth || !video.videoHeight) {
+                    throw new Error('相機尚未就緒');
+                }
                 const photoCanvas = document.createElement('canvas');
                 photoCanvas.width = video.videoWidth;
                 photoCanvas.height = video.videoHeight;
                 const photoCtx = photoCanvas.getContext('2d');
                 photoCtx.drawImage(video, 0, 0, photoCanvas.width, photoCanvas.height);
                 const dataUrl = photoCanvas.toDataURL('image/jpeg', 0.95);
-                const link = document.createElement('a');
-                link.href = dataUrl;
-                link.download = `ai-lab-${Date.now()}.jpg`;
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                if (navigator.canShare && !isIOS) {
+                    fetch(dataUrl)
+                        .then(res => res.blob())
+                        .then(blob => {
+                            const file = new File([blob], `ai-lab-${Date.now()}.jpg`, { type: 'image/jpeg' });
+                            return navigator.share({ files: [file], title: 'AI Lab Photo' });
+                        })
+                        .catch(() => {
+                            const link = document.createElement('a');
+                            link.href = dataUrl;
+                            link.download = `ai-lab-${Date.now()}.jpg`;
+                            document.body.appendChild(link);
+                            link.click();
+                            link.remove();
+                        });
+                } else if (isIOS) {
+                    const win = window.open();
+                    if (win) {
+                        win.document.write(`<img src="${dataUrl}" style="width:100%"/>`);
+                    }
+                    Swal.fire({
+                        icon: 'info',
+                        title: '已開啟照片',
+                        text: '請長按圖片儲存'
+                    });
+                } else {
+                    const link = document.createElement('a');
+                    link.href = dataUrl;
+                    link.download = `ai-lab-${Date.now()}.jpg`;
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                }
             } catch (err) {
                 console.error('拍照失敗', err);
                 Swal.fire({
