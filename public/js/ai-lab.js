@@ -171,6 +171,7 @@ success 或 fail (只能二選一，小寫)
         const voiceUser = document.getElementById('voiceUser');
         const voiceAi = document.getElementById('voiceAi');
         const voiceStatus = document.getElementById('voiceStatus');
+        const voiceSpeakToggle = document.getElementById('voiceSpeakToggle');
         const cameraContainer = document.querySelector('.camera-container');
         let miniMapEl = document.getElementById('miniMap');
         let locationInfoEl = document.getElementById('locationInfo');
@@ -330,6 +331,12 @@ success 或 fail (只能二選一，小寫)
                     finalSystemPrompt += `\n\n【拍攝地點資訊】${locationTextForPrompt}`;
                 }
                 finalSystemPrompt += `\n\n【輸出語言】${getLanguageInstruction()}`;
+                finalSystemPrompt += `\n\n【回答規範】請不要在回覆中提及「我根據地點資訊/位置資訊推斷」或引用地名作為判斷依據。地點僅作為背景參考，回答要自然。`;
+                if (locationTextForPrompt) {
+                    finalSystemPrompt += `\n\n【拍攝地點資訊】${locationTextForPrompt}`;
+                }
+                finalSystemPrompt += `\n\n【輸出語言】${getLanguageInstruction()}`;
+                finalSystemPrompt += `\n\n【回答規範】請不要在回覆中提及「我根據地點資訊/位置資訊推斷」或引用地名作為判斷依據。地點僅作為背景參考，回答要自然。`;
 
                 const payload = {
                     systemPrompt: finalSystemPrompt,
@@ -350,10 +357,17 @@ success 或 fail (只能二選一，小寫)
                 const data = await apiRes.json();
                 if (!data.success) throw new Error(data.message || 'AI 回覆失敗');
 
-                const replyText = data.description || '';
+                const rawText = data.description || '';
+                const cleanedText = rawText.replace(/```xml|```/gi, '').trim();
+                const replyMatch = cleanedText.match(/<reply>([\s\S]*?)<\/reply>/i);
+                const fallbackMatch = cleanedText.match(/<analysis>([\s\S]*?)<\/analysis>/i);
+                const replyText = replyMatch
+                    ? replyMatch[1].trim()
+                    : (cleanedText || (fallbackMatch ? fallbackMatch[1].trim() : ''));
                 updateVoicePanel(userText, replyText, '完成');
 
-                if ('speechSynthesis' in window) {
+                const shouldSpeak = voiceSpeakToggle ? voiceSpeakToggle.checked : true;
+                if (shouldSpeak && 'speechSynthesis' in window && replyText) {
                     const utter = new SpeechSynthesisUtterance(replyText);
                     utter.lang = getSpeechLocale();
                     window.speechSynthesis.cancel();
