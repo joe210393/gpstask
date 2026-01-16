@@ -165,6 +165,8 @@ success 或 fail (只能二選一，小寫)
         const cameraContainer = document.querySelector('.camera-container');
         let miniMapEl = document.getElementById('miniMap');
         let locationInfoEl = document.getElementById('locationInfo');
+        let miniMapWrap = document.querySelector('.mini-map-wrap');
+        let miniMapToggle = document.getElementById('miniMapToggle');
 
         if (!video || !canvas) throw new Error('關鍵 DOM 元素遺失');
 
@@ -275,6 +277,19 @@ success 或 fail (只能二選一，小寫)
             });
         }
 
+        function initMiniMapToggle() {
+            if (!miniMapToggle || !miniMapWrap) return;
+            const saved = localStorage.getItem('aiLabMiniMapCollapsed');
+            if (saved === '1') {
+                miniMapWrap.classList.add('collapsed');
+            }
+            miniMapToggle.addEventListener('click', () => {
+                miniMapWrap.classList.toggle('collapsed');
+                const isCollapsed = miniMapWrap.classList.contains('collapsed');
+                localStorage.setItem('aiLabMiniMapCollapsed', isCollapsed ? '1' : '0');
+            });
+        }
+
         // 切換模式
         function setMode(mode) {
             log(`切換模式: ${mode}`);
@@ -369,6 +384,12 @@ success 或 fail (只能二選一，小寫)
             const wrap = document.createElement('div');
             wrap.className = 'mini-map-wrap';
 
+            const toggleBtn = document.createElement('button');
+            toggleBtn.id = 'miniMapToggle';
+            toggleBtn.className = 'mini-map-toggle';
+            toggleBtn.title = '切換地圖';
+            toggleBtn.textContent = '🗺️';
+
             const mapDiv = document.createElement('div');
             mapDiv.id = 'miniMap';
             mapDiv.className = 'mini-map';
@@ -378,12 +399,15 @@ success 或 fail (只能二選一，小寫)
             infoDiv.className = 'location-info';
             infoDiv.textContent = '定位中...';
 
+            wrap.appendChild(toggleBtn);
             wrap.appendChild(mapDiv);
             wrap.appendChild(infoDiv);
             cameraContainer.appendChild(wrap);
 
             miniMapEl = mapDiv;
             locationInfoEl = infoDiv;
+            miniMapWrap = wrap;
+            miniMapToggle = toggleBtn;
         }
 
         function initMiniMap() {
@@ -686,8 +710,13 @@ success 或 fail (只能二選一，小寫)
                     finalSystemPrompt += `\n\n【語氣變化指令】\n失敗時請隨機使用一種嘲諷風格，例如：${failHint}\n成功時請隨機使用一種帶刺的肯定，例如：${successHint}`;
                 }
 
-                if (lastLocationText) {
-                    finalSystemPrompt += `\n\n【拍攝地點資訊】${lastLocationText}`;
+                const locationTextForPrompt = lastLocationText
+                    || (lastLatLng
+                        ? `緯度 ${lastLatLng.latitude.toFixed(5)}，經度 ${lastLatLng.longitude.toFixed(5)}`
+                        : '');
+                if (locationTextForPrompt) {
+                    finalSystemPrompt += `\n\n【拍攝地點資訊】${locationTextForPrompt}`;
+                    finalUserPrompt += `\n\n拍攝地點：${locationTextForPrompt}`;
                 }
                 finalSystemPrompt += `\n\n【輸出語言】${getLanguageInstruction()}`;
 
@@ -831,6 +860,7 @@ success 或 fail (只能二選一，小寫)
         // ------------------------------------------------
         resizeCanvas();
         initLanguageSelector();
+        initMiniMapToggle();
         setMode('free'); // 預設模式
         initMiniMap();
         startCamera();

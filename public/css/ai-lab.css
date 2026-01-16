@@ -67,6 +67,18 @@ canvas#drawingCanvas {
     pointer-events: none;
 }
 
+.mini-map-toggle {
+    align-self: flex-end;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #fff;
+    border-radius: 12px;
+    font-size: 12px;
+    padding: 4px 8px;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
 .mini-map {
     width: 96px;
     height: 96px;
@@ -87,6 +99,11 @@ canvas#drawingCanvas {
     border-radius: 10px;
     line-height: 1.4;
     opacity: 0.95;
+}
+
+.mini-map-wrap.collapsed .mini-map,
+.mini-map-wrap.collapsed .location-info {
+    display: none;
 }
 
 .mini-map .leaflet-control-container {
