@@ -242,6 +242,44 @@ canvas#drawingCanvas {
     width: 120px;
 }
 
+.voice-panel {
+    position: absolute;
+    left: 50%;
+    bottom: 90px;
+    transform: translateX(-50%);
+    width: min(90vw, 360px);
+    background: rgba(0, 0, 0, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 14px;
+    padding: 10px 12px;
+    color: #fff;
+    font-size: 12px;
+    z-index: 20;
+    pointer-events: none;
+}
+
+.voice-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.voice-label {
+    color: #ffd700;
+    min-width: 28px;
+}
+
+.voice-text {
+    flex: 1;
+    color: #fff;
+}
+
+.voice-status {
+    color: #9fd3ff;
+    font-size: 11px;
+    text-align: right;
+}
+
 .lang-selector select {
     background: #111;
     color: #fff;

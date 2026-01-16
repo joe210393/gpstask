@@ -249,23 +249,23 @@ function requireRole(...allowedRoles) {
 
 // 共享的存儲配置
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    // 確保目錄存在
-    if (!fs.existsSync(UPLOAD_DIR)) {
-      try {
-        fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-      } catch (err) {
-        console.error('建立上傳目錄失敗:', err);
+    destination: (req, file, cb) => {
+      // 確保目錄存在
+      if (!fs.existsSync(UPLOAD_DIR)) {
+        try {
+          fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+        } catch (err) {
+          console.error('建立上傳目錄失敗:', err);
+        }
       }
+      cb(null, UPLOAD_DIR);
+    },
+    filename: (req, file, cb) => {
+      // 生成安全的檔案名稱：時間戳 + 隨機字串 + 副檔名
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const extension = path.extname(file.originalname).toLowerCase();
+      cb(null, uniqueSuffix + extension);
     }
-    cb(null, UPLOAD_DIR);
-  },
-  filename: (req, file, cb) => {
-    // 生成安全的檔案名稱：時間戳 + 隨機字串 + 副檔名
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const extension = path.extname(file.originalname).toLowerCase();
-    cb(null, uniqueSuffix + extension);
-  }
 });
 
 // 共享的檔案類型過濾器（圖片和 3D 模型）
@@ -283,11 +283,11 @@ const fileFilter = (req, file, cb) => {
 // 音頻文件過濾器
 const audioFileFilter = (req, file, cb) => {
   const allowedExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac', '.webm'];
-  const fileExtension = path.extname(file.originalname).toLowerCase();
+    const fileExtension = path.extname(file.originalname).toLowerCase();
 
   if (allowedExtensions.includes(fileExtension)) {
-    cb(null, true);
-  } else {
+      cb(null, true);
+    } else {
     cb(new Error('不支援的檔案類型。只允許 MP3, WAV, OGG, M4A, AAC, FLAC, WebM。'), false);
   }
 };
@@ -481,9 +481,9 @@ app.post('/api/register', async (req, res) => {
   if (role !== 'user') {
     return res.status(403).json({ success: false, message: '僅允許註冊一般用戶，工作人員/商店/管理員帳號請由管理員建立或指派' });
   }
-  // 手機門號註冊，不需密碼
-  if (!/^09[0-9]{8}$/.test(username)) {
-    return res.status(400).json({ success: false, message: '請輸入正確的手機門號' });
+    // 手機門號註冊，不需密碼
+    if (!/^09[0-9]{8}$/.test(username)) {
+      return res.status(400).json({ success: false, message: '請輸入正確的手機門號' });
   }
   let conn;
   try {
@@ -1152,7 +1152,7 @@ app.post('/api/tasks', staffOrAdminAuth, async (req, res) => {
     const bgmUrlValue = bgm_url || null;
     
     if (hasBgmUrl) {
-      await conn.execute(
+    await conn.execute(
         `INSERT INTO tasks (
           name, lat, lng, radius, description, photoUrl, iconUrl, youtubeUrl, ar_image_url, points, created_by, 
           task_type, options, correct_answer,
@@ -1571,7 +1571,7 @@ app.put('/api/tasks/:id', staffOrAdminAuth, async (req, res) => {
     const hasBgmUrl = bgmColCheck.length > 0;
 
     if (hasBgmUrl) {
-      await conn.execute(
+    await conn.execute(
         `UPDATE tasks SET 
           name=?, lat=?, lng=?, radius=?, description=?, photoUrl=?, youtubeUrl=?, ar_image_url=?, points=?, 
           task_type=?, options=?, correct_answer=?,
@@ -1826,7 +1826,7 @@ app.get('/api/user-tasks/all', authenticateToken, async (req, res) => {
 function adminAuth(req, res, next) {
   authenticateTokenCompat(req, res, () => {
     if (req.user && req.user.role === 'admin') {
-      next();
+        next();
     } else {
       return res.status(403).json({ success: false, message: '無權限：需要管理員身分' });
     }
@@ -1840,8 +1840,8 @@ function staffOrAdminAuth(req, res, next) {
     if (role === 'admin' || role === 'shop' || role === 'staff') {
       next();
     } else {
-      return res.status(403).json({ success: false, message: '無權限' });
-    }
+          return res.status(403).json({ success: false, message: '無權限' });
+        }
   });
 }
 
@@ -2422,9 +2422,9 @@ app.get('/api/products', async (req, res) => {
     let query;
     if (hasIsActive && hasCreatedBy) {
       query = `SELECT p.*, u.username as creator_username
-         FROM products p
-         LEFT JOIN users u ON p.created_by = u.username
-         WHERE p.is_active = TRUE
+      FROM products p
+      LEFT JOIN users u ON p.created_by = u.username
+      WHERE p.is_active = TRUE
          ORDER BY p.points_required ASC`;
     } else if (hasIsActive) {
       query = `SELECT p.*, NULL as creator_username
@@ -2470,7 +2470,7 @@ app.get('/api/products/admin', staffOrAdminAuth, async (req, res) => {
     }
 
     const userRole = userRows[0].role;
-    
+
     // 檢查 products 表是否有 created_by 欄位
     const [createdByCols] = await conn.execute("SHOW COLUMNS FROM products LIKE 'created_by'");
     const hasCreatedBy = createdByCols.length > 0;
@@ -2483,8 +2483,8 @@ app.get('/api/products/admin', staffOrAdminAuth, async (req, res) => {
     } else {
       // 工作人員只能看到自己創建的商品（如果有 created_by 欄位）
       if (hasCreatedBy) {
-        query = 'SELECT * FROM products WHERE created_by = ? ORDER BY created_at DESC';
-        params = [username];
+      query = 'SELECT * FROM products WHERE created_by = ? ORDER BY created_at DESC';
+      params = [username];
       } else {
         // 如果沒有 created_by 欄位，工作人員可以看到所有商品（向後兼容）
         query = 'SELECT * FROM products ORDER BY created_at DESC';
@@ -2530,9 +2530,9 @@ app.post('/api/products', staffOrAdminAuth, async (req, res) => {
     } else if (hasCreatedBy) {
       // 如果只有 created_by 欄位，不包含 is_active
       [result] = await conn.execute(
-        'INSERT INTO products (name, description, image_url, points_required, stock, created_by) VALUES (?, ?, ?, ?, ?, ?)',
-        [name, description || '', image_url || '', points_required, stock, username]
-      );
+      'INSERT INTO products (name, description, image_url, points_required, stock, created_by) VALUES (?, ?, ?, ?, ?, ?)',
+      [name, description || '', image_url || '', points_required, stock, username]
+    );
     } else {
       // 如果都沒有，使用最簡單的 INSERT 語句
       [result] = await conn.execute(
@@ -2585,8 +2585,8 @@ app.put('/api/products/:id', staffOrAdminAuth, async (req, res) => {
       productParams = [id];
     } else {
       if (hasCreatedBy) {
-        productQuery = 'SELECT id FROM products WHERE id = ? AND created_by = ?';
-        productParams = [id, username];
+      productQuery = 'SELECT id FROM products WHERE id = ? AND created_by = ?';
+      productParams = [id, username];
       } else {
         // 如果沒有 created_by 欄位，工作人員可以編輯任何商品（向後兼容）
         productQuery = 'SELECT id FROM products WHERE id = ?';
@@ -2719,7 +2719,7 @@ app.post('/api/products/:id/redeem', authenticateToken, async (req, res) => {
     // 檢查 products 表是否有 is_active 欄位
     const [isActiveCols] = await conn.execute("SHOW COLUMNS FROM products LIKE 'is_active'");
     const hasIsActive = isActiveCols.length > 0;
-    
+
     // 獲取商品資訊
     let products;
     if (hasIsActive) {
@@ -2856,13 +2856,13 @@ app.get('/api/product-redemptions/admin', staffOrAdminAuth, async (req, res) => 
     if (userRole === 'admin') {
       // 管理員可以看到所有兌換記錄
       if (hasCreatedBy) {
-        query = `
-          SELECT pr.*, p.name as product_name, p.image_url, p.created_by as merchant_name, u.username
-          FROM product_redemptions pr
-          JOIN products p ON pr.product_id = p.id
-          JOIN users u ON pr.user_id = u.id
-          ORDER BY pr.redeemed_at DESC
-        `;
+      query = `
+        SELECT pr.*, p.name as product_name, p.image_url, p.created_by as merchant_name, u.username
+        FROM product_redemptions pr
+        JOIN products p ON pr.product_id = p.id
+        JOIN users u ON pr.user_id = u.id
+        ORDER BY pr.redeemed_at DESC
+      `;
       } else {
         query = `
           SELECT pr.*, p.name as product_name, p.image_url, NULL as merchant_name, u.username
@@ -2876,15 +2876,15 @@ app.get('/api/product-redemptions/admin', staffOrAdminAuth, async (req, res) => 
     } else {
       // 工作人員只能看到自己管理的商品的兌換記錄
       if (hasCreatedBy) {
-        query = `
-          SELECT pr.*, p.name as product_name, p.image_url, p.created_by as merchant_name, u.username
-          FROM product_redemptions pr
-          JOIN products p ON pr.product_id = p.id
-          JOIN users u ON pr.user_id = u.id
-          WHERE p.created_by = ?
-          ORDER BY pr.redeemed_at DESC
-        `;
-        params = [username];
+      query = `
+        SELECT pr.*, p.name as product_name, p.image_url, p.created_by as merchant_name, u.username
+        FROM product_redemptions pr
+        JOIN products p ON pr.product_id = p.id
+        JOIN users u ON pr.user_id = u.id
+        WHERE p.created_by = ?
+        ORDER BY pr.redeemed_at DESC
+      `;
+      params = [username];
       } else {
         // 如果沒有 created_by 欄位，工作人員可以看到所有記錄（向後兼容）
         query = `
@@ -3178,6 +3178,65 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
   }
 });
 
+// AI 文字聊天 API (語音/文字用)
+app.post('/api/chat-text', async (req, res) => {
+  try {
+    const systemPrompt = req.body.systemPrompt || '你是一個有用的 AI 助手。';
+    const userPromptText = req.body.userPrompt || '';
+    const userText = req.body.text || '';
+    const locationText = req.body.locationText || '';
+
+    if (!userText) {
+      return res.status(400).json({ success: false, message: '缺少使用者內容' });
+    }
+
+    const finalUserPrompt = `${userPromptText}\n\n${userText}${locationText ? `\n\n(位置: ${locationText})` : ''}`.trim();
+
+    const AI_API_URL = process.env.AI_API_URL || 'https://tactually-venerable-inez.ngrok-free.dev/v1';
+    const AI_MODEL = 'local-model';
+
+    console.log('🤖 正在呼叫 AI(文字):', AI_API_URL);
+
+    const aiResponse = await fetch(`${AI_API_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer lm-studio'
+      },
+      body: JSON.stringify({
+        model: AI_MODEL,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: finalUserPrompt }
+        ],
+        max_tokens: 600,
+        temperature: 0.7
+      })
+    });
+
+    if (!aiResponse.ok) {
+      const errText = await aiResponse.text();
+      console.error('AI API Error(文字):', errText);
+      throw new Error(`AI API 回應錯誤: ${aiResponse.status}`);
+    }
+
+    const aiData = await aiResponse.json();
+    const description = aiData.choices[0].message.content;
+
+    res.json({
+      success: true,
+      description: description
+    });
+  } catch (err) {
+    console.error('❌ AI 文字回覆失敗:', err);
+    res.status(500).json({
+      success: false,
+      message: 'AI 暫時無法連線，請確認後端設定',
+      error: err.message
+    });
+  }
+});
+
 app.post('/api/admin/import-users', adminAuth, uploadExcel.single('file'), async (req, res) => {
   const { simulateActivity, startDate, endDate } = req.body;
   const isSimulationEnabled = simulateActivity === 'true';
@@ -3418,12 +3477,12 @@ app.put('/api/product-redemptions/:id/status', staffOrAdminAuth, async (req, res
     let query, params;
     if (userRole === 'admin') {
       if (hasCreatedBy) {
-        query = `
-          SELECT pr.*, p.name as product_name, p.created_by
-          FROM product_redemptions pr
-          JOIN products p ON pr.product_id = p.id
-          WHERE pr.id = ?
-        `;
+      query = `
+        SELECT pr.*, p.name as product_name, p.created_by
+        FROM product_redemptions pr
+        JOIN products p ON pr.product_id = p.id
+        WHERE pr.id = ?
+      `;
       } else {
         query = `
           SELECT pr.*, p.name as product_name, NULL as created_by
@@ -3435,13 +3494,13 @@ app.put('/api/product-redemptions/:id/status', staffOrAdminAuth, async (req, res
       params = [id];
     } else {
       if (hasCreatedBy) {
-        query = `
-          SELECT pr.*, p.name as product_name, p.created_by
-          FROM product_redemptions pr
-          JOIN products p ON pr.product_id = p.id
-          WHERE pr.id = ? AND p.created_by = ?
-        `;
-        params = [id, username];
+      query = `
+        SELECT pr.*, p.name as product_name, p.created_by
+        FROM product_redemptions pr
+        JOIN products p ON pr.product_id = p.id
+        WHERE pr.id = ? AND p.created_by = ?
+      `;
+      params = [id, username];
       } else {
         // 如果沒有 created_by 欄位，工作人員可以處理任何兌換記錄（向後兼容）
         query = `
@@ -3539,7 +3598,7 @@ if (process.env.NODE_ENV !== 'production') {
     console.log('MYSQL_PORT:', process.env.MYSQL_PORT || '[未設定]');
     console.log('MYSQL_USERNAME:', process.env.MYSQL_USERNAME || '[未設定]');
     console.log('MYSQL_DATABASE:', process.env.MYSQL_DATABASE || '[未設定]');
-    console.log('MYSQL_ROOT_PASSWORD:', process.env.MYSQL_ROOT_PASSWORD ? '[已設定]' : '[未設定]');
+  console.log('MYSQL_ROOT_PASSWORD:', process.env.MYSQL_ROOT_PASSWORD ? '[已設定]' : '[未設定]');
     console.log('MYSQL_PASSWORD:', process.env.MYSQL_PASSWORD ? '[已設定]' : '[未設定]');
   }
   console.log('ALLOWED_ORIGINS:', process.env.ALLOWED_ORIGINS || '[未設定]');

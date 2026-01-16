@@ -149,6 +149,7 @@ success 或 fail (只能二選一，小寫)
         const backBtn = document.getElementById('backBtn');
         const switchCameraBtn = document.getElementById('switchCameraBtn');
         const captureBtn = document.getElementById('captureBtn');
+        const micBtn = document.getElementById('micBtn');
         const retryBtn = document.getElementById('retryBtn');
         const analyzeBtn = document.getElementById('analyzeBtn');
         const aiLoading = document.getElementById('aiLoading');
@@ -166,6 +167,10 @@ success 或 fail (只能二選一，小寫)
         const zoomControl = document.getElementById('zoomControl');
         const zoomRange = document.getElementById('zoomRange');
         const zoomValue = document.getElementById('zoomValue');
+        const voicePanel = document.getElementById('voicePanel');
+        const voiceUser = document.getElementById('voiceUser');
+        const voiceAi = document.getElementById('voiceAi');
+        const voiceStatus = document.getElementById('voiceStatus');
         const cameraContainer = document.querySelector('.camera-container');
         let miniMapEl = document.getElementById('miniMap');
         let locationInfoEl = document.getElementById('locationInfo');
@@ -233,6 +238,20 @@ success 或 fail (只能二選一，小寫)
             }
         }
 
+        function getSpeechLocale() {
+            const lang = langSelect ? langSelect.value : 'zh';
+            switch (lang) {
+                case 'en':
+                    return 'en-US';
+                case 'ja':
+                    return 'ja-JP';
+                case 'ko':
+                    return 'ko-KR';
+                default:
+                    return 'zh-TW';
+            }
+        }
+
         function initLanguageSelector() {
             if (!langSelect) {
                 if (!uiLayer) return;
@@ -279,6 +298,138 @@ success 或 fail (只能二選一，小寫)
             langSelect.addEventListener('change', () => {
                 localStorage.setItem('aiLabLang', langSelect.value);
             });
+        }
+
+        function updateVoicePanel(userText, aiText, statusText) {
+            if (!voicePanel) return;
+            voicePanel.classList.remove('hidden');
+            if (voiceUser && userText !== undefined) voiceUser.textContent = userText || '—';
+            if (voiceAi && aiText !== undefined) voiceAi.textContent = aiText || '—';
+            if (voiceStatus && statusText !== undefined) voiceStatus.textContent = statusText;
+        }
+
+        async function sendVoiceChat(userText) {
+            try {
+                updateVoicePanel(userText, '...', '送出中');
+                let finalSystemPrompt = systemPromptInput && systemPromptInput.value ? systemPromptInput.value : '';
+                let finalUserPrompt = userPromptInput && userPromptInput.value ? userPromptInput.value : '';
+                if (!finalSystemPrompt || finalSystemPrompt.length < 10) {
+                    const fallbackScript = getActiveScript();
+                    finalSystemPrompt = fallbackScript ? fallbackScript.system : finalSystemPrompt;
+                }
+                if (!finalUserPrompt) {
+                    const fallbackScript = getActiveScript();
+                    finalUserPrompt = fallbackScript ? fallbackScript.user : finalUserPrompt;
+                }
+
+                const locationTextForPrompt = lastLocationText
+                    || (lastLatLng
+                        ? `緯度 ${lastLatLng.latitude.toFixed(5)}，經度 ${lastLatLng.longitude.toFixed(5)}`
+                        : '');
+                if (locationTextForPrompt) {
+                    finalSystemPrompt += `\n\n【拍攝地點資訊】${locationTextForPrompt}`;
+                }
+                finalSystemPrompt += `\n\n【輸出語言】${getLanguageInstruction()}`;
+
+                const payload = {
+                    systemPrompt: finalSystemPrompt,
+                    userPrompt: finalUserPrompt,
+                    text: userText,
+                    locationText: locationTextForPrompt
+                };
+
+                const apiRes = await fetch('/api/chat-text', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!apiRes.ok) {
+                    const errText = await apiRes.text();
+                    throw new Error(`伺服器錯誤: ${errText}`);
+                }
+                const data = await apiRes.json();
+                if (!data.success) throw new Error(data.message || 'AI 回覆失敗');
+
+                const replyText = data.description || '';
+                updateVoicePanel(userText, replyText, '完成');
+
+                if ('speechSynthesis' in window) {
+                    const utter = new SpeechSynthesisUtterance(replyText);
+                    utter.lang = getSpeechLocale();
+                    window.speechSynthesis.cancel();
+                    window.speechSynthesis.speak(utter);
+                }
+            } catch (err) {
+                console.error('語音聊天錯誤', err);
+                updateVoicePanel(userText, '語音回覆失敗，請再試一次', '失敗');
+            }
+        }
+
+        function initSpeechChat() {
+            if (!micBtn) return;
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                micBtn.addEventListener('click', () => {
+                    Swal.fire({
+                        icon: 'info',
+                        title: '語音辨識不可用',
+                        text: '此裝置或瀏覽器不支援語音辨識'
+                    });
+                });
+                return;
+            }
+
+            const recognition = new SpeechRecognition();
+            recognition.lang = getSpeechLocale();
+            recognition.interimResults = true;
+            recognition.continuous = false;
+
+            let isRecording = false;
+
+            micBtn.addEventListener('click', () => {
+                if (!isRecording) {
+                    recognition.lang = getSpeechLocale();
+                    updateVoicePanel('', '', '聆聽中...');
+                    recognition.start();
+                    isRecording = true;
+                    micBtn.classList.add('active');
+                } else {
+                    recognition.stop();
+                    isRecording = false;
+                    micBtn.classList.remove('active');
+                }
+            });
+
+            recognition.onresult = (event) => {
+                let finalTranscript = '';
+                let interim = '';
+                for (let i = event.resultIndex; i < event.results.length; i += 1) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript;
+                    } else {
+                        interim += transcript;
+                    }
+                }
+                updateVoicePanel(finalTranscript || interim, '...', '辨識中...');
+                if (finalTranscript) {
+                    isRecording = false;
+                    micBtn.classList.remove('active');
+                    sendVoiceChat(finalTranscript.trim());
+                }
+            };
+
+            recognition.onerror = (event) => {
+                console.warn('語音辨識錯誤', event);
+                updateVoicePanel('', '語音辨識失敗', '失敗');
+                isRecording = false;
+                micBtn.classList.remove('active');
+            };
+
+            recognition.onend = () => {
+                isRecording = false;
+                micBtn.classList.remove('active');
+            };
         }
 
         function initMiniMapToggle() {
@@ -924,6 +1075,7 @@ success 或 fail (只能二選一，小寫)
         resizeCanvas();
         initLanguageSelector();
         initMiniMapToggle();
+        initSpeechChat();
         setMode('free'); // 預設模式
         initMiniMap();
         startCamera();
