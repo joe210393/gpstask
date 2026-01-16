@@ -119,17 +119,13 @@ canvas#drawingCanvas {
 }
 
 .location-bar {
-    position: absolute;
-    top: 64px;
-    left: 50%;
-    transform: translateX(-50%);
-    max-width: 90%;
+    position: static;
+    max-width: 100%;
     background: rgba(0, 0, 0, 0.55);
     color: #fff;
     font-size: 12px;
     padding: 6px 10px;
     border-radius: 12px;
-    z-index: 20;
     text-align: center;
     white-space: nowrap;
     overflow: hidden;
@@ -154,15 +150,13 @@ canvas#drawingCanvas {
         font-size: 16px;
     }
 
-    .location-bar {
-        top: 54px;
-        font-size: 11px;
-        max-width: 92%;
+    .top-controls {
+        top: 56px;
+        width: 94vw;
     }
 
-    .mode-switcher {
-        top: 86px;
-        width: 92%;
+    .location-bar {
+        font-size: 11px;
     }
 
     .mode-btn {
@@ -222,6 +216,37 @@ canvas#drawingCanvas {
     justify-content: space-between;
     align-items: center;
     z-index: 10;
+}
+
+.top-controls {
+    position: absolute;
+    top: 64px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(92vw, 520px);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 20;
+    pointer-events: none;
+}
+
+.control-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    pointer-events: auto;
+}
+
+.top-controls .mode-switcher {
+    position: static;
+    transform: none;
+    left: auto;
+    top: auto;
+    margin: 0 auto;
+    width: 100%;
+    justify-content: center;
+    pointer-events: auto;
 }
 
 .header-actions {
@@ -306,9 +331,7 @@ canvas#drawingCanvas {
 }
 
 .lang-selector {
-    position: absolute;
-    top: 120px;
-    left: 20px;
+    position: static;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -318,15 +341,11 @@ canvas#drawingCanvas {
     padding: 6px 10px;
     color: #fff;
     font-size: 12px;
-    z-index: 20;
     pointer-events: auto;
 }
 
 .zoom-control {
-    position: absolute;
-    top: 120px;
-    left: 50%;
-    transform: translateX(-50%);
+    position: static;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -336,7 +355,6 @@ canvas#drawingCanvas {
     padding: 6px 10px;
     color: #fff;
     font-size: 12px;
-    z-index: 20;
     pointer-events: auto;
 }
 

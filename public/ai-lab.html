@@ -45,35 +45,42 @@
                     <button id="switchCameraBtn" class="icon-btn">↻</button>
                 </div>
             </div>
-            <div id="locationBar" class="location-bar">目前位置：定位中...</div>
+
+            <div class="top-controls">
+                <div id="locationBar" class="location-bar">目前位置：定位中...</div>
+
+                <!-- 模式切換器 -->
+                <div class="mode-switcher">
+                    <button class="mode-btn active" data-mode="free">🌿 自由探索</button>
+                    <button class="mode-btn" data-mode="mission">🛡️ 任務模式</button>
+                </div>
+
+                <div class="control-row">
+                    <!-- 語言選擇 -->
+                    <div class="lang-selector">
+                        <label for="langSelect">語言</label>
+                        <select id="langSelect">
+                            <option value="zh">繁體中文</option>
+                            <option value="en">English</option>
+                            <option value="ja">日本語</option>
+                            <option value="ko">한국어</option>
+                        </select>
+                    </div>
+
+                    <!-- 縮放控制 -->
+                    <div id="zoomControl" class="zoom-control hidden">
+                        <button class="zoom-btn" data-zoom="1">1x</button>
+                        <button class="zoom-btn" data-zoom="2">2x</button>
+                        <button class="zoom-btn" data-zoom="5">5x</button>
+                        <button class="zoom-btn" data-zoom="10">10x</button>
+                        <span id="zoomValue">1.0x</span>
+                    </div>
+                </div>
+            </div>
 
             <!-- 導演模式開關 -->
             <button id="directorToggle" class="director-toggle hidden">🎬 導演設定</button>
 
-            <!-- 模式切換器 -->
-            <div class="mode-switcher">
-                <button class="mode-btn active" data-mode="free">🌿 自由探索</button>
-                <button class="mode-btn" data-mode="mission">🛡️ 任務模式</button>
-            </div>
-
-            <!-- 縮放控制 -->
-            <div id="zoomControl" class="zoom-control hidden">
-                <button class="zoom-btn" data-zoom="2">2x</button>
-                <button class="zoom-btn" data-zoom="5">5x</button>
-                <button class="zoom-btn" data-zoom="10">10x</button>
-                <span id="zoomValue">1.0x</span>
-            </div>
-
-            <!-- 語言選擇 -->
-            <div class="lang-selector">
-                <label for="langSelect">語言</label>
-                <select id="langSelect">
-                    <option value="zh">繁體中文</option>
-                    <option value="en">English</option>
-                    <option value="ja">日本語</option>
-                    <option value="ko">한국어</option>
-                </select>
-            </div>
 
             <!-- 導演控制台 -->
             <div id="directorPanel" class="director-panel hidden">
