@@ -40,6 +40,7 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
 }
 
 const app = express();
+console.log('🚀 System Reset: Restored to clean state (no RAG).');
 
 // 🔥 關鍵設定：信任反向代理（Zeabur/Cloudflare 等）
 // 設定為 1 表示只信任第一層代理（Zeabur 通常只有一層負載均衡器）
