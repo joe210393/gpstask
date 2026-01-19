@@ -1,0 +1,120 @@
+{
+  "statistics": {
+    "total": 2,
+    "complete": 0,
+    "partial": 2,
+    "empty": 0,
+    "photo_complete": 0,
+    "photo_building": 1,
+    "photo_none": 1,
+    "has_description": 2,
+    "usable": 2,
+    "percentages": {
+      "complete": 0.0,
+      "partial": 100.0,
+      "empty": 0.0,
+      "usable": 100.0,
+      "has_description": 100.0,
+      "photo_complete": 0.0,
+      "photo_building": 50.0,
+      "photo_none": 50.0
+    }
+  },
+  "sample_data": [
+    {
+      "code": "417+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=417+001+01+0",
+      "crawled_at": "2026-01-19 23:22:23",
+      "nomenclature": {
+        "name_zh": "pedunculata",
+        "name_latin": "fig. 262.",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "A shrub or small to rather large tree.Leaves l-foliolate, 4–30 cm long; petiole 0.5–5 cm long; leaflet blade glabrous, elliptic or elliptic-oblong to obovate or oblanceolate, 3.5–24.5 cm long, 2–8.5 cm wide, the base cuneate or sometimes rounded or attenuate, the apex obtusely acuminate or sometimes obtuse or rounded.Inflorescences few- to many-flowered, 2–25 cm long. Sepals 0.6–1.5 mm long; petals 3–11 mm long; ovary pubescent (rarely only at apex), 4-carpellate, completely syncarpous or with apical septicidal fissures; style pubescent toward base.Fruit usually rather sparsely pubescent and with a ring of dense, appressed hairs at base, but grading to tomentose or glabrous, completely syncarpous or with apical septicidal fissures, usually subglobose but grading to ellipsoid, pyriform, or broadly conical, sometimes lobed or ribbed, 5–15 mm wide, the epicarp drying 0.5–3 mm thick, with woody or subwoody mesocarp. Seeds 3–7 mm long.As seen in Taiwan, <i>Acronychia pedunculata</i> has leaves about 7–15 cm long with the leaflet blade about 6–12 cm long and 2.5–5 cm wide. The petals are about 5–6 mm long and the fruit, which is pubescent or sparsely so, is about 7–8 mm wide.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "333+010+05+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=333+010+05+0",
+      "crawled_at": "2026-01-19 23:22:28",
+      "nomenclature": {
+        "name_zh": "thunbergii",
+        "name_latin": "fig. 56.d.",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "Large Evergreen trees; branchlets terete, reddish-brown when dry; buds perulate, scales imbricate, golden-brown pubescent outside, young Leaves reddish.Leaves usually obovate, broadly elliptic, oblong, obovate-lanceolate to oblanceolate, 7-13 cm long, 3-6 cm broad, thickly coriaceous, obtuse to abruptly cuspidate at apex, cuneate, acute or often obtuse at base, entire and slightly revolute, glabrous and lustrous above, pubescent but soon glaucescent to glabrous beneath, midrib impressed above, elevated beneath, lateral veins 7-12 pairs, flattened above, slightly elevated beneath, veinlets somewhat obscure above, distinctly reticulate beneath; petioles 1-3 cm long, glabrous, brownish when dry.Inflorescences cymose panicles, terminal to subterminal, glabrous; peduncles 4-12 cm long; involucral bracts elliptic, reddish, caducous; pedicels 6-9 mm long, glabrous; receptacles 0.5 mm long, glabrous outside; tepals 6, elliptic-oblong, glabrous outside pubescent inside toward apex, ciliate, acute to obtuse, outer ones 3, 4.5 mm long, 2.2 mm broad, inner ones 5 mm long, 2.5 mm broad; fertile stamens 9, subequal, 1st and 2nd whorles of stamens eglandular, filaments glabrous and barbate at base, 2.5 mm long, anthers 4-celled, introrse, oblong, 1.7 mm long, glabrous, 3rd whorl with 2 glands, filaments 2.6 mm long, glabrous, glands stipitate at base of filaments, 0.4 mm long, the stipes 0.75 mm long, glabrous, anthers extrorse, 1.2 mm long, 4th whorl staminodes, sagittate, glabrous; ovary globose, 1.3 mm long, style slender, glabrous, 2.5 mm long, stigma capitate, 3-lobed.Fruit compressed-globose, 1 cm across, glabrous, with persistent reflexed enlarged tepals at base.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "unknown",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.5,
+        "max_score": 5,
+        "percentage": 70.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "無照片"
+        ]
+      }
+    }
+  ],
+  "analyzed_at": "2026-01-19 23:22:30"
+}
