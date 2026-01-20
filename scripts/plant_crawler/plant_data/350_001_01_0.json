@@ -1,0 +1,47 @@
+{
+  "code": "350+001+01+0",
+  "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=350+001+01+0",
+  "crawled_at": "2026-01-20 04:43:38",
+  "nomenclature": {
+    "name_zh": "arguta",
+    "name_latin": "photo 285.",
+    "family": "",
+    "family_zh": "",
+    "aliases": [],
+    "common_names": {}
+  },
+  "description": {
+    "has_description": true,
+    "description_en": "Tall climbing shrubs to 10 m long; branchlets glabrescent; pith light brown, lamellate.Leaves chartaceous, elliptic to broadly elliptic, sometimes broadly ovate, 4-10 cm. long, 3-8 cm broad, acuminate or cuspidate at apex, rounded or subcordate at base, margins densely serrulate, upper surface dark green, lower surface light green, young Leaves tomentose on veins, glabrescent, hairs remaining only in tufts in vein axils on lower surface, lateral veins ca. 6 or 7 per side; petioles 2-6 cm long.Infolrescences axillary, 1-10-flowered, 1 or 2-branched cymes, sparsely pubescent; flowers white; sepals sparsely tomentose on margins, ovoid or elliptic; ovary glabrous.Fruit ovoid to oblong, ca. 2-3 cm long, green or greenish-yellow, rostrate, glabrous, unspotted, calyx deciduous.",
+    "description_zh": "",
+    "life_form": "",
+    "morphology": "",
+    "distribution_text": ""
+  },
+  "photos": {
+    "status": "building",
+    "has_photos": false,
+    "photo_urls": [],
+    "count": 0
+  },
+  "distribution": {
+    "has_distribution": false,
+    "taiwan_distribution": "",
+    "world_distribution": "",
+    "coordinates": []
+  },
+  "specimens": {
+    "count": 0,
+    "specimens": []
+  },
+  "completeness": {
+    "score": 3.8,
+    "max_score": 5,
+    "percentage": 76.0,
+    "is_complete": false,
+    "is_usable": true,
+    "issues": [
+      "照片建置中"
+    ]
+  }
+}

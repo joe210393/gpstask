@@ -1,0 +1,47 @@
+{
+  "code": "415+001+01+0",
+  "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=415+001+01+0",
+  "crawled_at": "2026-01-20 04:44:07",
+  "nomenclature": {
+    "name_zh": "akoensis",
+    "name_latin": "Acalypha akoensis",
+    "family": "",
+    "family_zh": "",
+    "aliases": [],
+    "common_names": {}
+  },
+  "description": {
+    "has_description": true,
+    "description_en": "A shrub; branches reddish, terete, subglabrous.Leaves membranaceous, ovate, 12–16 cm long, 8–11 cm broad, the apex cuspidate-acute, the base cuneate-cordate or rounded-cordate, the margins serrulate, sparingly pilose on both surfaces; petioles 6–9 cm long, densely pubescent; stipules lanceolate, 12 mm long, acuminate.Male spikes filiform, recurved, 16–20 cm long, villose; peduncles 1 cm long. Female spikes slender, 5–9 cm long, pubescent; peduncles 1 cm long; bracts ovate, 3.5 mm long, 5 mm broad, 10-dentate, pubescent outside; bracteoles minute; ovary 3-lobed, hirsute; styles about 2.5 mm long.",
+    "description_zh": "",
+    "life_form": "",
+    "morphology": "",
+    "distribution_text": ""
+  },
+  "photos": {
+    "status": "building",
+    "has_photos": false,
+    "photo_urls": [],
+    "count": 0
+  },
+  "distribution": {
+    "has_distribution": false,
+    "taiwan_distribution": "",
+    "world_distribution": "",
+    "coordinates": []
+  },
+  "specimens": {
+    "count": 0,
+    "specimens": []
+  },
+  "completeness": {
+    "score": 3.8,
+    "max_score": 5,
+    "percentage": 76.0,
+    "is_complete": false,
+    "is_usable": true,
+    "issues": [
+      "照片建置中"
+    ]
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "code": "130+001+01+0",
+  "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=130+001+01+0",
+  "crawled_at": "2026-01-20 04:41:56",
+  "nomenclature": {
+    "name_zh": "conjugata",
+    "name_latin": "pl. 54.",
+    "family": "",
+    "family_zh": "",
+    "aliases": [],
+    "common_names": {}
+  },
+  "description": {
+    "has_description": true,
+    "description_en": "Rhizome about 1 cm in diameter.Fronds fan-shaped, cut into 2 halves, main lobes of each half narrowly lanceolate, with 2 main veins in each lobe, divided over 3/4 of way to base, apices acuminate, margins thickened with coarse serratiion; main veins prominently raised; young fronds densely covered with soft reddish-brown tomentum, especially on apices of lobes, mature fronds glabrous and glaucous beneath.",
+    "description_zh": "",
+    "life_form": "",
+    "morphology": "",
+    "distribution_text": ""
+  },
+  "photos": {
+    "status": "building",
+    "has_photos": false,
+    "photo_urls": [],
+    "count": 0
+  },
+  "distribution": {
+    "has_distribution": false,
+    "taiwan_distribution": "",
+    "world_distribution": "",
+    "coordinates": []
+  },
+  "specimens": {
+    "count": 0,
+    "specimens": []
+  },
+  "completeness": {
+    "score": 3.8,
+    "max_score": 5,
+    "percentage": 76.0,
+    "is_complete": false,
+    "is_usable": true,
+    "issues": [
+      "照片建置中"
+    ]
+  }
+}

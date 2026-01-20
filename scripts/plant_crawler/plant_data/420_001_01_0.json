@@ -1,0 +1,47 @@
+{
+  "code": "420+001+01+0",
+  "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=420+001+01+0",
+  "crawled_at": "2026-01-20 04:44:10",
+  "nomenclature": {
+    "name_zh": "chittagonga",
+    "name_latin": "pl. 283.",
+    "family": "",
+    "family_zh": "",
+    "aliases": [],
+    "common_names": {}
+  },
+  "description": {
+    "has_description": true,
+    "description_en": "A medium-sized tree; branches and branchlets densely silvery stellate-lepidote.Leaves about 14 cm long, imparipinnate, or partly paripinnate, the rachis and petioles lepidote; leaflets 5–6, alternate or opposite, elliptic to obovate, acute at apex, cuneate at base, coriaceous, 2.5–7.5 cm long, 2–2.5 cm broad, green-lepidote above, densely silvery lepidote beneath, the lateral veins about 4 on each side of the midrib, the midrib elevated above, distinctly elevated beneath; petioles 3–6 mm long.Panicle axillary, the rachis densely lepidote, 3–4 cm long; pedicels 1–2 mm long; calyx lepidote, 4–5-lobed, the lobes obtuse or rounded at apex; petals 4, yellow, glabrous, obovate-elliptic, concave, about 3.5 mm long, free from the staminal tube, the staminal tube about 3 mm long; anthers 8, ovate oblong, about 0.8 mm long, glabrous, sessile, inserted on the upper portion of the tube; ovary ovate, pubescent, the style none, the stigma ovate.Capsule obovate, densely lepidote, about 3 cm long, 2.2 cm across, 3-valved.",
+    "description_zh": "",
+    "life_form": "",
+    "morphology": "",
+    "distribution_text": ""
+  },
+  "photos": {
+    "status": "building",
+    "has_photos": false,
+    "photo_urls": [],
+    "count": 0
+  },
+  "distribution": {
+    "has_distribution": false,
+    "taiwan_distribution": "",
+    "world_distribution": "",
+    "coordinates": []
+  },
+  "specimens": {
+    "count": 0,
+    "specimens": []
+  },
+  "completeness": {
+    "score": 3.8,
+    "max_score": 5,
+    "percentage": 76.0,
+    "is_complete": false,
+    "is_usable": true,
+    "issues": [
+      "照片建置中"
+    ]
+  }
+}

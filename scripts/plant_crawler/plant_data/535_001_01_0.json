@@ -1,0 +1,47 @@
+{
+  "code": "535+001+01+0",
+  "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=535+001+01+0",
+  "crawled_at": "2026-01-20 04:45:09",
+  "nomenclature": {
+    "name_zh": "formosana",
+    "name_latin": "Patrinia formosana",
+    "family": "",
+    "family_zh": "",
+    "aliases": [],
+    "common_names": {}
+  },
+  "description": {
+    "has_description": true,
+    "description_en": "Large perennial herbs; stems terete, erect, to 150 cm tall, base woody, robust, densely covered with retrorse hairs; upper branches opposite, spreading.Leaves simple, undivided, opposite, thin, lower leaves broadly elliptic, 14–23 cm long, 4.5–8 cm wide, long-petiolate, acuminate or acute at apex, attenuate at base, margins serrate, pubescent on both surfaces and on margins; lower leaves deciduous at anthesis; upper leaves gradually smaller, elliptic, 4–9 cm long, short petiolate or sessile, margins serrate, pubescent on both surfaces and on margins.Inflorescences terminal and axillary, duplicate-corymbose, densely pubescent; bracts narrowly lanceolate or elliptic, 2–5 cm long, 2 mm wide, pubescent; calyx minutely 5-lobed; corolla yellow, funnel-shaped, 3 mm long, segments spreading; stamens usually 2 (rarely 3), inserted at base of corolla tube, filaments linear, ca. 3 mm long, sparsely hairy; style linear 3 mm long, stigma capitate.Achenes ovoid, 3–4 mm long, winged, wings nearly orbicular, 6.5 mm across, with nerves distinctly anastomosing.This species is similar to <i>P. villosa</i>, but differs by having simple leaves, which are not deeply pinnately divided. First year plants are nearly stemless and the leaves are all basal, long- petioled, broadly elliptic, winged nearly to base of petiole, with margins nearly crenate or slightly serrate at apex and pubescent throughout. These leaves are 14–24 cm long, 5–8 cm wide, much larger than the cauline leaves produced in the following season.",
+    "description_zh": "",
+    "life_form": "",
+    "morphology": "",
+    "distribution_text": ""
+  },
+  "photos": {
+    "status": "building",
+    "has_photos": false,
+    "photo_urls": [],
+    "count": 0
+  },
+  "distribution": {
+    "has_distribution": false,
+    "taiwan_distribution": "",
+    "world_distribution": "",
+    "coordinates": []
+  },
+  "specimens": {
+    "count": 0,
+    "specimens": []
+  },
+  "completeness": {
+    "score": 3.8,
+    "max_score": 5,
+    "percentage": 76.0,
+    "is_complete": false,
+    "is_usable": true,
+    "issues": [
+      "照片建置中"
+    ]
+  }
+}

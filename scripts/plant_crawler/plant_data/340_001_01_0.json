@@ -1,0 +1,47 @@
+{
+  "code": "340+001+01+0",
+  "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=340+001+01+0",
+  "crawled_at": "2026-01-20 04:43:32",
+  "nomenclature": {
+    "name_zh": "nucifera",
+    "name_latin": "pl. 19.",
+    "family": "",
+    "family_zh": "",
+    "aliases": [],
+    "common_names": {}
+  },
+  "description": {
+    "has_description": true,
+    "description_en": "Perennial herbs with horizontal rhizomes.Leaves centrally peltate, margins entire or slightly wavy, circular, 20-60 cm in diameter, pale green to green, glabrous above, green beneath; petioles 1-2 m long, short spined.Flowers showy, solitary, 10-25 cm across, fragrant; peduncle 1-2 m long, sepals 4 or 5, caducous; petals many, broadly elliptic, concave, white or pink; stamens numerous.Fruit aggregate, embedded in an enlarged receptacle, ellipsoid or ovoid, 1-1.7 cm long, the top protruding, reddish-brown.",
+    "description_zh": "",
+    "life_form": "",
+    "morphology": "",
+    "distribution_text": ""
+  },
+  "photos": {
+    "status": "building",
+    "has_photos": false,
+    "photo_urls": [],
+    "count": 0
+  },
+  "distribution": {
+    "has_distribution": false,
+    "taiwan_distribution": "",
+    "world_distribution": "",
+    "coordinates": []
+  },
+  "specimens": {
+    "count": 0,
+    "specimens": []
+  },
+  "completeness": {
+    "score": 3.8,
+    "max_score": 5,
+    "percentage": 76.0,
+    "is_complete": false,
+    "is_usable": true,
+    "issues": [
+      "照片建置中"
+    ]
+  }
+}

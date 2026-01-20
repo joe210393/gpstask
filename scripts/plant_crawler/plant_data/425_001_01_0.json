@@ -1,0 +1,47 @@
+{
+  "code": "425+001+01+0",
+  "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=425+001+01+0",
+  "crawled_at": "2026-01-20 04:44:13",
+  "nomenclature": {
+    "name_zh": "albopurpurascens",
+    "name_latin": "pl. 14b.",
+    "family": "",
+    "family_zh": "",
+    "aliases": [],
+    "common_names": {}
+  },
+  "description": {
+    "has_description": true,
+    "description_en": "Trees, evergreen, up to 15 m high; branchlets pubescent at first, soon glabrous.Leaves persistent, oblong-lanceolate, 2.5–13 cm long, 1–4 cm broad, caudate to acuminate at apex, obtuse to cuneate at base, coriaceous, pale green and glabrous above, white-purplish glaucous beneath, densely pubescent when young, 3-nerved at base, nerves slightly raised beneath; petioles 0.7–3.5 cm long, glaucous.Flowers small; pedicels short, 1.5–2 mm long; sepals 5, rounded ovate; petals 5, oblong ovate; disk not distinct, hairy appendages abundant; stamens 8. Pistillate flowers 6 mm across; sepals 1.5 mm long, pubescent outside; petals 3 mm long; staminodes short, anthers oblong, 1 mm long, filament shorter; ovary broadly rounded, styles 2, long, recurved downwards. Staminate flowers 4.5 mm across; stamens 1.5 mm long. Inflorescence cymose.samara glabrous; each wing with the semicarp 1.5–2.5 cm long; lower edges of two wings spreading at angles of 60–75 degree.",
+    "description_zh": "",
+    "life_form": "",
+    "morphology": "",
+    "distribution_text": ""
+  },
+  "photos": {
+    "status": "building",
+    "has_photos": false,
+    "photo_urls": [],
+    "count": 0
+  },
+  "distribution": {
+    "has_distribution": false,
+    "taiwan_distribution": "",
+    "world_distribution": "",
+    "coordinates": []
+  },
+  "specimens": {
+    "count": 0,
+    "specimens": []
+  },
+  "completeness": {
+    "score": 3.8,
+    "max_score": 5,
+    "percentage": 76.0,
+    "is_complete": false,
+    "is_usable": true,
+    "issues": [
+      "照片建置中"
+    ]
+  }
+}

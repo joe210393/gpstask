@@ -1,0 +1,47 @@
+{
+  "code": "125+001+01+0",
+  "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=125+001+01+0",
+  "crawled_at": "2026-01-20 04:41:53",
+  "nomenclature": {
+    "name_zh": "paleolata",
+    "name_latin": "Dryopteris paleolata",
+    "family": "",
+    "family_zh": "",
+    "aliases": [],
+    "common_names": {}
+  },
+  "description": {
+    "has_description": true,
+    "description_en": "Stipe 30-45cm long, stramineous, c. s. of base of stipe with about 5 bundles; laminae large, nearly as broad as long, basal pair of pinnae largest.Indusia thin, brown, upper free, margin somewhat erose.",
+    "description_zh": "",
+    "life_form": "",
+    "morphology": "",
+    "distribution_text": ""
+  },
+  "photos": {
+    "status": "building",
+    "has_photos": false,
+    "photo_urls": [],
+    "count": 0
+  },
+  "distribution": {
+    "has_distribution": false,
+    "taiwan_distribution": "",
+    "world_distribution": "",
+    "coordinates": []
+  },
+  "specimens": {
+    "count": 0,
+    "specimens": []
+  },
+  "completeness": {
+    "score": 3.8,
+    "max_score": 5,
+    "percentage": 76.0,
+    "is_complete": false,
+    "is_usable": true,
+    "issues": [
+      "照片建置中"
+    ]
+  }
+}

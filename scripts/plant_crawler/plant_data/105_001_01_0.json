@@ -1,0 +1,47 @@
+{
+  "code": "105+001+01+0",
+  "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=105+001+01+0",
+  "crawled_at": "2026-01-20 04:41:42",
+  "nomenclature": {
+    "name_zh": "ramosissimum",
+    "name_latin": "Equisetum ramosissimum",
+    "family": "",
+    "family_zh": "",
+    "aliases": [],
+    "common_names": {}
+  },
+  "description": {
+    "has_description": true,
+    "description_en": "Stems unbranched or with 2-3 branches per node, 20-160 cm tall, 1-7 mm in diameter; stomata in 1-3 lines in the grooves.sheaths longer than wide, the lower sheaths with a brown band, the upper ones green; teeth 3-9 mm long, having brown centers with white margins, when broken off, leaving a brown rim at top of sheaths. Strobili apiculate.Cross section of stem showing vallecular collenchyma not extending to vallecular canal; endodermis double, i.e. with an inner and outer endodermis.",
+    "description_zh": "",
+    "life_form": "",
+    "morphology": "",
+    "distribution_text": ""
+  },
+  "photos": {
+    "status": "building",
+    "has_photos": false,
+    "photo_urls": [],
+    "count": 0
+  },
+  "distribution": {
+    "has_distribution": false,
+    "taiwan_distribution": "",
+    "world_distribution": "",
+    "coordinates": []
+  },
+  "specimens": {
+    "count": 0,
+    "specimens": []
+  },
+  "completeness": {
+    "score": 3.8,
+    "max_score": 5,
+    "percentage": 76.0,
+    "is_complete": false,
+    "is_usable": true,
+    "issues": [
+      "照片建置中"
+    ]
+  }
+}

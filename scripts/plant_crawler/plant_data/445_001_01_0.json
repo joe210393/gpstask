@@ -1,0 +1,47 @@
+{
+  "code": "445+001+01+0",
+  "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=445+001+01+0",
+  "crawled_at": "2026-01-20 04:44:24",
+  "nomenclature": {
+    "name_zh": "membranacea",
+    "name_latin": "fig. 237.",
+    "family": "",
+    "family_zh": "",
+    "aliases": [],
+    "common_names": {}
+  },
+  "description": {
+    "has_description": true,
+    "description_en": "Small evergreen trees; branchlets flexuous.Leaves mostly membranaceous, alternate, distichous, oblong, 6.5–17.5 cm long, 2–7 cm broad, acute, obtuse to short-attenuate at base, inconspicuously crenulate-serrulate, glabrous, the midrib and veins elevated on both surfaces; petioles 2–3 cm long, puberulous, bracteate at base;sepals puberulous, 1.5 mm long; petals absent; stamens 8, 0.6 mm long; filaments pubescent, united at base with short alternating staminodes (0.3 mm long) into a tube.Capsules succulent, ellipsoid, 10–15 mm long, black.",
+    "description_zh": "",
+    "life_form": "",
+    "morphology": "",
+    "distribution_text": ""
+  },
+  "photos": {
+    "status": "building",
+    "has_photos": false,
+    "photo_urls": [],
+    "count": 0
+  },
+  "distribution": {
+    "has_distribution": false,
+    "taiwan_distribution": "",
+    "world_distribution": "",
+    "coordinates": []
+  },
+  "specimens": {
+    "count": 0,
+    "specimens": []
+  },
+  "completeness": {
+    "score": 3.8,
+    "max_score": 5,
+    "percentage": 76.0,
+    "is_complete": false,
+    "is_usable": true,
+    "issues": [
+      "照片建置中"
+    ]
+  }
+}

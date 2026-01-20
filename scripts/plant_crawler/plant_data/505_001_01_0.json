@@ -1,0 +1,47 @@
+{
+  "code": "505+001+01+0",
+  "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=505+001+01+0",
+  "crawled_at": "2026-01-20 04:44:52",
+  "nomenclature": {
+    "name_zh": "arvensis",
+    "name_latin": "Lysimachia arvensis",
+    "family": "",
+    "family_zh": "",
+    "aliases": [],
+    "common_names": {}
+  },
+  "description": {
+    "has_description": true,
+    "description_en": "Annual or biennial herbs, glabrous, whitish or glauous; stems 4-angled, many-branched, prostrate at base, 10–30 cm long.Leaves opposite, sessile, ovate, 10–25 mm long, 5–15 mm wide, spreading, margins entire, apex acute to subobtuse, base rounded.Flowers axillary, pedicel 2–3 cm long; calyx segments linear-lanceolate, long-acuminate, 4–6 mm long; corolla bluish-purple to reddish, lobes obovate-orbicular, apex serrate, often ciliolate.Capsules globose, dehiscence circumscissile; seeds small, dark brown.",
+    "description_zh": "",
+    "life_form": "",
+    "morphology": "",
+    "distribution_text": ""
+  },
+  "photos": {
+    "status": "building",
+    "has_photos": false,
+    "photo_urls": [],
+    "count": 0
+  },
+  "distribution": {
+    "has_distribution": false,
+    "taiwan_distribution": "",
+    "world_distribution": "",
+    "coordinates": []
+  },
+  "specimens": {
+    "count": 0,
+    "specimens": []
+  },
+  "completeness": {
+    "score": 3.8,
+    "max_score": 5,
+    "percentage": 76.0,
+    "is_complete": false,
+    "is_usable": true,
+    "issues": [
+      "照片建置中"
+    ]
+  }
+}

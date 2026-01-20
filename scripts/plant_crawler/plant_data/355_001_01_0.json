@@ -1,0 +1,47 @@
+{
+  "code": "355+001+01+0",
+  "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=355+001+01+0",
+  "crawled_at": "2026-01-20 04:43:41",
+  "nomenclature": {
+    "name_zh": "decumbens",
+    "name_latin": "Corydalis decumbens",
+    "family": "",
+    "family_zh": "",
+    "aliases": [],
+    "common_names": {}
+  },
+  "description": {
+    "has_description": true,
+    "description_en": "Glaucescent perennial herbs with globose tubers; stems tufted, slender, glabrous, decumbent, erect above, 10-30 cm long.Leaves few, the radical ones long-petioled, 2- to 3-ternate; leaflets 2- to 3-parted or -cleft, segmants thin, oblanceolate to obovate, 1-2 cm long, 3-7 mm wide; cauline leaves usually 2, short-petioled, 2-ternate.Flowers rose to blue-purple, few, in racemes; bracts rhombic-ovate, entire, subacute.Capsules linear, ca. 2 cm long, slightly torulose; seeds dark brown, minutely mammillate.",
+    "description_zh": "",
+    "life_form": "",
+    "morphology": "",
+    "distribution_text": ""
+  },
+  "photos": {
+    "status": "building",
+    "has_photos": false,
+    "photo_urls": [],
+    "count": 0
+  },
+  "distribution": {
+    "has_distribution": false,
+    "taiwan_distribution": "",
+    "world_distribution": "",
+    "coordinates": []
+  },
+  "specimens": {
+    "count": 0,
+    "specimens": []
+  },
+  "completeness": {
+    "score": 3.8,
+    "max_score": 5,
+    "percentage": 76.0,
+    "is_complete": false,
+    "is_usable": true,
+    "issues": [
+      "照片建置中"
+    ]
+  }
+}

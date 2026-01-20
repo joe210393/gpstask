@@ -1,0 +1,47 @@
+{
+  "code": "430+001+01+0",
+  "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=430+001+01+0",
+  "crawled_at": "2026-01-20 04:44:16",
+  "nomenclature": {
+    "name_zh": "arisanensis",
+    "name_latin": "fig. 10.",
+    "family": "",
+    "family_zh": "",
+    "aliases": [],
+    "common_names": {}
+  },
+  "description": {
+    "has_description": true,
+    "description_en": "A small evergreen tree, branchlets slender.Leaves chartaceous, elliptic or lanceolate, 5–8 cm long, 1.2–2.5 cm broad, the apex long caudate, the margins serrate; petioles 6–8 cm long.Flowers in axillary clusters.Drupe red, globose, 4–5 mm across, fruiting pedicel 2–3 mm long.",
+    "description_zh": "",
+    "life_form": "",
+    "morphology": "",
+    "distribution_text": ""
+  },
+  "photos": {
+    "status": "building",
+    "has_photos": false,
+    "photo_urls": [],
+    "count": 0
+  },
+  "distribution": {
+    "has_distribution": false,
+    "taiwan_distribution": "",
+    "world_distribution": "",
+    "coordinates": []
+  },
+  "specimens": {
+    "count": 0,
+    "specimens": []
+  },
+  "completeness": {
+    "score": 3.8,
+    "max_score": 5,
+    "percentage": 76.0,
+    "is_complete": false,
+    "is_usable": true,
+    "issues": [
+      "照片建置中"
+    ]
+  }
+}

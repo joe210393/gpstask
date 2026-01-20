@@ -1,0 +1,47 @@
+{
+  "code": "315+001+01+0",
+  "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=315+001+01+0",
+  "crawled_at": "2026-01-20 04:43:17",
+  "nomenclature": {
+    "name_zh": "japonica",
+    "name_latin": "fig. 662.",
+    "family": "",
+    "family_zh": "",
+    "aliases": [],
+    "common_names": {}
+  },
+  "description": {
+    "has_description": true,
+    "description_en": "Small parasitic subshrubs, 5–15 cm tall. Branches with internodes of various lengths, flat.Male flowers with a short calyx tube, lobes triangular, 0.5 mm long, 0.3 mm broad, concave, apex reflexed; synandrium depressed-globose, 0.25 mm across. Female flowers sessile, calyx lobes small, broadly triangular.Fruit obovoid, ca. 2 mm long, 1.3 mm broad, apex rounded.",
+    "description_zh": "",
+    "life_form": "",
+    "morphology": "",
+    "distribution_text": ""
+  },
+  "photos": {
+    "status": "building",
+    "has_photos": false,
+    "photo_urls": [],
+    "count": 0
+  },
+  "distribution": {
+    "has_distribution": false,
+    "taiwan_distribution": "",
+    "world_distribution": "",
+    "coordinates": []
+  },
+  "specimens": {
+    "count": 0,
+    "specimens": []
+  },
+  "completeness": {
+    "score": 3.8,
+    "max_score": 5,
+    "percentage": 76.0,
+    "is_complete": false,
+    "is_usable": true,
+    "issues": [
+      "照片建置中"
+    ]
+  }
+}

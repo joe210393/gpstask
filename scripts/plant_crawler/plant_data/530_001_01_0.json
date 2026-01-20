@@ -1,0 +1,47 @@
+{
+  "code": "530+001+01+0",
+  "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=530+001+01+0",
+  "crawled_at": "2026-01-20 04:45:05",
+  "nomenclature": {
+    "name_zh": "indica",
+    "name_latin": "Aeginetia indica",
+    "family": "",
+    "family_zh": "",
+    "aliases": [],
+    "common_names": {}
+  },
+  "description": {
+    "has_description": true,
+    "description_en": "Herbs, reddish; stems very short.scales deltoid, 5–10 mm long, glabrous, apex acuminate or long- acuminate.Flowers 3–5 cm long; pedicels erect, 15–25 cm long, glabrous; calyx 2–3 cm long, apex acute or acuminate; corolla pinkish-purple, 2–5 cm long, glabrous; filaments purple, glabrous.Capsules ovoid-globose, 1.5–2.5 cm long.",
+    "description_zh": "",
+    "life_form": "",
+    "morphology": "",
+    "distribution_text": ""
+  },
+  "photos": {
+    "status": "building",
+    "has_photos": false,
+    "photo_urls": [],
+    "count": 0
+  },
+  "distribution": {
+    "has_distribution": false,
+    "taiwan_distribution": "",
+    "world_distribution": "",
+    "coordinates": []
+  },
+  "specimens": {
+    "count": 0,
+    "specimens": []
+  },
+  "completeness": {
+    "score": 3.8,
+    "max_score": 5,
+    "percentage": 76.0,
+    "is_complete": false,
+    "is_usable": true,
+    "issues": [
+      "照片建置中"
+    ]
+  }
+}

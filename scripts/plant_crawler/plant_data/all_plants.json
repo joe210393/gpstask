@@ -1,0 +1,1422 @@
+{
+  "metadata": {
+    "total": 30,
+    "usable": 29,
+    "created_at": "2026-01-20 04:45:35",
+    "source": "https://tai2.ntu.edu.tw",
+    "description": "台灣植物資訊整合查詢系統"
+  },
+  "plants": [
+    {
+      "code": "105+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=105+001+01+0",
+      "crawled_at": "2026-01-20 04:41:42",
+      "nomenclature": {
+        "name_zh": "ramosissimum",
+        "name_latin": "Equisetum ramosissimum",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "Stems unbranched or with 2-3 branches per node, 20-160 cm tall, 1-7 mm in diameter; stomata in 1-3 lines in the grooves.sheaths longer than wide, the lower sheaths with a brown band, the upper ones green; teeth 3-9 mm long, having brown centers with white margins, when broken off, leaving a brown rim at top of sheaths. Strobili apiculate.Cross section of stem showing vallecular collenchyma not extending to vallecular canal; endodermis double, i.e. with an inner and outer endodermis.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "110+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=110+001+01+0",
+      "crawled_at": "2026-01-20 04:41:45",
+      "nomenclature": {
+        "name_zh": "linearis",
+        "name_latin": "pl. 1.",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "Stipe 20-100 cm tall, 2-3 mm across; fronds with easily abraded branched or stellate hairs at forks and on rachises, costae, and costules; branching equal or nearly equal at forks; ultimate forks usually without reflexed accessory branches; stipule-like bract about 1 cm long, usually lobed at base; ultimate branches glaucous beneath, 15-30 cm long, 4-6 cm wide, widest near base; veinlets in groups of 3-4.Sori with 6-9 sporangia.There are many varieties of this species, some seem quite distinct and could be considered as species, but in most cases there is so much variation that even variety rank is questionable. There probably is a lot of hybridization.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "115+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=115+001+01+0",
+      "crawled_at": "2026-01-20 04:41:48",
+      "nomenclature": {
+        "name_zh": "hirsuta",
+        "name_latin": "Dennstaedtia hirsuta",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "Rhizome short-creeping, densely clothed with brownish long hairs, bearing a tuft of fronds.Stipes 10-30 cm long, greenish-yellow, clothed with whitish to brownish long soft hairs; lamina 10-28 cm long, lanceolate, bipinnate, herbaceous, densely hairy; pinnules oblong, acute, serrate.Sori small; indusia globose, hairy.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "120+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=120+001+01+0",
+      "crawled_at": "2026-01-20 04:41:50",
+      "nomenclature": {
+        "name_zh": "aureum",
+        "name_latin": "pl. 97.",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "Rhizome creeping, usually short, dictyostelic.Frond fairly large, up to 1 m, oblong-ovate, simply pinnate, thick-coriaceous, glabrescent; pinnae many, simple, only the upper ones fertile.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "125+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=125+001+01+0",
+      "crawled_at": "2026-01-20 04:41:53",
+      "nomenclature": {
+        "name_zh": "paleolata",
+        "name_latin": "Dryopteris paleolata",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "Stipe 30-45cm long, stramineous, c. s. of base of stipe with about 5 bundles; laminae large, nearly as broad as long, basal pair of pinnae largest.Indusia thin, brown, upper free, margin somewhat erose.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "130+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=130+001+01+0",
+      "crawled_at": "2026-01-20 04:41:56",
+      "nomenclature": {
+        "name_zh": "conjugata",
+        "name_latin": "pl. 54.",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "Rhizome about 1 cm in diameter.Fronds fan-shaped, cut into 2 halves, main lobes of each half narrowly lanceolate, with 2 main veins in each lobe, divided over 3/4 of way to base, apices acuminate, margins thickened with coarse serratiion; main veins prominently raised; young fronds densely covered with soft reddish-brown tomentum, especially on apices of lobes, mature fronds glabrous and glaucous beneath.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "135+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=135+001+01+0",
+      "crawled_at": "2026-01-20 04:41:59",
+      "nomenclature": {
+        "name_zh": "minuta",
+        "name_latin": "fig. 2.",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "Summer, aquatic form: Plants growing in deep water have their leaflets floating on water, the succulent stipes up to 30 cm long; those in shallow water have erect stipes 8-10 cm long; leaflets 20 mm long, entire or crenate; areolae linear, narrow; rhizome internodes 6-9 cm long.Winter, terreestrial form: Plants growing on drained fields much small, the internodes short, about 1-4 mm long, the stipes 2-8 cm long; leaflets 5-10 mm long; sporocarps 1-2, borne at or near base of stipe, on separate stalks, oval, hairy, the upper tooth acute, the lower tooth blunt.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "305+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=305+001+01+0",
+      "crawled_at": "2026-01-20 04:43:11",
+      "nomenclature": {
+        "name_zh": "formosana",
+        "name_latin": "fig. 24.",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "Deciduous trees, 20 m tall, 40 cm across; branchlets glabrous or slightly pubescent when young.Leaves alternate, elliptic, oblong to ovate-oblong, 6–12 cm long, 2–5 cm wide, acuminate at apex, broadly cuneate at base, glabrous or slightly pubescent when young, serrulate, lateral veins 6–7 pairs, midrib prominent beneath; petioles slender, 1.5–2.5 cm long.Staminate catkins at apex of branchlets, pendulous; bracts rhombic-rounded, each subtending 3 flowers; pistillate spikes at apex of old branchlets; bracts 3–4 mm long, woody, apex rounded, 5-lobed, each bract subtending 2 flowers; ovary 2-celled, each cell with 1 ovule; styles 2.Fruiting catkins 1–3 together, peduncled, about 1.5 cm long, cone-like, ellipsoid, persistent;nutlets compressed, with narrow wings, persistent, style remaining at the top.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "315+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=315+001+01+0",
+      "crawled_at": "2026-01-20 04:43:17",
+      "nomenclature": {
+        "name_zh": "japonica",
+        "name_latin": "fig. 662.",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "Small parasitic subshrubs, 5–15 cm tall. Branches with internodes of various lengths, flat.Male flowers with a short calyx tube, lobes triangular, 0.5 mm long, 0.3 mm broad, concave, apex reflexed; synandrium depressed-globose, 0.25 mm across. Female flowers sessile, calyx lobes small, broadly triangular.Fruit obovoid, ca. 2 mm long, 1.3 mm broad, apex rounded.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "320+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=320+001+01+0",
+      "crawled_at": "2026-01-20 04:43:21",
+      "nomenclature": {
+        "name_zh": "lotoides",
+        "name_latin": "Glinus lotoides",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "Annual herbs with white stellate hairs. Stems prostrate-ascending.Leaves opposite or ternate; petiole 0.3-1.5 cm long; blade ovate to obovate, obtuse, 1.0-3.2 cm long, 5-20 mm wide.Flowers subsessile; sepals oblong, mucronate, 3-10 mm long, glabrous adaxially, stellate-pubescent abaxially; stamens mostly 5-10; styles 5.Capsules oblong, 5-valved.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "325+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=325+001+01+0",
+      "crawled_at": "2026-01-20 04:43:24",
+      "nomenclature": {
+        "name_zh": "maximowicziana",
+        "name_latin": "Atriplex maximowicziana",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "Perennial herbs; stems to 100 cm tall, procumbent or erect, suffrescent at base, densely farinose; branches ascending, angled.Leaves alternate or lower ones subopposite, ovate to trullate, 1-4 cm long, 7-18 mm wide, obtuse to mucronulate at apex, cuneate at base, entire.Plants monoecious; staminate inflorescence a terminal densely packed spike, ca. 1 cm long; tepals 5, obovate; stamens 5; pistillate inflorescences smaller spikes clustered into a panicle.Utricles sessile, fascicled, bracts compressed, trullate-rhombic, 6-9 mm long, more or less toothed at base, connate only at base.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "335+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=335+001+01+0",
+      "crawled_at": "2026-01-20 04:43:29",
+      "nomenclature": {
+        "name_zh": "aralioides",
+        "name_latin": "pl. 39, 40.",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "Evergreen tree, usually 4-25 m high, with trunk to 5 m. in diam, the bark dark brown to black; banchlets stout; terminal buds with papyraceous scales.Leaves coriaceous, broadly ovate to lanceolate-elliptic or rarely elliptic, deep green, glossy, 5-10.5 cm long, 3-8 cm broad, rounded or broad obtuse at base, acuminate to cuspidate at apex, slighly thicker and undulate at margin, entire at the lower part, serrulate distally, pinnate-nerved; petiole 3-8 cm long.Inflorescece 6-10 cm long, 14- to 23-flowered, bract thin-papyraceous, linear, 1-2 cm long; pedicels 1-3 cm long, in fruit much longer; stamnes 40-75, spreading at first in protandrous tree and downard in protogynous tree, filaments erect when shedding pollen; carpels (5-)7-11, with 16-30 ovules.Follicetum 6-10 mm wide, with persistent dry stigma;seeds 5-12 per follicle, linear ellipsoid, 3-4 mm long.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "340+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=340+001+01+0",
+      "crawled_at": "2026-01-20 04:43:32",
+      "nomenclature": {
+        "name_zh": "nucifera",
+        "name_latin": "pl. 19.",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "Perennial herbs with horizontal rhizomes.Leaves centrally peltate, margins entire or slightly wavy, circular, 20-60 cm in diameter, pale green to green, glabrous above, green beneath; petioles 1-2 m long, short spined.Flowers showy, solitary, 10-25 cm across, fragrant; peduncle 1-2 m long, sepals 4 or 5, caducous; petals many, broadly elliptic, concave, white or pink; stamens numerous.Fruit aggregate, embedded in an enlarged receptacle, ellipsoid or ovoid, 1-1.7 cm long, the top protruding, reddish-brown.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "350+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=350+001+01+0",
+      "crawled_at": "2026-01-20 04:43:38",
+      "nomenclature": {
+        "name_zh": "arguta",
+        "name_latin": "photo 285.",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "Tall climbing shrubs to 10 m long; branchlets glabrescent; pith light brown, lamellate.Leaves chartaceous, elliptic to broadly elliptic, sometimes broadly ovate, 4-10 cm. long, 3-8 cm broad, acuminate or cuspidate at apex, rounded or subcordate at base, margins densely serrulate, upper surface dark green, lower surface light green, young Leaves tomentose on veins, glabrescent, hairs remaining only in tufts in vein axils on lower surface, lateral veins ca. 6 or 7 per side; petioles 2-6 cm long.Infolrescences axillary, 1-10-flowered, 1 or 2-branched cymes, sparsely pubescent; flowers white; sepals sparsely tomentose on margins, ovoid or elliptic; ovary glabrous.Fruit ovoid to oblong, ca. 2-3 cm long, green or greenish-yellow, rostrate, glabrous, unspotted, calyx deciduous.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "355+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=355+001+01+0",
+      "crawled_at": "2026-01-20 04:43:41",
+      "nomenclature": {
+        "name_zh": "decumbens",
+        "name_latin": "Corydalis decumbens",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "Glaucescent perennial herbs with globose tubers; stems tufted, slender, glabrous, decumbent, erect above, 10-30 cm long.Leaves few, the radical ones long-petioled, 2- to 3-ternate; leaflets 2- to 3-parted or -cleft, segmants thin, oblanceolate to obovate, 1-2 cm long, 3-7 mm wide; cauline leaves usually 2, short-petioled, 2-ternate.Flowers rose to blue-purple, few, in racemes; bracts rhombic-ovate, entire, subacute.Capsules linear, ca. 2 cm long, slightly torulose; seeds dark brown, minutely mammillate.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "405+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=405+001+01+0",
+      "crawled_at": "2026-01-20 04:44:02",
+      "nomenclature": {
+        "name_zh": "longicarpa",
+        "name_latin": "Astilbe longicarpa",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "A perennial, pubescent, erect herb, 40–150 cm high.Radical and cauline leaves long-petiolate, ternate-bipinnate, lateral and terminal leaflets ovate-lanceolate, cordate, truncate or obtuse at base, acuminate at apex, 7–13 cm long, 2–5 cm wide, the margins duplicate-serrate.Inflorescence terminal, paniculate, 30–60 cm long, the axis with short glandular hairs; flowers white, small, short pedicellate; calyx 5-lobed, the lobes ovate, 1.5–2 mm long; petals spathulate, about 1 mm long; stamens 10.Capsules about 4 mm long; seeds small, numerous.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "415+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=415+001+01+0",
+      "crawled_at": "2026-01-20 04:44:07",
+      "nomenclature": {
+        "name_zh": "akoensis",
+        "name_latin": "Acalypha akoensis",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "A shrub; branches reddish, terete, subglabrous.Leaves membranaceous, ovate, 12–16 cm long, 8–11 cm broad, the apex cuspidate-acute, the base cuneate-cordate or rounded-cordate, the margins serrulate, sparingly pilose on both surfaces; petioles 6–9 cm long, densely pubescent; stipules lanceolate, 12 mm long, acuminate.Male spikes filiform, recurved, 16–20 cm long, villose; peduncles 1 cm long. Female spikes slender, 5–9 cm long, pubescent; peduncles 1 cm long; bracts ovate, 3.5 mm long, 5 mm broad, 10-dentate, pubescent outside; bracteoles minute; ovary 3-lobed, hirsute; styles about 2.5 mm long.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "420+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=420+001+01+0",
+      "crawled_at": "2026-01-20 04:44:10",
+      "nomenclature": {
+        "name_zh": "chittagonga",
+        "name_latin": "pl. 283.",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "A medium-sized tree; branches and branchlets densely silvery stellate-lepidote.Leaves about 14 cm long, imparipinnate, or partly paripinnate, the rachis and petioles lepidote; leaflets 5–6, alternate or opposite, elliptic to obovate, acute at apex, cuneate at base, coriaceous, 2.5–7.5 cm long, 2–2.5 cm broad, green-lepidote above, densely silvery lepidote beneath, the lateral veins about 4 on each side of the midrib, the midrib elevated above, distinctly elevated beneath; petioles 3–6 mm long.Panicle axillary, the rachis densely lepidote, 3–4 cm long; pedicels 1–2 mm long; calyx lepidote, 4–5-lobed, the lobes obtuse or rounded at apex; petals 4, yellow, glabrous, obovate-elliptic, concave, about 3.5 mm long, free from the staminal tube, the staminal tube about 3 mm long; anthers 8, ovate oblong, about 0.8 mm long, glabrous, sessile, inserted on the upper portion of the tube; ovary ovate, pubescent, the style none, the stigma ovate.Capsule obovate, densely lepidote, about 3 cm long, 2.2 cm across, 3-valved.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "425+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=425+001+01+0",
+      "crawled_at": "2026-01-20 04:44:13",
+      "nomenclature": {
+        "name_zh": "albopurpurascens",
+        "name_latin": "pl. 14b.",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "Trees, evergreen, up to 15 m high; branchlets pubescent at first, soon glabrous.Leaves persistent, oblong-lanceolate, 2.5–13 cm long, 1–4 cm broad, caudate to acuminate at apex, obtuse to cuneate at base, coriaceous, pale green and glabrous above, white-purplish glaucous beneath, densely pubescent when young, 3-nerved at base, nerves slightly raised beneath; petioles 0.7–3.5 cm long, glaucous.Flowers small; pedicels short, 1.5–2 mm long; sepals 5, rounded ovate; petals 5, oblong ovate; disk not distinct, hairy appendages abundant; stamens 8. Pistillate flowers 6 mm across; sepals 1.5 mm long, pubescent outside; petals 3 mm long; staminodes short, anthers oblong, 1 mm long, filament shorter; ovary broadly rounded, styles 2, long, recurved downwards. Staminate flowers 4.5 mm across; stamens 1.5 mm long. Inflorescence cymose.samara glabrous; each wing with the semicarp 1.5–2.5 cm long; lower edges of two wings spreading at angles of 60–75 degree.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "430+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=430+001+01+0",
+      "crawled_at": "2026-01-20 04:44:16",
+      "nomenclature": {
+        "name_zh": "arisanensis",
+        "name_latin": "fig. 10.",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "A small evergreen tree, branchlets slender.Leaves chartaceous, elliptic or lanceolate, 5–8 cm long, 1.2–2.5 cm broad, the apex long caudate, the margins serrate; petioles 6–8 cm long.Flowers in axillary clusters.Drupe red, globose, 4–5 mm across, fruiting pedicel 2–3 mm long.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "435+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=435+001+01+0",
+      "crawled_at": "2026-01-20 04:44:19",
+      "nomenclature": {
+        "name_zh": "arisanensis",
+        "name_latin": "photo 7.",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "A scandent shrub, branchlets glabrous, terete, yellowish and turning to black when dri\r\ned.Leaves papyriferous, ovate, 2–4 cm long, 1–1.5 cm wide, glabrous on both surfaces, the lateral veins 9–11 per side, parallel and prominent, acute at apex and obtuse at base; the margin entire or obscurely repand; petioles glabrous, 6–10 mm long.Inflorescences terminal, pseudo-racemose, glabrous, 12–15 cm long, simple or with very short branches at the base; flowers 6–15, fascicled, pedicels 3–6 mm long; calyx triangular, acute at apex.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "445+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=445+001+01+0",
+      "crawled_at": "2026-01-20 04:44:24",
+      "nomenclature": {
+        "name_zh": "membranacea",
+        "name_latin": "fig. 237.",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "Small evergreen trees; branchlets flexuous.Leaves mostly membranaceous, alternate, distichous, oblong, 6.5–17.5 cm long, 2–7 cm broad, acute, obtuse to short-attenuate at base, inconspicuously crenulate-serrulate, glabrous, the midrib and veins elevated on both surfaces; petioles 2–3 cm long, puberulous, bracteate at base;sepals puberulous, 1.5 mm long; petals absent; stamens 8, 0.6 mm long; filaments pubescent, united at base with short alternating staminodes (0.3 mm long) into a tube.Capsules succulent, ellipsoid, 10–15 mm long, black.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "450+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=450+001+01+0",
+      "crawled_at": "2026-01-20 04:44:26",
+      "nomenclature": {
+        "name_zh": "aphylla",
+        "name_latin": "fig. 183.",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": false,
+        "description_en": "",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 1.8,
+        "max_score": 5,
+        "percentage": 36.0,
+        "is_complete": false,
+        "is_usable": false,
+        "issues": [
+          "缺少特徵描述",
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "455+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=455+001+01+0",
+      "crawled_at": "2026-01-20 04:44:29",
+      "nomenclature": {
+        "name_zh": "baccifera",
+        "name_latin": "Ammannia baccifera",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "An annual herb; much-branched annual; stems 10–50 cm long, 4-angled;leaves membranous, oblanceolate to linear, 5–50 mm long, 1–10 mm wide, narrowed at both ends, entire;flowers few, in dense axillary fascicles, the pedicels 0.2–1.5 mm long, glabrous; calyx 1–2 mm long, the lobes 0.5-0.7 mm long; petals absent; stamens 4, the anthers subglobose; styles 0.3-0.5 mm long; capsules globose, 1–1.5 rnm across, slightly exserted from the calyx.Commonly growing with A. multiflora together in paddy fields with lower and less branched stem.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "465+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=465+001+01+0",
+      "crawled_at": "2026-01-20 04:44:34",
+      "nomenclature": {
+        "name_zh": "formosanum",
+        "name_latin": "pl. 860.",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "A low perennial herb, becoming black when dry. Stems branched at base, creeping below, ascending above, up to 15 cm high, somewhat hairy.Leaves petiolate, the upper alternate, the lower opposite; blade up to 10 mm long, deltoid to ovate, acute, subtruncate or obtuse at base, entire, 12–23 mm long, 10–16 mm wide, pilose above, along veins beneath. Stipules opposite, adnate to petioles, membranaceous, reflexed ovate-deltoid, acuminate, slightly fimbricate-ciliate at margin.Flowers white monoecious, axillary, sessile, both staminate and pistillate arranged at the same nodes; perianth of staminate flowers deeply 3-lobed, the segments oblanceolate, reflexed and obtuse at apex, 1-nerved, 3 mm long; stamens 3–8; anthers linear, opening longitudinally, the filaments slender, pistillate flowers smaller, the perianth 3-lobed, the lobes small, obtuse; styles recurved; ovule solitary, basal.Fruit a subglobase nut, included in the thin membranous calyx: seeds solitary, hairy, with fleshy endosperm.This species differs from T. japonicum mainly by the number of stamens and the shape of pistillate flowers. This species is known from one locallity and has been collected twice only.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "505+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=505+001+01+0",
+      "crawled_at": "2026-01-20 04:44:52",
+      "nomenclature": {
+        "name_zh": "arvensis",
+        "name_latin": "Lysimachia arvensis",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "Annual or biennial herbs, glabrous, whitish or glauous; stems 4-angled, many-branched, prostrate at base, 10–30 cm long.Leaves opposite, sessile, ovate, 10–25 mm long, 5–15 mm wide, spreading, margins entire, apex acute to subobtuse, base rounded.Flowers axillary, pedicel 2–3 cm long; calyx segments linear-lanceolate, long-acuminate, 4–6 mm long; corolla bluish-purple to reddish, lobes obovate-orbicular, apex serrate, often ciliolate.Capsules globose, dehiscence circumscissile; seeds small, dark brown.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "515+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=515+001+01+0",
+      "crawled_at": "2026-01-20 04:44:57",
+      "nomenclature": {
+        "name_zh": "curassavica",
+        "name_latin": "pl. 976.",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "Herbs to 1 m tall, glabrous.Leaves opposite, lanceolate or oblong-lanceolate, apex acuminate or acute, base narrowed into a short petiole, blade glabrous, 7–13 cm long, 1.5–3.2 cm broad.Cymes 10–20-flowered, pubescent; peduncles 3–6 cm long; pedicels 1.2–2 cm long; calyx lobes 5, lanceolate, pubescent, reflexed at anthesis, ca. 4 mm long; corolla rotate, red, 7–9 mm long, lobes reflexed, oblong, acute, glabrous; corona orange, 3.5–4 mm long; gynostegium 2.5–3 mm long.Follicles one per pedicel, ovoid-oblong, glabrous, 5–8 cm long. Seeds flat, ovate, circular winged, 6–7 mm long, comose.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "530+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=530+001+01+0",
+      "crawled_at": "2026-01-20 04:45:05",
+      "nomenclature": {
+        "name_zh": "indica",
+        "name_latin": "Aeginetia indica",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "Herbs, reddish; stems very short.scales deltoid, 5–10 mm long, glabrous, apex acuminate or long- acuminate.Flowers 3–5 cm long; pedicels erect, 15–25 cm long, glabrous; calyx 2–3 cm long, apex acute or acuminate; corolla pinkish-purple, 2–5 cm long, glabrous; filaments purple, glabrous.Capsules ovoid-globose, 1.5–2.5 cm long.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "535+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=535+001+01+0",
+      "crawled_at": "2026-01-20 04:45:09",
+      "nomenclature": {
+        "name_zh": "formosana",
+        "name_latin": "Patrinia formosana",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "Large perennial herbs; stems terete, erect, to 150 cm tall, base woody, robust, densely covered with retrorse hairs; upper branches opposite, spreading.Leaves simple, undivided, opposite, thin, lower leaves broadly elliptic, 14–23 cm long, 4.5–8 cm wide, long-petiolate, acuminate or acute at apex, attenuate at base, margins serrate, pubescent on both surfaces and on margins; lower leaves deciduous at anthesis; upper leaves gradually smaller, elliptic, 4–9 cm long, short petiolate or sessile, margins serrate, pubescent on both surfaces and on margins.Inflorescences terminal and axillary, duplicate-corymbose, densely pubescent; bracts narrowly lanceolate or elliptic, 2–5 cm long, 2 mm wide, pubescent; calyx minutely 5-lobed; corolla yellow, funnel-shaped, 3 mm long, segments spreading; stamens usually 2 (rarely 3), inserted at base of corolla tube, filaments linear, ca. 3 mm long, sparsely hairy; style linear 3 mm long, stigma capitate.Achenes ovoid, 3–4 mm long, winged, wings nearly orbicular, 6.5 mm across, with nerves distinctly anastomosing.This species is similar to <i>P. villosa</i>, but differs by having simple leaves, which are not deeply pinnately divided. First year plants are nearly stemless and the leaves are all basal, long- petioled, broadly elliptic, winged nearly to base of petiole, with margins nearly crenate or slightly serrate at apex and pubescent throughout. These leaves are 14–24 cm long, 5–8 cm wide, much larger than the cauline leaves produced in the following season.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    },
+    {
+      "code": "540+001+01+0",
+      "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=540+001+01+0",
+      "crawled_at": "2026-01-20 04:45:13",
+      "nomenclature": {
+        "name_zh": "zeylanica",
+        "name_latin": "pl. 24.",
+        "family": "",
+        "family_zh": "",
+        "aliases": [],
+        "common_names": {}
+      },
+      "description": {
+        "has_description": true,
+        "description_en": "Stems 20–70 cm tall.Leaves oblong, elliptic, or lanceolate, 2–9 cm long, 3–20 mm wide; petioles 2–10 mm long.Inflorescence 8-20 mm long, 6–8 cm in diameter; corolla short-campanulate, white, ca. 1 mm long.Capsule globose, 3 mm long.Chromosome number n = 12, 16, 20, 21, 24.",
+        "description_zh": "",
+        "life_form": "",
+        "morphology": "",
+        "distribution_text": ""
+      },
+      "photos": {
+        "status": "building",
+        "has_photos": false,
+        "photo_urls": [],
+        "count": 0
+      },
+      "distribution": {
+        "has_distribution": false,
+        "taiwan_distribution": "",
+        "world_distribution": "",
+        "coordinates": []
+      },
+      "specimens": {
+        "count": 0,
+        "specimens": []
+      },
+      "completeness": {
+        "score": 3.8,
+        "max_score": 5,
+        "percentage": 76.0,
+        "is_complete": false,
+        "is_usable": true,
+        "issues": [
+          "照片建置中"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "code": "335+001+01+0",
+  "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=335+001+01+0",
+  "crawled_at": "2026-01-20 04:43:29",
+  "nomenclature": {
+    "name_zh": "aralioides",
+    "name_latin": "pl. 39, 40.",
+    "family": "",
+    "family_zh": "",
+    "aliases": [],
+    "common_names": {}
+  },
+  "description": {
+    "has_description": true,
+    "description_en": "Evergreen tree, usually 4-25 m high, with trunk to 5 m. in diam, the bark dark brown to black; banchlets stout; terminal buds with papyraceous scales.Leaves coriaceous, broadly ovate to lanceolate-elliptic or rarely elliptic, deep green, glossy, 5-10.5 cm long, 3-8 cm broad, rounded or broad obtuse at base, acuminate to cuspidate at apex, slighly thicker and undulate at margin, entire at the lower part, serrulate distally, pinnate-nerved; petiole 3-8 cm long.Inflorescece 6-10 cm long, 14- to 23-flowered, bract thin-papyraceous, linear, 1-2 cm long; pedicels 1-3 cm long, in fruit much longer; stamnes 40-75, spreading at first in protandrous tree and downard in protogynous tree, filaments erect when shedding pollen; carpels (5-)7-11, with 16-30 ovules.Follicetum 6-10 mm wide, with persistent dry stigma;seeds 5-12 per follicle, linear ellipsoid, 3-4 mm long.",
+    "description_zh": "",
+    "life_form": "",
+    "morphology": "",
+    "distribution_text": ""
+  },
+  "photos": {
+    "status": "building",
+    "has_photos": false,
+    "photo_urls": [],
+    "count": 0
+  },
+  "distribution": {
+    "has_distribution": false,
+    "taiwan_distribution": "",
+    "world_distribution": "",
+    "coordinates": []
+  },
+  "specimens": {
+    "count": 0,
+    "specimens": []
+  },
+  "completeness": {
+    "score": 3.8,
+    "max_score": 5,
+    "percentage": 76.0,
+    "is_complete": false,
+    "is_usable": true,
+    "issues": [
+      "照片建置中"
+    ]
+  }
+}

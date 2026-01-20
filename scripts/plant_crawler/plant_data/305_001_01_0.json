@@ -1,0 +1,47 @@
+{
+  "code": "305+001+01+0",
+  "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=305+001+01+0",
+  "crawled_at": "2026-01-20 04:43:11",
+  "nomenclature": {
+    "name_zh": "formosana",
+    "name_latin": "fig. 24.",
+    "family": "",
+    "family_zh": "",
+    "aliases": [],
+    "common_names": {}
+  },
+  "description": {
+    "has_description": true,
+    "description_en": "Deciduous trees, 20 m tall, 40 cm across; branchlets glabrous or slightly pubescent when young.Leaves alternate, elliptic, oblong to ovate-oblong, 6–12 cm long, 2–5 cm wide, acuminate at apex, broadly cuneate at base, glabrous or slightly pubescent when young, serrulate, lateral veins 6–7 pairs, midrib prominent beneath; petioles slender, 1.5–2.5 cm long.Staminate catkins at apex of branchlets, pendulous; bracts rhombic-rounded, each subtending 3 flowers; pistillate spikes at apex of old branchlets; bracts 3–4 mm long, woody, apex rounded, 5-lobed, each bract subtending 2 flowers; ovary 2-celled, each cell with 1 ovule; styles 2.Fruiting catkins 1–3 together, peduncled, about 1.5 cm long, cone-like, ellipsoid, persistent;nutlets compressed, with narrow wings, persistent, style remaining at the top.",
+    "description_zh": "",
+    "life_form": "",
+    "morphology": "",
+    "distribution_text": ""
+  },
+  "photos": {
+    "status": "building",
+    "has_photos": false,
+    "photo_urls": [],
+    "count": 0
+  },
+  "distribution": {
+    "has_distribution": false,
+    "taiwan_distribution": "",
+    "world_distribution": "",
+    "coordinates": []
+  },
+  "specimens": {
+    "count": 0,
+    "specimens": []
+  },
+  "completeness": {
+    "score": 3.8,
+    "max_score": 5,
+    "percentage": 76.0,
+    "is_complete": false,
+    "is_usable": true,
+    "issues": [
+      "照片建置中"
+    ]
+  }
+}

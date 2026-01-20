@@ -1,0 +1,48 @@
+{
+  "code": "450+001+01+0",
+  "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=450+001+01+0",
+  "crawled_at": "2026-01-20 04:44:26",
+  "nomenclature": {
+    "name_zh": "aphylla",
+    "name_latin": "fig. 183.",
+    "family": "",
+    "family_zh": "",
+    "aliases": [],
+    "common_names": {}
+  },
+  "description": {
+    "has_description": false,
+    "description_en": "",
+    "description_zh": "",
+    "life_form": "",
+    "morphology": "",
+    "distribution_text": ""
+  },
+  "photos": {
+    "status": "building",
+    "has_photos": false,
+    "photo_urls": [],
+    "count": 0
+  },
+  "distribution": {
+    "has_distribution": false,
+    "taiwan_distribution": "",
+    "world_distribution": "",
+    "coordinates": []
+  },
+  "specimens": {
+    "count": 0,
+    "specimens": []
+  },
+  "completeness": {
+    "score": 1.8,
+    "max_score": 5,
+    "percentage": 36.0,
+    "is_complete": false,
+    "is_usable": false,
+    "issues": [
+      "缺少特徵描述",
+      "照片建置中"
+    ]
+  }
+}

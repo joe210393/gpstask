@@ -1,0 +1,47 @@
+{
+  "code": "465+001+01+0",
+  "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=465+001+01+0",
+  "crawled_at": "2026-01-20 04:44:34",
+  "nomenclature": {
+    "name_zh": "formosanum",
+    "name_latin": "pl. 860.",
+    "family": "",
+    "family_zh": "",
+    "aliases": [],
+    "common_names": {}
+  },
+  "description": {
+    "has_description": true,
+    "description_en": "A low perennial herb, becoming black when dry. Stems branched at base, creeping below, ascending above, up to 15 cm high, somewhat hairy.Leaves petiolate, the upper alternate, the lower opposite; blade up to 10 mm long, deltoid to ovate, acute, subtruncate or obtuse at base, entire, 12–23 mm long, 10–16 mm wide, pilose above, along veins beneath. Stipules opposite, adnate to petioles, membranaceous, reflexed ovate-deltoid, acuminate, slightly fimbricate-ciliate at margin.Flowers white monoecious, axillary, sessile, both staminate and pistillate arranged at the same nodes; perianth of staminate flowers deeply 3-lobed, the segments oblanceolate, reflexed and obtuse at apex, 1-nerved, 3 mm long; stamens 3–8; anthers linear, opening longitudinally, the filaments slender, pistillate flowers smaller, the perianth 3-lobed, the lobes small, obtuse; styles recurved; ovule solitary, basal.Fruit a subglobase nut, included in the thin membranous calyx: seeds solitary, hairy, with fleshy endosperm.This species differs from T. japonicum mainly by the number of stamens and the shape of pistillate flowers. This species is known from one locallity and has been collected twice only.",
+    "description_zh": "",
+    "life_form": "",
+    "morphology": "",
+    "distribution_text": ""
+  },
+  "photos": {
+    "status": "building",
+    "has_photos": false,
+    "photo_urls": [],
+    "count": 0
+  },
+  "distribution": {
+    "has_distribution": false,
+    "taiwan_distribution": "",
+    "world_distribution": "",
+    "coordinates": []
+  },
+  "specimens": {
+    "count": 0,
+    "specimens": []
+  },
+  "completeness": {
+    "score": 3.8,
+    "max_score": 5,
+    "percentage": 76.0,
+    "is_complete": false,
+    "is_usable": true,
+    "issues": [
+      "照片建置中"
+    ]
+  }
+}

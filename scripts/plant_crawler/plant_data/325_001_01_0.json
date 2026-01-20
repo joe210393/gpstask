@@ -1,0 +1,47 @@
+{
+  "code": "325+001+01+0",
+  "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=325+001+01+0",
+  "crawled_at": "2026-01-20 04:43:24",
+  "nomenclature": {
+    "name_zh": "maximowicziana",
+    "name_latin": "Atriplex maximowicziana",
+    "family": "",
+    "family_zh": "",
+    "aliases": [],
+    "common_names": {}
+  },
+  "description": {
+    "has_description": true,
+    "description_en": "Perennial herbs; stems to 100 cm tall, procumbent or erect, suffrescent at base, densely farinose; branches ascending, angled.Leaves alternate or lower ones subopposite, ovate to trullate, 1-4 cm long, 7-18 mm wide, obtuse to mucronulate at apex, cuneate at base, entire.Plants monoecious; staminate inflorescence a terminal densely packed spike, ca. 1 cm long; tepals 5, obovate; stamens 5; pistillate inflorescences smaller spikes clustered into a panicle.Utricles sessile, fascicled, bracts compressed, trullate-rhombic, 6-9 mm long, more or less toothed at base, connate only at base.",
+    "description_zh": "",
+    "life_form": "",
+    "morphology": "",
+    "distribution_text": ""
+  },
+  "photos": {
+    "status": "building",
+    "has_photos": false,
+    "photo_urls": [],
+    "count": 0
+  },
+  "distribution": {
+    "has_distribution": false,
+    "taiwan_distribution": "",
+    "world_distribution": "",
+    "coordinates": []
+  },
+  "specimens": {
+    "count": 0,
+    "specimens": []
+  },
+  "completeness": {
+    "score": 3.8,
+    "max_score": 5,
+    "percentage": 76.0,
+    "is_complete": false,
+    "is_usable": true,
+    "issues": [
+      "照片建置中"
+    ]
+  }
+}

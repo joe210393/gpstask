@@ -1,0 +1,47 @@
+{
+  "code": "405+001+01+0",
+  "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=405+001+01+0",
+  "crawled_at": "2026-01-20 04:44:02",
+  "nomenclature": {
+    "name_zh": "longicarpa",
+    "name_latin": "Astilbe longicarpa",
+    "family": "",
+    "family_zh": "",
+    "aliases": [],
+    "common_names": {}
+  },
+  "description": {
+    "has_description": true,
+    "description_en": "A perennial, pubescent, erect herb, 40–150 cm high.Radical and cauline leaves long-petiolate, ternate-bipinnate, lateral and terminal leaflets ovate-lanceolate, cordate, truncate or obtuse at base, acuminate at apex, 7–13 cm long, 2–5 cm wide, the margins duplicate-serrate.Inflorescence terminal, paniculate, 30–60 cm long, the axis with short glandular hairs; flowers white, small, short pedicellate; calyx 5-lobed, the lobes ovate, 1.5–2 mm long; petals spathulate, about 1 mm long; stamens 10.Capsules about 4 mm long; seeds small, numerous.",
+    "description_zh": "",
+    "life_form": "",
+    "morphology": "",
+    "distribution_text": ""
+  },
+  "photos": {
+    "status": "building",
+    "has_photos": false,
+    "photo_urls": [],
+    "count": 0
+  },
+  "distribution": {
+    "has_distribution": false,
+    "taiwan_distribution": "",
+    "world_distribution": "",
+    "coordinates": []
+  },
+  "specimens": {
+    "count": 0,
+    "specimens": []
+  },
+  "completeness": {
+    "score": 3.8,
+    "max_score": 5,
+    "percentage": 76.0,
+    "is_complete": false,
+    "is_usable": true,
+    "issues": [
+      "照片建置中"
+    ]
+  }
+}

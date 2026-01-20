@@ -1,0 +1,47 @@
+{
+  "code": "110+001+01+0",
+  "url": "https://tai2.ntu.edu.tw/PlantInfo/species-name.php?code=110+001+01+0",
+  "crawled_at": "2026-01-20 04:41:45",
+  "nomenclature": {
+    "name_zh": "linearis",
+    "name_latin": "pl. 1.",
+    "family": "",
+    "family_zh": "",
+    "aliases": [],
+    "common_names": {}
+  },
+  "description": {
+    "has_description": true,
+    "description_en": "Stipe 20-100 cm tall, 2-3 mm across; fronds with easily abraded branched or stellate hairs at forks and on rachises, costae, and costules; branching equal or nearly equal at forks; ultimate forks usually without reflexed accessory branches; stipule-like bract about 1 cm long, usually lobed at base; ultimate branches glaucous beneath, 15-30 cm long, 4-6 cm wide, widest near base; veinlets in groups of 3-4.Sori with 6-9 sporangia.There are many varieties of this species, some seem quite distinct and could be considered as species, but in most cases there is so much variation that even variety rank is questionable. There probably is a lot of hybridization.",
+    "description_zh": "",
+    "life_form": "",
+    "morphology": "",
+    "distribution_text": ""
+  },
+  "photos": {
+    "status": "building",
+    "has_photos": false,
+    "photo_urls": [],
+    "count": 0
+  },
+  "distribution": {
+    "has_distribution": false,
+    "taiwan_distribution": "",
+    "world_distribution": "",
+    "coordinates": []
+  },
+  "specimens": {
+    "count": 0,
+    "specimens": []
+  },
+  "completeness": {
+    "score": 3.8,
+    "max_score": 5,
+    "percentage": 76.0,
+    "is_complete": false,
+    "is_usable": true,
+    "issues": [
+      "照片建置中"
+    ]
+  }
+}
