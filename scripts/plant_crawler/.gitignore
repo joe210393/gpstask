@@ -20,6 +20,12 @@ crawler_output.log
 plant_codes_progress.json
 plant_codes_complete.json
 plant_codes_complete.txt
+all_plant_codes_progress.*
+all_plant_codes_partial.*
+all_plant_codes_interrupted.*
+all_plant_codes_error.*
+discovery.log
+smart_discovery.log
 
 # Plant data (generated, can be large)
 plant_data/*.json
