@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Crawler runtime files
+crawler.pid
+nohup.out
+crawler.log
+crawler_output.log
+
+# Progress and result files (generated during crawling)
+plant_codes_progress.json
+plant_codes_complete.json
+plant_codes_complete.txt
+
+# Plant data (generated, can be large)
+plant_data/*.json
+!plant_data/rag_documents.json
+!plant_data/rag_documents_enhanced.json
+!plant_data/rag_documents.jsonl
+!plant_data/rag_documents_enhanced.jsonl
+!plant_data/all_plants.json
+!plant_data/rag_plants.json
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
