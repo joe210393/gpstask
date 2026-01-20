@@ -256,15 +256,33 @@ class RobustCrawler:
 
 
 def main():
+    codes_file = 'plant_codes.txt'
     delay = 1.5
 
+    # 解析命令行参数
     if len(sys.argv) > 1:
-        try:
-            delay = float(sys.argv[1])
-        except:
-            pass
+        # 第一个参数可以是文件名或延迟时间
+        arg1 = sys.argv[1]
+        if arg1.endswith('.txt'):
+            codes_file = arg1
+            # 第二个参数是延迟时间
+            if len(sys.argv) > 2:
+                try:
+                    delay = float(sys.argv[2])
+                except:
+                    pass
+        else:
+            # 第一个参数是延迟时间
+            try:
+                delay = float(arg1)
+            except:
+                pass
 
-    crawler = RobustCrawler(delay=delay)
+    print(f"📝 使用编码文件: {codes_file}")
+    print(f"⏱️  请求延迟: {delay} 秒")
+    print()
+
+    crawler = RobustCrawler(codes_file=codes_file, delay=delay)
     crawler.crawl_all()
 
 
