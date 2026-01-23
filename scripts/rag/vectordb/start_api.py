@@ -35,6 +35,33 @@ COLLECTION_NAME = "taiwan_plants"
 EMBEDDING_MODEL = "jinaai/jina-embeddings-v3"
 API_PORT = int(os.environ.get("EMBEDDING_API_PORT", "8100"))
 
+def get_qdrant_client():
+    """建立 Qdrant 客戶端，自動處理 HTTP/HTTPS"""
+    from urllib.parse import urlparse
+    parsed = urlparse(QDRANT_URL)
+
+    is_https = parsed.scheme == 'https'
+    host = parsed.hostname or 'localhost'
+    port = parsed.port or (443 if is_https else 6333)
+
+    if QDRANT_API_KEY:
+        return QdrantClient(
+            host=host,
+            port=port,
+            api_key=QDRANT_API_KEY,
+            https=is_https,
+            prefer_grpc=False,
+            timeout=120
+        )
+    else:
+        return QdrantClient(
+            host=host,
+            port=port,
+            https=is_https,
+            prefer_grpc=False,
+            timeout=120
+        )
+
 # 分類閾值
 PLANT_THRESHOLD = 0.68  # 與「植物」相似度超過此值才認為是植物查詢
 
@@ -56,9 +83,7 @@ def init():
     print(f"連接 Qdrant: {QDRANT_URL}")
     if QDRANT_API_KEY:
         print("  使用 API Key 認證")
-        qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
-    else:
-        qdrant_client = QdrantClient(url=QDRANT_URL)
+    qdrant_client = get_qdrant_client()
 
     print(f"載入 embedding 模型: {EMBEDDING_MODEL}")
     model = SentenceTransformer(EMBEDDING_MODEL, trust_remote_code=True)

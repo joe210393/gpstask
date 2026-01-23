@@ -29,6 +29,33 @@ from qdrant_client.models import (
 QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6333")
 QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY", None)  # Zeabur Qdrant API Key
 COLLECTION_NAME = "taiwan_plants"
+
+def get_qdrant_client():
+    """建立 Qdrant 客戶端，自動處理 HTTP/HTTPS"""
+    from urllib.parse import urlparse
+    parsed = urlparse(QDRANT_URL)
+
+    is_https = parsed.scheme == 'https'
+    host = parsed.hostname or 'localhost'
+    port = parsed.port or (443 if is_https else 6333)
+
+    if QDRANT_API_KEY:
+        return QdrantClient(
+            host=host,
+            port=port,
+            api_key=QDRANT_API_KEY,
+            https=is_https,
+            prefer_grpc=False,
+            timeout=120
+        )
+    else:
+        return QdrantClient(
+            host=host,
+            port=port,
+            https=is_https,
+            prefer_grpc=False,
+            timeout=120
+        )
 EMBEDDING_MODEL = "jinaai/jina-embeddings-v3"
 BATCH_SIZE = 32  # 每批處理的資料數量
 EMBEDDING_DIM = 1024  # jina-embeddings-v3 維度
@@ -190,10 +217,7 @@ def main():
     if QDRANT_API_KEY:
         print("  使用 API Key 認證")
     try:
-        if QDRANT_API_KEY:
-            client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
-        else:
-            client = QdrantClient(url=QDRANT_URL)
+        client = get_qdrant_client()
         client.get_collections()  # 測試連接
         print("✅ Qdrant 連接成功")
     except Exception as e:
