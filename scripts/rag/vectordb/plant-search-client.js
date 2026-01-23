@@ -128,6 +128,106 @@ async function searchPlants(query, topK = 5) {
 }
 
 /**
+ * 取得 Vision AI 用的結構化 Prompt
+ */
+async function getVisionPrompt() {
+  try {
+    const response = await fetch(`${EMBEDDING_API_URL}/vision-prompt`);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('[PlantSearch] Get vision prompt error:', error.message);
+    return null;
+  }
+}
+
+/**
+ * 混合搜尋：結合 embedding + 特徵權重
+ * @param {Object} options - 搜尋選項
+ * @param {string} options.query - 自然語言描述
+ * @param {string[]} options.features - Vision AI 提取的特徵
+ * @param {string[]} options.guessNames - Vision AI 猜測的植物名稱
+ * @param {number} options.topK - 返回結果數量
+ */
+async function hybridSearch({ query = '', features = [], guessNames = [], topK = 5 }) {
+  try {
+    const response = await fetch(`${EMBEDDING_API_URL}/hybrid-search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query,
+        features,
+        guess_names: guessNames,
+        top_k: topK,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('[PlantSearch] Hybrid search error:', error.message);
+    return {
+      query,
+      features,
+      guess_names: guessNames,
+      results: [],
+      error: error.message,
+    };
+  }
+}
+
+/**
+ * 解析 Vision AI 的 JSON 回應
+ * @param {string} visionResponse - Vision AI 的原始回應
+ */
+function parseVisionResponse(visionResponse) {
+  try {
+    // 嘗試直接解析 JSON
+    const parsed = JSON.parse(visionResponse);
+    return {
+      success: true,
+      intent: parsed.intent || 'unknown',
+      confidence: parsed.confidence || 0,
+      shortCaption: parsed.short_caption || '',
+      plant: parsed.plant || { guess_names: [], features: [] },
+      general: parsed.general || { keywords: [] },
+    };
+  } catch (e) {
+    // 嘗試從文字中提取 JSON
+    const jsonMatch = visionResponse.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          success: true,
+          intent: parsed.intent || 'unknown',
+          confidence: parsed.confidence || 0,
+          shortCaption: parsed.short_caption || '',
+          plant: parsed.plant || { guess_names: [], features: [] },
+          general: parsed.general || { keywords: [] },
+        };
+      } catch (e2) {
+        // ignore
+      }
+    }
+    return {
+      success: false,
+      intent: 'unknown',
+      confidence: 0,
+      shortCaption: visionResponse.substring(0, 100),
+      plant: { guess_names: [], features: [] },
+      general: { keywords: [] },
+      rawText: visionResponse,
+    };
+  }
+}
+
+/**
  * 根據植物代碼獲取詳細資訊 URL
  */
 function getPlantDetailUrl(code) {
@@ -155,6 +255,9 @@ module.exports = {
   classify,
   smartSearch,
   searchPlants,
+  hybridSearch,
+  getVisionPrompt,
+  parseVisionResponse,
   getPlantDetailUrl,
   formatResults,
   EMBEDDING_API_URL,

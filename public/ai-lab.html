@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AI 視覺實驗室 (Director Mode)</title>
-    <link rel="stylesheet" href="css/ai-lab.css?v=5">
+    <link rel="stylesheet" href="css/ai-lab.css?v=7">
     <link rel="stylesheet" href="css/mode-switch.css?v=2">
     <link
         rel="stylesheet"
@@ -125,18 +125,34 @@
             <!-- 結果展示區 (隱藏) -->
             <div id="resultPanel" class="result-panel">
                 <div class="result-content">
+                    <!-- 多照片縮圖區 -->
+                    <div id="photoStrip" class="photo-strip">
+                        <div class="photo-slot" data-index="0">
+                            <div class="slot-placeholder">1</div>
+                        </div>
+                        <div class="photo-slot" data-index="1">
+                            <div class="slot-placeholder">2</div>
+                        </div>
+                        <div class="photo-slot" data-index="2">
+                            <div class="slot-placeholder">3</div>
+                        </div>
+                    </div>
+                    <div id="photoHint" class="photo-hint">請從不同角度拍攝 3 張照片</div>
+
                     <img id="croppedImage" src="" alt="Cropped">
                     <div class="analysis-box">
                         <div id="aiLoading" class="hidden">
-                            <div class="spinner"></div> 正在分析...
+                            <div class="spinner"></div>
+                            <span id="loadingText">正在分析...</span>
                         </div>
                         <div id="aiResult" class="ai-text"></div>
                         <div id="rawOutput" class="raw-output"></div>
                     </div>
                 </div>
                 <div class="action-buttons">
-                    <button id="retryBtn" class="btn secondary">重試</button>
-                    <button id="analyzeBtn" class="btn primary">AI 辨識</button>
+                    <button id="retryBtn" class="btn secondary">重新拍攝</button>
+                    <button id="addPhotoBtn" class="btn secondary">拍攝下一張</button>
+                    <button id="analyzeBtn" class="btn primary" disabled>AI 辨識</button>
                 </div>
             </div>
         </div>
@@ -145,6 +161,6 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
         crossorigin=""></script>
-    <script src="js/ai-lab.js?v=5"></script>
+    <script src="js/ai-lab.js?v=7"></script>
 </body>
 </html>

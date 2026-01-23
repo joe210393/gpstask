@@ -152,9 +152,20 @@ success 或 fail (只能二選一，小寫)
         const micBtn = document.getElementById('micBtn');
         const retryBtn = document.getElementById('retryBtn');
         const analyzeBtn = document.getElementById('analyzeBtn');
+        const addPhotoBtn = document.getElementById('addPhotoBtn');
         const aiLoading = document.getElementById('aiLoading');
+        const loadingText = document.getElementById('loadingText');
         const aiResult = document.getElementById('aiResult');
         const rawOutput = document.getElementById('rawOutput');
+        const photoStrip = document.getElementById('photoStrip');
+        const photoSlots = document.querySelectorAll('.photo-slot');
+        const photoHint = document.getElementById('photoHint');
+
+        // Multi-photo state
+        const capturedPhotos = [];
+        const REQUIRED_PHOTOS = 3;
+        const CONFIDENCE_HIGH = 0.85;
+        const CONFIDENCE_MEDIUM = 0.40;
         
         // Director Panel Elements
         const directorToggle = document.getElementById('directorToggle');
@@ -506,17 +517,44 @@ success 或 fail (只能二選一，小寫)
                 
                 log('正在啟動相機...');
                 
+                // 高畫質相機設定（iOS/Android 優化）
+                const highQualityConstraints = {
+                    video: {
+                        facingMode: facingMode,
+                        width: { ideal: 1920, min: 1280 },
+                        height: { ideal: 1080, min: 720 },
+                        aspectRatio: { ideal: 16/9 },
+                        // iOS 需要這些設定來獲得更好畫質
+                        advanced: [
+                            { width: 1920, height: 1080 },
+                            { width: 1280, height: 720 }
+                        ]
+                    },
+                    audio: false
+                };
+
                 try {
-                    stream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: facingMode },
-                        audio: false
-                    });
+                    stream = await navigator.mediaDevices.getUserMedia(highQualityConstraints);
+                    log(`相機解析度: ${stream.getVideoTracks()[0]?.getSettings()?.width || '?'}x${stream.getVideoTracks()[0]?.getSettings()?.height || '?'}`);
                 } catch (err1) {
-                    log('指定鏡頭失敗，嘗試通用設定: ' + err1.name);
-                    stream = await navigator.mediaDevices.getUserMedia({
-                        video: true,
-                        audio: false
-                    });
+                    log('高畫質模式失敗，嘗試標準設定: ' + err1.name);
+                    // 降級到標準設定
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia({
+                            video: {
+                                facingMode: facingMode,
+                                width: { ideal: 1280 },
+                                height: { ideal: 720 }
+                            },
+                            audio: false
+                        });
+                    } catch (err2) {
+                        log('標準設定也失敗，使用最基本設定');
+                        stream = await navigator.mediaDevices.getUserMedia({
+                            video: true,
+                            audio: false
+                        });
+                    }
                 }
                 
                 video.srcObject = stream;
@@ -831,9 +869,8 @@ success 或 fail (只能二選一，小寫)
 
             try {
                 finalCtx.drawImage(tempCanvas, sourceX, sourceY, sourceW, sourceH, 0, 0, width, height);
-                const dataUrl = finalCanvas.toDataURL('image/jpeg', 0.9); // 提高畫質到 0.9
-                croppedImage.src = dataUrl;
-                showResultPanel();
+                const dataUrl = finalCanvas.toDataURL('image/jpeg', 0.95); // 高畫質
+                addPhotoToCollection(dataUrl);
             } catch (e) {
                 console.error('截圖失敗', e);
                 aiResult.innerHTML = '<span style="color:red">截圖失敗: ' + e.message + '</span>';
@@ -841,18 +878,90 @@ success 或 fail (只能二選一，小寫)
             }
         }
 
+        // 添加照片到集合
+        function addPhotoToCollection(dataUrl) {
+            if (capturedPhotos.length >= REQUIRED_PHOTOS) {
+                // 已滿，替換最後一張
+                capturedPhotos[REQUIRED_PHOTOS - 1] = dataUrl;
+            } else {
+                capturedPhotos.push(dataUrl);
+            }
+
+            // 更新 UI
+            updatePhotoStrip();
+            croppedImage.src = dataUrl;
+            showResultPanel();
+        }
+
+        // 更新照片條
+        function updatePhotoStrip() {
+            photoSlots.forEach((slot, index) => {
+                slot.classList.remove('filled', 'active');
+                const existingImg = slot.querySelector('img');
+                if (existingImg) existingImg.remove();
+
+                if (capturedPhotos[index]) {
+                    slot.classList.add('filled');
+                    const img = document.createElement('img');
+                    img.src = capturedPhotos[index];
+                    slot.appendChild(img);
+                }
+            });
+
+            // 標記下一個要拍的位置
+            const nextIndex = Math.min(capturedPhotos.length, REQUIRED_PHOTOS - 1);
+            if (capturedPhotos.length < REQUIRED_PHOTOS) {
+                photoSlots[nextIndex]?.classList.add('active');
+            }
+
+            // 更新提示文字和按鈕狀態
+            const count = capturedPhotos.length;
+            if (count >= REQUIRED_PHOTOS) {
+                if (photoHint) {
+                    photoHint.textContent = '✓ 已拍攝 3 張照片，可以開始辨識';
+                    photoHint.classList.add('complete');
+                }
+                analyzeBtn.disabled = false;
+                if (addPhotoBtn) {
+                    addPhotoBtn.disabled = true;
+                    addPhotoBtn.textContent = '已完成';
+                }
+            } else {
+                if (photoHint) {
+                    photoHint.textContent = `請從不同角度拍攝 (${count}/${REQUIRED_PHOTOS})`;
+                    photoHint.classList.remove('complete');
+                }
+                analyzeBtn.disabled = true;
+                if (addPhotoBtn) {
+                    addPhotoBtn.disabled = false;
+                    addPhotoBtn.textContent = `拍攝第 ${count + 1} 張`;
+                }
+            }
+        }
+
         function showResultPanel() {
             resultPanel.style.display = 'flex';
             resultPanel.classList.add('active');
-            if (!aiResult.innerHTML.includes('辨識結果')) {
+
+            const count = capturedPhotos.length;
+            if (count < REQUIRED_PHOTOS) {
+                aiResult.innerHTML = `<div style="text-align:center; color:#666;">
+                    <div style="font-size:24px; margin-bottom:8px;">📷</div>
+                    <div>請繼續拍攝不同角度的照片</div>
+                    <div style="font-size:13px; color:#999; margin-top:4px;">多角度可提高辨識準確度</div>
+                </div>`;
+            } else {
                 aiResult.innerHTML = '準備就緒，點擊「AI 辨識」開始分析';
-                if(rawOutput) rawOutput.style.display = 'none';
             }
-            analyzeBtn.disabled = false;
+            if(rawOutput) rawOutput.style.display = 'none';
             analyzeBtn.textContent = 'AI 辨識';
         }
 
         function retry() {
+            // 清空所有照片
+            capturedPhotos.length = 0;
+            updatePhotoStrip();
+
             resultPanel.classList.remove('active');
             resultPanel.style.display = 'none';
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -961,39 +1070,152 @@ success 或 fail (只能二選一，小寫)
         // 重試按鈕
         retryBtn.addEventListener('click', retry);
 
-        // AI 辨識按鈕 (核心邏輯)
+        // 拍攝下一張按鈕
+        if (addPhotoBtn) {
+            addPhotoBtn.addEventListener('click', () => {
+                // 關閉結果面板，回到拍攝模式
+                resultPanel.classList.remove('active');
+                resultPanel.style.display = 'none';
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                instruction.style.opacity = '1';
+            });
+        }
+
+        // AI 思考動畫系統
+        const AI_THINKING_STAGES = {
+            upload: [
+                '📤 正在上傳照片...',
+                '📷 讀取圖片資料中...',
+                '🔄 準備傳送至 AI...'
+            ],
+            analyze: [
+                '🔍 AI 正在觀察圖片...',
+                '🧠 辨識物體輪廓中...',
+                '👀 分析色彩與紋理...',
+                '🎯 鎖定主要特徵...',
+                '📐 測量比例關係...'
+            ],
+            plant: [
+                '🌿 這看起來像植物...',
+                '🍃 分析葉片形狀...',
+                '🌸 檢查花朵特徵...',
+                '🌳 判斷生長型態...',
+                '📋 提取關鍵特徵...'
+            ],
+            search: [
+                '📚 搜尋植物資料庫...',
+                '🔎 比對 9000+ 種植物...',
+                '⚖️ 計算相似度分數...',
+                '🏆 排序最佳候選...'
+            ],
+            finalize: [
+                '✨ 整理辨識結果...',
+                '📊 計算信心度...',
+                '✅ 準備顯示答案...'
+            ]
+        };
+
+        let thinkingInterval = null;
+        let currentStage = 'upload';
+        let stageMessageIndex = 0;
+
+        // 開始 AI 思考動畫
+        function startThinkingAnimation() {
+            stopThinkingAnimation();
+            currentStage = 'upload';
+            stageMessageIndex = 0;
+            updateLoadingMessage(AI_THINKING_STAGES[currentStage][0]);
+
+            thinkingInterval = setInterval(() => {
+                const messages = AI_THINKING_STAGES[currentStage];
+                stageMessageIndex = (stageMessageIndex + 1) % messages.length;
+                updateLoadingMessage(messages[stageMessageIndex]);
+            }, 1500); // 每 1.5 秒換一個訊息
+        }
+
+        // 切換到下一個思考階段
+        function setThinkingStage(stage) {
+            if (AI_THINKING_STAGES[stage]) {
+                currentStage = stage;
+                stageMessageIndex = 0;
+                updateLoadingMessage(AI_THINKING_STAGES[stage][0]);
+            }
+        }
+
+        // 停止思考動畫
+        function stopThinkingAnimation() {
+            if (thinkingInterval) {
+                clearInterval(thinkingInterval);
+                thinkingInterval = null;
+            }
+        }
+
+        // 更新載入訊息（帶淡入效果）
+        function updateLoadingMessage(message) {
+            if (loadingText) {
+                loadingText.style.opacity = '0.5';
+                setTimeout(() => {
+                    loadingText.textContent = message;
+                    loadingText.style.opacity = '1';
+                }, 150);
+            }
+        }
+
+        // 發送單張照片進行分析
+        async function analyzePhoto(photoDataUrl, index, systemPrompt, userPrompt, gpsData) {
+            updateLoadingMessage(`分析第 ${index + 1} 張照片...`);
+
+            const response = await fetch(photoDataUrl);
+            const blob = await response.blob();
+            const formData = new FormData();
+            formData.append('image', blob, `capture_${index}.jpg`);
+            formData.append('systemPrompt', systemPrompt);
+            formData.append('userPrompt', userPrompt);
+
+            if (gpsData) {
+                formData.append('latitude', gpsData.latitude);
+                formData.append('longitude', gpsData.longitude);
+            }
+
+            const apiRes = await fetch('/api/vision-test', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!apiRes.ok) {
+                throw new Error(`第 ${index + 1} 張照片分析失敗`);
+            }
+
+            return await apiRes.json();
+        }
+
+        // AI 辨識按鈕 (核心邏輯 - 多照片版本)
         analyzeBtn.addEventListener('click', async () => {
             stopVoiceRecognition();
             analyzeBtn.disabled = true;
+            if (addPhotoBtn) addPhotoBtn.disabled = true;
             aiLoading.classList.remove('hidden');
             aiResult.innerHTML = '';
             if(rawOutput) rawOutput.style.display = 'none';
 
+            // 開始 AI 思考動畫
+            startThinkingAnimation();
+
             try {
-                // 1. 準備圖片
-                const response = await fetch(croppedImage.src);
-                const blob = await response.blob();
-                const formData = new FormData();
-                formData.append('image', blob, 'capture.jpg');
-                
-                // 2. 準備 Prompt (強健性設計)
-                // 優先使用 systemPromptInput 的值 (導演手動修改優先)
-                // 但如果為空，強制回退到 PROMPTS[currentMode] (確保神經病 Prompt 存在)
+
+                // 1. 準備 Prompt
                 let finalSystemPrompt = systemPromptInput && systemPromptInput.value ? systemPromptInput.value : '';
                 let finalUserPrompt = userPromptInput && userPromptInput.value ? userPromptInput.value : '';
 
                 if (!finalSystemPrompt || finalSystemPrompt.length < 10) {
-                    log('Prompt 空白或過短，強制載入預設劇本');
                     const fallbackScript = getActiveScript();
                     finalSystemPrompt = fallbackScript ? fallbackScript.system : finalSystemPrompt;
-                    // 同步回 UI
                     if (systemPromptInput) systemPromptInput.value = finalSystemPrompt;
                 }
-                
-                // User prompt 也要防呆
+
                 if (!finalUserPrompt) {
-                     const fallbackScript = getActiveScript();
-                     finalUserPrompt = fallbackScript ? fallbackScript.user : finalUserPrompt;
+                    const fallbackScript = getActiveScript();
+                    finalUserPrompt = fallbackScript ? fallbackScript.user : finalUserPrompt;
                 }
 
                 if (currentMode === 'mission' && MISSION_ENABLED) {
@@ -1003,149 +1225,254 @@ success 或 fail (只能二選一，小寫)
                 }
 
                 const locationTextForPrompt = lastLocationText
-                    || (lastLatLng
-                        ? `緯度 ${lastLatLng.latitude.toFixed(5)}，經度 ${lastLatLng.longitude.toFixed(5)}`
-                        : '');
+                    || (lastLatLng ? `緯度 ${lastLatLng.latitude.toFixed(5)}，經度 ${lastLatLng.longitude.toFixed(5)}` : '');
                 if (locationTextForPrompt) {
                     finalSystemPrompt += `\n\n【拍攝地點資訊】${locationTextForPrompt}`;
                     finalUserPrompt += `\n\n拍攝地點：${locationTextForPrompt}`;
                 }
                 finalSystemPrompt += `\n\n【輸出語言】${getLanguageInstruction()}`;
 
-                log(`發送 Prompt (${currentMode}): ${finalSystemPrompt.substring(0, 15)}...`);
-                formData.append('systemPrompt', finalSystemPrompt);
-                formData.append('userPrompt', finalUserPrompt);
-
-                // 3. 準備 GPS
+                // 2. 取得 GPS
+                let gpsData = null;
                 try {
                     const pos = await new Promise((resolve, reject) => {
-                        navigator.geolocation.getCurrentPosition(resolve, reject, { 
-                            timeout: 2000, enableHighAccuracy: false 
-                        });
+                        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 2000, enableHighAccuracy: false });
                     });
-                    formData.append('latitude', pos.coords.latitude);
-                    formData.append('longitude', pos.coords.longitude);
-                    lastLatLng = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
-                    if (!lastLocationText || lastLocationText === '定位中...' || lastLocationText === '定位失敗') {
-                        const display = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
-                        updateLocationText(display || `緯度 ${pos.coords.latitude.toFixed(5)}，經度 ${pos.coords.longitude.toFixed(5)}`);
-                    }
-                    log('GPS 附加成功');
+                    gpsData = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+                    lastLatLng = gpsData;
                 } catch (gpsErr) {
                     console.warn('GPS 略過', gpsErr);
                 }
 
-                // 4. 發送請求
-                const apiRes = await fetch('/api/vision-test', {
-                    method: 'POST',
-                    body: formData
-                });
+                // 3. 分析所有照片
+                setThinkingStage('analyze');
+                const allResults = [];
+                const allPlantScores = [];
+                const allPlants = [];
+                let hasPlantResult = false;
 
-                if (!apiRes.ok) {
-                    const errText = await apiRes.text();
-                    throw new Error(`伺服器錯誤: ${errText}`);
+                for (let i = 0; i < capturedPhotos.length; i++) {
+                    // 更新進度訊息
+                    updateLoadingMessage(`🔍 分析第 ${i + 1}/${capturedPhotos.length} 張照片...`);
+
+                    const result = await analyzePhoto(capturedPhotos[i], i, finalSystemPrompt, finalUserPrompt, gpsData);
+                    allResults.push(result);
+
+                    // 收集植物 RAG 結果
+                    if (result.plant_rag?.is_plant && result.plant_rag?.plants?.length > 0) {
+                        hasPlantResult = true;
+                        // 第一次發現植物時切換到植物分析階段
+                        if (!hasPlantResult) {
+                            setThinkingStage('plant');
+                        }
+                        result.plant_rag.plants.forEach(p => {
+                            allPlantScores.push(p.score);
+                            // 避免重複植物
+                            if (!allPlants.find(existing => existing.scientific_name === p.scientific_name)) {
+                                allPlants.push(p);
+                            }
+                        });
+                    }
                 }
 
-                const data = await apiRes.json();
-                
-                // 5. 處理回應 (XML 解析)
-                if (data.success) {
-                    const fullText = data.description;
-                    console.log("Full AI Response:", fullText);
+                // 切換到搜尋階段
+                if (hasPlantResult) {
+                    setThinkingStage('search');
+                    await new Promise(r => setTimeout(r, 800));
+                }
 
-                    // XML 解析邏輯
-                    const replyMatch = fullText.match(/<reply>([\s\S]*?)<\/reply>/i);
-                    const analysisMatch = fullText.match(/<analysis>([\s\S]*?)<\/analysis>/i);
+                // 切換到最終階段
+                setThinkingStage('finalize');
+                await new Promise(r => setTimeout(r, 500));
 
-                    function extractTag(text, tag) {
-                        const tagMatch = text.match(new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'i'));
-                        return tagMatch ? tagMatch[1].trim() : null;
-                    }
-                    function extractOpenTagContent(text, tag) {
-                        const openTag = new RegExp(`<${tag}>`, 'i');
-                        const openMatch = text.match(openTag);
-                        if (!openMatch) return null;
-                        const startIdx = openMatch.index + openMatch[0].length;
-                        return text.substring(startIdx).trim();
-                    }
-                    function inferResultFromAnalysis(analysisText) {
-                        if (!analysisText) return null;
-                        if (/是\s*$/m.test(analysisText) && /是不是遙控器|是不是電池|是不是電池蓋|是不是電池或電池蓋/.test(analysisText)) {
-                            return 'success';
-                        }
-                        if (/否\s*$/m.test(analysisText) && /是不是遙控器|是不是電池|是不是電池蓋|是不是電池或電池蓋/.test(analysisText)) {
-                            return 'fail';
-                        }
-                        return null;
-                    }
+                // 4. 計算平均信心度
+                let avgConfidence = 0;
+                if (allPlantScores.length > 0) {
+                    avgConfidence = allPlantScores.reduce((a, b) => a + b, 0) / allPlantScores.length;
+                }
 
-                    let finalReplyText = '';
-                    if (replyMatch) {
-                        finalReplyText = replyMatch[1].trim();
-                    } else {
-                        // 容錯情況：AI 沒寫好 XML
-                        // 嘗試尋找 </analysis> 之後的內容
-                        const analysisEndIndex = fullText.indexOf('</analysis>');
-                        if (analysisEndIndex !== -1) {
-                            finalReplyText = fullText.substring(analysisEndIndex + 11).trim();
-                        } else {
-                            const looseReply = extractOpenTagContent(fullText, 'reply');
-                            if (looseReply) {
-                                finalReplyText = looseReply;
-                            } else {
-                                finalReplyText = fullText;
-                            }
-                        }
-                    }
+                // 依分數排序植物
+                allPlants.sort((a, b) => b.score - a.score);
 
-                    if (!finalReplyText && analysisMatch) {
-                        finalReplyText = analysisMatch[1].trim();
-                    }
+                // 停止思考動畫
+                stopThinkingAnimation();
 
-                    if (finalReplyText) {
-                        aiResult.innerHTML = finalReplyText.replace(/\n/g, '<br>');
-                    } else {
-                        aiResult.innerHTML = '<span style="color:red">AI 回應為空，請再試一次</span>';
-                    }
-
-                    // 任務模式：判斷是否過關，進入下一關
-                    if (currentMode === 'mission' && MISSION_ENABLED && !missionCompleted) {
-                        let resultTag = extractTag(fullText, 'result');
-                        if (!resultTag) {
-                            resultTag = inferResultFromAnalysis(extractTag(fullText, 'analysis'));
-                        }
-                        if (resultTag && resultTag.toLowerCase() === 'success') {
-                            if (missionStepIndex < MISSION_STEPS.length - 1) {
-                                missionStepIndex += 1;
-                                const nextScript = getActiveScript();
-                                applyScript(nextScript, true);
-                                log(`任務進度前進到第 ${missionStepIndex + 1} 關`);
-                            } else {
-                                missionCompleted = true;
-                                Swal.fire({
-                                    title: '🎉 任務完成',
-                                    text: '你已完成所有測試關卡！',
-                                    icon: 'success',
-                                    confirmButtonText: '太好了',
-                                    backdrop: `rgba(0,0,0,0.8)`
-                                });
-                                log('任務完成');
-                            }
-                        }
-                    }
+                // 5. 根據信心度顯示不同結果
+                if (avgConfidence >= CONFIDENCE_HIGH) {
+                    // 高信心度：直接顯示答案
+                    showHighConfidenceResult(allResults, allPlants, avgConfidence);
+                } else if (avgConfidence >= CONFIDENCE_MEDIUM) {
+                    // 中等信心度：請求補拍
+                    showMediumConfidenceResult(allResults, allPlants, avgConfidence);
+                } else if (allPlants.length > 0) {
+                    // 低信心度但有結果：請重新拍攝
+                    showLowConfidenceResult(allResults, allPlants, avgConfidence);
                 } else {
-                    aiResult.innerHTML = `<span style="color:red">辨識失敗: ${data.message}</span>`;
+                    // 沒有植物結果：顯示一般 AI 回應
+                    showNonPlantResult(allResults);
                 }
 
             } catch (err) {
                 console.error('API 錯誤:', err);
+                stopThinkingAnimation();
                 aiResult.innerHTML = `<span style="color:red">系統錯誤: ${err.message}</span>`;
             } finally {
+                stopThinkingAnimation();
                 aiLoading.classList.add('hidden');
                 analyzeBtn.disabled = false;
                 analyzeBtn.textContent = '再次辨識';
             }
         });
+
+        // 高信心度結果 (>85%)
+        function showHighConfidenceResult(allResults, plants, confidence) {
+            const topPlant = plants[0];
+            const confidencePercent = Math.round(confidence * 100);
+
+            let html = `
+                <div style="text-align: center; margin-bottom: 12px;">
+                    <div style="font-size: 28px; margin-bottom: 8px;">🌿</div>
+                    <div style="font-size: 18px; font-weight: 600; color: #2e7d32;">辨識結果</div>
+                    <div class="confidence-bar" style="margin: 12px auto; max-width: 200px;">
+                        <div class="confidence-fill high" style="width: ${confidencePercent}%"></div>
+                    </div>
+                    <div style="font-size: 13px; color: #4caf50;">信心度: ${confidencePercent}%</div>
+                </div>
+            `;
+
+            // 主要植物
+            html += `
+                <div style="padding: 16px; background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-radius: 12px; border: 2px solid #4caf50; margin-bottom: 12px;">
+                    <div style="font-size: 20px; font-weight: 600; color: #1b5e20; margin-bottom: 4px;">
+                        ${topPlant.chinese_name || topPlant.scientific_name}
+                    </div>
+                    <div style="font-size: 14px; color: #558b2f; font-style: italic; margin-bottom: 8px;">
+                        ${topPlant.scientific_name}
+                    </div>
+                    <div style="font-size: 13px; color: #666;">
+                        科: ${topPlant.family || '-'} | 型態: ${topPlant.life_form || '-'}
+                    </div>
+                    ${topPlant.summary ? `<div style="font-size: 13px; color: #555; margin-top: 8px; line-height: 1.5;">${topPlant.summary}</div>` : ''}
+                </div>
+            `;
+
+            // 其他可能
+            if (plants.length > 1) {
+                html += `<div style="font-size: 13px; color: #666; margin-top: 8px;">其他可能: `;
+                html += plants.slice(1, 3).map(p => p.chinese_name || p.scientific_name).join('、');
+                html += `</div>`;
+            }
+
+            aiResult.innerHTML = html;
+        }
+
+        // 中等信心度結果 (40-85%)
+        function showMediumConfidenceResult(allResults, plants, confidence) {
+            const confidencePercent = Math.round(confidence * 100);
+
+            let html = `
+                <div class="need-more-photos">
+                    <div class="icon">🤔</div>
+                    <div class="message">需要更多角度確認</div>
+                    <div class="hint">目前信心度 ${confidencePercent}%，請再拍攝一個不同角度</div>
+                </div>
+            `;
+
+            // 顯示目前猜測
+            if (plants.length > 0) {
+                html += `
+                    <div style="margin-top: 12px; padding: 12px; background: #fff8e1; border-radius: 8px; border: 1px solid #ffe082;">
+                        <div style="font-size: 13px; color: #f57c00; margin-bottom: 8px;">目前推測:</div>
+                        ${plants.slice(0, 2).map(p => `
+                            <div style="font-size: 14px; color: #333;">
+                                • ${p.chinese_name || p.scientific_name} <span style="color:#999">(${Math.round(p.score * 100)}%)</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            aiResult.innerHTML = html;
+
+            // 允許補拍一張
+            if (addPhotoBtn) {
+                addPhotoBtn.disabled = false;
+                addPhotoBtn.textContent = '補拍一張';
+            }
+            analyzeBtn.textContent = '重新分析';
+        }
+
+        // 低信心度結果 (<40%)
+        function showLowConfidenceResult(allResults, plants, confidence) {
+            const confidencePercent = Math.round(confidence * 100);
+
+            aiResult.innerHTML = `
+                <div class="retry-message">
+                    <div class="icon">📷</div>
+                    <div class="message">無法確認辨識結果</div>
+                    <div class="hint">信心度僅 ${confidencePercent}%，建議重新拍攝</div>
+                </div>
+                <div style="margin-top: 12px; text-align: center;">
+                    <div style="font-size: 13px; color: #666; margin-bottom: 8px;">拍攝建議:</div>
+                    <div style="font-size: 12px; color: #888; line-height: 1.6;">
+                        • 確保光線充足<br>
+                        • 拍攝葉片、花朵等特徵<br>
+                        • 避免過度晃動
+                    </div>
+                </div>
+            `;
+
+            // 重置照片
+            retryBtn.textContent = '重新拍攝';
+        }
+
+        // 非植物結果
+        function showNonPlantResult(allResults) {
+            // 使用第一張照片的 AI 回應
+            const firstResult = allResults[0];
+
+            if (!firstResult?.success) {
+                aiResult.innerHTML = '<span style="color:red">辨識失敗，請重試</span>';
+                return;
+            }
+
+            const fullText = firstResult.description;
+
+            // XML 解析邏輯
+            function extractTag(text, tag) {
+                const match = text.match(new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'i'));
+                return match ? match[1].trim() : null;
+            }
+
+            let finalReplyText = extractTag(fullText, 'reply');
+            if (!finalReplyText) {
+                const analysisEndIndex = fullText.indexOf('</analysis>');
+                if (analysisEndIndex !== -1) {
+                    finalReplyText = fullText.substring(analysisEndIndex + 11).trim();
+                } else {
+                    finalReplyText = fullText;
+                }
+            }
+
+            if (finalReplyText) {
+                aiResult.innerHTML = `
+                    <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;">
+                        ${finalReplyText.replace(/\n/g, '<br>')}
+                    </div>
+                `;
+
+                // 提示非植物
+                if (firstResult.plant_rag && !firstResult.plant_rag.is_plant) {
+                    aiResult.innerHTML += `
+                        <div style="margin-top: 8px; font-size: 12px; color: #999; text-align: center;">
+                            📝 識別為: ${firstResult.plant_rag.category || '非植物'}
+                        </div>
+                    `;
+                }
+            } else {
+                aiResult.innerHTML = '<span style="color:red">AI 回應為空，請再試一次</span>';
+            }
+        }
 
         // ------------------------------------------------
         // 6. 初始化 (Initialization)

@@ -12,6 +12,7 @@ const rateLimit = require('express-rate-limit');
 const webpush = require('web-push');
 const XLSX = require('xlsx');
 const { getDbConfig } = require('./db-config');
+const { smartSearch, classify, hybridSearch, getVisionPrompt, parseVisionResponse } = require('./scripts/rag/vectordb/plant-search-client');
 
 // JWT 設定
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -40,7 +41,7 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
 }
 
 const app = express();
-console.log('🚀 System Reset: Restored to clean state (no RAG).');
+console.log('🚀 GPS Task Server with Plant RAG integration');
 
 // 🔥 關鍵設定：信任反向代理（Zeabur/Cloudflare 等）
 // 設定為 1 表示只信任第一層代理（Zeabur 通常只有一層負載均衡器）
@@ -3164,18 +3165,113 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
     const aiData = await aiResponse.json();
     const description = aiData.choices[0].message.content;
 
+    // 4. 植物 RAG 搜尋
+    // 嘗試解析結構化 JSON，如果成功則用混合搜尋
+    let plantResults = null;
+    try {
+      console.log('🌿 正在查詢植物 RAG...');
+
+      // 嘗試解析 Vision AI 的結構化輸出
+      const visionParsed = parseVisionResponse(description);
+
+      if (visionParsed.success && visionParsed.intent === 'plant') {
+        // 使用混合搜尋（結合特徵權重）
+        console.log(`📊 結構化辨識: intent=${visionParsed.intent}, features=${visionParsed.plant.features.join(',')}`);
+
+        const hybridResult = await hybridSearch({
+          query: visionParsed.shortCaption || description,
+          features: visionParsed.plant.features || [],
+          guessNames: visionParsed.plant.guess_names || [],
+          topK: 3
+        });
+
+        if (hybridResult.results?.length > 0) {
+          console.log(`✅ 混合搜尋找到 ${hybridResult.results.length} 個結果`);
+          plantResults = {
+            is_plant: true,
+            search_type: 'hybrid',
+            vision_parsed: {
+              intent: visionParsed.intent,
+              confidence: visionParsed.confidence,
+              features: visionParsed.plant.features,
+              guess_names: visionParsed.plant.guess_names
+            },
+            feature_info: hybridResult.feature_info,
+            plants: hybridResult.results.map(p => ({
+              chinese_name: p.chinese_name,
+              scientific_name: p.scientific_name,
+              family: p.family,
+              life_form: p.life_form,
+              score: p.score,
+              embedding_score: p.embedding_score,
+              feature_score: p.feature_score,
+              matched_features: p.matched_features,
+              summary: p.summary
+            }))
+          };
+        }
+      }
+
+      // 如果結構化解析失敗或不是植物，用原本的 smartSearch
+      if (!plantResults) {
+        const ragResult = await smartSearch(description, 3);
+
+        if (ragResult.classification?.is_plant && ragResult.results?.length > 0) {
+          console.log(`✅ 傳統搜尋找到 ${ragResult.results.length} 個結果`);
+          plantResults = {
+            is_plant: true,
+            search_type: 'embedding',
+            message: ragResult.message,
+            plants: ragResult.results.map(p => ({
+              chinese_name: p.chinese_name,
+              scientific_name: p.scientific_name,
+              family: p.family,
+              life_form: p.life_form,
+              score: p.score,
+              summary: p.summary
+            }))
+          };
+        } else {
+          console.log(`📝 非植物查詢: ${ragResult.classification?.category || 'unknown'}`);
+          plantResults = {
+            is_plant: false,
+            category: ragResult.classification?.category,
+            message: ragResult.message
+          };
+        }
+      }
+    } catch (ragErr) {
+      console.warn('⚠️ 植物 RAG 查詢失敗 (非致命):', ragErr.message);
+      // RAG 失敗不影響主要回應
+    }
+
     res.json({
       success: true,
-      description: description
+      description: description,
+      plant_rag: plantResults
     });
 
   } catch (err) {
     console.error('❌ AI 辨識失敗:', err);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'AI 暫時無法連線，請確認後端設定',
       error: err.message
     });
+  }
+});
+
+// 取得植物辨識用的結構化 Prompt
+app.get('/api/plant-vision-prompt', async (req, res) => {
+  try {
+    const promptData = await getVisionPrompt();
+    if (promptData) {
+      res.json({ success: true, ...promptData });
+    } else {
+      res.status(503).json({ success: false, message: 'Embedding API 未連接' });
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
