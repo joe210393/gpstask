@@ -26,5 +26,8 @@
   },
   "engines": {
     "node": "18.x"
+  },
+  "devDependencies": {
+    "jsdom": "^27.0.1"
   }
 }

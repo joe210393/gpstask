@@ -1161,14 +1161,84 @@ success 或 fail (只能二選一，小寫)
             }
         }
 
-        // 發送單張照片進行分析
-        async function analyzePhoto(photoDataUrl, index, systemPrompt, userPrompt, gpsData) {
-            updateLoadingMessage(`分析第 ${index + 1} 張照片...`);
+        // 合併多張照片成一張格子圖
+        async function combinePhotosToGrid(photos) {
+            return new Promise((resolve) => {
+                const count = photos.length;
+                if (count === 0) {
+                    resolve(null);
+                    return;
+                }
+                if (count === 1) {
+                    resolve(photos[0]);
+                    return;
+                }
 
+                // 創建格子圖 canvas
+                const gridCanvas = document.createElement('canvas');
+                const ctx = gridCanvas.getContext('2d');
+
+                // 根據照片數量決定排列方式
+                const cols = count <= 2 ? count : 2;
+                const rows = Math.ceil(count / cols);
+                const cellWidth = 640;
+                const cellHeight = 480;
+
+                gridCanvas.width = cellWidth * cols;
+                gridCanvas.height = cellHeight * rows;
+
+                // 填充白色背景
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, gridCanvas.width, gridCanvas.height);
+
+                // 載入並繪製每張照片
+                let loaded = 0;
+                photos.forEach((photoUrl, index) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const col = index % cols;
+                        const row = Math.floor(index / cols);
+                        const x = col * cellWidth;
+                        const y = row * cellHeight;
+
+                        // 保持比例繪製
+                        const scale = Math.min(cellWidth / img.width, cellHeight / img.height);
+                        const drawWidth = img.width * scale;
+                        const drawHeight = img.height * scale;
+                        const offsetX = x + (cellWidth - drawWidth) / 2;
+                        const offsetY = y + (cellHeight - drawHeight) / 2;
+
+                        ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+
+                        // 添加照片編號標籤
+                        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                        ctx.fillRect(x + 5, y + 5, 30, 25);
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = 'bold 16px sans-serif';
+                        ctx.fillText(`${index + 1}`, x + 12, y + 23);
+
+                        loaded++;
+                        if (loaded === count) {
+                            resolve(gridCanvas.toDataURL('image/jpeg', 0.9));
+                        }
+                    };
+                    img.onerror = () => {
+                        loaded++;
+                        if (loaded === count) {
+                            resolve(gridCanvas.toDataURL('image/jpeg', 0.9));
+                        }
+                    };
+                    img.src = photoUrl;
+                });
+            });
+        }
+
+        // 發送照片進行分析（單次請求）
+        async function analyzePhotos(photoDataUrl, systemPrompt, userPrompt, gpsData) {
             const response = await fetch(photoDataUrl);
             const blob = await response.blob();
             const formData = new FormData();
-            formData.append('image', blob, `capture_${index}.jpg`);
+            formData.append('image', blob, 'capture_grid.jpg');
             formData.append('systemPrompt', systemPrompt);
             formData.append('userPrompt', userPrompt);
 
@@ -1183,7 +1253,7 @@ success 或 fail (只能二選一，小寫)
             });
 
             if (!apiRes.ok) {
-                throw new Error(`第 ${index + 1} 張照片分析失敗`);
+                throw new Error('照片分析失敗');
             }
 
             return await apiRes.json();
@@ -1244,58 +1314,62 @@ success 或 fail (只能二選一，小寫)
                     console.warn('GPS 略過', gpsErr);
                 }
 
-                // 3. 分析所有照片
+                // 3. 合併照片並分析（單次 API 請求）
+                setThinkingStage('upload');
+                updateLoadingMessage('📷 合併照片中...');
+
+                // 如果有多張照片，合併成格子圖
+                const gridImage = await combinePhotosToGrid(capturedPhotos);
+                if (!gridImage) {
+                    throw new Error('無法處理照片');
+                }
+
+                // 更新預覽圖為合併後的格子圖
+                croppedImage.src = gridImage;
+
+                // 添加多照片提示到 prompt
+                if (capturedPhotos.length > 1) {
+                    finalUserPrompt += `\n\n【注意】這是從 ${capturedPhotos.length} 個不同角度拍攝的照片組合，請綜合分析所有角度的特徵。`;
+                }
+
                 setThinkingStage('analyze');
-                const allResults = [];
-                const allPlantScores = [];
+
+                // 單次 API 請求
+                const result = await analyzePhotos(gridImage, finalSystemPrompt, finalUserPrompt, gpsData);
+
+                // 處理結果
                 const allPlants = [];
+                let avgConfidence = 0;
                 let hasPlantResult = false;
 
-                for (let i = 0; i < capturedPhotos.length; i++) {
-                    // 更新進度訊息
-                    updateLoadingMessage(`🔍 分析第 ${i + 1}/${capturedPhotos.length} 張照片...`);
+                if (result.plant_rag?.is_plant && result.plant_rag?.plants?.length > 0) {
+                    hasPlantResult = true;
+                    setThinkingStage('plant');
+                    await new Promise(r => setTimeout(r, 300));
 
-                    const result = await analyzePhoto(capturedPhotos[i], i, finalSystemPrompt, finalUserPrompt, gpsData);
-                    allResults.push(result);
+                    result.plant_rag.plants.forEach(p => {
+                        allPlants.push(p);
+                    });
 
-                    // 收集植物 RAG 結果
-                    if (result.plant_rag?.is_plant && result.plant_rag?.plants?.length > 0) {
-                        hasPlantResult = true;
-                        // 第一次發現植物時切換到植物分析階段
-                        if (!hasPlantResult) {
-                            setThinkingStage('plant');
-                        }
-                        result.plant_rag.plants.forEach(p => {
-                            allPlantScores.push(p.score);
-                            // 避免重複植物
-                            if (!allPlants.find(existing => existing.scientific_name === p.scientific_name)) {
-                                allPlants.push(p);
-                            }
-                        });
-                    }
-                }
+                    // 計算平均信心度
+                    const scores = allPlants.map(p => p.score);
+                    avgConfidence = scores.reduce((a, b) => a + b, 0) / scores.length;
 
-                // 切換到搜尋階段
-                if (hasPlantResult) {
                     setThinkingStage('search');
-                    await new Promise(r => setTimeout(r, 800));
+                    await new Promise(r => setTimeout(r, 500));
                 }
 
-                // 切換到最終階段
                 setThinkingStage('finalize');
-                await new Promise(r => setTimeout(r, 500));
-
-                // 4. 計算平均信心度
-                let avgConfidence = 0;
-                if (allPlantScores.length > 0) {
-                    avgConfidence = allPlantScores.reduce((a, b) => a + b, 0) / allPlantScores.length;
-                }
-
-                // 依分數排序植物
-                allPlants.sort((a, b) => b.score - a.score);
+                await new Promise(r => setTimeout(r, 300));
 
                 // 停止思考動畫
                 stopThinkingAnimation();
+
+                // 將單一結果包裝成陣列格式（兼容後續處理）
+                const allResults = [result];
+
+                // 依分數排序植物
+                allPlants.sort((a, b) => b.score - a.score);
 
                 // 5. 根據信心度顯示不同結果
                 if (avgConfidence >= CONFIDENCE_HIGH) {
@@ -1436,7 +1510,10 @@ success 或 fail (只能二選一，小寫)
                 return;
             }
 
-            const fullText = firstResult.description;
+            let fullText = firstResult.description;
+
+            // 移除 markdown 代碼區塊標記 (```xml ... ```)
+            fullText = fullText.replace(/^```(?:xml)?\s*/i, '').replace(/\s*```$/i, '');
 
             // XML 解析邏輯
             function extractTag(text, tag) {
@@ -1449,14 +1526,19 @@ success 或 fail (只能二選一，小寫)
                 const analysisEndIndex = fullText.indexOf('</analysis>');
                 if (analysisEndIndex !== -1) {
                     finalReplyText = fullText.substring(analysisEndIndex + 11).trim();
+                    // 移除可能的結尾 ``` 標記
+                    finalReplyText = finalReplyText.replace(/\s*```$/i, '');
                 } else {
                     finalReplyText = fullText;
                 }
             }
 
+            // 移除可能殘留的 XML/markdown 標記
+            finalReplyText = finalReplyText.replace(/<\/?reply>/gi, '').trim();
+
             if (finalReplyText) {
                 aiResult.innerHTML = `
-                    <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;">
+                    <div style="padding: 12px; background: #f5f5f5; border-radius: 8px; line-height: 1.6;">
                         ${finalReplyText.replace(/\n/g, '<br>')}
                     </div>
                 `;
