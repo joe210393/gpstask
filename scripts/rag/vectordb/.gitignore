@@ -1,0 +1,15 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Progress files
+embed_progress.json
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/

@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+
+# 進度檔案（不需要上傳）
+data/progress.json
+data/extract-progress.json
+vectordb/embed_progress.json
+
+# macOS
+.DS_Store

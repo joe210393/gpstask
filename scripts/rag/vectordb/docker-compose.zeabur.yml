@@ -1,0 +1,27 @@
+# Zeabur 部署用 docker-compose
+# 包含 Qdrant + Embedding API
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+    restart: always
+
+  embedding-api:
+    build: .
+    ports:
+      - "8100:8100"
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - EMBEDDING_API_PORT=8100
+    depends_on:
+      - qdrant
+    restart: always
+
+volumes:
+  qdrant_data:
