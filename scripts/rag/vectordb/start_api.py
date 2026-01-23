@@ -33,7 +33,8 @@ QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6333")
 QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY", None)  # Zeabur Qdrant API Key
 COLLECTION_NAME = "taiwan_plants"
 EMBEDDING_MODEL = "jinaai/jina-embeddings-v3"
-API_PORT = int(os.environ.get("EMBEDDING_API_PORT", "8100"))
+# Zeabur 用 PORT，本地開發用 EMBEDDING_API_PORT
+API_PORT = int(os.environ.get("PORT", os.environ.get("EMBEDDING_API_PORT", "8100")))
 
 def get_qdrant_client():
     """建立 Qdrant 客戶端，自動處理 HTTP/HTTPS"""
