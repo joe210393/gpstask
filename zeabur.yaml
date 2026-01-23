@@ -8,9 +8,9 @@ services:
         dockerfile: vectordb/Dockerfile
         context: scripts/rag
     ports:
-      - port: 8100
+      - port: 8080
         protocol: http
     env:
       QDRANT_URL: https://gps-task-qdrant.zeabur.app
       QDRANT_API_KEY: ${QDRANT_API_KEY}
-      EMBEDDING_API_PORT: "8100"
+      PORT: "8080"

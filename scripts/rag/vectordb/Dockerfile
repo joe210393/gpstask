@@ -31,8 +31,8 @@ RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTr
 # 環境變數（會被 Zeabur 環境變數覆蓋）
 ENV QDRANT_URL=http://qdrant:6333
 ENV QDRANT_API_KEY=
-ENV EMBEDDING_API_PORT=8100
+ENV PORT=8080
 
-EXPOSE 8100
+EXPOSE 8080
 
 CMD ["python", "start_api.py"]
