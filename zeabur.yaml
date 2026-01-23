@@ -1,0 +1,16 @@
+services:
+  embedding-api:
+    type: docker
+    source:
+      git:
+        repo: joe210393/gpstask
+        branch: main
+        dockerfile: vectordb/Dockerfile
+        context: scripts/rag
+    ports:
+      - port: 8100
+        protocol: http
+    env:
+      QDRANT_URL: https://gps-task-qdrant.zeabur.app
+      QDRANT_API_KEY: ${QDRANT_API_KEY}
+      EMBEDDING_API_PORT: "8100"
