@@ -38,6 +38,7 @@ API_PORT = int(os.environ.get("PORT", os.environ.get("EMBEDDING_API_PORT", "8100
 
 def get_qdrant_client():
     """建立 Qdrant 客戶端，自動處理 HTTP/HTTPS"""
+    import warnings
     from urllib.parse import urlparse
     parsed = urlparse(QDRANT_URL)
 
@@ -45,23 +46,29 @@ def get_qdrant_client():
     host = parsed.hostname or 'localhost'
     port = parsed.port or (443 if is_https else 6333)
 
-    if QDRANT_API_KEY:
+    # 如果是內部網路 HTTP 連線，不使用 API Key
+    use_api_key = QDRANT_API_KEY if is_https else None
+
+    if use_api_key:
         return QdrantClient(
             host=host,
             port=port,
-            api_key=QDRANT_API_KEY,
+            api_key=use_api_key,
             https=is_https,
             prefer_grpc=False,
             timeout=120
         )
     else:
-        return QdrantClient(
-            host=host,
-            port=port,
-            https=is_https,
-            prefer_grpc=False,
-            timeout=120
-        )
+        # 內部連線不需要 API Key，忽略警告
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return QdrantClient(
+                host=host,
+                port=port,
+                https=is_https,
+                prefer_grpc=False,
+                timeout=120
+            )
 
 # 分類閾值
 PLANT_THRESHOLD = 0.68  # 與「植物」相似度超過此值才認為是植物查詢
@@ -83,8 +90,17 @@ def init():
 
     print(f"連接 Qdrant: {QDRANT_URL}")
     if QDRANT_API_KEY:
-        print("  使用 API Key 認證")
-    qdrant_client = get_qdrant_client()
+        print("  API Key 已設定")
+
+    try:
+        qdrant_client = get_qdrant_client()
+        # 測試連線
+        collections = qdrant_client.get_collections()
+        print(f"  ✅ Qdrant 連線成功，共 {len(collections.collections)} 個 collections")
+    except Exception as e:
+        print(f"  ❌ Qdrant 連線失敗: {e}")
+        print(f"  請檢查 QDRANT_URL 和 QDRANT_API_KEY 設定")
+        raise
 
     print(f"載入 embedding 模型: {EMBEDDING_MODEL}")
     model = SentenceTransformer(EMBEDDING_MODEL, trust_remote_code=True)
