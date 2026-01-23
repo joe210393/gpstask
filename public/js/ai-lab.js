@@ -1124,12 +1124,21 @@ success 或 fail (只能二選一，小寫)
             stopThinkingAnimation();
             currentStage = 'upload';
             stageMessageIndex = 0;
-            updateLoadingMessage(AI_THINKING_STAGES[currentStage][0]);
+
+            // 立即顯示第一個訊息（不使用延遲）
+            if (loadingText) {
+                loadingText.textContent = AI_THINKING_STAGES[currentStage][0];
+                loadingText.style.opacity = '1';
+            }
+
+            console.log('🎬 思考動畫開始:', AI_THINKING_STAGES[currentStage][0]);
 
             thinkingInterval = setInterval(() => {
                 const messages = AI_THINKING_STAGES[currentStage];
-                stageMessageIndex = (stageMessageIndex + 1) % messages.length;
-                updateLoadingMessage(messages[stageMessageIndex]);
+                if (messages) {
+                    stageMessageIndex = (stageMessageIndex + 1) % messages.length;
+                    updateLoadingMessage(messages[stageMessageIndex]);
+                }
             }, 1500); // 每 1.5 秒換一個訊息
         }
 
@@ -1138,7 +1147,11 @@ success 或 fail (只能二選一，小寫)
             if (AI_THINKING_STAGES[stage]) {
                 currentStage = stage;
                 stageMessageIndex = 0;
-                updateLoadingMessage(AI_THINKING_STAGES[stage][0]);
+                console.log('🔄 切換思考階段:', stage, AI_THINKING_STAGES[stage][0]);
+                // 立即更新（不使用淡入效果避免延遲）
+                if (loadingText) {
+                    loadingText.textContent = AI_THINKING_STAGES[stage][0];
+                }
             }
         }
 
@@ -1147,12 +1160,14 @@ success 或 fail (只能二選一，小寫)
             if (thinkingInterval) {
                 clearInterval(thinkingInterval);
                 thinkingInterval = null;
+                console.log('⏹️ 思考動畫停止');
             }
         }
 
         // 更新載入訊息（帶淡入效果）
         function updateLoadingMessage(message) {
-            if (loadingText) {
+            if (loadingText && message) {
+                loadingText.style.transition = 'opacity 0.15s ease';
                 loadingText.style.opacity = '0.5';
                 setTimeout(() => {
                     loadingText.textContent = message;
@@ -1178,11 +1193,11 @@ success 或 fail (只能二選一，小寫)
                 const gridCanvas = document.createElement('canvas');
                 const ctx = gridCanvas.getContext('2d');
 
-                // 根據照片數量決定排列方式
+                // 根據照片數量決定排列方式（高解析度 1920x1080 每格）
                 const cols = count <= 2 ? count : 2;
                 const rows = Math.ceil(count / cols);
-                const cellWidth = 640;
-                const cellHeight = 480;
+                const cellWidth = 1920;
+                const cellHeight = 1080;
 
                 gridCanvas.width = cellWidth * cols;
                 gridCanvas.height = cellHeight * rows;
@@ -1264,12 +1279,17 @@ success 或 fail (只能二選一，小寫)
             stopVoiceRecognition();
             analyzeBtn.disabled = true;
             if (addPhotoBtn) addPhotoBtn.disabled = true;
-            aiLoading.classList.remove('hidden');
+
+            // 立即顯示載入動畫（確保在任何 async 之前）
             aiResult.innerHTML = '';
             if(rawOutput) rawOutput.style.display = 'none';
+            aiLoading.classList.remove('hidden');
 
             // 開始 AI 思考動畫
             startThinkingAnimation();
+
+            // 強制渲染更新
+            await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
             try {
 
@@ -1337,11 +1357,14 @@ success 或 fail (只能二選一，小寫)
                 // 單次 API 請求
                 const result = await analyzePhotos(gridImage, finalSystemPrompt, finalUserPrompt, gpsData);
 
+                console.log('🤖 API 回應:', result);
+
                 // 處理結果
                 const allPlants = [];
                 let avgConfidence = 0;
                 let hasPlantResult = false;
 
+                // 檢查是否有植物 RAG 結果
                 if (result.plant_rag?.is_plant && result.plant_rag?.plants?.length > 0) {
                     hasPlantResult = true;
                     setThinkingStage('plant');
@@ -1357,6 +1380,12 @@ success 或 fail (只能二選一，小寫)
 
                     setThinkingStage('search');
                     await new Promise(r => setTimeout(r, 500));
+                    console.log(`🌿 植物結果: ${allPlants.length} 個, 平均信心度: ${Math.round(avgConfidence * 100)}%`);
+                } else {
+                    // 非植物情況也要顯示動畫進度
+                    setThinkingStage('analyze');
+                    await new Promise(r => setTimeout(r, 500));
+                    console.log('📦 非植物結果，類別:', result.plant_rag?.category || 'unknown');
                 }
 
                 setThinkingStage('finalize');
@@ -1371,30 +1400,48 @@ success 或 fail (只能二選一，小寫)
                 // 依分數排序植物
                 allPlants.sort((a, b) => b.score - a.score);
 
-                // 5. 根據信心度顯示不同結果
-                if (avgConfidence >= CONFIDENCE_HIGH) {
-                    // 高信心度：直接顯示答案
+                // 5. 根據結果類型顯示不同內容
+                if (hasPlantResult && avgConfidence >= CONFIDENCE_HIGH) {
+                    // 高信心度植物：直接顯示答案
                     showHighConfidenceResult(allResults, allPlants, avgConfidence);
-                } else if (avgConfidence >= CONFIDENCE_MEDIUM) {
-                    // 中等信心度：請求補拍
+                } else if (hasPlantResult && avgConfidence >= CONFIDENCE_MEDIUM) {
+                    // 中等信心度植物：請求補拍
                     showMediumConfidenceResult(allResults, allPlants, avgConfidence);
-                } else if (allPlants.length > 0) {
-                    // 低信心度但有結果：請重新拍攝
+                } else if (hasPlantResult && allPlants.length > 0) {
+                    // 低信心度但有植物結果：請重新拍攝
                     showLowConfidenceResult(allResults, allPlants, avgConfidence);
                 } else {
-                    // 沒有植物結果：顯示一般 AI 回應
+                    // 沒有植物結果或是其他物品：顯示一般 AI 回應
                     showNonPlantResult(allResults);
                 }
 
             } catch (err) {
                 console.error('API 錯誤:', err);
                 stopThinkingAnimation();
-                aiResult.innerHTML = `<span style="color:red">系統錯誤: ${err.message}</span>`;
+
+                // 根據錯誤類型顯示不同訊息
+                let errorMessage = '系統錯誤';
+                if (err.message.includes('fetch') || err.message.includes('Failed')) {
+                    errorMessage = 'AI 服務暫時無法連線';
+                } else if (err.message.includes('timeout')) {
+                    errorMessage = 'AI 回應超時';
+                } else {
+                    errorMessage = err.message;
+                }
+
+                aiResult.innerHTML = `
+                    <div style="text-align: center; padding: 16px;">
+                        <div style="font-size: 28px; margin-bottom: 8px;">⚠️</div>
+                        <div style="color: #c62828; font-weight: 500;">${errorMessage}</div>
+                        <div style="color: #666; font-size: 13px; margin-top: 8px;">請稍後再試</div>
+                    </div>
+                `;
             } finally {
                 stopThinkingAnimation();
                 aiLoading.classList.add('hidden');
                 analyzeBtn.disabled = false;
                 analyzeBtn.textContent = '再次辨識';
+                if (addPhotoBtn) addPhotoBtn.disabled = false;
             }
         });
 
@@ -1504,16 +1551,22 @@ success 或 fail (只能二選一，小寫)
         function showNonPlantResult(allResults) {
             // 使用第一張照片的 AI 回應
             const firstResult = allResults[0];
+            console.log('📋 showNonPlantResult called:', firstResult);
 
             if (!firstResult?.success) {
                 aiResult.innerHTML = '<span style="color:red">辨識失敗，請重試</span>';
                 return;
             }
 
-            let fullText = firstResult.description;
+            let fullText = firstResult.description || '';
 
-            // 移除 markdown 代碼區塊標記 (```xml ... ```)
-            fullText = fullText.replace(/^```(?:xml)?\s*/i, '').replace(/\s*```$/i, '');
+            if (!fullText) {
+                aiResult.innerHTML = '<span style="color:red">AI 回應為空，請再試一次</span>';
+                return;
+            }
+
+            // 移除 markdown 代碼區塊標記 (```xml ... ``` 或 ```json ... ```)
+            fullText = fullText.replace(/^```(?:xml|json)?\s*/i, '').replace(/\s*```$/i, '');
 
             // XML 解析邏輯
             function extractTag(text, tag) {
@@ -1522,32 +1575,67 @@ success 或 fail (只能二選一，小寫)
             }
 
             let finalReplyText = extractTag(fullText, 'reply');
+
+            // 如果沒有 <reply> 標籤，嘗試其他方式
             if (!finalReplyText) {
+                // 嘗試提取 </analysis> 後的內容
                 const analysisEndIndex = fullText.indexOf('</analysis>');
                 if (analysisEndIndex !== -1) {
                     finalReplyText = fullText.substring(analysisEndIndex + 11).trim();
                     // 移除可能的結尾 ``` 標記
                     finalReplyText = finalReplyText.replace(/\s*```$/i, '');
-                } else {
-                    finalReplyText = fullText;
+                    // 移除 <reply> 和 </reply> 標記如果存在
+                    finalReplyText = finalReplyText.replace(/<\/?reply>/gi, '').trim();
                 }
+            }
+
+            // 如果還是沒有內容，嘗試使用 <analysis> 內容
+            if (!finalReplyText) {
+                finalReplyText = extractTag(fullText, 'analysis');
+            }
+
+            // 最後嘗試：使用整個回應（移除 XML 標籤）
+            if (!finalReplyText) {
+                finalReplyText = fullText
+                    .replace(/<\/?(?:analysis|reply|result)>/gi, '')
+                    .replace(/\s*```$/i, '')
+                    .trim();
             }
 
             // 移除可能殘留的 XML/markdown 標記
             finalReplyText = finalReplyText.replace(/<\/?reply>/gi, '').trim();
 
+            console.log('📝 Final reply text:', finalReplyText.substring(0, 100) + '...');
+
             if (finalReplyText) {
+                // 決定顯示的類別圖標
+                let categoryInfo = '';
+                if (firstResult.plant_rag) {
+                    const cat = firstResult.plant_rag.category || '一般物品';
+                    const categoryIcons = {
+                        'animal': '🐾 動物',
+                        'artifact': '🔧 人造物',
+                        'food': '🍴 食物',
+                        'other': '📦 其他',
+                        'plant': '🌿 植物'
+                    };
+                    categoryInfo = categoryIcons[cat] || `📝 ${cat}`;
+                }
+
                 aiResult.innerHTML = `
+                    <div style="text-align: center; margin-bottom: 10px;">
+                        <span style="font-size: 24px;">${categoryInfo.split(' ')[0] || '🔍'}</span>
+                    </div>
                     <div style="padding: 12px; background: #f5f5f5; border-radius: 8px; line-height: 1.6;">
                         ${finalReplyText.replace(/\n/g, '<br>')}
                     </div>
                 `;
 
-                // 提示非植物
-                if (firstResult.plant_rag && !firstResult.plant_rag.is_plant) {
+                // 顯示識別類別
+                if (categoryInfo) {
                     aiResult.innerHTML += `
-                        <div style="margin-top: 8px; font-size: 12px; color: #999; text-align: center;">
-                            📝 識別為: ${firstResult.plant_rag.category || '非植物'}
+                        <div style="margin-top: 8px; font-size: 12px; color: #666; text-align: center;">
+                            ${categoryInfo}
                         </div>
                     `;
                 }

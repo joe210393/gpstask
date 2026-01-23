@@ -14,6 +14,7 @@ from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
 
 QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6333")
+QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY", None)  # Zeabur Qdrant API Key
 COLLECTION_NAME = "taiwan_plants"
 EMBEDDING_MODEL = "jinaai/jina-embeddings-v3"
 
@@ -21,7 +22,10 @@ EMBEDDING_MODEL = "jinaai/jina-embeddings-v3"
 def search(query: str, top_k: int = 5):
     """搜尋植物"""
     # 連接 Qdrant
-    client = QdrantClient(url=QDRANT_URL)
+    if QDRANT_API_KEY:
+        client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+    else:
+        client = QdrantClient(url=QDRANT_URL)
 
     # 載入模型
     print(f"載入模型...")

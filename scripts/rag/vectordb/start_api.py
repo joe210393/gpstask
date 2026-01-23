@@ -30,6 +30,7 @@ from qdrant_client import QdrantClient
 from feature_weights import FeatureWeightCalculator, get_vision_prompt, FEATURE_INDEX
 
 QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6333")
+QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY", None)  # Zeabur Qdrant API Key
 COLLECTION_NAME = "taiwan_plants"
 EMBEDDING_MODEL = "jinaai/jina-embeddings-v3"
 API_PORT = int(os.environ.get("EMBEDDING_API_PORT", "8100"))
@@ -53,7 +54,11 @@ def init():
     global model, qdrant_client, category_embeddings, feature_calculator
 
     print(f"連接 Qdrant: {QDRANT_URL}")
-    qdrant_client = QdrantClient(url=QDRANT_URL)
+    if QDRANT_API_KEY:
+        print("  使用 API Key 認證")
+        qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+    else:
+        qdrant_client = QdrantClient(url=QDRANT_URL)
 
     print(f"載入 embedding 模型: {EMBEDDING_MODEL}")
     model = SentenceTransformer(EMBEDDING_MODEL, trust_remote_code=True)
@@ -61,11 +66,23 @@ def init():
     # 載入特徵權重計算器
     print("載入特徵權重計算器...")
     import os.path
-    data_path = os.path.join(os.path.dirname(__file__), "..", "data", "plants-enriched.jsonl")
-    if os.path.exists(data_path):
+    # 檢查多個可能的資料路徑 (本地開發 vs Docker 部署)
+    possible_paths = [
+        os.path.join(os.path.dirname(__file__), "..", "data", "plants-enriched.jsonl"),  # 本地開發
+        os.path.join(os.path.dirname(__file__), "data", "plants-enriched.jsonl"),  # Docker 同層目錄
+        "/app/data/plants-enriched.jsonl",  # Docker 絕對路徑
+    ]
+    data_path = None
+    for path in possible_paths:
+        if os.path.exists(path):
+            data_path = path
+            break
+
+    if data_path:
+        print(f"  資料檔: {data_path}")
         feature_calculator = FeatureWeightCalculator(data_path)
     else:
-        print(f"警告: 找不到資料檔 {data_path}，使用預設權重")
+        print(f"警告: 找不到資料檔，使用預設權重")
         feature_calculator = FeatureWeightCalculator()
 
     # 預計算類別向量

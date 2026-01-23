@@ -101,12 +101,17 @@ python start_api.py
 
 ### 1. 部署 Qdrant
 - Zeabur Marketplace → "Qdrant"
-- 或 Prebuilt Image: `qdrant/qdrant`
+- 設定環境變數:
+  - `PASSWORD=你的API金鑰`
+  - `QDRANT__SERVICE__API_KEY=${PASSWORD}`
 - 加 Volume 持久化
 
 ### 2. 部署 Embedding API
-- 從此目錄部署
-- 環境變數：`QDRANT_URL=http://your-qdrant:6333`
+- 從 `scripts/rag` 目錄部署
+- Dockerfile 路徑: `vectordb/Dockerfile`
+- 環境變數：
+  - `QDRANT_URL=https://your-qdrant.zeabur.app` (使用 Zeabur 內部 URL 或公開 URL)
+  - `QDRANT_API_KEY=你的API金鑰` (與 Qdrant 的 PASSWORD 相同)
 
 ## Node.js 整合
 
@@ -131,4 +136,6 @@ console.log(cls.category); // "animal"
 | 變數 | 預設值 | 說明 |
 |------|--------|------|
 | `QDRANT_URL` | `http://localhost:6333` | Qdrant 位址 |
+| `QDRANT_API_KEY` | (無) | Qdrant API Key (Zeabur 需要) |
 | `EMBEDDING_API_PORT` | `8100` | API Port |
+| `EMBEDDING_API_URL` | `http://localhost:8100` | 給 Node.js 用的 API URL |
