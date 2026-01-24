@@ -3247,35 +3247,50 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
         }
       }
 
-      // 如果結構化解析失敗或不是植物，用原本的 smartSearch
+      // 如果結構化解析失敗或不是植物，先用 classify 判斷，只有植物才搜尋（省 token）
       if (!plantResults) {
-        const ragResult = await smartSearch(description, 3);
+        // 先快速分類，避免非植物查詢也扣 embedding token
+        const classification = await classify(description);
+        
+        if (classification.is_plant) {
+          // 確認是植物，才進行完整搜尋
+          const ragResult = await smartSearch(description, 3);
 
-        if (ragResult.classification?.is_plant && ragResult.results?.length > 0) {
-          console.log(`✅ 傳統搜尋找到 ${ragResult.results.length} 個結果`);
-          plantResults = {
-            is_plant: true,
-            search_type: 'embedding',
-            message: ragResult.message,
-            plants: ragResult.results.map(p => ({
-              chinese_name: p.chinese_name,
-              scientific_name: p.scientific_name,
-              family: p.family,
-              life_form: p.life_form,
-              score: p.score,
-              summary: p.summary
-            }))
-          };
+          if (ragResult.classification?.is_plant && ragResult.results?.length > 0) {
+            console.log(`✅ 傳統搜尋找到 ${ragResult.results.length} 個結果`);
+            plantResults = {
+              is_plant: true,
+              search_type: 'embedding',
+              message: ragResult.message,
+              plants: ragResult.results.map(p => ({
+                chinese_name: p.chinese_name,
+                scientific_name: p.scientific_name,
+                family: p.family,
+                life_form: p.life_form,
+                score: p.score,
+                summary: p.summary
+              }))
+            };
+          } else {
+            const cls = ragResult.classification || {};
+            console.log(
+              `📝 RAG 判斷非植物(is_plant=false): category=${cls.category || 'unknown'} plant_score=${cls.plant_score ?? 'n/a'}`
+            );
+            plantResults = {
+              is_plant: false,
+              category: ragResult.classification?.category,
+              message: ragResult.message
+            };
+          }
         } else {
-          const cls = ragResult.classification || {};
-          // 這裡的 category 可能仍是 "plant"，但因為未達 plant_threshold 而 is_plant=false
+          // 分類結果顯示非植物，直接跳過搜尋（省 token）
           console.log(
-            `📝 RAG 判斷非植物(is_plant=false): category=${cls.category || 'unknown'} plant_score=${cls.plant_score ?? 'n/a'}`
+            `⏭️ 跳過 RAG 搜尋（非植物）: category=${classification.category || 'unknown'} plant_score=${classification.plant_score ?? 'n/a'}`
           );
           plantResults = {
             is_plant: false,
-            category: ragResult.classification?.category,
-            message: ragResult.message
+            category: classification.category,
+            message: `非植物相關查詢（${classification.category}），已跳過 RAG 搜尋以節省 token`
           };
         }
       }

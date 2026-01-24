@@ -88,7 +88,7 @@ def get_qdrant_client():
             )
 
 # 分類閾值
-PLANT_THRESHOLD = 0.68  # 與「植物」相似度超過此值才認為是植物查詢
+PLANT_THRESHOLD = 0.40  # 與「植物」相似度超過此值才認為是植物查詢（降低以減少誤判）
 
 # 全域變數（啟動時載入）
 model = None
