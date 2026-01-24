@@ -1,25 +1,20 @@
-FROM python:3.11-slim
-LABEL "language"="python"
+# Node.js Express 主應用 Dockerfile
+FROM node:18-alpine
+LABEL "language"="nodejs"
 
 WORKDIR /app
 
+# 複製 package.json 和 lock 文件
+COPY package*.json ./
+
 # 安裝依賴
-COPY scripts/rag/vectordb/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN npm ci --only=production
 
-# 複製程式碼
-COPY scripts/rag/vectordb/start_api.py .
-COPY scripts/rag/vectordb/search_plants.py .
-COPY scripts/rag/vectordb/embed_plants.py .
-COPY scripts/rag/vectordb/feature_weights.py .
+# 複製所有代碼和靜態文件
+COPY . .
 
-# 建立資料目錄並複製資料檔案
-RUN mkdir -p /app/data
-COPY scripts/rag/data/plants-enriched.jsonl /app/data/plants-enriched.jsonl
+# 暴露端口
+EXPOSE 3001
 
-# 預先下載模型（build 時下載，避免啟動時下載）
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('jinaai/jina-embeddings-v3', trust_remote_code=True)"
-
-EXPOSE 8080
-
-CMD ["python", "start_api.py"]
+# 啟動應用
+CMD ["node", "index.js"]

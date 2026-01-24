@@ -1,4 +1,0 @@
-{
-  "build_type": "docker",
-  "dockerfile": "vectordb/Dockerfile"
-}

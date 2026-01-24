@@ -1,12 +1,29 @@
+# Zeabur 部署配置
+# 定義兩個服務：主應用 (Node.js) + Embedding API (Python)
+
 services:
+  # 主 Node.js Express 應用
+  gps-task:
+    type: docker
+    source:
+      git:
+        repo: joe210393/gpstask
+        branch: main
+    ports:
+      - port: 3001
+        protocol: http
+    env:
+      NODE_ENV: production
+      PORT: "3001"
+
+  # Python 植物向量搜尋 API
   embedding-api:
     type: docker
     source:
       git:
         repo: joe210393/gpstask
         branch: main
-        dockerfile: vectordb/Dockerfile
-        context: scripts/rag
+        dockerfile: Dockerfile.embedding
     ports:
       - port: 8080
         protocol: http
