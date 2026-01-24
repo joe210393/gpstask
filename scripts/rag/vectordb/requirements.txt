@@ -1,7 +1,5 @@
-# JINA Embedding + Qdrant
-sentence-transformers>=2.2.0
+# Jina API embedding (no local model) + Qdrant
+# 目標：讓 embedding-api 容器部署更快、更小、更穩（不下載/載入本地模型）
 qdrant-client>=1.7.0
-torch>=2.0.0
-transformers>=4.36.0
-einops>=0.7.0
+requests>=2.31.0
 numpy>=1.24.0

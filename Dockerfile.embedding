@@ -18,8 +18,7 @@ COPY scripts/rag/vectordb/feature_weights.py .
 RUN mkdir -p /app/data
 COPY scripts/rag/data/plants-enriched.jsonl /app/data/plants-enriched.jsonl
 
-# 預先下載模型（build 時下載，避免啟動時下載）
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('jinaai/jina-embeddings-v3', trust_remote_code=True)"
+# 不預先下載本地模型：本服務預期使用 Jina API（USE_JINA_API=true + JINA_API_KEY）
 
 EXPOSE 8080
 

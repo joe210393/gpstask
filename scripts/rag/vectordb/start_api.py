@@ -298,7 +298,7 @@ def _init_background_impl():
                     embeddings_array = embeddings  # (N, D) 或 (D,)
                 elif isinstance(embeddings, list):
                     # list[np.ndarray] 或 list[list[float]] 或 list[np.ndarray(D,)]
-                    embeddings_array = np.array(embeddings)
+                embeddings_array = np.array(embeddings)
                 else:
                     embeddings_array = np.array([embeddings])
 
