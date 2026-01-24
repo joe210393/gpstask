@@ -21,13 +21,19 @@ API 端點：
 """
 
 import os
+import sys
 import json
+import threading
 import numpy as np
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
-from sentence_transformers import SentenceTransformer
-from qdrant_client import QdrantClient
-from feature_weights import FeatureWeightCalculator, get_vision_prompt, FEATURE_INDEX
+
+# 延遲載入重量級模組
+SentenceTransformer = None
+QdrantClient = None
+FeatureWeightCalculator = None
+get_vision_prompt = None
+FEATURE_INDEX = {}
 
 QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6333")
 QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY", None)  # Zeabur Qdrant API Key
@@ -84,36 +90,72 @@ EMBEDDING_WEIGHT = 0.6  # embedding 相似度權重
 FEATURE_WEIGHT = 0.4    # 特徵匹配權重
 
 
-def init():
-    """初始化模型和連接"""
+def init_background():
+    """背景初始化模型和連接（在獨立線程中執行）"""
     global model, qdrant_client, category_embeddings, feature_calculator
+    global SentenceTransformer, QdrantClient, FeatureWeightCalculator, get_vision_prompt, FEATURE_INDEX
 
-    print(f"連接 Qdrant: {QDRANT_URL}")
+    print("🚀 開始背景初始化...")
+    sys.stdout.flush()
+
+    # 1. 載入 Qdrant 客戶端模組
+    try:
+        print("  載入 qdrant_client 模組...")
+        sys.stdout.flush()
+        from qdrant_client import QdrantClient as QC
+        QdrantClient = QC
+    except Exception as e:
+        print(f"  ⚠️ 無法載入 qdrant_client: {e}")
+        sys.stdout.flush()
+
+    # 2. 連接 Qdrant
+    print(f"  連接 Qdrant: {QDRANT_URL}")
     if QDRANT_API_KEY:
-        print("  API Key 已設定")
+        print("    API Key 已設定")
+    sys.stdout.flush()
 
     try:
         qdrant_client = get_qdrant_client()
-        # 測試連線
         collections = qdrant_client.get_collections()
         print(f"  ✅ Qdrant 連線成功，共 {len(collections.collections)} 個 collections")
     except Exception as e:
         print(f"  ⚠️ Qdrant 連線失敗: {e}")
-        print(f"  QDRANT_URL={QDRANT_URL}")
-        print(f"  應用將繼續運行，但搜尋功能不可用")
-        qdrant_client = None  # 設為 None，讓應用繼續運行
+        print(f"    應用將繼續運行，但搜尋功能不可用")
+        qdrant_client = None
+    sys.stdout.flush()
 
-    print(f"載入 embedding 模型: {EMBEDDING_MODEL}")
-    model = SentenceTransformer(EMBEDDING_MODEL, trust_remote_code=True)
+    # 3. 載入 embedding 模型
+    try:
+        print(f"  載入 embedding 模型: {EMBEDDING_MODEL}")
+        print("    這可能需要幾分鐘...")
+        sys.stdout.flush()
+        from sentence_transformers import SentenceTransformer as ST
+        SentenceTransformer = ST
+        model = SentenceTransformer(EMBEDDING_MODEL, trust_remote_code=True)
+        print("  ✅ 模型載入成功")
+    except Exception as e:
+        print(f"  ⚠️ 模型載入失敗: {e}")
+        model = None
+    sys.stdout.flush()
 
-    # 載入特徵權重計算器
-    print("載入特徵權重計算器...")
+    # 4. 載入特徵權重計算器
+    try:
+        print("  載入特徵權重計算器...")
+        sys.stdout.flush()
+        from feature_weights import FeatureWeightCalculator as FWC, get_vision_prompt as gvp, FEATURE_INDEX as FI
+        FeatureWeightCalculator = FWC
+        get_vision_prompt = gvp
+        FEATURE_INDEX = FI
+    except Exception as e:
+        print(f"  ⚠️ 特徵權重計算器載入失敗: {e}")
+    sys.stdout.flush()
+
+    # 5. 載入特徵資料
     import os.path
-    # 檢查多個可能的資料路徑 (本地開發 vs Docker 部署)
     possible_paths = [
-        os.path.join(os.path.dirname(__file__), "..", "data", "plants-enriched.jsonl"),  # 本地開發
-        os.path.join(os.path.dirname(__file__), "data", "plants-enriched.jsonl"),  # Docker 同層目錄
-        "/app/data/plants-enriched.jsonl",  # Docker 絕對路徑
+        os.path.join(os.path.dirname(__file__), "..", "data", "plants-enriched.jsonl"),
+        os.path.join(os.path.dirname(__file__), "data", "plants-enriched.jsonl"),
+        "/app/data/plants-enriched.jsonl",
     ]
     data_path = None
     for path in possible_paths:
@@ -121,46 +163,59 @@ def init():
             data_path = path
             break
 
-    if data_path:
-        print(f"  資料檔: {data_path}")
-        feature_calculator = FeatureWeightCalculator(data_path)
+    if data_path and FeatureWeightCalculator:
+        try:
+            print(f"  資料檔: {data_path}")
+            feature_calculator = FeatureWeightCalculator(data_path)
+            print("  ✅ 特徵權重計算器載入成功")
+        except Exception as e:
+            print(f"  ⚠️ 特徵權重計算器初始化失敗: {e}")
+            feature_calculator = None
     else:
-        print(f"警告: 找不到資料檔，使用預設權重")
-        feature_calculator = FeatureWeightCalculator()
+        print("  ⚠️ 找不到資料檔或模組，使用空的計算器")
+        feature_calculator = None
+    sys.stdout.flush()
 
-    # 預計算類別向量
-    print("計算類別向量...")
-    categories = {
-        "plant": [
-            "植物", "花", "樹", "草", "葉子", "果實", "種子", "樹木", "灌木", "藤蔓",
-            "蕨類", "苔蘚", "藻類", "植物特徵", "開花植物", "園藝植物", "野生植物",
-            "plant", "flower", "tree", "leaf", "fruit", "botanical"
-        ],
-        "animal": [
-            "動物", "鳥", "魚", "蟲", "獸", "哺乳類", "爬蟲類", "兩棲類", "昆蟲",
-            "野生動物", "寵物", "海洋生物", "animal", "bird", "fish", "insect"
-        ],
-        "artifact": [
-            "建築", "房子", "車", "機器", "工具", "家具", "電器", "人造物",
-            "建築物", "橋", "道路", "雕像", "藝術品", "building", "machine", "tool"
-        ],
-        "food": [
-            "食物", "料理", "菜", "飲料", "水果", "蔬菜", "肉類", "甜點",
-            "food", "dish", "cuisine", "meal"
-        ],
-        "other": [
-            "風景", "天氣", "地形", "山", "河", "海", "天空", "雲",
-            "landscape", "weather", "nature", "geography"
-        ]
-    }
+    # 6. 計算類別向量（如果模型可用）
+    if model:
+        try:
+            print("  計算類別向量...")
+            sys.stdout.flush()
+            categories = {
+                "plant": ["植物", "花", "樹", "草", "葉子", "果實"],
+                "animal": ["動物", "鳥", "魚", "蟲", "獸"],
+                "artifact": ["建築", "房子", "車", "機器", "工具"],
+                "food": ["食物", "料理", "菜", "飲料"],
+                "other": ["風景", "天氣", "地形", "山", "河"]
+            }
+            category_embeddings = {}
+            for cat, keywords in categories.items():
+                embeddings = model.encode(keywords)
+                category_embeddings[cat] = np.mean(embeddings, axis=0)
+            print("  ✅ 類別向量計算完成")
+        except Exception as e:
+            print(f"  ⚠️ 類別向量計算失敗: {e}")
+            category_embeddings = None
+    sys.stdout.flush()
 
-    category_embeddings = {}
-    for cat, keywords in categories.items():
-        embeddings = model.encode(keywords)
-        # 取平均作為類別向量
-        category_embeddings[cat] = np.mean(embeddings, axis=0)
+    print("🎉 背景初始化完成！")
+    sys.stdout.flush()
 
-    print("✅ 初始化完成")
+
+def init():
+    """啟動背景初始化線程，立即返回讓 HTTP 服務器啟動"""
+    print("=" * 60)
+    print("🌿 植物向量搜尋 API")
+    print("=" * 60)
+    sys.stdout.flush()
+
+    # 在背景線程中執行初始化
+    init_thread = threading.Thread(target=init_background, daemon=True)
+    init_thread.start()
+
+    print("📡 HTTP 服務器正在啟動...")
+    print("   初始化將在背景執行")
+    sys.stdout.flush()
 
 
 def classify_query(query: str) -> dict:
@@ -168,6 +223,16 @@ def classify_query(query: str) -> dict:
     分類查詢類型
     返回: { "category": "plant/animal/artifact/food/other", "confidence": 0.xx, "is_plant": true/false }
     """
+    if model is None or category_embeddings is None:
+        return {
+            "category": "unknown",
+            "confidence": 0,
+            "scores": {},
+            "is_plant": False,
+            "plant_score": 0,
+            "error": "模型尚未載入完成"
+        }
+
     query_vector = model.encode(query)
 
     # 計算與各類別的相似度
@@ -350,8 +415,10 @@ class RequestHandler(BaseHTTPRequestHandler):
             self._send_json({
                 "status": "ok",
                 "model": EMBEDDING_MODEL,
+                "model_loaded": model is not None,
                 "qdrant_connected": qdrant_client is not None,
-                "qdrant_url": QDRANT_URL
+                "qdrant_url": QDRANT_URL,
+                "ready": model is not None and qdrant_client is not None
             })
 
         elif parsed.path == "/vision-prompt":
