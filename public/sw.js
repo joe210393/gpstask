@@ -2,7 +2,7 @@
 // 負責推送通知與快取管理
 
 // bump this to force clients to drop old cached assets (prevents "I fixed it but nothing changes")
-const CACHE_NAME = 'gps-task-v2';
+const CACHE_NAME = 'gps-task-v3';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -48,12 +48,30 @@ self.addEventListener('activate', function(event) {
 
 // 攔截網路請求（快取策略）
 self.addEventListener('fetch', function(event) {
+  const req = event.request;
+  const url = new URL(req.url);
+
+  // 不快取 API / 非 GET（避免干擾後端與表單）
+  if (req.method !== 'GET' || url.pathname.startsWith('/api/')) {
+    event.respondWith(fetch(req));
+    return;
+  }
+
+  // 對 HTML/CSS/JS 採用 network-first，避免「部署了但手機永遠吃舊 JS」導致動畫/結果永遠不更新
+  if (
+    url.pathname.endsWith('.html') ||
+    url.pathname.startsWith('/js/') ||
+    url.pathname.startsWith('/css/')
+  ) {
+    event.respondWith(
+      fetch(req).catch(() => caches.match(req))
+    );
+    return;
+  }
+
+  // 其他靜態資源維持 cache-first
   event.respondWith(
-    caches.match(event.request)
-      .then(function(response) {
-        // 如果有快取，返回快取；否則從網路獲取
-        return response || fetch(event.request);
-      })
+    caches.match(req).then((response) => response || fetch(req))
   );
 });
 
