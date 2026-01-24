@@ -289,7 +289,9 @@ def _init_background_impl():
                 # 如果是單一向量，轉換為列表
                 if not isinstance(embeddings, list):
                     embeddings = [embeddings]
-                category_embeddings[cat] = np.mean(embeddings, axis=0)
+                # 轉換為 numpy array 再計算平均值
+                embeddings_array = np.array(embeddings)
+                category_embeddings[cat] = np.mean(embeddings_array, axis=0)
             print("  ✅ 類別向量計算完成")
         except MemoryError as e:
             print(f"  ❌ 記憶體不足，無法計算類別向量: {e}")
