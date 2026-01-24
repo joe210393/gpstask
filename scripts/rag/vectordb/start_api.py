@@ -95,8 +95,21 @@ def init_background():
     global model, qdrant_client, category_embeddings, feature_calculator
     global SentenceTransformer, QdrantClient, FeatureWeightCalculator, get_vision_prompt, FEATURE_INDEX
 
-    print("🚀 開始背景初始化...")
-    sys.stdout.flush()
+    try:
+        print("🚀 開始背景初始化...")
+        sys.stdout.flush()
+        _init_background_impl()
+    except Exception as e:
+        print(f"❌ 背景初始化失敗: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.stdout.flush()
+
+
+def _init_background_impl():
+    """實際的背景初始化實作（由 init_background 包裝）"""
+    global model, qdrant_client, category_embeddings, feature_calculator
+    global SentenceTransformer, QdrantClient, FeatureWeightCalculator, get_vision_prompt, FEATURE_INDEX
 
     # 1. 載入 Qdrant 客戶端模組
     try:
@@ -129,12 +142,25 @@ def init_background():
         print(f"  載入 embedding 模型: {EMBEDDING_MODEL}")
         print("    這可能需要幾分鐘...")
         sys.stdout.flush()
+
         from sentence_transformers import SentenceTransformer as ST
         SentenceTransformer = ST
+
+        print("    正在下載/載入模型權重...")
+        sys.stdout.flush()
+
         model = SentenceTransformer(EMBEDDING_MODEL, trust_remote_code=True)
+
         print("  ✅ 模型載入成功")
+    except MemoryError as e:
+        print(f"  ❌ 記憶體不足，無法載入模型: {e}")
+        import traceback
+        traceback.print_exc()
+        model = None
     except Exception as e:
         print(f"  ⚠️ 模型載入失敗: {e}")
+        import traceback
+        traceback.print_exc()
         model = None
     sys.stdout.flush()
 
@@ -190,11 +216,20 @@ def init_background():
             }
             category_embeddings = {}
             for cat, keywords in categories.items():
+                print(f"    處理類別: {cat}")
+                sys.stdout.flush()
                 embeddings = model.encode(keywords)
                 category_embeddings[cat] = np.mean(embeddings, axis=0)
             print("  ✅ 類別向量計算完成")
+        except MemoryError as e:
+            print(f"  ❌ 記憶體不足，無法計算類別向量: {e}")
+            import traceback
+            traceback.print_exc()
+            category_embeddings = None
         except Exception as e:
             print(f"  ⚠️ 類別向量計算失敗: {e}")
+            import traceback
+            traceback.print_exc()
             category_embeddings = None
     sys.stdout.flush()
 
@@ -542,28 +577,45 @@ class RequestHandler(BaseHTTPRequestHandler):
 
 
 def main():
-    init()
-
-    server = HTTPServer(("0.0.0.0", API_PORT), RequestHandler)
-    print(f"\n🌿 植物向量搜尋 API 啟動")
-    print(f"   http://localhost:{API_PORT}")
-    print(f"\n端點：")
-    print(f"   GET  /health")
-    print(f"   GET  /vision-prompt          - 取得 Vision AI 結構化 Prompt")
-    print(f"   GET  /classify?q=紅色的花")
-    print(f"   GET  /search?q=紅色的花&top_k=5&smart=true")
-    print(f"   POST /search       {{\"query\": \"...\", \"top_k\": 5, \"smart\": true}}")
-    print(f"   POST /classify     {{\"query\": \"...\"}}")
-    print(f"   POST /hybrid-search {{\"query\": \"...\", \"features\": [...], \"guess_names\": [...]}}")
-    print(f"\n混合搜尋權重: embedding={EMBEDDING_WEIGHT}, feature={FEATURE_WEIGHT}")
-    print(f"植物判斷閾值: {PLANT_THRESHOLD}")
-    print(f"\n按 Ctrl+C 停止...")
-
     try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\n停止服務")
-        server.shutdown()
+        init()
+
+        server = HTTPServer(("0.0.0.0", API_PORT), RequestHandler)
+        print(f"\n🌿 植物向量搜尋 API 啟動")
+        print(f"   http://localhost:{API_PORT}")
+        print(f"\n端點：")
+        print(f"   GET  /health")
+        print(f"   GET  /vision-prompt          - 取得 Vision AI 結構化 Prompt")
+        print(f"   GET  /classify?q=紅色的花")
+        print(f"   GET  /search?q=紅色的花&top_k=5&smart=true")
+        print(f"   POST /search       {{\"query\": \"...\", \"top_k\": 5, \"smart\": true}}")
+        print(f"   POST /classify     {{\"query\": \"...\"}}")
+        print(f"   POST /hybrid-search {{\"query\": \"...\", \"features\": [...], \"guess_names\": [...]}}")
+        print(f"\n混合搜尋權重: embedding={EMBEDDING_WEIGHT}, feature={FEATURE_WEIGHT}")
+        print(f"植物判斷閾值: {PLANT_THRESHOLD}")
+        print(f"\n按 Ctrl+C 停止...")
+        sys.stdout.flush()
+
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            print("\n停止服務")
+            server.shutdown()
+
+    except Exception as e:
+        print(f"❌ 致命錯誤: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.stdout.flush()
+
+        # 保持容器運行，不要退出
+        print("\n⚠️  服務發生錯誤，但保持運行以便檢查日誌")
+        print("   容器將保持運行狀態...")
+        sys.stdout.flush()
+
+        import time
+        while True:
+            time.sleep(60)
 
 
 if __name__ == "__main__":
