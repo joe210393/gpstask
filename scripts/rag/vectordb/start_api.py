@@ -98,9 +98,10 @@ def init():
         collections = qdrant_client.get_collections()
         print(f"  ✅ Qdrant 連線成功，共 {len(collections.collections)} 個 collections")
     except Exception as e:
-        print(f"  ❌ Qdrant 連線失敗: {e}")
-        print(f"  請檢查 QDRANT_URL 和 QDRANT_API_KEY 設定")
-        raise
+        print(f"  ⚠️ Qdrant 連線失敗: {e}")
+        print(f"  QDRANT_URL={QDRANT_URL}")
+        print(f"  應用將繼續運行，但搜尋功能不可用")
+        qdrant_client = None  # 設為 None，讓應用繼續運行
 
     print(f"載入 embedding 模型: {EMBEDDING_MODEL}")
     model = SentenceTransformer(EMBEDDING_MODEL, trust_remote_code=True)
@@ -196,6 +197,9 @@ def classify_query(query: str) -> dict:
 
 def search_plants(query: str, top_k: int = 5):
     """搜尋植物（純 embedding）"""
+    if qdrant_client is None:
+        return []  # Qdrant 未連線，返回空結果
+
     query_vector = model.encode(query).tolist()
 
     results = qdrant_client.query_points(
@@ -233,6 +237,9 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
     Returns:
         搜尋結果列表，包含混合分數
     """
+    if qdrant_client is None:
+        return []  # Qdrant 未連線，返回空結果
+
     # 1. 先用 embedding 取得候選
     # 如果有猜測名稱，加入查詢
     search_query = query
@@ -340,7 +347,12 @@ class RequestHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
 
         if parsed.path == "/health":
-            self._send_json({"status": "ok", "model": EMBEDDING_MODEL})
+            self._send_json({
+                "status": "ok",
+                "model": EMBEDDING_MODEL,
+                "qdrant_connected": qdrant_client is not None,
+                "qdrant_url": QDRANT_URL
+            })
 
         elif parsed.path == "/vision-prompt":
             # 取得 Vision AI 用的結構化 Prompt
