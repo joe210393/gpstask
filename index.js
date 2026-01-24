@@ -390,7 +390,11 @@ app.post('/api/login', async (req, res) => {
       res.cookie('token', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax', // 開發環境使用 lax 以支持跨域
+        // IMPORTANT:
+        // - Using SameSite=Strict can break flows when users open the site from external apps (LINE/FB/in-app browsers),
+        //   causing cookies not to be sent and "開始任務" to fail with 401.
+        // - Lax is the practical default for this app while still providing CSRF mitigation.
+        sameSite: 'lax',
         maxAge: 7 * 24 * 60 * 60 * 1000,
         path: '/' // 確保 cookie 在所有路徑下都可用
       });
@@ -438,7 +442,8 @@ app.post('/api/login', async (req, res) => {
       res.cookie('token', token, {
         httpOnly: true, // 防止 XSS 攻擊
         secure: process.env.NODE_ENV === 'production', // 生產環境使用 HTTPS
-        sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax', // 開發環境使用 lax 以支持跨域
+        // See note above: keep lax to avoid external-entry cookie loss.
+        sameSite: 'lax',
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 天
         path: '/' // 確保 cookie 在所有路徑下都可用
       });

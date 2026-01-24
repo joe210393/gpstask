@@ -160,6 +160,12 @@
     const id = urlParams.get('id');
     const API_BASE = '';
     const taskDetailEl = document.getElementById('taskDetail');
+    
+    function handleAuthExpired() {
+      alert('登入狀態已過期，請重新登入');
+      localStorage.removeItem('loginUser');
+      window.location.href = '/login.html';
+    }
 
     if (!id) {
       taskDetailEl.innerHTML = '<div class="text-center text-danger">未指定任務 ID</div>';
@@ -228,7 +234,13 @@
             fetch(`${API_BASE}/api/user-tasks/all?username=${encodeURIComponent(loginUser.username)}`, {
               credentials: 'include'
             })
-              .then(res => res.json())
+              .then(res => {
+                if (res.status === 401) {
+                  handleAuthExpired();
+                  throw new Error('unauthorized');
+                }
+                return res.json();
+              })
               .then(udata => {
                 if (udata.success && Array.isArray(udata.tasks)) {
                   // 已完成
@@ -336,6 +348,10 @@
               body: JSON.stringify({ username: loginUser.username, task_id: t.id })
             })
             .then(res => {
+              if (res.status === 401) {
+                handleAuthExpired();
+                throw new Error('unauthorized');
+              }
               if (!res.ok) {
                 throw new Error(`HTTP ${res.status}`);
               }
