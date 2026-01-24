@@ -3136,10 +3136,16 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
 
     // 3. 呼叫 AI API (LM Studio / OpenAI Compatible)
     // AI endpoint (OpenAI-compatible)
-    // In production, DO NOT rely on a hardcoded personal ngrok URL.
-    const AI_API_URL = process.env.AI_API_URL || 'http://localhost:1234/v1';
+    // NOTE: On Zeabur/production you MUST set AI_API_URL (and usually AI_API_KEY),
+    // otherwise the server would try to call localhost and always fail.
+    const AI_API_URL =
+      process.env.AI_API_URL || (process.env.NODE_ENV !== 'production' ? 'http://localhost:1234/v1' : null);
     const AI_MODEL = process.env.AI_MODEL || 'local-model'; // LM Studio 通常不挑模型名稱
     const AI_API_KEY = process.env.AI_API_KEY || 'lm-studio';
+
+    if (!AI_API_URL) {
+      throw new Error('AI_API_URL 未設定：請在部署環境設定 AI_API_URL / AI_API_KEY / AI_MODEL');
+    }
 
     console.log('🤖 正在呼叫 AI:', AI_API_URL);
     console.log('📝 System Prompt:', systemPrompt.substring(0, 50) + '...');
@@ -3314,9 +3320,14 @@ app.post('/api/chat-text', async (req, res) => {
 
     const finalUserPrompt = `${userPromptText}\n\n${userText}${locationText ? `\n\n(位置: ${locationText})` : ''}`.trim();
 
-    const AI_API_URL = process.env.AI_API_URL || 'http://localhost:1234/v1';
+    const AI_API_URL =
+      process.env.AI_API_URL || (process.env.NODE_ENV !== 'production' ? 'http://localhost:1234/v1' : null);
     const AI_MODEL = process.env.AI_MODEL || 'local-model';
     const AI_API_KEY = process.env.AI_API_KEY || 'lm-studio';
+
+    if (!AI_API_URL) {
+      throw new Error('AI_API_URL 未設定：請在部署環境設定 AI_API_URL / AI_API_KEY / AI_MODEL');
+    }
 
     console.log('🤖 正在呼叫 AI(文字):', AI_API_URL);
 

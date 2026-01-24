@@ -18,6 +18,10 @@ services:
       # Zeabur 內網呼叫另一個 service，hostname 會是 zeabur.yaml 裡的 service key
       # 這個 repo 內的 embedding 服務 key 是 embedding-api
       EMBEDDING_API_URL: http://embedding-api:8080
+      # AI (OpenAI-compatible). Configure these in Zeabur environment variables.
+      AI_API_URL: ${AI_API_URL}
+      AI_API_KEY: ${AI_API_KEY}
+      AI_MODEL: ${AI_MODEL}
 
   # Python 植物向量搜尋 API
   embedding-api:
