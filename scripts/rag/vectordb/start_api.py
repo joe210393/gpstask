@@ -121,6 +121,10 @@ def encode_text(text):
 
         is_batch = isinstance(text, list)
         texts = text if is_batch else [text]
+        
+        # 記錄每次 API 調用（用於追蹤 token 消耗）
+        print(f"[Jina API] 調用 embedding: batch={is_batch}, texts_count={len(texts)}, sample={texts[0][:20] if texts else 'empty'}...")
+        sys.stdout.flush()
 
         try:
             response = requests.post(
@@ -139,6 +143,14 @@ def encode_text(text):
             )
             response.raise_for_status()
             data = response.json()
+            
+            # 記錄 tokens 使用量（如果 API 有回傳）
+            usage = data.get("usage", {})
+            if usage:
+                print(f"[Jina API] ✅ 成功: tokens={usage.get('total_tokens', 'unknown')}")
+            else:
+                print(f"[Jina API] ✅ 成功: {len(data.get('data', []))} 個 embeddings")
+            sys.stdout.flush()
 
             embeddings = [item["embedding"] for item in data["data"]]
 
@@ -286,9 +298,10 @@ def _init_background_impl():
     sys.stdout.flush()
 
     # 6. 計算類別向量（如果模型可用或使用 Jina API）
+    # 優化：合併所有關鍵字為一次 batch 調用，減少 Jina API 調用次數（從 5 次降到 1 次）
     if model or (USE_JINA_API and JINA_API_KEY):
         try:
-            print("  計算類別向量...")
+            print("  計算類別向量（優化：單次 batch 調用）...")
             sys.stdout.flush()
             categories = {
                 "plant": ["植物", "花", "樹", "草", "葉子", "果實"],
@@ -297,28 +310,45 @@ def _init_background_impl():
                 "food": ["食物", "料理", "菜", "飲料"],
                 "other": ["風景", "天氣", "地形", "山", "河"]
             }
-            category_embeddings = {}
+            
+            # 收集所有關鍵字和對應的類別索引
+            all_keywords = []
+            keyword_to_category = {}  # {index: category}
+            category_keyword_indices = {}  # {category: [indices]}
+            
+            idx = 0
             for cat, keywords in categories.items():
-                print(f"    處理類別: {cat}")
-                sys.stdout.flush()
-                embeddings = encode_text(keywords)
-                # SentenceTransformer.encode(list) 會回傳 np.ndarray (N, D)
-                # Jina API 的 encode_text(list) 會回傳 list[np.ndarray] (N 個 D 向量)
-                if isinstance(embeddings, np.ndarray):
-                    embeddings_array = embeddings  # (N, D) 或 (D,)
-                elif isinstance(embeddings, list):
-                    # list[np.ndarray] 或 list[list[float]] 或 list[np.ndarray(D,)]
-                    embeddings_array = np.array(embeddings)
-                else:
-                    embeddings_array = np.array([embeddings])
-
-                # 確保是 (N, D)
-                if embeddings_array.ndim == 1:
-                    embeddings_array = embeddings_array.reshape(1, -1)
-
-                # 類別向量要是 (D,)
-                category_embeddings[cat] = np.mean(embeddings_array, axis=0)
-            print("  ✅ 類別向量計算完成")
+                category_keyword_indices[cat] = list(range(idx, idx + len(keywords)))
+                for kw in keywords:
+                    all_keywords.append(kw)
+                    keyword_to_category[idx] = cat
+                    idx += 1
+            
+            # 一次性 batch 調用（所有關鍵字一起）
+            print(f"    批次處理 {len(all_keywords)} 個關鍵字（5 個類別）...")
+            sys.stdout.flush()
+            all_embeddings = encode_text(all_keywords)
+            
+            # 處理回傳結果
+            if isinstance(all_embeddings, np.ndarray):
+                embeddings_array = all_embeddings  # (N, D)
+            elif isinstance(all_embeddings, list):
+                embeddings_array = np.array(all_embeddings)  # list[np.ndarray] -> (N, D)
+            else:
+                embeddings_array = np.array([all_embeddings])
+            
+            # 確保是 (N, D)
+            if embeddings_array.ndim == 1:
+                embeddings_array = embeddings_array.reshape(1, -1)
+            
+            # 按類別分組並計算平均向量
+            category_embeddings = {}
+            for cat, indices in category_keyword_indices.items():
+                cat_vectors = embeddings_array[indices]  # (len(keywords), D)
+                category_embeddings[cat] = np.mean(cat_vectors, axis=0)  # (D,)
+                print(f"    ✅ {cat}: {len(indices)} 個關鍵字")
+            
+            print("  ✅ 類別向量計算完成（僅 1 次 API 調用）")
         except MemoryError as e:
             print(f"  ❌ 記憶體不足，無法計算類別向量: {e}")
             import traceback
