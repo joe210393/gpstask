@@ -39,6 +39,8 @@ QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6333")
 QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY", None)  # Zeabur Qdrant API Key
 COLLECTION_NAME = "taiwan_plants"
 EMBEDDING_MODEL = "jinaai/jina-embeddings-v3"
+JINA_API_KEY = os.environ.get("JINA_API_KEY", None)  # Jina AI API Key
+USE_JINA_API = os.environ.get("USE_JINA_API", "false").lower() == "true"
 # Zeabur 用 PORT，本地開發用 EMBEDDING_API_PORT
 API_PORT = int(os.environ.get("PORT", os.environ.get("EMBEDDING_API_PORT", "8100")))
 
@@ -90,6 +92,65 @@ EMBEDDING_WEIGHT = 0.6  # embedding 相似度權重
 FEATURE_WEIGHT = 0.4    # 特徵匹配權重
 
 
+def encode_text(text):
+    """
+    編碼文字為向量，根據設定選擇使用本地模型或 Jina API
+
+    Args:
+        text: 單一文字字串或文字列表
+
+    Returns:
+        numpy array 或 list of numpy arrays
+    """
+    if USE_JINA_API and JINA_API_KEY:
+        # 使用 Jina API
+        import requests
+
+        is_batch = isinstance(text, list)
+        texts = text if is_batch else [text]
+
+        try:
+            response = requests.post(
+                "https://api.jina.ai/v1/embeddings",
+                headers={
+                    "Authorization": f"Bearer {JINA_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "jina-embeddings-v3",
+                    "task": "retrieval.query",
+                    "dimensions": 1024,
+                    "input": texts
+                },
+                timeout=30
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            embeddings = [item["embedding"] for item in data["data"]]
+
+            if is_batch:
+                return [np.array(emb) for emb in embeddings]
+            else:
+                return np.array(embeddings[0])
+
+        except Exception as e:
+            print(f"⚠️ Jina API 錯誤: {e}")
+            sys.stdout.flush()
+            # 如果 API 失敗，嘗試使用本地模型（如果可用）
+            if model:
+                return model.encode(text)
+            else:
+                raise RuntimeError("Jina API 和本地模型都不可用")
+
+    elif model:
+        # 使用本地模型
+        return model.encode(text)
+
+    else:
+        raise RuntimeError("沒有可用的 embedding 方法（需要設定 USE_JINA_API=true 或載入本地模型）")
+
+
 def init_background():
     """背景初始化模型和連接（在獨立線程中執行）"""
     global model, qdrant_client, category_embeddings, feature_calculator
@@ -137,31 +198,37 @@ def _init_background_impl():
         qdrant_client = None
     sys.stdout.flush()
 
-    # 3. 載入 embedding 模型
-    try:
-        print(f"  載入 embedding 模型: {EMBEDDING_MODEL}")
-        print("    這可能需要幾分鐘...")
-        sys.stdout.flush()
-
-        from sentence_transformers import SentenceTransformer as ST
-        SentenceTransformer = ST
-
-        print("    正在下載/載入模型權重...")
-        sys.stdout.flush()
-
-        model = SentenceTransformer(EMBEDDING_MODEL, trust_remote_code=True)
-
-        print("  ✅ 模型載入成功")
-    except MemoryError as e:
-        print(f"  ❌ 記憶體不足，無法載入模型: {e}")
-        import traceback
-        traceback.print_exc()
+    # 3. 載入 embedding 模型（如果不使用 Jina API）
+    if USE_JINA_API and JINA_API_KEY:
+        print(f"  使用 Jina AI API: {EMBEDDING_MODEL}")
+        print(f"    API Key: {'*' * 20}{JINA_API_KEY[-4:] if JINA_API_KEY else 'None'}")
+        print("  ⏩ 跳過本地模型載入")
         model = None
-    except Exception as e:
-        print(f"  ⚠️ 模型載入失敗: {e}")
-        import traceback
-        traceback.print_exc()
-        model = None
+    else:
+        try:
+            print(f"  載入本地 embedding 模型: {EMBEDDING_MODEL}")
+            print("    這可能需要幾分鐘...")
+            sys.stdout.flush()
+
+            from sentence_transformers import SentenceTransformer as ST
+            SentenceTransformer = ST
+
+            print("    正在下載/載入模型權重...")
+            sys.stdout.flush()
+
+            model = SentenceTransformer(EMBEDDING_MODEL, trust_remote_code=True)
+
+            print("  ✅ 模型載入成功")
+        except MemoryError as e:
+            print(f"  ❌ 記憶體不足，無法載入模型: {e}")
+            import traceback
+            traceback.print_exc()
+            model = None
+        except Exception as e:
+            print(f"  ⚠️ 模型載入失敗: {e}")
+            import traceback
+            traceback.print_exc()
+            model = None
     sys.stdout.flush()
 
     # 4. 載入特徵權重計算器
@@ -202,8 +269,8 @@ def _init_background_impl():
         feature_calculator = None
     sys.stdout.flush()
 
-    # 6. 計算類別向量（如果模型可用）
-    if model:
+    # 6. 計算類別向量（如果模型可用或使用 Jina API）
+    if model or (USE_JINA_API and JINA_API_KEY):
         try:
             print("  計算類別向量...")
             sys.stdout.flush()
@@ -218,7 +285,10 @@ def _init_background_impl():
             for cat, keywords in categories.items():
                 print(f"    處理類別: {cat}")
                 sys.stdout.flush()
-                embeddings = model.encode(keywords)
+                embeddings = encode_text(keywords)
+                # 如果是單一向量，轉換為列表
+                if not isinstance(embeddings, list):
+                    embeddings = [embeddings]
                 category_embeddings[cat] = np.mean(embeddings, axis=0)
             print("  ✅ 類別向量計算完成")
         except MemoryError as e:
@@ -258,7 +328,7 @@ def classify_query(query: str) -> dict:
     分類查詢類型
     返回: { "category": "plant/animal/artifact/food/other", "confidence": 0.xx, "is_plant": true/false }
     """
-    if model is None or category_embeddings is None:
+    if category_embeddings is None:
         return {
             "category": "unknown",
             "confidence": 0,
@@ -268,7 +338,7 @@ def classify_query(query: str) -> dict:
             "error": "模型尚未載入完成"
         }
 
-    query_vector = model.encode(query)
+    query_vector = encode_text(query)
 
     # 計算與各類別的相似度
     scores = {}
@@ -300,7 +370,9 @@ def search_plants(query: str, top_k: int = 5):
     if qdrant_client is None:
         return []  # Qdrant 未連線，返回空結果
 
-    query_vector = model.encode(query).tolist()
+    query_vector = encode_text(query)
+    if not isinstance(query_vector, list):
+        query_vector = query_vector.tolist()
 
     results = qdrant_client.query_points(
         collection_name=COLLECTION_NAME,
@@ -346,7 +418,9 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
     if guess_names:
         search_query = f"{query} {' '.join(guess_names)}"
 
-    query_vector = model.encode(search_query).tolist()
+    query_vector = encode_text(search_query)
+    if not isinstance(query_vector, list):
+        query_vector = query_vector.tolist()
 
     # 取更多候選再重新排序
     candidates = qdrant_client.query_points(
@@ -447,13 +521,18 @@ class RequestHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
 
         if parsed.path == "/health":
+            # 檢查 embedding 是否可用（本地模型或 Jina API）
+            embedding_ready = model is not None or (USE_JINA_API and JINA_API_KEY)
+
             self._send_json({
                 "status": "ok",
                 "model": EMBEDDING_MODEL,
+                "use_jina_api": USE_JINA_API,
+                "jina_api_configured": JINA_API_KEY is not None,
                 "model_loaded": model is not None,
                 "qdrant_connected": qdrant_client is not None,
                 "qdrant_url": QDRANT_URL,
-                "ready": model is not None and qdrant_client is not None
+                "ready": embedding_ready and qdrant_client is not None
             })
 
         elif parsed.path == "/vision-prompt":
@@ -591,7 +670,8 @@ def main():
         print(f"   POST /search       {{\"query\": \"...\", \"top_k\": 5, \"smart\": true}}")
         print(f"   POST /classify     {{\"query\": \"...\"}}")
         print(f"   POST /hybrid-search {{\"query\": \"...\", \"features\": [...], \"guess_names\": [...]}}")
-        print(f"\n混合搜尋權重: embedding={EMBEDDING_WEIGHT}, feature={FEATURE_WEIGHT}")
+        print(f"\nEmbedding 方式: {'Jina AI API' if USE_JINA_API else '本地模型'}")
+        print(f"混合搜尋權重: embedding={EMBEDDING_WEIGHT}, feature={FEATURE_WEIGHT}")
         print(f"植物判斷閾值: {PLANT_THRESHOLD}")
         print(f"\n按 Ctrl+C 停止...")
         sys.stdout.flush()
