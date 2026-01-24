@@ -3702,6 +3702,24 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Embedding API health (for Zeabur debugging from phone)
+app.get('/api/embedding-health', async (req, res) => {
+  try {
+    const h = await healthCheck();
+    res.json({
+      ok: Boolean(h.ok),
+      embedding_api_url: process.env.EMBEDDING_API_URL || null,
+      health: h,
+    });
+  } catch (err) {
+    res.status(500).json({
+      ok: false,
+      embedding_api_url: process.env.EMBEDDING_API_URL || null,
+      error: err.message,
+    });
+  }
+});
+
 app.get(/^\/(?!api\/).*/, (req, res, next) => {
   if (req.path.match(/\.[a-zA-Z0-9]+$/)) return next();
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

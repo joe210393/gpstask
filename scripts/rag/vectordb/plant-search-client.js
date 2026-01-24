@@ -39,7 +39,7 @@ async function healthCheck() {
     const data = await response.json();
     return { ok: true, ...data };
   } catch (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: error.message, url: EMBEDDING_API_URL };
   }
 }
 
@@ -70,7 +70,7 @@ async function classify(query) {
 
     return await response.json();
   } catch (error) {
-    console.error('[PlantSearch] Classify error:', error.message);
+    console.error('[PlantSearch] Classify error:', error.message, 'url=', EMBEDDING_API_URL);
     return { category: 'other', confidence: 0, is_plant: false, plant_score: 0 };
   }
 }
@@ -105,7 +105,7 @@ async function smartSearch(query, topK = 5) {
 
     return await response.json();
   } catch (error) {
-    console.error('[PlantSearch] Smart search error:', error.message);
+    console.error('[PlantSearch] Smart search error:', error.message, 'url=', EMBEDDING_API_URL);
     return {
       query,
       classification: { category: 'other', is_plant: false },
@@ -135,7 +135,7 @@ async function searchPlants(query, topK = 5) {
     const data = await response.json();
     return data.results || [];
   } catch (error) {
-    console.error('[PlantSearch] Search error:', error.message);
+    console.error('[PlantSearch] Search error:', error.message, 'url=', EMBEDDING_API_URL);
     return [];
   }
 }
@@ -151,7 +151,7 @@ async function getVisionPrompt() {
     }
     return await response.json();
   } catch (error) {
-    console.error('[PlantSearch] Get vision prompt error:', error.message);
+    console.error('[PlantSearch] Get vision prompt error:', error.message, 'url=', EMBEDDING_API_URL);
     return null;
   }
 }
@@ -183,7 +183,7 @@ async function hybridSearch({ query = '', features = [], guessNames = [], topK =
 
     return await response.json();
   } catch (error) {
-    console.error('[PlantSearch] Hybrid search error:', error.message);
+    console.error('[PlantSearch] Hybrid search error:', error.message, 'url=', EMBEDDING_API_URL);
     return {
       query,
       features,
