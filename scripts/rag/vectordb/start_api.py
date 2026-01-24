@@ -558,6 +558,41 @@ class RequestHandler(BaseHTTPRequestHandler):
                 "ready": embedding_ready and qdrant_client is not None
             })
 
+        elif parsed.path == "/stats":
+            # 回傳 Qdrant collection 狀態，確認向量索引是否真的建好了
+            if qdrant_client is None:
+                self._send_json({
+                    "ok": False,
+                    "error": "Qdrant not connected",
+                    "collection": COLLECTION_NAME,
+                    "qdrant_url": QDRANT_URL,
+                }, 503)
+                return
+
+            try:
+                info = qdrant_client.get_collection(collection_name=COLLECTION_NAME)
+                count = qdrant_client.count(collection_name=COLLECTION_NAME, exact=True)
+
+                # vectors 設定資訊（不同版本的 qdrant_client 可能結構稍不同，這裡做保守處理）
+                vectors_cfg = getattr(info, "config", None)
+                vectors_cfg = getattr(vectors_cfg, "params", None) if vectors_cfg else None
+                vectors_cfg = getattr(vectors_cfg, "vectors", None) if vectors_cfg else None
+
+                self._send_json({
+                    "ok": True,
+                    "collection": COLLECTION_NAME,
+                    "points_count": getattr(count, "count", None),
+                    "vectors_config": str(vectors_cfg) if vectors_cfg is not None else None,
+                    "qdrant_url": QDRANT_URL,
+                })
+            except Exception as e:
+                self._send_json({
+                    "ok": False,
+                    "error": str(e),
+                    "collection": COLLECTION_NAME,
+                    "qdrant_url": QDRANT_URL,
+                }, 500)
+
         elif parsed.path == "/vision-prompt":
             # 取得 Vision AI 用的結構化 Prompt
             self._send_json({

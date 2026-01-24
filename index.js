@@ -12,7 +12,7 @@ const rateLimit = require('express-rate-limit');
 const webpush = require('web-push');
 const XLSX = require('xlsx');
 const { getDbConfig } = require('./db-config');
-const { smartSearch, classify, hybridSearch, getVisionPrompt, parseVisionResponse, healthCheck } = require('./scripts/rag/vectordb/plant-search-client');
+const { smartSearch, classify, hybridSearch, getVisionPrompt, parseVisionResponse, healthCheck, stats: embeddingStats } = require('./scripts/rag/vectordb/plant-search-client');
 
 // 避免 Embedding API 暫時不可用時，前端不斷重送導致「看起來像無限循環」
 let _embeddingHealthCache = { ts: 0, ok: null, ready: null };
@@ -3710,6 +3710,23 @@ app.get('/api/embedding-health', async (req, res) => {
       ok: Boolean(h.ok),
       embedding_api_url: process.env.EMBEDDING_API_URL || null,
       health: h,
+    });
+  } catch (err) {
+    res.status(500).json({
+      ok: false,
+      embedding_api_url: process.env.EMBEDDING_API_URL || null,
+      error: err.message,
+    });
+  }
+});
+
+app.get('/api/embedding-stats', async (req, res) => {
+  try {
+    const s = await embeddingStats();
+    res.json({
+      ok: Boolean(s.ok),
+      embedding_api_url: process.env.EMBEDDING_API_URL || null,
+      stats: s,
     });
   } catch (err) {
     res.status(500).json({

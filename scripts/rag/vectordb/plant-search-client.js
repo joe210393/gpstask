@@ -44,6 +44,21 @@ async function healthCheck() {
 }
 
 /**
+ * Qdrant/collection 統計（用於確認向量是否已建）
+ */
+async function stats() {
+  try {
+    const response = await fetchWithTimeout(`${EMBEDDING_API_URL}/stats`);
+    if (!response.ok) {
+      return { ok: false, error: `HTTP ${response.status}`, url: EMBEDDING_API_URL };
+    }
+    return await response.json();
+  } catch (error) {
+    return { ok: false, error: error.message, url: EMBEDDING_API_URL };
+  }
+}
+
+/**
  * 分類查詢
  * @param {string} query - 要分類的文字
  * @returns {Promise<Object>} 分類結果
@@ -265,6 +280,7 @@ function formatResults(results) {
 
 module.exports = {
   healthCheck,
+  stats,
   classify,
   smartSearch,
   searchPlants,
