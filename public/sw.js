@@ -1,7 +1,8 @@
 // Service Worker for GPS Task System
 // 負責推送通知與快取管理
 
-const CACHE_NAME = 'gps-task-v1';
+// bump this to force clients to drop old cached assets (prevents "I fixed it but nothing changes")
+const CACHE_NAME = 'gps-task-v2';
 const urlsToCache = [
   '/',
   '/index.html',

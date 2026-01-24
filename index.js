@@ -12,7 +12,24 @@ const rateLimit = require('express-rate-limit');
 const webpush = require('web-push');
 const XLSX = require('xlsx');
 const { getDbConfig } = require('./db-config');
-const { smartSearch, classify, hybridSearch, getVisionPrompt, parseVisionResponse } = require('./scripts/rag/vectordb/plant-search-client');
+const { smartSearch, classify, hybridSearch, getVisionPrompt, parseVisionResponse, healthCheck } = require('./scripts/rag/vectordb/plant-search-client');
+
+// 避免 Embedding API 暫時不可用時，前端不斷重送導致「看起來像無限循環」
+let _embeddingHealthCache = { ts: 0, ok: null, ready: null };
+async function isEmbeddingApiReady({ ttlMs = 15000 } = {}) {
+  const now = Date.now();
+  if (_embeddingHealthCache.ts && now - _embeddingHealthCache.ts < ttlMs) {
+    return Boolean(_embeddingHealthCache.ok && _embeddingHealthCache.ready);
+  }
+  try {
+    const h = await healthCheck();
+    _embeddingHealthCache = { ts: now, ok: h.ok, ready: h.ready };
+    return Boolean(h.ok && h.ready);
+  } catch (e) {
+    _embeddingHealthCache = { ts: now, ok: false, ready: false };
+    return false;
+  }
+}
 
 // JWT 設定
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -3169,6 +3186,11 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
     // 嘗試解析結構化 JSON，如果成功則用混合搜尋
     let plantResults = null;
     try {
+      const embeddingReady = await isEmbeddingApiReady();
+      if (!embeddingReady) {
+        console.warn('⚠️ Embedding API 未就緒，跳過植物 RAG');
+        plantResults = { is_plant: false, message: 'Embedding API 未就緒，暫時跳過植物搜尋' };
+      } else {
       console.log('🌿 正在查詢植物 RAG...');
 
       // 嘗試解析 Vision AI 的結構化輸出
@@ -3239,6 +3261,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
             message: ragResult.message
           };
         }
+      }
       }
     } catch (ragErr) {
       console.warn('⚠️ 植物 RAG 查詢失敗 (非致命):', ragErr.message);

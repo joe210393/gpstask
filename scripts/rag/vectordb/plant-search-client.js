@@ -14,12 +14,25 @@
 const EMBEDDING_API_URL =
   process.env.EMBEDDING_API_URL || 'http://localhost:8100';
 
+const EMBEDDING_API_TIMEOUT_MS = Number(process.env.EMBEDDING_API_TIMEOUT_MS || 8000);
+
+async function fetchWithTimeout(url, options = {}) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), EMBEDDING_API_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 /**
  * 健康檢查
  */
 async function healthCheck() {
   try {
-    const response = await fetch(`${EMBEDDING_API_URL}/health`);
+    const response = await fetchWithTimeout(`${EMBEDDING_API_URL}/health`);
     if (!response.ok) {
       return { ok: false, error: `HTTP ${response.status}` };
     }
@@ -45,7 +58,7 @@ async function healthCheck() {
  */
 async function classify(query) {
   try {
-    const response = await fetch(`${EMBEDDING_API_URL}/classify`, {
+    const response = await fetchWithTimeout(`${EMBEDDING_API_URL}/classify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query }),
@@ -80,7 +93,7 @@ async function classify(query) {
  */
 async function smartSearch(query, topK = 5) {
   try {
-    const response = await fetch(`${EMBEDDING_API_URL}/search`, {
+    const response = await fetchWithTimeout(`${EMBEDDING_API_URL}/search`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query, top_k: topK, smart: true }),
@@ -109,7 +122,7 @@ async function smartSearch(query, topK = 5) {
  */
 async function searchPlants(query, topK = 5) {
   try {
-    const response = await fetch(`${EMBEDDING_API_URL}/search`, {
+    const response = await fetchWithTimeout(`${EMBEDDING_API_URL}/search`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query, top_k: topK, smart: false }),
@@ -132,7 +145,7 @@ async function searchPlants(query, topK = 5) {
  */
 async function getVisionPrompt() {
   try {
-    const response = await fetch(`${EMBEDDING_API_URL}/vision-prompt`);
+    const response = await fetchWithTimeout(`${EMBEDDING_API_URL}/vision-prompt`);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
@@ -153,7 +166,7 @@ async function getVisionPrompt() {
  */
 async function hybridSearch({ query = '', features = [], guessNames = [], topK = 5 }) {
   try {
-    const response = await fetch(`${EMBEDDING_API_URL}/hybrid-search`, {
+    const response = await fetchWithTimeout(`${EMBEDDING_API_URL}/hybrid-search`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

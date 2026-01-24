@@ -38,9 +38,15 @@ FEATURE_INDEX = {}
 QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6333")
 QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY", None)  # Zeabur Qdrant API Key
 COLLECTION_NAME = "taiwan_plants"
-EMBEDDING_MODEL = "jinaai/jina-embeddings-v3"
+# 允許用環境變數覆蓋模型，避免在 Zeabur 上因為記憶體不足造成反覆重啟
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "jinaai/jina-embeddings-v3")
 JINA_API_KEY = os.environ.get("JINA_API_KEY", None)  # Jina AI API Key
-USE_JINA_API = os.environ.get("USE_JINA_API", "false").lower() == "true"
+# USE_JINA_API:
+# - "true": 強制使用 Jina API
+# - "false": 強制本地模型
+# - "auto": 若有 JINA_API_KEY 則使用 Jina API（避免忘了設定）
+_use_jina_env = os.environ.get("USE_JINA_API", "auto").lower()
+USE_JINA_API = (_use_jina_env == "true") or (_use_jina_env == "auto" and bool(JINA_API_KEY))
 # Zeabur 用 PORT，本地開發用 EMBEDDING_API_PORT
 API_PORT = int(os.environ.get("PORT", os.environ.get("EMBEDDING_API_PORT", "8100")))
 
@@ -286,11 +292,21 @@ def _init_background_impl():
                 print(f"    處理類別: {cat}")
                 sys.stdout.flush()
                 embeddings = encode_text(keywords)
-                # 如果是單一向量，轉換為列表
-                if not isinstance(embeddings, list):
-                    embeddings = [embeddings]
-                # 轉換為 numpy array 再計算平均值
-                embeddings_array = np.array(embeddings)
+                # SentenceTransformer.encode(list) 會回傳 np.ndarray (N, D)
+                # Jina API 的 encode_text(list) 會回傳 list[np.ndarray] (N 個 D 向量)
+                if isinstance(embeddings, np.ndarray):
+                    embeddings_array = embeddings  # (N, D) 或 (D,)
+                elif isinstance(embeddings, list):
+                    # list[np.ndarray] 或 list[list[float]] 或 list[np.ndarray(D,)]
+                    embeddings_array = np.array(embeddings)
+                else:
+                    embeddings_array = np.array([embeddings])
+
+                # 確保是 (N, D)
+                if embeddings_array.ndim == 1:
+                    embeddings_array = embeddings_array.reshape(1, -1)
+
+                # 類別向量要是 (D,)
                 category_embeddings[cat] = np.mean(embeddings_array, axis=0)
             print("  ✅ 類別向量計算完成")
         except MemoryError as e:
@@ -341,6 +357,11 @@ def classify_query(query: str) -> dict:
         }
 
     query_vector = encode_text(query)
+    if isinstance(query_vector, list):
+        query_vector = np.array(query_vector)
+    if isinstance(query_vector, np.ndarray) and query_vector.ndim > 1:
+        # 保險：若意外回傳 (N, D)，取平均變成 (D,)
+        query_vector = np.mean(query_vector, axis=0)
 
     # 計算與各類別的相似度
     scores = {}
@@ -654,6 +675,12 @@ class RequestHandler(BaseHTTPRequestHandler):
             self._send_json({"error": "Not found"}, 404)
 
     def log_message(self, format, *args):
+        # Zeabur 會頻繁打 health check，避免日誌刷屏讓人誤以為「無限循環」
+        try:
+            if getattr(self, "path", "").startswith("/health"):
+                return
+        except Exception:
+            pass
         print(f"[API] {args[0]}")
 
 
