@@ -25,6 +25,7 @@ import sys
 import json
 import threading
 import numpy as np
+import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
@@ -46,7 +47,9 @@ JINA_API_KEY = os.environ.get("JINA_API_KEY", None)  # Jina AI API Key
 # - "false": 強制本地模型
 # - "auto": 若有 JINA_API_KEY 則使用 Jina API（避免忘了設定）
 _use_jina_env = os.environ.get("USE_JINA_API", "auto").lower()
-USE_JINA_API = (_use_jina_env == "true") or (_use_jina_env == "auto" and bool(JINA_API_KEY))
+FORCE_JINA_API = (_use_jina_env == "true")
+AUTO_JINA_API = (_use_jina_env == "auto")
+USE_JINA_API = FORCE_JINA_API or (AUTO_JINA_API and bool(JINA_API_KEY))
 # Zeabur 用 PORT，本地開發用 EMBEDDING_API_PORT
 API_PORT = int(os.environ.get("PORT", os.environ.get("EMBEDDING_API_PORT", "8100")))
 
@@ -70,7 +73,7 @@ def get_qdrant_client():
             api_key=use_api_key,
             https=is_https,
             prefer_grpc=False,
-            timeout=120
+            timeout=30
         )
     else:
         # 內部連線不需要 API Key，忽略警告
@@ -81,7 +84,7 @@ def get_qdrant_client():
                 port=port,
                 https=is_https,
                 prefer_grpc=False,
-                timeout=120
+            timeout=30
             )
 
 # 分類閾值
@@ -108,6 +111,10 @@ def encode_text(text):
     Returns:
         numpy array 或 list of numpy arrays
     """
+    # 強制 Jina 模式：即使 key 沒有設，也不應嘗試回退到本地模型（避免 Zeabur OOM/下載模型）
+    if FORCE_JINA_API and not JINA_API_KEY:
+        raise RuntimeError("USE_JINA_API=true 但未設定 JINA_API_KEY（已禁止回退到本地模型）")
+
     if USE_JINA_API and JINA_API_KEY:
         # 使用 Jina API
         import requests
@@ -143,11 +150,13 @@ def encode_text(text):
         except Exception as e:
             print(f"⚠️ Jina API 錯誤: {e}")
             sys.stdout.flush()
-            # 如果 API 失敗，嘗試使用本地模型（如果可用）
+            # 強制 Jina 模式時，不回退到本地模型（避免 OOM/下載模型）
+            if FORCE_JINA_API:
+                raise RuntimeError(f"Jina API 失敗（且 USE_JINA_API=true 禁止回退本地模型）: {e}")
+            # 非強制時，才允許回退到本地模型（若可用）
             if model:
                 return model.encode(text)
-            else:
-                raise RuntimeError("Jina API 和本地模型都不可用")
+            raise RuntimeError("Jina API 和本地模型都不可用")
 
     elif model:
         # 使用本地模型
@@ -205,7 +214,8 @@ def _init_background_impl():
     sys.stdout.flush()
 
     # 3. 載入 embedding 模型（如果不使用 Jina API）
-    if USE_JINA_API and JINA_API_KEY:
+    # FORCE_JINA_API=true 時，就算 key 缺失也不載本地模型（避免 Zeabur 下載/記憶體問題）
+    if FORCE_JINA_API or (USE_JINA_API and JINA_API_KEY):
         print(f"  使用 Jina AI API: {EMBEDDING_MODEL}")
         print(f"    API Key: {'*' * 20}{JINA_API_KEY[-4:] if JINA_API_KEY else 'None'}")
         print("  ⏩ 跳過本地模型載入")
@@ -392,8 +402,9 @@ def search_plants(query: str, top_k: int = 5):
     """搜尋植物（純 embedding）"""
     if qdrant_client is None:
         return []  # Qdrant 未連線，返回空結果
-
+    t0 = time.perf_counter()
     query_vector = encode_text(query)
+    t1 = time.perf_counter()
     if not isinstance(query_vector, list):
         query_vector = query_vector.tolist()
 
@@ -402,6 +413,9 @@ def search_plants(query: str, top_k: int = 5):
         query=query_vector,
         limit=top_k,
     ).points
+    t2 = time.perf_counter()
+    print(f"[API] /search encode={(t1 - t0):.3f}s qdrant={(t2 - t1):.3f}s total={(t2 - t0):.3f}s top_k={top_k}")
+    sys.stdout.flush()
 
     return [
         {
@@ -441,7 +455,9 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
     if guess_names:
         search_query = f"{query} {' '.join(guess_names)}"
 
+    t0 = time.perf_counter()
     query_vector = encode_text(search_query)
+    t1 = time.perf_counter()
     if not isinstance(query_vector, list):
         query_vector = query_vector.tolist()
 
@@ -451,6 +467,9 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         query=query_vector,
         limit=top_k * 3,  # 取 3 倍候選
     ).points
+    t2 = time.perf_counter()
+    print(f"[API] /hybrid-search encode={(t1 - t0):.3f}s qdrant={(t2 - t1):.3f}s total={(t2 - t0):.3f}s top_k={top_k} features={len(features or [])} guess_names={len(guess_names or [])}")
+    sys.stdout.flush()
 
     # 2. 計算每個候選的混合分數
     results = []

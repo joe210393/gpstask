@@ -14,7 +14,10 @@
 const EMBEDDING_API_URL =
   process.env.EMBEDDING_API_URL || 'http://localhost:8100';
 
-const EMBEDDING_API_TIMEOUT_MS = Number(process.env.EMBEDDING_API_TIMEOUT_MS || 8000);
+// NOTE:
+// Python embedding-api 端可能需要呼叫外部 Embedding（如 Jina）+ Qdrant 查詢，
+// 8s 在雲端常常不夠，會造成 Node 先 abort、而 embedding-api 仍在忙，看起來像「沒反應」。
+const EMBEDDING_API_TIMEOUT_MS = Number(process.env.EMBEDDING_API_TIMEOUT_MS || 30000);
 
 async function fetchWithTimeout(url, options = {}) {
   const controller = new AbortController();

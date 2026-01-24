@@ -3267,7 +3267,11 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
             }))
           };
         } else {
-          console.log(`📝 非植物查詢: ${ragResult.classification?.category || 'unknown'}`);
+          const cls = ragResult.classification || {};
+          // 這裡的 category 可能仍是 "plant"，但因為未達 plant_threshold 而 is_plant=false
+          console.log(
+            `📝 RAG 判斷非植物(is_plant=false): category=${cls.category || 'unknown'} plant_score=${cls.plant_score ?? 'n/a'}`
+          );
           plantResults = {
             is_plant: false,
             category: ragResult.classification?.category,
