@@ -3135,9 +3135,11 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
     const finalUserPrompt = userPromptText + locationInfo;
 
     // 3. 呼叫 AI API (LM Studio / OpenAI Compatible)
-    // 使用您的 ngrok 網址
-    const AI_API_URL = process.env.AI_API_URL || 'https://tactually-venerable-inez.ngrok-free.dev/v1'; 
-    const AI_MODEL = 'local-model'; // LM Studio 通常不挑模型名稱
+    // AI endpoint (OpenAI-compatible)
+    // In production, DO NOT rely on a hardcoded personal ngrok URL.
+    const AI_API_URL = process.env.AI_API_URL || 'http://localhost:1234/v1';
+    const AI_MODEL = process.env.AI_MODEL || 'local-model'; // LM Studio 通常不挑模型名稱
+    const AI_API_KEY = process.env.AI_API_KEY || 'lm-studio';
 
     console.log('🤖 正在呼叫 AI:', AI_API_URL);
     console.log('📝 System Prompt:', systemPrompt.substring(0, 50) + '...');
@@ -3146,7 +3148,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer lm-studio'
+        'Authorization': `Bearer ${AI_API_KEY}`
       },
       body: JSON.stringify({
         model: AI_MODEL,
@@ -3312,8 +3314,9 @@ app.post('/api/chat-text', async (req, res) => {
 
     const finalUserPrompt = `${userPromptText}\n\n${userText}${locationText ? `\n\n(位置: ${locationText})` : ''}`.trim();
 
-    const AI_API_URL = process.env.AI_API_URL || 'https://tactually-venerable-inez.ngrok-free.dev/v1';
-    const AI_MODEL = 'local-model';
+    const AI_API_URL = process.env.AI_API_URL || 'http://localhost:1234/v1';
+    const AI_MODEL = process.env.AI_MODEL || 'local-model';
+    const AI_API_KEY = process.env.AI_API_KEY || 'lm-studio';
 
     console.log('🤖 正在呼叫 AI(文字):', AI_API_URL);
 
@@ -3321,7 +3324,7 @@ app.post('/api/chat-text', async (req, res) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer lm-studio'
+        'Authorization': `Bearer ${AI_API_KEY}`
       },
       body: JSON.stringify({
         model: AI_MODEL,
