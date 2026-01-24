@@ -491,6 +491,34 @@ canvas#drawingCanvas {
     gap: 15px;
 }
 
+/* Mobile: 直向顯示，避免右側分析區被擠到看不到（就會覺得「沒動畫沒結果」） */
+@media (max-width: 480px) {
+    .result-panel {
+        max-height: 70vh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .result-content {
+        flex-direction: column;
+    }
+
+    img#croppedImage {
+        width: 100%;
+        height: auto;
+        max-height: 180px;
+    }
+
+    .analysis-box {
+        max-height: 45vh;
+        overflow: visible;
+    }
+
+    .ai-text {
+        max-height: 40vh;
+    }
+}
+
 img#croppedImage {
     width: 100px;
     height: 100px;

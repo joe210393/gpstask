@@ -15,9 +15,9 @@ services:
     env:
       NODE_ENV: production
       PORT: "3001"
-      # Zeabur 內網呼叫另一個 service，通常 hostname 會是「服務名稱」
-      # 你的 embedding-api 服務名是 gpstask-ooffix
-      EMBEDDING_API_URL: http://gpstask-ooffix:8080
+      # Zeabur 內網呼叫另一個 service，hostname 會是 zeabur.yaml 裡的 service key
+      # 這個 repo 內的 embedding 服務 key 是 embedding-api
+      EMBEDDING_API_URL: http://embedding-api:8080
 
   # Python 植物向量搜尋 API
   embedding-api:
