@@ -3195,8 +3195,18 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
     const aiData = await aiResponse.json();
     const description = aiData.choices[0].message.content;
 
-    // 4. 植物 RAG 搜尋
-    // 嘗試解析結構化 JSON，如果成功則用混合搜尋
+    // 4. 從 AI 回應中提取詳細描述（用於 RAG 搜尋）
+    // 嘗試從 XML <analysis> 標籤中提取詳細描述
+    let detailedDescription = description;
+    const analysisMatch = description.match(/<analysis>([\s\S]*?)<\/analysis>/i);
+    if (analysisMatch) {
+      detailedDescription = analysisMatch[1].trim();
+      console.log('📋 從 <analysis> 提取詳細描述:', detailedDescription.substring(0, 100) + '...');
+    } else {
+      console.log('⚠️ 未找到 <analysis> 標籤，使用完整回應作為描述');
+    }
+
+    // 5. 植物 RAG 搜尋（使用詳細描述，而不是猜測的名稱）
     let plantResults = null;
     try {
       const embeddingReady = await isEmbeddingApiReady();
@@ -3204,17 +3214,18 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
         console.warn('⚠️ Embedding API 未就緒，跳過植物 RAG');
         plantResults = { is_plant: false, message: 'Embedding API 未就緒，暫時跳過植物搜尋' };
       } else {
-      console.log('🌿 正在查詢植物 RAG...');
+      console.log('🌿 正在查詢植物 RAG（使用詳細描述）...');
 
-      // 嘗試解析 Vision AI 的結構化輸出
+      // 嘗試解析 Vision AI 的結構化輸出（如果有的話）
       const visionParsed = parseVisionResponse(description);
 
       if (visionParsed.success && visionParsed.intent === 'plant') {
         // 使用混合搜尋（結合特徵權重）
+        // 重要：使用詳細描述作為 query，而不是 shortCaption 或 guess_names
         console.log(`📊 結構化辨識: intent=${visionParsed.intent}, features=${visionParsed.plant.features.join(',')}`);
 
         const hybridResult = await hybridSearch({
-          query: visionParsed.shortCaption || description,
+          query: detailedDescription, // 使用詳細描述，而不是猜測的名稱
           features: visionParsed.plant.features || [],
           guessNames: visionParsed.plant.guess_names || [],
           topK: 3
@@ -3249,12 +3260,13 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
 
       // 如果結構化解析失敗或不是植物，先用 classify 判斷，只有植物才搜尋（省 token）
       if (!plantResults) {
-        // 先快速分類，避免非植物查詢也扣 embedding token
-        const classification = await classify(description);
+        // 使用詳細描述進行分類（而不是完整回應）
+        const classification = await classify(detailedDescription);
         
         if (classification.is_plant) {
-          // 確認是植物，才進行完整搜尋
-          const ragResult = await smartSearch(description, 3);
+          // 確認是植物，使用詳細描述進行完整搜尋
+          console.log('🔍 使用詳細描述進行 RAG 搜尋...');
+          const ragResult = await smartSearch(detailedDescription, 3);
 
           if (ragResult.classification?.is_plant && ragResult.results?.length > 0) {
             console.log(`✅ 傳統搜尋找到 ${ragResult.results.length} 個結果`);
