@@ -3263,9 +3263,10 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
         // 使用詳細描述進行分類（而不是完整回應）
         const classification = await classify(detailedDescription);
         
-        if (classification.is_plant) {
+        // 嚴格檢查：只有 plant_score >= 0.4 且 is_plant=true 才搜尋
+        if (classification.is_plant && classification.plant_score >= 0.4) {
           // 確認是植物，使用詳細描述進行完整搜尋
-          console.log('🔍 使用詳細描述進行 RAG 搜尋...');
+          console.log(`🔍 確認是植物 (plant_score=${classification.plant_score.toFixed(3)} >= 0.4)，使用詳細描述進行 RAG 搜尋...`);
           const ragResult = await smartSearch(detailedDescription, 3);
 
           if (ragResult.classification?.is_plant && ragResult.results?.length > 0) {
