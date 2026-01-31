@@ -28,6 +28,7 @@ import numpy as np
 import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
+from qdrant_client.models import Filter, FieldCondition, MatchValue, MatchAny, MatchText
 
 # 延遲載入重量級模組
 SentenceTransformer = None
@@ -513,7 +514,7 @@ def search_plants(query: str, top_k: int = 5):
 
 def hybrid_search(query: str, features: list = None, guess_names: list = None, top_k: int = 5):
     """
-    混合搜尋：結合 embedding 相似度 + 特徵權重
+    混合搜尋：結合 embedding 相似度 + 特徵權重 + 關鍵字匹配
 
     Args:
         query: 自然語言描述
@@ -526,6 +527,42 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
     """
     if qdrant_client is None:
         return []  # Qdrant 未連線，返回空結果
+
+    # 0. 如果有 guess_names，先進行關鍵字匹配（提高辨識率）
+    keyword_matched_ids = set()
+    if guess_names:
+        try:
+            # 使用 Qdrant filter 搜尋 chinese_name 和 scientific_name
+            # 注意：Qdrant 的 MatchValue 是精確匹配，我們需要先取得所有候選再過濾
+            # 或者使用 scroll 方法取得所有資料再過濾
+            for name in guess_names:
+                if name and name.strip():
+                    name_clean = name.strip()
+                    # 使用 scroll 取得所有資料，然後在記憶體中過濾
+                    # 這對於小資料集（<10K）是可行的
+                    scroll_result = qdrant_client.scroll(
+                        collection_name=COLLECTION_NAME,
+                        limit=10000,  # 假設資料不超過 10K
+                        with_payload=True,
+                        with_vectors=False
+                    )
+                    
+                    # 在記憶體中過濾匹配的植物
+                    for point in scroll_result[0]:
+                        chinese_name = point.payload.get("chinese_name", "") or ""
+                        scientific_name = point.payload.get("scientific_name", "") or ""
+                        
+                        # 檢查是否包含該名稱（部分匹配）
+                        if name_clean in chinese_name or name_clean in scientific_name:
+                            keyword_matched_ids.add(point.id)
+                    
+                    # 只搜尋一次就夠了（所有 guess_names 一起處理）
+                    break
+            
+            if keyword_matched_ids:
+                print(f"[API] 關鍵字匹配找到 {len(keyword_matched_ids)} 個候選（guess_names: {guess_names}）")
+        except Exception as e:
+            print(f"[API] 關鍵字匹配失敗: {e}，繼續使用 embedding 搜尋")
 
     # 1. 先用 embedding 取得候選
     # 如果有猜測名稱，加入查詢
@@ -553,6 +590,12 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
     results = []
     for r in candidates:
         embedding_score = r.score  # 0~1
+        
+        # 關鍵字匹配加分（如果 guess_names 匹配到 chinese_name 或 scientific_name）
+        keyword_bonus = 0.0
+        if r.id in keyword_matched_ids:
+            keyword_bonus = 0.3  # 關鍵字匹配給予 0.3 的額外加分
+            print(f"[API] 關鍵字匹配: {r.payload.get('chinese_name', '未知')} (id={r.id})")
 
         # 計算特徵匹配分數
         feature_score = 0.0
@@ -560,10 +603,20 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
 
         if features and feature_calculator:
             # 取得植物的描述文字（處理 None 值）
+            # 包含 key_features 以提高匹配率
+            key_features = r.payload.get("key_features", [])
+            key_features_text = ""
+            if key_features:
+                if isinstance(key_features, list):
+                    key_features_text = " ".join([str(kf) for kf in key_features])
+                else:
+                    key_features_text = str(key_features)
+            
             plant_text = " ".join(filter(None, [
                 r.payload.get("summary") or "",
                 r.payload.get("life_form") or "",
                 r.payload.get("morphology") or "",
+                key_features_text,  # 新增：加入 key_features
             ]))
 
             # 計算特徵匹配
@@ -572,11 +625,12 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             matched_features = [f["name"] for f in match_result["matched_features"]]
 
         # 3. 計算混合分數
-        # 如果沒有特徵，純用 embedding
+        # 公式：embedding_score + feature_score + keyword_bonus
+        # 如果沒有特徵，純用 embedding + keyword_bonus
         if features:
-            hybrid_score = (EMBEDDING_WEIGHT * embedding_score) + (FEATURE_WEIGHT * feature_score)
+            hybrid_score = (EMBEDDING_WEIGHT * embedding_score) + (FEATURE_WEIGHT * feature_score) + keyword_bonus
         else:
-            hybrid_score = embedding_score
+            hybrid_score = embedding_score + keyword_bonus
 
         results.append({
             "code": r.payload.get("code"),

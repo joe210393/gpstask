@@ -199,12 +199,21 @@ function traitsToFeatureList(traits) {
     'shrub': '灌木',
     'subshrub': '亞灌木',
     'herb': '草本',
+    'herbaceous': '草本',  // 新增：herbaceous = herb
     'annual_herb': '一年生草本',
     'biennial_herb': '二年生草本',
     'perennial_herb': '多年生草本',
     'vine': '藤本',
     'climbing_vine': '攀緣藤本',
     'aquatic': '水生植物',
+    
+    // phenology
+    'annual': '一年生',
+    'biennial': '二年生',
+    'perennial': '多年生',
+    'annual_perennial': '一年生或多年生',  // 新增
+    'evergreen': '常綠',
+    'deciduous': '落葉',
     
     // leaf_arrangement
     'alternate': '互生',
@@ -219,6 +228,7 @@ function traitsToFeatureList(traits) {
     'obovate': '倒卵形',
     'lanceolate': '披針形',
     'linear': '線形',
+    'linear_lanceolate': '線狀披針形',  // 新增
     'elliptic': '橢圓形',
     'oblong_elliptic': '長橢圓形',
     'orbicular': '圓形',
@@ -234,12 +244,20 @@ function traitsToFeatureList(traits) {
     // leaf_margin
     'entire': '全緣',
     'serrate': '鋸齒',
+    'serrated': '鋸齒',  // 新增：serrated = serrate
     'undulate': '波狀緣',
     'crenate': '圓鋸齒',
     'shallow_lobed': '淺裂',
     'deep_lobed': '深裂',
     'pinnatifid': '羽狀裂',
     'palmately_lobed': '掌狀裂',
+    
+    // leaf_texture
+    'smooth': '光滑',  // 新增
+    'glabrous': '無毛',
+    'pubescent': '有毛',
+    'rough': '粗糙',
+    'waxy': '蠟質',
     
     // inflorescence
     'raceme': '總狀花序',
@@ -251,7 +269,7 @@ function traitsToFeatureList(traits) {
     'spadix_spathe': '佛焰花序',
     'catkin': '葇荑花序',
     
-    // flower_color
+    // flower_color (支援單一值和複數值)
     'white': '白花',
     'yellow': '黃花',
     'red': '紅花',
@@ -260,6 +278,11 @@ function traitsToFeatureList(traits) {
     'orange': '橙花',
     'green': '綠花',
     'blue': '藍花',
+    // 複數值處理（用逗號分隔）
+    'yellow, pink, orange': '黃花',  // 取第一個顏色
+    'yellow, pink, white': '黃花',
+    'pink, white': '粉紅花',
+    'red, pink': '紅花',
     
     // fruit_type
     'drupe': '核果',
@@ -284,13 +307,30 @@ function traitsToFeatureList(traits) {
 
   for (const [key, trait] of Object.entries(traits)) {
     if (trait && trait.value && trait.value !== 'unknown') {
+      let traitValue = trait.value;
+      
+      // 處理複數值（用逗號分隔的情況）
+      if (typeof traitValue === 'string' && traitValue.includes(',')) {
+        // 取第一個值作為主要特徵
+        traitValue = traitValue.split(',')[0].trim();
+      }
+      
       // 優先使用映射表
-      const chineseKeyword = traitValueMap[trait.value];
+      const chineseKeyword = traitValueMap[traitValue];
       if (chineseKeyword) {
         features.push(chineseKeyword);
       } else {
-        // 如果沒有映射，使用原始 value（可能需要後續處理）
-        console.warn(`[TraitsParser] 未找到 ${key}=${trait.value} 的中文映射`);
+        // 如果沒有映射，嘗試部分匹配（例如：linear_lanceolate 可能匹配 linear 或 lanceolate）
+        const partialMatch = Object.keys(traitValueMap).find(k => 
+          traitValue.includes(k) || k.includes(traitValue)
+        );
+        if (partialMatch) {
+          features.push(traitValueMap[partialMatch]);
+          console.log(`[TraitsParser] ${key}=${trait.value} 使用部分匹配: ${partialMatch} → ${traitValueMap[partialMatch]}`);
+        } else {
+          // 如果還是沒有映射，使用原始 value（可能需要後續處理）
+          console.warn(`[TraitsParser] 未找到 ${key}=${trait.value} 的中文映射`);
+        }
       }
     }
   }
