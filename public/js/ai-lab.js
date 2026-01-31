@@ -1581,10 +1581,16 @@ success 或 fail (只能二選一，小寫)
                 // 將單一結果包裝成陣列格式（兼容後續處理）
                 const allResults = [result];
 
-                // 依分數排序植物
-                allPlants.sort((a, b) => b.score - a.score);
+                // 依分數排序植物（使用顯示分數）
+                allPlants.sort((a, b) => (b.displayScore || b.score) - (a.displayScore || a.score));
 
                 // 5. 根據結果類型顯示不同內容
+                // 如果有快速特徵已顯示，清除它並顯示最終結果
+                if (quickFeatures) {
+                    // 清除快速特徵顯示區域，準備顯示最終結果
+                    aiResult.innerHTML = '';
+                }
+                
                 if (hasPlantResult && avgConfidence >= CONFIDENCE_HIGH) {
                     // 高信心度植物：直接顯示答案
                     showHighConfidenceResult(allResults, allPlants, avgConfidence);
