@@ -122,16 +122,29 @@ class FeatureWeightCalculator:
         # 統計每個特徵在多少文件中出現
         for plant in plants:
             # 取得所有相關文字
+            # 支援新格式（identification）和舊格式（features）
+            identification = plant.get("identification", {})
             features = plant.get("features", {})
-            morphology = features.get("morphology", [])
-            life_form = features.get("life_form", "")
-            description = features.get("description_zh", "")
+            
+            # 新格式使用 identification，舊格式使用 features
+            if identification:
+                morphology = identification.get("morphology", [])
+                life_form = identification.get("life_form", "")
+                description = identification.get("summary", "")
+                # 也從 key_features 取得特徵
+                key_features = identification.get("key_features", [])
+            else:
+                morphology = features.get("morphology", [])
+                life_form = features.get("life_form", "")
+                description = features.get("description_zh", "")
+                key_features = []
 
             # 合併所有文字欄位（包含英文描述）
             text = " ".join([
                 life_form or "",
                 " ".join(morphology) if morphology else "",
                 description or "",
+                " ".join(key_features) if key_features else "",
             ]).lower()
 
             # 找出這個文件包含哪些特徵
