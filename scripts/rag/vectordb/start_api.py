@@ -274,6 +274,10 @@ def _init_background_impl():
     # 5. 載入特徵資料
     import os.path
     possible_paths = [
+        os.path.join(os.path.dirname(__file__), "..", "data", "plants-forest-gov-tw.jsonl"),
+        os.path.join(os.path.dirname(__file__), "data", "plants-forest-gov-tw.jsonl"),
+        "/app/data/plants-forest-gov-tw.jsonl",
+        # 向後兼容舊檔案
         os.path.join(os.path.dirname(__file__), "..", "data", "plants-enriched.jsonl"),
         os.path.join(os.path.dirname(__file__), "data", "plants-enriched.jsonl"),
         "/app/data/plants-enriched.jsonl",
