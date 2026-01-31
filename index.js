@@ -3388,7 +3388,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                   }
                 });
                 
-                plantResults = {
+                const newResults = {
                   is_plant: true,
                   search_type: 'hybrid_traits',
                   traits: traits,
@@ -3406,6 +3406,25 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                     summary: p.summary
                   }))
                 };
+                
+                // 如果已經有預先搜尋的結果，比較分數，選擇更好的
+                if (preSearchResults && preSearchResults.is_plant && preSearchResults.plants && preSearchResults.plants.length > 0) {
+                  const preTopScore = preSearchResults.plants[0].score;
+                  const newTopScore = newResults.plants[0].score;
+                  
+                  // 只有當新結果的最高分數明顯高於預先結果（高 15% 以上）時，才使用新結果
+                  // 否則保留預先結果（因為它可能是更可靠的 embedding 搜尋結果）
+                  if (newTopScore > preTopScore + 0.15) {
+                    console.log(`🔄 新搜尋結果分數更高（${(newTopScore * 100).toFixed(1)}% vs ${(preTopScore * 100).toFixed(1)}%），使用新結果`);
+                    plantResults = newResults;
+                  } else {
+                    console.log(`✅ 保留預先搜尋結果（${(preTopScore * 100).toFixed(1)}% vs ${(newTopScore * 100).toFixed(1)}%），分數差異不足以替換`);
+                    // 保留預先結果，但可以合併一些有用的資訊
+                    plantResults = preSearchResults;
+                  }
+                } else {
+                  plantResults = newResults;
+                }
               }
             }
           } else {
@@ -3441,7 +3460,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                   }
                 });
                 
-                plantResults = {
+                const newResults = {
                   is_plant: true,
                   search_type: 'hybrid',
                   vision_parsed: {
@@ -3463,6 +3482,22 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                     summary: p.summary
                   }))
                 };
+                
+                // 如果已經有預先搜尋的結果，比較分數，選擇更好的
+                if (preSearchResults && preSearchResults.is_plant && preSearchResults.plants && preSearchResults.plants.length > 0) {
+                  const preTopScore = preSearchResults.plants[0].score;
+                  const newTopScore = newResults.plants[0].score;
+                  
+                  if (newTopScore > preTopScore + 0.15) {
+                    console.log(`🔄 新搜尋結果分數更高（${(newTopScore * 100).toFixed(1)}% vs ${(preTopScore * 100).toFixed(1)}%），使用新結果`);
+                    plantResults = newResults;
+                  } else {
+                    console.log(`✅ 保留預先搜尋結果（${(preTopScore * 100).toFixed(1)}% vs ${(newTopScore * 100).toFixed(1)}%），分數差異不足以替換`);
+                    plantResults = preSearchResults;
+                  }
+                } else {
+                  plantResults = newResults;
+                }
               }
             }
           }
@@ -3499,7 +3534,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                   console.log(`  ${idx + 1}. ${p.chinese_name} (${p.scientific_name || '無學名'}) - 分數: ${(p.score * 100).toFixed(1)}%`);
                 });
                 
-                plantResults = {
+                const newResults = {
                   is_plant: true,
                   search_type: 'embedding',
                   message: ragResult.message,
@@ -3512,6 +3547,22 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                     summary: p.summary
                   }))
                 };
+                
+                // 如果已經有預先搜尋的結果，比較分數，選擇更好的
+                if (preSearchResults && preSearchResults.is_plant && preSearchResults.plants && preSearchResults.plants.length > 0) {
+                  const preTopScore = preSearchResults.plants[0].score;
+                  const newTopScore = newResults.plants[0].score;
+                  
+                  if (newTopScore > preTopScore + 0.15) {
+                    console.log(`🔄 新搜尋結果分數更高（${(newTopScore * 100).toFixed(1)}% vs ${(preTopScore * 100).toFixed(1)}%），使用新結果`);
+                    plantResults = newResults;
+                  } else {
+                    console.log(`✅ 保留預先搜尋結果（${(preTopScore * 100).toFixed(1)}% vs ${(newTopScore * 100).toFixed(1)}%），分數差異不足以替換`);
+                    plantResults = preSearchResults;
+                  }
+                } else {
+                  plantResults = newResults;
+                }
               } else {
                 const cls = ragResult.classification || {};
                 console.log(
@@ -3618,23 +3669,33 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
     }
     
     // 將 LM 信心度加成加入 plantResults
+    // 重要：只有在原始分數足夠高時（>= 0.5），才應用 LM 加成
+    // 避免低分數的結果因為 LM 匹配而被過度提升
     if (lmConfidenceBoost > 0 && plantResults && plantResults.plants) {
-      plantResults.lm_confidence_boost = lmConfidenceBoost;
-      // 對每個植物結果加上加成
-      // 使用混合方式：加法 + 乘法，確保低分數也能得到足夠的提升
-      // 公式：adjusted_score = min(1.0, score + boost + score * 0.2)
-      // 這樣即使原始分數很低（例如 0.16），也能得到顯著提升
-      plantResults.plants = plantResults.plants.map(p => {
-        const baseBoost = lmConfidenceBoost; // 基礎加成（例如 0.4）
-        const multiplierBoost = p.score * 0.2; // 基於原始分數的額外加成（20%）
-        const totalBoost = baseBoost + multiplierBoost;
-        const adjusted = Math.min(1.0, p.score + totalBoost);
-        console.log(`📊 分數調整: 原始=${(p.score * 100).toFixed(1)}%, 加成=${(totalBoost * 100).toFixed(1)}%, 調整後=${(adjusted * 100).toFixed(1)}%`);
-        return {
-          ...p,
-          adjusted_score: adjusted
-        };
-      });
+      const topScore = plantResults.plants[0]?.score || 0;
+      
+      // 只有當最高分數 >= 0.5 時，才應用 LM 加成
+      // 這可以避免低分數結果（例如 0.41）被過度提升，超過高分數結果（例如 0.72）
+      if (topScore >= 0.5) {
+        plantResults.lm_confidence_boost = lmConfidenceBoost;
+        // 對每個植物結果加上加成
+        // 使用混合方式：加法 + 乘法，確保低分數也能得到足夠的提升
+        // 公式：adjusted_score = min(1.0, score + boost + score * 0.2)
+        // 這樣即使原始分數很低（例如 0.16），也能得到顯著提升
+        plantResults.plants = plantResults.plants.map(p => {
+          const baseBoost = lmConfidenceBoost; // 基礎加成（例如 0.4）
+          const multiplierBoost = p.score * 0.2; // 基於原始分數的額外加成（20%）
+          const totalBoost = baseBoost + multiplierBoost;
+          const adjusted = Math.min(1.0, p.score + totalBoost);
+          console.log(`📊 分數調整: 原始=${(p.score * 100).toFixed(1)}%, 加成=${(totalBoost * 100).toFixed(1)}%, 調整後=${(adjusted * 100).toFixed(1)}%`);
+          return {
+            ...p,
+            adjusted_score: adjusted
+          };
+        });
+      } else {
+        console.log(`⚠️ 最高分數 ${(topScore * 100).toFixed(1)}% < 50%，跳過 LM 加成，避免低分數結果被過度提升`);
+      }
     }
 
     res.json({
