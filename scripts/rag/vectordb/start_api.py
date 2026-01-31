@@ -529,36 +529,34 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
     if qdrant_client is None:
         return []  # Qdrant 未連線，返回空結果
 
-    # 0. 如果有 guess_names，先進行關鍵字匹配（提高辨識率）
+    # 0. 如果有 guess_names，先進行關鍵字匹配（輔助提高辨識率）
+    # 注意：關鍵字匹配只是輔助，主要還是依賴 embedding 和特徵匹配
     keyword_matched_ids = set()
     if guess_names:
         try:
-            # 使用 Qdrant filter 搜尋 chinese_name 和 scientific_name
-            # 注意：Qdrant 的 MatchValue 是精確匹配，我們需要先取得所有候選再過濾
-            # 或者使用 scroll 方法取得所有資料再過濾
-            for name in guess_names:
-                if name and name.strip():
-                    name_clean = name.strip()
-                    # 使用 scroll 取得所有資料，然後在記憶體中過濾
-                    # 這對於小資料集（<10K）是可行的
-                    scroll_result = qdrant_client.scroll(
-                        collection_name=COLLECTION_NAME,
-                        limit=10000,  # 假設資料不超過 10K
-                        with_payload=True,
-                        with_vectors=False
-                    )
-                    
-                    # 在記憶體中過濾匹配的植物
-                    for point in scroll_result[0]:
-                        chinese_name = point.payload.get("chinese_name", "") or ""
-                        scientific_name = point.payload.get("scientific_name", "") or ""
-                        
+            # 使用 scroll 取得所有資料，然後在記憶體中過濾
+            # 這對於小資料集（<10K）是可行的
+            # 只執行一次 scroll，然後檢查所有 guess_names
+            scroll_result = qdrant_client.scroll(
+                collection_name=COLLECTION_NAME,
+                limit=10000,  # 假設資料不超過 10K
+                with_payload=True,
+                with_vectors=False
+            )
+            
+            # 在記憶體中過濾匹配的植物
+            for point in scroll_result[0]:
+                chinese_name = point.payload.get("chinese_name", "") or ""
+                scientific_name = point.payload.get("scientific_name", "") or ""
+                
+                # 檢查是否匹配任一 guess_name（部分匹配）
+                for name in guess_names:
+                    if name and name.strip():
+                        name_clean = name.strip()
                         # 檢查是否包含該名稱（部分匹配）
                         if name_clean in chinese_name or name_clean in scientific_name:
                             keyword_matched_ids.add(point.id)
-                    
-                    # 只搜尋一次就夠了（所有 guess_names 一起處理）
-                    break
+                            break  # 匹配到一個就夠了
             
             if keyword_matched_ids:
                 print(f"[API] 關鍵字匹配找到 {len(keyword_matched_ids)} 個候選（guess_names: {guess_names}）")
