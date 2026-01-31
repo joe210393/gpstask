@@ -1,0 +1,306 @@
+/**
+ * Traits Parser - 從 Vision AI 回應中提取結構化特徵
+ * 參考：image_traits_prompt.md
+ */
+
+/**
+ * 從 Vision AI 回應中提取 traits JSON
+ * @param {string} visionResponse - Vision AI 的原始回應
+ * @returns {Object|null} 解析後的 traits 物件，如果失敗則返回 null
+ */
+function parseTraitsFromResponse(visionResponse) {
+  if (!visionResponse || typeof visionResponse !== 'string') {
+    return null;
+  }
+
+  try {
+    // 方法 1: 嘗試找到 ```json ... ``` 區塊
+    const jsonBlockMatch = visionResponse.match(/```json\s*([\s\S]*?)\s*```/i);
+    if (jsonBlockMatch) {
+      const jsonStr = jsonBlockMatch[1].trim();
+      const parsed = JSON.parse(jsonStr);
+      return validateTraits(parsed);
+    }
+
+    // 方法 2: 嘗試找到 { ... } JSON 物件（在 </reply> 之後）
+    const replyEndIndex = visionResponse.indexOf('</reply>');
+    if (replyEndIndex !== -1) {
+      const afterReply = visionResponse.substring(replyEndIndex + 7);
+      const jsonMatch = afterReply.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return validateTraits(parsed);
+      }
+    }
+
+    // 方法 3: 嘗試直接解析整個回應（如果整個回應就是 JSON）
+    try {
+      const parsed = JSON.parse(visionResponse.trim());
+      return validateTraits(parsed);
+    } catch (e) {
+      // 不是純 JSON，繼續
+    }
+
+    return null;
+  } catch (error) {
+    console.warn('[TraitsParser] 解析 traits JSON 失敗:', error.message);
+    return null;
+  }
+}
+
+/**
+ * 驗證並清理 traits 物件
+ * @param {Object} traits - 原始 traits 物件
+ * @returns {Object|null} 驗證後的 traits 物件
+ */
+function validateTraits(traits) {
+  if (!traits || typeof traits !== 'object') {
+    return null;
+  }
+
+  // 如果是空物件，返回 null（表示非植物）
+  if (Object.keys(traits).length === 0) {
+    return null;
+  }
+
+  // 定義有效的 trait keys
+  const validTraits = [
+    'life_form',
+    'phenology',
+    'leaf_arrangement',
+    'leaf_shape',
+    'leaf_margin',
+    'leaf_texture',
+    'inflorescence',
+    'flower_color',
+    'fruit_type',
+    'fruit_color',
+    'surface_hair'
+  ];
+
+  const validated = {};
+  let hasValidTrait = false;
+
+  for (const key of validTraits) {
+    if (traits[key]) {
+      const trait = traits[key];
+      if (trait && typeof trait === 'object' && 'value' in trait) {
+        // 驗證 value 不是 "unknown" 或 confidence 太低
+        if (trait.value !== 'unknown' && trait.value !== '' && 
+            trait.confidence && trait.confidence > 0.3) {
+          validated[key] = {
+            value: trait.value,
+            confidence: Math.max(0, Math.min(1, trait.confidence || 0.5)),
+            evidence: trait.evidence || ''
+          };
+          hasValidTrait = true;
+        }
+      }
+    }
+  }
+
+  return hasValidTrait ? validated : null;
+}
+
+/**
+ * 根據 traits 判斷是否為植物
+ * 參考：traits_matching_algorithm.md
+ * 
+ * 判斷邏輯：
+ * 1. 如果有高 confidence (>=0.75) 的關鍵特徵（leaf_arrangement, leaf_shape, inflorescence），判定為植物
+ * 2. 如果有中等 confidence (>=0.5) 的關鍵特徵，且總共有 2+ 個有效特徵，判定為植物
+ * 3. 否則返回 false
+ * 
+ * @param {Object} traits - 驗證後的 traits 物件
+ * @returns {Object} { is_plant: boolean, confidence: number, reason: string }
+ */
+function isPlantFromTraits(traits) {
+  if (!traits || Object.keys(traits).length === 0) {
+    return {
+      is_plant: false,
+      confidence: 0,
+      reason: '未提取到任何植物特徵'
+    };
+  }
+
+  // 關鍵特徵（高權重）
+  const keyTraits = ['leaf_arrangement', 'leaf_shape', 'inflorescence'];
+  
+  // 次要特徵（中等權重）
+  const secondaryTraits = ['life_form', 'leaf_margin', 'flower_color'];
+  
+  // 檢查關鍵特徵
+  let highConfidenceKeyTraits = 0;
+  let mediumConfidenceKeyTraits = 0;
+  
+  for (const key of keyTraits) {
+    if (traits[key]) {
+      const conf = traits[key].confidence;
+      if (conf >= 0.75) {
+        highConfidenceKeyTraits++;
+      } else if (conf >= 0.5) {
+        mediumConfidenceKeyTraits++;
+      }
+    }
+  }
+
+  // 計算總有效特徵數
+  const totalValidTraits = Object.keys(traits).length;
+
+  // 判斷邏輯
+  if (highConfidenceKeyTraits >= 1) {
+    // 有高 confidence 的關鍵特徵，判定為植物
+    return {
+      is_plant: true,
+      confidence: 0.9,
+      reason: `檢測到 ${highConfidenceKeyTraits} 個高信心度關鍵特徵（葉序/葉形/花序）`
+    };
+  } else if (mediumConfidenceKeyTraits >= 1 && totalValidTraits >= 2) {
+    // 有中等 confidence 的關鍵特徵，且總共有 2+ 個有效特徵
+    return {
+      is_plant: true,
+      confidence: 0.7,
+      reason: `檢測到 ${mediumConfidenceKeyTraits} 個中等信心度關鍵特徵，共 ${totalValidTraits} 個有效特徵`
+    };
+  } else if (totalValidTraits >= 3) {
+    // 總共有 3+ 個有效特徵（即使都不是關鍵特徵）
+    return {
+      is_plant: true,
+      confidence: 0.6,
+      reason: `檢測到 ${totalValidTraits} 個有效植物特徵`
+    };
+  } else {
+    // 特徵不足，判定為非植物
+    return {
+      is_plant: false,
+      confidence: 0.3,
+      reason: `特徵不足：僅有 ${totalValidTraits} 個有效特徵，且無關鍵特徵`
+    };
+  }
+}
+
+/**
+ * 將 traits 轉換為特徵列表（用於 hybrid_search）
+ * @param {Object} traits - 驗證後的 traits 物件
+ * @returns {Array<string>} 特徵列表
+ */
+function traitsToFeatureList(traits) {
+  if (!traits || Object.keys(traits).length === 0) {
+    return [];
+  }
+
+  const features = [];
+  
+  // 映射表：將英文 trait value 轉換為中文關鍵字
+  const traitValueMap = {
+    // life_form
+    'tree': '喬木',
+    'small_tree': '小喬木',
+    'shrub': '灌木',
+    'subshrub': '亞灌木',
+    'herb': '草本',
+    'annual_herb': '一年生草本',
+    'biennial_herb': '二年生草本',
+    'perennial_herb': '多年生草本',
+    'vine': '藤本',
+    'climbing_vine': '攀緣藤本',
+    'aquatic': '水生植物',
+    
+    // leaf_arrangement
+    'alternate': '互生',
+    'opposite': '對生',
+    'whorled': '輪生',
+    'fascicled': '叢生',
+    'basal': '基生',
+    'clustered': '簇生',
+    
+    // leaf_shape
+    'ovate': '卵形',
+    'obovate': '倒卵形',
+    'lanceolate': '披針形',
+    'linear': '線形',
+    'elliptic': '橢圓形',
+    'oblong_elliptic': '長橢圓形',
+    'orbicular': '圓形',
+    'cordate': '心形',
+    'reniform': '腎形',
+    'triangular': '三角形',
+    'rhombic': '菱形',
+    'spatulate': '匙形',
+    'fiddle': '提琴形',
+    'palmate': '掌狀',
+    'acicular': '針形',
+    
+    // leaf_margin
+    'entire': '全緣',
+    'serrate': '鋸齒',
+    'undulate': '波狀緣',
+    'crenate': '圓鋸齒',
+    'shallow_lobed': '淺裂',
+    'deep_lobed': '深裂',
+    'pinnatifid': '羽狀裂',
+    'palmately_lobed': '掌狀裂',
+    
+    // inflorescence
+    'raceme': '總狀花序',
+    'panicle': '圓錐花序',
+    'corymb_cyme': '聚繖花序',
+    'spike': '穗狀花序',
+    'umbel': '繖形花序',
+    'capitulum': '頭狀花序',
+    'spadix_spathe': '佛焰花序',
+    'catkin': '葇荑花序',
+    
+    // flower_color
+    'white': '白花',
+    'yellow': '黃花',
+    'red': '紅花',
+    'purple': '紫花',
+    'pink': '粉紅花',
+    'orange': '橙花',
+    'green': '綠花',
+    'blue': '藍花',
+    
+    // fruit_type
+    'drupe': '核果',
+    'capsule': '蒴果',
+    'achene': '瘦果',
+    'berry': '漿果',
+    'legume': '莢果',
+    'samara': '翅果',
+    'nut': '堅果',
+    'pome': '梨果',
+    'aggregate': '聚合果',
+    'caryopsis': '穎果',
+    
+    // surface_hair
+    'glabrous': '無毛',
+    'pubescent_soft': '柔毛',
+    'tomentose': '絨毛',
+    'hirsute': '粗毛',
+    'spiny': '有刺',
+    'scaly': '鱗片'
+  };
+
+  for (const [key, trait] of Object.entries(traits)) {
+    if (trait && trait.value && trait.value !== 'unknown') {
+      // 優先使用映射表
+      const chineseKeyword = traitValueMap[trait.value];
+      if (chineseKeyword) {
+        features.push(chineseKeyword);
+      } else {
+        // 如果沒有映射，使用原始 value（可能需要後續處理）
+        console.warn(`[TraitsParser] 未找到 ${key}=${trait.value} 的中文映射`);
+      }
+    }
+  }
+
+  return features;
+}
+
+module.exports = {
+  parseTraitsFromResponse,
+  validateTraits,
+  isPlantFromTraits,
+  traitsToFeatureList
+};

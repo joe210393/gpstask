@@ -111,7 +111,7 @@ success 或 fail (只能二選一，小寫)
 
 **重要：你必須按照以下步驟進行分析，絕對不能跳過任何步驟！**
 
-請依照以下 XML 格式回答：
+請依照以下 XML 格式回答，並在最後輸出結構化的 traits JSON：
 
 <analysis>
 **第一步：尺寸判斷（必須完成，用於驗證生活型）**
@@ -221,6 +221,31 @@ success 或 fail (只能二選一，小寫)
 
 **注意：絕對不要直接給出最終答案！你只能描述細節和猜測，最終答案需要透過資料庫比對後才能確定。**
 </analysis>
+
+**第七步：輸出結構化特徵（僅限植物，必須輸出 JSON）**
+如果第三步判斷為「植物」，請在 </reply> 之後輸出以下 JSON 格式的特徵資料（不要加其他文字）：
+
+\`\`\`json
+{
+  "life_form": {"value":"shrub","confidence":0.8,"evidence":"植株呈木質分枝"},
+  "phenology": {"value":"evergreen","confidence":0.7,"evidence":"葉片全年保持綠色"},
+  "leaf_arrangement": {"value":"opposite","confidence":0.9,"evidence":"葉片對生排列"},
+  "leaf_shape": {"value":"ovate","confidence":0.8,"evidence":"葉片呈卵形"},
+  "leaf_margin": {"value":"serrate","confidence":0.85,"evidence":"葉緣有明顯鋸齒"},
+  "leaf_texture": {"value":"chartaceous_thick","confidence":0.6,"evidence":"葉片質地厚紙質"},
+  "inflorescence": {"value":"corymb_cyme","confidence":0.9,"evidence":"聚繖花序，花朵密集排列成球狀"},
+  "flower_color": {"value":"pink","confidence":0.9,"evidence":"花朵呈粉紅色"},
+  "fruit_type": {"value":"unknown","confidence":0.1,"evidence":"照片未見果實"},
+  "fruit_color": {"value":"unknown","confidence":0.1,"evidence":"照片未見果實"},
+  "surface_hair": {"value":"glabrous","confidence":0.7,"evidence":"葉片表面光滑無毛"}
+}
+\`\`\`
+
+**重要規則：**
+1. 每個 trait 都要有 value、confidence(0~1)、evidence
+2. 如果看不到或無法判斷，請回傳 value = "unknown" 並給低 confidence (0.1-0.3)
+3. 只填寫能清楚觀察到的特徵，不確定就不要填或填 unknown
+4. 如果第三步判斷為「動物」或「人造物」，請輸出空的 JSON：{}
 
 <reply>
 用親切、專業但通俗的語氣向玩家介紹這個東西。

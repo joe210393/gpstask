@@ -13,6 +13,7 @@ const webpush = require('web-push');
 const XLSX = require('xlsx');
 const { getDbConfig } = require('./db-config');
 const { smartSearch, classify, hybridSearch, getVisionPrompt, parseVisionResponse, healthCheck, stats: embeddingStats } = require('./scripts/rag/vectordb/plant-search-client');
+const { parseTraitsFromResponse, isPlantFromTraits, traitsToFeatureList } = require('./scripts/rag/vectordb/traits-parser');
 
 // 避免 Embedding API 暫時不可用時，前端不斷重送導致「看起來像無限循環」
 let _embeddingHealthCache = { ts: 0, ok: null, ready: null };
@@ -3348,11 +3349,11 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
               }
             } else {
               // 分類結果顯示非植物，直接跳過搜尋（省 token）
-              console.log(
-                `⏭️ 跳過 RAG 搜尋（非植物）: category=${classification.category || 'unknown'} plant_score=${
-                  classification.plant_score ?? 'n/a'
-                }`
-              );
+              const reason = traitsBasedDecision 
+                ? `Traits 判斷: ${traitsBasedDecision.reason}` 
+                : `Classify 判斷: category=${classification.category || 'unknown'} plant_score=${classification.plant_score?.toFixed(3) ?? 'n/a'} < ${PLANT_SCORE_THRESHOLD}`;
+              
+              console.log(`⏭️ 跳過 RAG 搜尋（非植物）: ${reason}`);
               plantResults = {
                 is_plant: false,
                 category: classification.category,
