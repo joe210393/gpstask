@@ -95,10 +95,11 @@ def main():
         print(f"   - 唯一植物 ID: 4,302 筆")
         print(f"   - 實際 Qdrant 向量: {count:,} 筆")
         
-        # 統計所有資料來源
+        # 統計所有資料來源（取樣）
+        sample_size = min(1000, count)
         all_results = client.scroll(
             collection_name=COLLECTION_NAME,
-            limit=1000,  # 取樣 1000 筆統計
+            limit=sample_size,
             with_payload=True
         )
         
@@ -111,24 +112,29 @@ def main():
             if source == 'forest-gov-tw':
                 forest_gov_tw_count += 1
         
-        print(f"\n📊 資料來源統計（取樣 1000 筆）：")
+        print(f"\n📊 資料來源統計（取樣 {len(all_results[0])} 筆）：")
         for source, cnt in sorted(source_stats.items(), key=lambda x: x[1], reverse=True):
-            percentage = (cnt / len(all_results[0])) * 100
+            percentage = (cnt / len(all_results[0])) * 100 if len(all_results[0]) > 0 else 0
             print(f"   {source}: {cnt} 筆 ({percentage:.1f}%)")
         
         # 估算總數
         if len(all_results[0]) > 0:
             forest_gov_tw_percentage = (forest_gov_tw_count / len(all_results[0])) * 100
             estimated_forest_gov_tw = int(count * forest_gov_tw_percentage / 100)
-            print(f"\n📈 估算（基於取樣）：")
+            print(f"\n📈 估算（基於取樣 {len(all_results[0])} 筆）：")
             print(f"   forest-gov-tw 資料: 約 {estimated_forest_gov_tw:,} 筆 ({forest_gov_tw_percentage:.1f}%)")
-        
-        if count >= 4000 and estimated_forest_gov_tw >= 4000:
-            print(f"\n✅ 向量資料包含新資料（forest-gov-tw）")
-        elif count >= 4000:
-            print(f"\n⚠️  向量數量足夠，但新資料比例較低")
+            print(f"   預期新資料: 4,670 筆（唯一植物 ID: 4,302 筆）")
+            
+            if estimated_forest_gov_tw >= 4000:
+                print(f"\n✅ 新資料（forest-gov-tw）已存在於 Qdrant 中")
+                if estimated_forest_gov_tw > 5000:
+                    print(f"   ⚠️  數量比預期多，可能包含重複資料或多次上傳")
+            elif count >= 4000:
+                print(f"\n⚠️  向量數量足夠，但新資料比例較低（{forest_gov_tw_percentage:.1f}%）")
+            else:
+                print(f"\n⚠️  向量數量較少，可能是舊資料")
         else:
-            print(f"\n⚠️  向量數量較少，可能是舊資料")
+            print(f"\n⚠️  無法取樣資料")
         
     except Exception as e:
         print(f"\n❌ 錯誤: {e}")
