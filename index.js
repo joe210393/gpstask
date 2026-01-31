@@ -3569,7 +3569,9 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 lmNameLower.includes(plantNameLower) ||
                 lmNameLower.includes(scientificNameLower)) {
               // LM 提到的植物名稱與 RAG 結果匹配，給予信心度加成
-              lmConfidenceBoost = 0.25; // 加成 0.25（25%）
+              // 使用更高的加成（0.4 = 40%），因為 LM 和 RAG 都正確識別了植物
+              // 這表示辨識結果非常可靠
+              lmConfidenceBoost = 0.4; // 加成 0.4（40%）
               console.log(`✅ LM 與 RAG 匹配: LM提到「${lmName}」，RAG找到「${plant.chinese_name}」，給予信心度加成 ${(lmConfidenceBoost * 100).toFixed(0)}%`);
               break;
             }
