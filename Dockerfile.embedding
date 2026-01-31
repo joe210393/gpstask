@@ -18,13 +18,15 @@ COPY scripts/rag/vectordb/feature_weights.py .
 RUN mkdir -p /app/data
 # 先刪除可能存在的舊檔案
 RUN rm -f /app/data/plants-enriched.jsonl
-# 複製新資料檔案
+# 複製新資料檔案（必須成功，否則構建失敗）
 COPY scripts/rag/data/plants-forest-gov-tw.jsonl /app/data/plants-forest-gov-tw.jsonl
-# 確認新檔案已複製（如果失敗會中斷構建）
-RUN test -f /app/data/plants-forest-gov-tw.jsonl && \
-    ls -lh /app/data/plants-forest-gov-tw.jsonl && \
+# 立即確認新檔案已複製（如果失敗會中斷構建）
+RUN ls -lh /app/data/plants-forest-gov-tw.jsonl && \
     echo "✅ 新資料檔案已複製" || \
-    (echo "❌ 錯誤：新資料檔案不存在！請檢查 COPY 路徑和構建上下文" && exit 1)
+    (echo "❌ 錯誤：新資料檔案不存在！COPY 指令可能失敗" && \
+     echo "   請檢查構建日誌中的 COPY 錯誤訊息" && \
+     echo "   構建上下文應該是專案根目錄" && \
+     exit 1)
 # 再次確認刪除舊檔案（防止從其他來源複製）
 RUN rm -f /app/data/plants-enriched.jsonl && \
     ls -lh /app/data/ && \
