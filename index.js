@@ -3514,16 +3514,41 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
       const replyMatch = description.match(/<reply>([\s\S]*?)<\/reply>/i);
       const replyText = replyMatch ? replyMatch[1] : description;
       
-      // 提取中文名（常見模式：金魚草、香堇菜、Snapdragon 等）
-      const chineseNameMatch = replyText.match(/([金魚草香堇菜倒鈴花學生花]+|Snapdragon|Antirrhinum majus)/i);
-      if (chineseNameMatch) {
-        lmPlantNames.push(chineseNameMatch[1]);
+      // 方法 1: 從 RAG 結果中取得所有可能的中文名和學名，然後在 LM 回答中搜尋
+      // 這樣可以匹配任何植物名稱，而不只是特定幾個
+      const allPossibleNames = [];
+      for (const plant of plantResults.plants) {
+        if (plant.chinese_name && plant.chinese_name.length >= 2) {
+          allPossibleNames.push(plant.chinese_name);
+        }
+        if (plant.scientific_name && plant.scientific_name.length >= 2) {
+          allPossibleNames.push(plant.scientific_name);
+        }
       }
       
-      // 提取學名（常見模式：*Antirrhinum majus*、Antirrhinum majus）
-      const scientificNameMatch = replyText.match(/\*?([A-Z][a-z]+ [a-z]+)\*?/);
-      if (scientificNameMatch) {
-        lmPlantNames.push(scientificNameMatch[1]);
+      // 在 LM 回答中搜尋這些名稱
+      for (const name of allPossibleNames) {
+        // 檢查中文名（至少 2 個字）
+        if (name.length >= 2 && replyText.includes(name)) {
+          lmPlantNames.push(name);
+        }
+        // 檢查學名（格式：Genus species，使用正則表達式匹配）
+        const scientificNamePattern = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // 轉義特殊字符
+        if (replyText.match(new RegExp(scientificNamePattern, 'i'))) {
+          lmPlantNames.push(name);
+        }
+      }
+      
+      // 方法 2: 提取學名（常見模式：*Antirrhinum majus*、Antirrhinum majus）
+      // 作為備用方法，以防 RAG 結果中沒有學名
+      const scientificNameMatches = replyText.match(/\*?([A-Z][a-z]+(?:\s+[a-z]+)+)\*?/g);
+      if (scientificNameMatches) {
+        for (const match of scientificNameMatches) {
+          const cleanName = match.replace(/[*_]/g, '').trim();
+          if (cleanName.length > 0) {
+            lmPlantNames.push(cleanName);
+          }
+        }
       }
       
       // 檢查 RAG 結果中是否有匹配的植物
