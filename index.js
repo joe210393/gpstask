@@ -3335,6 +3335,9 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
     }
 
     // 6. 如果預先 RAG 沒有結果，進行後續 RAG 搜尋（驗證和補充）
+    // 注意：如果預先搜尋已經有結果，應該保留它，不要被後續搜尋覆蓋
+    // 除非後續搜尋的分數明顯更高（例如高 20% 以上）
+    let preSearchResults = plantResults; // 保存預先搜尋的結果
     if (!plantResults) {
       try {
         const embeddingReady = await isEmbeddingApiReady();
