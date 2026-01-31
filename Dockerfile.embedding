@@ -19,7 +19,8 @@ RUN mkdir -p /app/data
 # 先刪除可能存在的舊檔案（強制清除，避免快取問題）
 RUN rm -rf /app/data/*.jsonl || true
 # 添加 ARG 強制重新執行 COPY（避免構建快取問題）
-ARG FORCE_REBUILD=2025-01-31
+# 每次需要清除快取時，修改這個值即可
+ARG FORCE_REBUILD=2025-01-31-2
 # 複製新資料檔案（必須成功，否則構建失敗）
 COPY scripts/rag/data/plants-forest-gov-tw.jsonl /app/data/plants-forest-gov-tw.jsonl
 # 立即確認新檔案已複製（如果失敗會中斷構建）
