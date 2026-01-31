@@ -273,22 +273,32 @@ def _init_background_impl():
 
     # 5. 載入特徵資料
     import os.path
-    # 優先使用新的資料檔案
-    possible_paths = [
+    # 優先使用新的資料檔案，明確排除舊檔案
+    preferred_paths = [
+        "/app/data/plants-forest-gov-tw.jsonl",  # Docker 容器中的路徑（優先）
         os.path.join(os.path.dirname(__file__), "..", "data", "plants-forest-gov-tw.jsonl"),
         os.path.join(os.path.dirname(__file__), "data", "plants-forest-gov-tw.jsonl"),
-        "/app/data/plants-forest-gov-tw.jsonl",
-        # 向後兼容舊檔案（僅作為備用）
+    ]
+    
+    # 備用路徑（僅當新檔案不存在時使用）
+    fallback_paths = [
         os.path.join(os.path.dirname(__file__), "..", "data", "plants-enriched.jsonl"),
         os.path.join(os.path.dirname(__file__), "data", "plants-enriched.jsonl"),
         "/app/data/plants-enriched.jsonl",
     ]
+    
     data_path = None
-    for path in possible_paths:
+    # 先搜尋新檔案
+    for path in preferred_paths:
         if os.path.exists(path):
             data_path = path
-            # 如果找到新檔案，優先使用，不再繼續尋找
-            if "plants-forest-gov-tw.jsonl" in path:
+            break
+    
+    # 如果新檔案不存在，才使用舊檔案
+    if not data_path:
+        for path in fallback_paths:
+            if os.path.exists(path):
+                data_path = path
                 break
 
     if data_path and FeatureWeightCalculator:
