@@ -3376,6 +3376,15 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
 
               if (hybridResult.results?.length > 0) {
                 console.log(`✅ Traits-based 混合搜尋找到 ${hybridResult.results.length} 個結果`);
+                // 顯示所有檢測到的植物（用於調試）
+                console.log('📋 所有檢測到的植物：');
+                hybridResult.results.forEach((p, idx) => {
+                  console.log(`  ${idx + 1}. ${p.chinese_name} (${p.scientific_name || '無學名'}) - 分數: ${(p.score * 100).toFixed(1)}% (embedding: ${(p.embedding_score * 100).toFixed(1)}%, feature: ${(p.feature_score * 100).toFixed(1)}%)`);
+                  if (p.matched_features && p.matched_features.length > 0) {
+                    console.log(`     匹配特徵: ${p.matched_features.join(', ')}`);
+                  }
+                });
+                
                 plantResults = {
                   is_plant: true,
                   search_type: 'hybrid_traits',
@@ -3420,6 +3429,15 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
 
               if (hybridResult.results?.length > 0) {
                 console.log(`✅ 混合搜尋找到 ${hybridResult.results.length} 個結果`);
+                // 顯示所有檢測到的植物（用於調試）
+                console.log('📋 所有檢測到的植物：');
+                hybridResult.results.forEach((p, idx) => {
+                  console.log(`  ${idx + 1}. ${p.chinese_name} (${p.scientific_name || '無學名'}) - 分數: ${(p.score * 100).toFixed(1)}% (embedding: ${(p.embedding_score * 100).toFixed(1)}%, feature: ${(p.feature_score * 100).toFixed(1)}%)`);
+                  if (p.matched_features && p.matched_features.length > 0) {
+                    console.log(`     匹配特徵: ${p.matched_features.join(', ')}`);
+                  }
+                });
+                
                 plantResults = {
                   is_plant: true,
                   search_type: 'hybrid',
@@ -3472,6 +3490,12 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
 
               if (ragResult.classification?.is_plant && ragResult.results?.length > 0) {
                 console.log(`✅ 傳統搜尋找到 ${ragResult.results.length} 個結果`);
+                // 顯示所有檢測到的植物（用於調試）
+                console.log('📋 所有檢測到的植物：');
+                ragResult.results.forEach((p, idx) => {
+                  console.log(`  ${idx + 1}. ${p.chinese_name} (${p.scientific_name || '無學名'}) - 分數: ${(p.score * 100).toFixed(1)}%`);
+                });
+                
                 plantResults = {
                   is_plant: true,
                   search_type: 'embedding',
