@@ -1635,6 +1635,43 @@ success 或 fail (只能二選一，小寫)
             }
         });
 
+        // 顯示第一階段結果（快速特徵提取）
+        function showQuickFeatures(features) {
+            // 格式化特徵文字（將列表格式轉換為更易讀的格式）
+            let formattedFeatures = features;
+            
+            // 如果是列表格式（*   **生活型:** ...），轉換為更易讀的格式
+            if (features.includes('*') && features.includes('**')) {
+                formattedFeatures = features
+                    .split('\n')
+                    .filter(line => line.trim().startsWith('*'))
+                    .map(line => {
+                        // 移除 * 和 ** 標記，保留內容
+                        return line.replace(/^\*\s*\*\*/, '•').replace(/\*\*/g, '').trim();
+                    })
+                    .join('\n');
+            }
+            
+            aiResult.innerHTML = `
+                <div style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-radius: 12px; padding: 16px; margin-bottom: 16px; border: 1px solid #81c784;">
+                    <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                        <div style="font-size: 24px; margin-right: 8px;">🔍</div>
+                        <div style="font-size: 16px; font-weight: 600; color: #2e7d32;">圖片細節分析</div>
+                    </div>
+                    <div style="background: white; border-radius: 8px; padding: 12px; font-size: 14px; line-height: 1.8; color: #333; white-space: pre-wrap;">${formattedFeatures}</div>
+                    <div style="margin-top: 12px; text-align: center; font-size: 12px; color: #666;">
+                        <div style="display: inline-flex; align-items: center;">
+                            <div style="width: 12px; height: 12px; border-radius: 50%; background: #4caf50; margin-right: 6px; animation: pulse 1.5s infinite;"></div>
+                            正在比對資料庫，請稍候...
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 確保結果區域可見
+            aiResult.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
         // 高信心度結果 (>85%)
         function showHighConfidenceResult(allResults, plants, confidence) {
             const topPlant = plants[0];
