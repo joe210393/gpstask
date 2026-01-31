@@ -95,46 +95,72 @@ def main():
         print(f"   - 唯一植物 ID: 4,302 筆")
         print(f"   - 實際 Qdrant 向量: {count:,} 筆")
         
-        # 統計所有資料來源（取樣）
+        # 統計所有資料來源（取樣，最多 1000 筆）
         sample_size = min(1000, count)
-        all_results = client.scroll(
-            collection_name=COLLECTION_NAME,
-            limit=sample_size,
-            with_payload=True
-        )
+        print(f"\n📊 正在取樣 {sample_size} 筆資料進行統計...")
         
         source_stats = {}
         forest_gov_tw_count = 0
-        for point in all_results[0]:
-            payload = point.payload
-            source = payload.get('source', 'unknown')
-            source_stats[source] = source_stats.get(source, 0) + 1
-            if source == 'forest-gov-tw':
-                forest_gov_tw_count += 1
+        total_sampled = 0
         
-        print(f"\n📊 資料來源統計（取樣 {len(all_results[0])} 筆）：")
+        # 使用 scroll 分批取樣
+        offset = None
+        batch_size = 100
+        
+        while total_sampled < sample_size:
+            current_batch = min(batch_size, sample_size - total_sampled)
+            try:
+                result = client.scroll(
+                    collection_name=COLLECTION_NAME,
+                    limit=current_batch,
+                    offset=offset,
+                    with_payload=True
+                )
+                points, next_offset = result
+                
+                if len(points) == 0:
+                    break
+                
+                for point in points:
+                    payload = point.payload
+                    source = payload.get('source', 'unknown')
+                    source_stats[source] = source_stats.get(source, 0) + 1
+                    if source == 'forest-gov-tw':
+                        forest_gov_tw_count += 1
+                
+                total_sampled += len(points)
+                offset = next_offset
+                
+                if next_offset is None:
+                    break
+            except Exception as e:
+                print(f"   ⚠️  取樣時發生錯誤: {e}")
+                break
+        
+        if total_sampled == 0:
+            print("⚠️  無法取樣資料")
+            return
+        
+        print(f"\n📊 資料來源統計（取樣 {total_sampled} 筆）：")
         for source, cnt in sorted(source_stats.items(), key=lambda x: x[1], reverse=True):
-            percentage = (cnt / len(all_results[0])) * 100 if len(all_results[0]) > 0 else 0
+            percentage = (cnt / total_sampled) * 100
             print(f"   {source}: {cnt} 筆 ({percentage:.1f}%)")
         
         # 估算總數
-        if len(all_results[0]) > 0:
-            forest_gov_tw_percentage = (forest_gov_tw_count / len(all_results[0])) * 100
-            estimated_forest_gov_tw = int(count * forest_gov_tw_percentage / 100)
-            print(f"\n📈 估算（基於取樣 {len(all_results[0])} 筆）：")
-            print(f"   forest-gov-tw 資料: 約 {estimated_forest_gov_tw:,} 筆 ({forest_gov_tw_percentage:.1f}%)")
-            print(f"   預期新資料: 4,670 筆（唯一植物 ID: 4,302 筆）")
-            
-            if estimated_forest_gov_tw >= 4000:
-                print(f"\n✅ 新資料（forest-gov-tw）已存在於 Qdrant 中")
-                if estimated_forest_gov_tw > 5000:
-                    print(f"   ⚠️  數量比預期多，可能包含重複資料或多次上傳")
-            elif count >= 4000:
-                print(f"\n⚠️  向量數量足夠，但新資料比例較低（{forest_gov_tw_percentage:.1f}%）")
-            else:
-                print(f"\n⚠️  向量數量較少，可能是舊資料")
+        forest_gov_tw_percentage = (forest_gov_tw_count / total_sampled) * 100
+        estimated_forest_gov_tw = int(count * forest_gov_tw_percentage / 100)
+        print(f"\n📈 估算（基於取樣 {total_sampled} 筆）：")
+        print(f"   forest-gov-tw 資料: 約 {estimated_forest_gov_tw:,} 筆 ({forest_gov_tw_percentage:.1f}%)")
+        print(f"   預期新資料: 4,670 筆（唯一植物 ID: 4,302 筆）")
+        
+        if estimated_forest_gov_tw >= 4000:
+            print(f"\n✅ 新資料（forest-gov-tw）已存在於 Qdrant 中")
+            if estimated_forest_gov_tw > 5000:
+                print(f"   ⚠️  數量比預期多，可能包含重複資料或多次上傳")
+        elif count >= 4000:
+            print(f"\n⚠️  向量數量足夠，但新資料比例較低（{forest_gov_tw_percentage:.1f}%）")
         else:
-            print(f"\n⚠️  無法取樣資料")
+            print(f"\n⚠️  向量數量較少，可能是舊資料")
         
     except Exception as e:
         print(f"\n❌ 錯誤: {e}")
