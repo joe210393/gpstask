@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """
-植物資料向量化腳本（使用 Jina API）
+植物資料向量化腳本（使用 Jina API，1024 維）
 適配新的 plants-forest-gov-tw.jsonl 格式
+
+**重要：此腳本使用 Jina API（1024 維），會消耗 Jina API tokens**
+**但 1024 維能提供更好的細節辨識精度**
 
 使用方式：
 1. 設定環境變數：
@@ -11,6 +14,15 @@
 
 2. 執行：
    python embed_plants_forest_jina.py
+
+3. 生產環境設定（Zeabur）：
+   - 在 embedding-api 服務中設定：USE_JINA_API=true（或 auto）
+   - 這樣生產環境也會使用 Jina API（1024 維），與向量化資料匹配
+
+Token 消耗估算：
+   - 約 4,670 筆資料
+   - 每筆約 200-500 tokens
+   - 總計約 1,000,000 - 2,000,000 tokens（約 10-20% 的免費額度）
 """
 
 import json
@@ -273,6 +285,21 @@ def main():
     if not remaining:
         print("✅ 所有資料已處理完成！")
         return
+    
+    # 估算總 tokens（粗略估算）
+    print(f"\n💰 Token 消耗估算：")
+    sample_texts = [create_plant_text(p) for p in remaining[:10]]
+    avg_chars = sum(len(t) for t in sample_texts) / len(sample_texts) if sample_texts else 0
+    estimated_total_tokens = int(len(remaining) * avg_chars / 1.5)  # 中文字符約 1.5 字符 = 1 token
+    print(f"   預估總 tokens：{estimated_total_tokens:,} tokens")
+    print(f"   您目前剩餘：10,000,000 tokens（免費額度）")
+    print(f"   預估消耗比例：{estimated_total_tokens / 10_000_000 * 100:.2f}%")
+    print(f"   剩餘 tokens：{10_000_000 - estimated_total_tokens:,} tokens")
+    print(f"\n   繼續向量化？(yes/no): ", end="")
+    response = input().strip().lower()
+    if response != 'yes':
+        print("   已取消操作")
+        sys.exit(0)
     
     # 批次處理
     for i in range(0, len(remaining), BATCH_SIZE):
