@@ -3159,8 +3159,98 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
       throw new Error('AI_MODEL 未設定：請在部署環境設定 AI_MODEL（例如：google/gemma-3-12b）');
     }
 
+    // 3.5. 先進行快速特徵提取和 RAG 搜尋（協同模式）
+    // 目標：提高整體辨識率，讓 LM 和 RAG 協同工作
+    let plantResults = null;
+    let ragContextForLM = ''; // RAG 結果，將加入 LM prompt
+    
+    try {
+      const embeddingReady = await isEmbeddingApiReady();
+      if (embeddingReady) {
+        console.log('🔍 協同模式：先進行快速 RAG 搜尋...');
+        
+        // 先進行一次簡化的特徵提取（只提取關鍵特徵，不給答案）
+        const quickFeaturePrompt = `你是一位專業的植物形態學家。請快速分析圖片中的植物特徵，只提取關鍵識別特徵（生活型、葉序、葉形、花序、花色等），不要給出植物名稱。用簡短文字描述即可。`;
+        
+        try {
+          const quickResponse = await fetch(`${AI_API_URL}/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${AI_API_KEY}`
+            },
+            body: JSON.stringify({
+              model: AI_MODEL,
+              messages: [
+                { role: "system", content: quickFeaturePrompt },
+                {
+                  role: "user",
+                  content: [
+                    { type: "text", text: "請快速提取這張圖片中植物的關鍵識別特徵（生活型、葉序、葉形、花序、花色等），用簡短文字描述。" },
+                    { type: "image_url", image_url: { url: dataUrl } }
+                  ]
+                }
+              ],
+              max_tokens: 500,
+              temperature: 0.3
+            })
+          });
+          
+          if (quickResponse.ok) {
+            const quickData = await quickResponse.json();
+            const quickDescription = quickData.choices[0].message.content;
+            console.log('📊 快速特徵提取完成，開始 RAG 搜尋...');
+            
+            // 使用快速提取的特徵進行 RAG 搜尋
+            const traits = parseTraitsFromResponse(quickDescription);
+            
+            if (traits) {
+              const traitsBasedDecision = isPlantFromTraits(traits);
+              if (traitsBasedDecision.is_plant) {
+                const features = traitsToFeatureList(traits);
+                const hybridResult = await hybridSearch({
+                  query: quickDescription,
+                  features: features,
+                  guessNames: [],
+                  topK: 5  // 取前 5 個候選，讓 LM 參考
+                });
+                
+                if (hybridResult.results?.length > 0) {
+                  console.log(`✅ RAG 找到 ${hybridResult.results.length} 個候選植物`);
+                  plantResults = {
+                    is_plant: true,
+                    search_type: 'hybrid_traits_pre',
+                    plants: hybridResult.results.map(p => ({
+                      chinese_name: p.chinese_name,
+                      scientific_name: p.scientific_name,
+                      family: p.family,
+                      life_form: p.life_form,
+                      score: p.score,
+                      summary: p.summary
+                    }))
+                  };
+                  
+                  // 建立 RAG 上下文，加入 LM prompt
+                  const topPlants = hybridResult.results.slice(0, 3);
+                  ragContextForLM = `\n\n**重要：資料庫比對結果（請參考但不要完全依賴）**\n根據特徵比對，資料庫中最可能的候選植物是：\n${topPlants.map((p, i) => `${i + 1}. ${p.chinese_name}（${p.scientific_name}）\n   - 科：${p.family || '未知'}\n   - 生活型：${p.life_form || '未知'}\n   - 匹配度：${(p.score * 100).toFixed(1)}%\n   - 摘要：${p.summary || '無'}`).join('\n\n')}\n\n請結合圖片觀察和上述候選植物，給出最準確的判斷。如果圖片特徵與候選植物高度吻合，可以確認；如果不吻合，請根據圖片實際特徵判斷。`;
+                }
+              }
+            }
+          }
+        } catch (quickErr) {
+          console.warn('⚠️ 快速特徵提取失敗，繼續正常流程:', quickErr.message);
+        }
+      }
+    } catch (ragPreErr) {
+      console.warn('⚠️ 預先 RAG 搜尋失敗，繼續正常流程:', ragPreErr.message);
+    }
+
+    // 4. 呼叫 AI（將 RAG 結果加入 prompt，讓 LM 參考）
     console.log('🤖 正在呼叫 AI:', AI_API_URL);
     console.log('📝 System Prompt:', systemPrompt.substring(0, 50) + '...');
+    
+    // 將 RAG 上下文加入 system prompt
+    const enhancedSystemPrompt = systemPrompt + ragContextForLM;
 
     const aiResponse = await fetch(`${AI_API_URL}/chat/completions`, {
       method: 'POST',
@@ -3173,7 +3263,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
         messages: [
           {
             role: "system",
-            content: systemPrompt
+            content: enhancedSystemPrompt
           },
           {
             role: "user",
@@ -3188,8 +3278,8 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
             ]
           }
         ],
-        max_tokens: 2000, // 增加 token 數以容納完整的分析過程和回答
-        temperature: 0.7 // 稍微增加創造力
+        max_tokens: 2000,
+        temperature: 0.7
       })
     });
 
@@ -3208,21 +3298,18 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
       console.warn('⚠️ AI 回應被截斷（finish_reason: length），可能缺少完整的 XML 格式');
     }
 
-    // 4. 從 AI 回應中提取詳細描述（用於 RAG 搜尋）
-    // 嘗試從 XML <analysis> 標籤中提取詳細描述
+    // 5. 從 AI 回應中提取詳細描述（用於後續 RAG 驗證）
     let detailedDescription = description;
     const analysisMatch = description.match(/<analysis>([\s\S]*?)<\/analysis>/i);
     if (analysisMatch) {
       detailedDescription = analysisMatch[1].trim();
       console.log('📋 從 <analysis> 提取詳細描述:', detailedDescription.substring(0, 100) + '...');
     } else {
-      // 如果沒有完整的 <analysis> 標籤，嘗試提取部分內容
       const partialAnalysisMatch = description.match(/<analysis>([\s\S]*)/i);
       if (partialAnalysisMatch) {
         detailedDescription = partialAnalysisMatch[1].trim();
         console.log('⚠️ 找到不完整的 <analysis> 標籤（可能被截斷），使用部分內容');
       } else {
-        // 嘗試從回應中提取關鍵描述部分
         const stepMatch = description.match(/第二步：詳細描述圖片細節[^]*?([\s\S]{200,})/i);
         if (stepMatch) {
           detailedDescription = stepMatch[1].trim();
@@ -3233,10 +3320,10 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
       }
     }
 
-    // 5. 植物 RAG 搜尋（使用詳細描述，而不是猜測的名稱）
-    let plantResults = null;
-    try {
-      const embeddingReady = await isEmbeddingApiReady();
+    // 6. 如果預先 RAG 沒有結果，進行後續 RAG 搜尋（驗證和補充）
+    if (!plantResults) {
+      try {
+        const embeddingReady = await isEmbeddingApiReady();
       if (!embeddingReady) {
         console.warn('⚠️ Embedding API 未就緒，跳過植物 RAG');
         plantResults = { is_plant: false, message: 'Embedding API 未就緒，暫時跳過植物搜尋' };
@@ -3413,9 +3500,10 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
           }
         }
       }
-    } catch (ragErr) {
-      console.warn('⚠️ 植物 RAG 查詢失敗 (非致命):', ragErr.message);
-      // RAG 失敗不影響主要回應
+      } catch (ragErr) {
+        console.warn('⚠️ 植物 RAG 查詢失敗 (非致命):', ragErr.message);
+        // RAG 失敗不影響主要回應
+      }
     }
 
     res.json({
