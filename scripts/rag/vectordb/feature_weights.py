@@ -140,7 +140,14 @@ class FeatureWeightCalculator:
                 key_features = []
 
             # 合併所有文字欄位（包含英文描述）
-            # morphology 可能是列表，需要正確處理
+            # 確保所有欄位都是字串
+            life_form_str = ""
+            if life_form:
+                if isinstance(life_form, list):
+                    life_form_str = " ".join([str(lf) for lf in life_form])
+                else:
+                    life_form_str = str(life_form)
+            
             morphology_text = ""
             if morphology:
                 if isinstance(morphology, list):
@@ -148,6 +155,13 @@ class FeatureWeightCalculator:
                     morphology_text = " ".join([str(m) for m in morphology])
                 else:
                     morphology_text = str(morphology)
+            
+            description_str = ""
+            if description:
+                if isinstance(description, list):
+                    description_str = " ".join([str(d) for d in description])
+                else:
+                    description_str = str(description)
             
             # key_features 也是列表
             key_features_text = ""
@@ -158,9 +172,9 @@ class FeatureWeightCalculator:
                     key_features_text = str(key_features)
             
             text = " ".join([
-                life_form or "",
+                life_form_str,
                 morphology_text,
-                description or "",
+                description_str,
                 key_features_text,
             ]).lower()
 
