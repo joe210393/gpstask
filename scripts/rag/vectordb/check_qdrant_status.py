@@ -86,8 +86,8 @@ def main():
                     print(f"     ⚠️  舊資料來源")
         
         print(f"\n📈 資料來源統計（取樣）：")
-        for source, count in sources.items():
-            print(f"   {source}: {count} 筆")
+        for source, cnt in sources.items():
+            print(f"   {source}: {cnt} 筆")
         
         # 檢查預期的向量數量
         print(f"\n💡 預期狀態：")
