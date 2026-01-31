@@ -3145,11 +3145,16 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
     // otherwise the server would try to call localhost and always fail.
     const AI_API_URL =
       process.env.AI_API_URL || (process.env.NODE_ENV !== 'production' ? 'http://localhost:1234/v1' : null);
-    const AI_MODEL = process.env.AI_MODEL || 'local-model'; // LM Studio 通常不挑模型名稱
+    // 生產環境必須設定 AI_MODEL，開發環境使用預設值
+    const AI_MODEL = process.env.AI_MODEL || (process.env.NODE_ENV !== 'production' ? 'google/gemma-3-12b' : null);
     const AI_API_KEY = process.env.AI_API_KEY || 'lm-studio';
 
     if (!AI_API_URL) {
       throw new Error('AI_API_URL 未設定：請在部署環境設定 AI_API_URL / AI_API_KEY / AI_MODEL');
+    }
+    
+    if (!AI_MODEL) {
+      throw new Error('AI_MODEL 未設定：請在部署環境設定 AI_MODEL（例如：google/gemma-3-12b）');
     }
 
     console.log('🤖 正在呼叫 AI:', AI_API_URL);
@@ -3214,99 +3219,121 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
         console.warn('⚠️ Embedding API 未就緒，跳過植物 RAG');
         plantResults = { is_plant: false, message: 'Embedding API 未就緒，暫時跳過植物搜尋' };
       } else {
-      console.log('🌿 正在查詢植物 RAG（使用詳細描述）...');
+        console.log('🌿 正在查詢植物 RAG（使用詳細描述）...');
 
-      // 嘗試解析 Vision AI 的結構化輸出（如果有的話）
-      const visionParsed = parseVisionResponse(description);
-
-      if (visionParsed.success && visionParsed.intent === 'plant') {
-        // 使用混合搜尋（結合特徵權重）
-        // 重要：使用詳細描述作為 query，而不是 shortCaption 或 guess_names
-        console.log(`📊 結構化辨識: intent=${visionParsed.intent}, features=${visionParsed.plant.features.join(',')}`);
-
-        const hybridResult = await hybridSearch({
-          query: detailedDescription, // 使用詳細描述，而不是猜測的名稱
-          features: visionParsed.plant.features || [],
-          guessNames: visionParsed.plant.guess_names || [],
-          topK: 3
-        });
-
-        if (hybridResult.results?.length > 0) {
-          console.log(`✅ 混合搜尋找到 ${hybridResult.results.length} 個結果`);
-          plantResults = {
-            is_plant: true,
-            search_type: 'hybrid',
-            vision_parsed: {
-              intent: visionParsed.intent,
-              confidence: visionParsed.confidence,
-              features: visionParsed.plant.features,
-              guess_names: visionParsed.plant.guess_names
-            },
-            feature_info: hybridResult.feature_info,
-            plants: hybridResult.results.map(p => ({
-              chinese_name: p.chinese_name,
-              scientific_name: p.scientific_name,
-              family: p.family,
-              life_form: p.life_form,
-              score: p.score,
-              embedding_score: p.embedding_score,
-              feature_score: p.feature_score,
-              matched_features: p.matched_features,
-              summary: p.summary
-            }))
-          };
-        }
-      }
-
-      // 如果結構化解析失敗或不是植物，先用 classify 判斷，只有植物才搜尋（省 token）
-      if (!plantResults) {
-        // 使用詳細描述進行分類（而不是完整回應）
-        const classification = await classify(detailedDescription);
-        
-        // 嚴格檢查：只有 plant_score >= 0.4 且 is_plant=true 才搜尋
-        if (classification.is_plant && classification.plant_score >= 0.4) {
-          // 確認是植物，使用詳細描述進行完整搜尋
-          console.log(`🔍 確認是植物 (plant_score=${classification.plant_score.toFixed(3)} >= 0.4)，使用詳細描述進行 RAG 搜尋...`);
-          const ragResult = await smartSearch(detailedDescription, 3);
-
-          if (ragResult.classification?.is_plant && ragResult.results?.length > 0) {
-            console.log(`✅ 傳統搜尋找到 ${ragResult.results.length} 個結果`);
-            plantResults = {
-              is_plant: true,
-              search_type: 'embedding',
-              message: ragResult.message,
-              plants: ragResult.results.map(p => ({
-                chinese_name: p.chinese_name,
-                scientific_name: p.scientific_name,
-                family: p.family,
-                life_form: p.life_form,
-                score: p.score,
-                summary: p.summary
-              }))
-            };
-          } else {
-            const cls = ragResult.classification || {};
-            console.log(
-              `📝 RAG 判斷非植物(is_plant=false): category=${cls.category || 'unknown'} plant_score=${cls.plant_score ?? 'n/a'}`
-            );
-            plantResults = {
-              is_plant: false,
-              category: ragResult.classification?.category,
-              message: ragResult.message
-            };
-          }
-        } else {
-          // 分類結果顯示非植物，直接跳過搜尋（省 token）
-          console.log(
-            `⏭️ 跳過 RAG 搜尋（非植物）: category=${classification.category || 'unknown'} plant_score=${classification.plant_score ?? 'n/a'}`
-          );
+        // 先用 Vision 的文字結果做一次「粗分類」，如果明確寫出是人造物，就完全跳過 RAG
+        if (description && description.includes('第三步：判斷類別') && description.includes('人造物')) {
+          console.log('⏭️ Vision 判斷為人造物，直接跳過所有植物 RAG 與文字分類');
           plantResults = {
             is_plant: false,
-            category: classification.category,
-            message: `非植物相關查詢（${classification.category}），已跳過 RAG 搜尋以節省 token`
+            category: 'human_made',
+            message: 'Vision 分析判斷為人造物，已略過植物搜尋'
           };
+        } else {
+          // 嘗試解析 Vision AI 的結構化輸出（如果有的話）
+          const visionParsed = parseVisionResponse(description);
+
+          if (visionParsed.success && visionParsed.intent === 'plant') {
+            // 使用混合搜尋（結合特徵權重）
+            // 重要：使用詳細描述作為 query，而不是 shortCaption 或 guess_names
+            console.log(
+              `📊 結構化辨識: intent=${visionParsed.intent}, features=${visionParsed.plant.features.join(',')}`
+            );
+
+            const hybridResult = await hybridSearch({
+              query: detailedDescription, // 使用詳細描述，而不是猜測的名稱
+              features: visionParsed.plant.features || [],
+              guessNames: visionParsed.plant.guess_names || [],
+              topK: 3
+            });
+
+            if (hybridResult.results?.length > 0) {
+              console.log(`✅ 混合搜尋找到 ${hybridResult.results.length} 個結果`);
+              plantResults = {
+                is_plant: true,
+                search_type: 'hybrid',
+                vision_parsed: {
+                  intent: visionParsed.intent,
+                  confidence: visionParsed.confidence,
+                  features: visionParsed.plant.features,
+                  guess_names: visionParsed.plant.guess_names
+                },
+                feature_info: hybridResult.feature_info,
+                plants: hybridResult.results.map(p => ({
+                  chinese_name: p.chinese_name,
+                  scientific_name: p.scientific_name,
+                  family: p.family,
+                  life_form: p.life_form,
+                  score: p.score,
+                  embedding_score: p.embedding_score,
+                  feature_score: p.feature_score,
+                  matched_features: p.matched_features,
+                  summary: p.summary
+                }))
+              };
+            }
+          }
+
+          // 如果結構化解析失敗或不是植物，先用 classify 判斷，只有植物才搜尋（省 token）
+          if (!plantResults) {
+            // 使用詳細描述進行分類（而不是完整回應）
+            const classification = await classify(detailedDescription);
+
+            // 調高門檻：只有 plant_score 足夠高 且 is_plant=true 才搜尋
+            const PLANT_SCORE_THRESHOLD = 0.7;
+
+            if (classification.is_plant && classification.plant_score >= PLANT_SCORE_THRESHOLD) {
+              // 確認是植物，使用詳細描述進行完整搜尋
+              console.log(
+                `🔍 確認是植物 (plant_score=${classification.plant_score.toFixed(
+                  3
+                )} >= ${PLANT_SCORE_THRESHOLD})，使用詳細描述進行 RAG 搜尋...`
+              );
+              const ragResult = await smartSearch(detailedDescription, 3);
+
+              if (ragResult.classification?.is_plant && ragResult.results?.length > 0) {
+                console.log(`✅ 傳統搜尋找到 ${ragResult.results.length} 個結果`);
+                plantResults = {
+                  is_plant: true,
+                  search_type: 'embedding',
+                  message: ragResult.message,
+                  plants: ragResult.results.map(p => ({
+                    chinese_name: p.chinese_name,
+                    scientific_name: p.scientific_name,
+                    family: p.family,
+                    life_form: p.life_form,
+                    score: p.score,
+                    summary: p.summary
+                  }))
+                };
+              } else {
+                const cls = ragResult.classification || {};
+                console.log(
+                  `📝 RAG 判斷非植物(is_plant=false): category=${cls.category || 'unknown'} plant_score=${
+                    cls.plant_score ?? 'n/a'
+                  }`
+                );
+                plantResults = {
+                  is_plant: false,
+                  category: ragResult.classification?.category,
+                  message: ragResult.message
+                };
+              }
+            } else {
+              // 分類結果顯示非植物，直接跳過搜尋（省 token）
+              console.log(
+                `⏭️ 跳過 RAG 搜尋（非植物）: category=${classification.category || 'unknown'} plant_score=${
+                  classification.plant_score ?? 'n/a'
+                }`
+              );
+              plantResults = {
+                is_plant: false,
+                category: classification.category,
+                message: `非植物相關查詢（${classification.category}），已跳過 RAG 搜尋以節省 token`
+              };
+            }
+          }
         }
-      }
       }
     } catch (ragErr) {
       console.warn('⚠️ 植物 RAG 查詢失敗 (非致命):', ragErr.message);
@@ -3359,11 +3386,16 @@ app.post('/api/chat-text', async (req, res) => {
 
     const AI_API_URL =
       process.env.AI_API_URL || (process.env.NODE_ENV !== 'production' ? 'http://localhost:1234/v1' : null);
-    const AI_MODEL = process.env.AI_MODEL || 'local-model';
+    // 生產環境必須設定 AI_MODEL，開發環境使用預設值
+    const AI_MODEL = process.env.AI_MODEL || (process.env.NODE_ENV !== 'production' ? 'google/gemma-3-12b' : null);
     const AI_API_KEY = process.env.AI_API_KEY || 'lm-studio';
 
     if (!AI_API_URL) {
       throw new Error('AI_API_URL 未設定：請在部署環境設定 AI_API_URL / AI_API_KEY / AI_MODEL');
+    }
+    
+    if (!AI_MODEL) {
+      throw new Error('AI_MODEL 未設定：請在部署環境設定 AI_MODEL（例如：google/gemma-3-12b）');
     }
 
     console.log('🤖 正在呼叫 AI(文字):', AI_API_URL);
