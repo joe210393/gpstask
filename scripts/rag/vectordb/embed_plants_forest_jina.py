@@ -29,6 +29,7 @@ import json
 import os
 import sys
 import time
+import random
 import requests
 from pathlib import Path
 from typing import List, Dict, Any
@@ -49,7 +50,7 @@ JINA_API_KEY = os.environ.get("JINA_API_KEY", None)
 COLLECTION_NAME = "taiwan_plants"
 EMBEDDING_DIM = 1024  # Jina embeddings-v3 維度
 
-BATCH_SIZE = 32  # 每批處理的資料數量
+BATCH_SIZE = 16  # 每批處理的資料數量（降低以避免速率限制：每分鐘 100K tokens）
 
 # 資料路徑
 SCRIPT_DIR = Path(__file__).parent
@@ -85,12 +86,13 @@ def get_qdrant_client():
         )
 
 
-def encode_text_jina(texts: List[str]) -> List[List[float]]:
+def encode_text_jina(texts: List[str], max_retries: int = 3) -> List[List[float]]:
     """
-    使用 Jina API 將文字編碼為向量
+    使用 Jina API 將文字編碼為向量（帶重試機制）
     
     Args:
         texts: 文字列表
+        max_retries: 最大重試次數
         
     Returns:
         向量列表
@@ -98,26 +100,87 @@ def encode_text_jina(texts: List[str]) -> List[List[float]]:
     if not JINA_API_KEY:
         raise ValueError("JINA_API_KEY 未設定")
     
-    response = requests.post(
-        "https://api.jina.ai/v1/embeddings",
-        headers={
-            "Authorization": f"Bearer {JINA_API_KEY}",
-            "Content-Type": "application/json"
-        },
-        json={
-            "model": "jina-embeddings-v3",
-            "task": "retrieval.document",
-            "dimensions": 1024,
-            "input": texts
-        },
-        timeout=60
-    )
-    response.raise_for_status()
-    data = response.json()
+    # 過濾空字串並檢查長度
+    valid_texts = [t for t in texts if t and t.strip()]
+    if not valid_texts:
+        raise ValueError("沒有有效的文字輸入")
     
-    # 提取向量
-    embeddings = [item["embedding"] for item in data["data"]]
-    return embeddings
+    # 檢查文字長度（Jina API 可能有長度限制）
+    for i, text in enumerate(valid_texts):
+        if len(text) > 8192:  # Jina API 通常限制在 8192 tokens
+            print(f"⚠️  警告：文字 {i} 過長 ({len(text)} 字符)，將截斷")
+            valid_texts[i] = text[:8000]  # 截斷到安全長度
+    
+    # 重試機制
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(
+                "https://api.jina.ai/v1/embeddings",
+                headers={
+                    "Authorization": f"Bearer {JINA_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "jina-embeddings-v3",
+                    "task": "retrieval.passage",  # 修正：使用 retrieval.passage 而非 retrieval.document
+                    "dimensions": 1024,
+                    "input": valid_texts
+                },
+                timeout=60
+            )
+            
+            # 處理速率限制（429）
+            if response.status_code == 429:
+                error_data = response.json() if response.headers.get('content-type', '').startswith('application/json') else {}
+                retry_after = int(response.headers.get('Retry-After', 60))  # 預設 60 秒
+                
+                if attempt < max_retries - 1:
+                    wait_time = retry_after + random.uniform(5, 15)  # 額外隨機延遲 5-15 秒
+                    print(f"   ⏳ 速率限制，等待 {wait_time:.1f} 秒後重試（嘗試 {attempt + 1}/{max_retries}）...")
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    print(f"   ❌ 達到最大重試次數，放棄此批次")
+                    response.raise_for_status()
+            
+            # 詳細錯誤處理
+            if response.status_code != 200:
+                print(f"❌ Jina API 錯誤: {response.status_code}")
+                try:
+                    error_data = response.json()
+                    print(f"   錯誤詳情: {json.dumps(error_data, indent=2, ensure_ascii=False)}")
+                    # 顯示第一個輸入文字（用於除錯）
+                    if valid_texts:
+                        print(f"   第一個輸入文字（前 200 字符）: {valid_texts[0][:200]}")
+                except:
+                    print(f"   錯誤回應: {response.text[:500]}")
+                response.raise_for_status()
+            
+            data = response.json()
+            
+            # 記錄實際使用的 tokens（如果 API 有回傳）
+            usage = data.get("usage", {})
+            if usage:
+                tokens_used = usage.get("total_tokens", 0)
+                print(f"   ✅ Jina API 成功，使用 tokens: {tokens_used:,}")
+            
+            # 提取向量
+            embeddings = [item["embedding"] for item in data["data"]]
+            return embeddings
+            
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429 and attempt < max_retries - 1:
+                continue  # 繼續重試
+            raise
+        except Exception as e:
+            if attempt < max_retries - 1:
+                wait_time = (attempt + 1) * 5  # 指數退避
+                print(f"   ⚠️  錯誤: {e}，等待 {wait_time} 秒後重試...")
+                time.sleep(wait_time)
+                continue
+            raise
+    
+    raise Exception("達到最大重試次數，無法完成請求")
 
 
 def create_plant_text(plant: Dict[str, Any]) -> str:
@@ -307,16 +370,31 @@ def main():
         batch_texts = [create_plant_text(p) for p in batch]
         batch_ids = [get_plant_id(p) for p in batch]
         
+        # 過濾空文字，保持索引對應
+        valid_indices = []
+        valid_texts = []
+        for idx, text in enumerate(batch_texts):
+            if text and text.strip():
+                valid_indices.append(idx)
+                valid_texts.append(text)
+        
+        if not valid_texts:
+            print(f"⚠️  批次 {i // BATCH_SIZE + 1} 沒有有效文字，跳過")
+            continue
+        
         try:
             # 使用 Jina API 編碼
-            print(f"\n📊 處理批次 {i // BATCH_SIZE + 1}/{(len(remaining) + BATCH_SIZE - 1) // BATCH_SIZE}...")
-            vectors = encode_text_jina(batch_texts)
+            batch_num = i // BATCH_SIZE + 1
+            total_batches = (len(remaining) + BATCH_SIZE - 1) // BATCH_SIZE
+            print(f"\n📊 處理批次 {batch_num}/{total_batches} ({len(valid_texts)} 筆有效/{len(batch)} 筆總計)...")
+            vectors = encode_text_jina(valid_texts)
             
-            # 建立 Qdrant points
+            # 建立 Qdrant points（只處理有效的）
             points = []
-            for j, plant in enumerate(batch):
-                plant_id = batch_ids[j]
-                vector = vectors[j]
+            for vec_idx, text_idx in enumerate(valid_indices):
+                plant = batch[text_idx]
+                plant_id = batch_ids[text_idx]
+                vector = vectors[vec_idx]
                 
                 points.append(PointStruct(
                     id=hash(plant_id) % (2**63),  # Qdrant ID 必須是 int64
@@ -347,8 +425,12 @@ def main():
             
             print(f"✅ 批次完成，已處理 {len(processed)}/{len(plants)} 筆")
             
-            # 避免 API 限流
-            time.sleep(0.5)
+            # 批次之間添加延遲，避免速率限制（每分鐘 100K tokens）
+            # 估算：每批次約 10K tokens，所以每批次間隔約 6 秒
+            if batch_num < total_batches:  # 最後一批不需要延遲
+                delay = random.uniform(6, 10)  # 隨機延遲 6-10 秒
+                print(f"   ⏸️  等待 {delay:.1f} 秒以避免速率限制...")
+                time.sleep(delay)
             
         except Exception as e:
             print(f"❌ 批次處理失敗: {e}")
