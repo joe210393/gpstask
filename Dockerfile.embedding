@@ -16,10 +16,11 @@ COPY scripts/rag/vectordb/feature_weights.py .
 
 # 建立資料目錄並複製資料檔案（用於特徵權重計算，實際搜尋使用 Qdrant）
 RUN mkdir -p /app/data
-# 先刪除可能存在的舊檔案
-RUN rm -f /app/data/plants-enriched.jsonl
+# 先刪除可能存在的舊檔案（強制清除，避免快取問題）
+RUN rm -rf /app/data/*.jsonl || true
 # 複製新資料檔案（必須成功，否則構建失敗）
-COPY scripts/rag/data/plants-forest-gov-tw.jsonl /app/data/plants-forest-gov-tw.jsonl
+# 注意：添加時間戳記強制重新執行 COPY（避免構建快取問題）
+COPY --chmod=644 scripts/rag/data/plants-forest-gov-tw.jsonl /app/data/plants-forest-gov-tw.jsonl
 # 立即確認新檔案已複製（如果失敗會中斷構建）
 RUN ls -lh /app/data/plants-forest-gov-tw.jsonl && \
     echo "✅ 新資料檔案已複製" || \
