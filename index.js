@@ -3299,9 +3299,15 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
             // 使用詳細描述進行分類（而不是完整回應）
             const classification = await classify(detailedDescription);
 
-            // 調高門檻：只有 plant_score 足夠高 且 is_plant=true 才搜尋
-            // 但如果 AI 回應被截斷，降低閾值以確保能搜尋
-            const PLANT_SCORE_THRESHOLD = finishReason === 'length' ? 0.5 : 0.7;
+            // 調整閾值：與 Python API 的 PLANT_THRESHOLD (0.40) 保持一致
+            // 如果 Vision AI 已經明確判斷是植物（從 <analysis> 中看到「第三步：判斷類別」是「植物」），
+            // 則降低閾值以確保能搜尋
+            const visionSaysPlant = description && 
+              description.includes('第三步：判斷類別') && 
+              description.includes('植物');
+            
+            // 如果 Vision AI 明確說是植物，使用較低閾值；否則使用正常閾值
+            const PLANT_SCORE_THRESHOLD = visionSaysPlant ? 0.4 : (finishReason === 'length' ? 0.45 : 0.5);
 
             if (classification.is_plant && classification.plant_score >= PLANT_SCORE_THRESHOLD) {
               // 確認是植物，使用詳細描述進行完整搜尋
