@@ -100,6 +100,7 @@ feature_calculator = None  # 特徵權重計算器
 # 混合評分權重
 EMBEDDING_WEIGHT = 0.6  # embedding 相似度權重
 FEATURE_WEIGHT = 0.4    # 特徵匹配權重
+KEYWORD_BONUS_WEIGHT = 0.1  # 關鍵字匹配加分權重（較小，避免過度偏向名稱匹配）
 
 
 def encode_text(text):
@@ -592,10 +593,11 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         embedding_score = r.score  # 0~1
         
         # 關鍵字匹配加分（如果 guess_names 匹配到 chinese_name 或 scientific_name）
+        # 注意：這只是輔助加分，不會過度影響整體匹配結果
         keyword_bonus = 0.0
         if r.id in keyword_matched_ids:
-            keyword_bonus = 0.3  # 關鍵字匹配給予 0.3 的額外加分
-            print(f"[API] 關鍵字匹配: {r.payload.get('chinese_name', '未知')} (id={r.id})")
+            keyword_bonus = KEYWORD_BONUS_WEIGHT  # 關鍵字匹配給予較小的加分（0.1），避免過度偏向名稱匹配
+            print(f"[API] 關鍵字匹配: {r.payload.get('chinese_name', '未知')} (id={r.id}, bonus={keyword_bonus})")
 
         # 計算特徵匹配分數
         feature_score = 0.0
@@ -625,8 +627,9 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             matched_features = [f["name"] for f in match_result["matched_features"]]
 
         # 3. 計算混合分數
-        # 公式：embedding_score + feature_score + keyword_bonus
-        # 如果沒有特徵，純用 embedding + keyword_bonus
+        # 公式：(EMBEDDING_WEIGHT * embedding_score) + (FEATURE_WEIGHT * feature_score) + keyword_bonus
+        # 關鍵字匹配只是輔助加分，不會過度影響整體匹配結果
+        # 主要還是依賴 embedding 相似度和特徵匹配
         if features:
             hybrid_score = (EMBEDDING_WEIGHT * embedding_score) + (FEATURE_WEIGHT * feature_score) + keyword_bonus
         else:
