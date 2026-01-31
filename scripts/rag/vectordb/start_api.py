@@ -625,14 +625,34 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             matched_features = [f["name"] for f in match_result["matched_features"]]
 
         # 3. 計算混合分數
-        # 公式：(EMBEDDING_WEIGHT * embedding_score) + (FEATURE_WEIGHT * feature_score) + keyword_bonus
-        # 關鍵字匹配只是輔助加分，不會過度影響整體匹配結果
-        # 主要還是依賴 embedding 相似度和特徵匹配
+        # 改進公式：使用非線性組合，確保分數更合理
+        # 原公式：(EMBEDDING_WEIGHT * embedding_score) + (FEATURE_WEIGHT * feature_score) + keyword_bonus
+        # 問題：如果 embedding_score 和 feature_score 都很低，總分會過低
+        # 新公式：使用加權平均 + 乘法增強 + 關鍵字加成
+        # - 基礎分數：加權平均（embedding 和 feature 的加權平均）
+        # - 增強分數：如果兩者都匹配，使用乘法增強（例如 embedding * feature）
+        # - 最終分數：基礎分數 + 增強分數 * 增強係數 + 關鍵字加成
         if features:
-            hybrid_score = (EMBEDDING_WEIGHT * embedding_score) + (FEATURE_WEIGHT * feature_score) + keyword_bonus
+            # 基礎分數：加權平均
+            base_score = (EMBEDDING_WEIGHT * embedding_score) + (FEATURE_WEIGHT * feature_score)
+            
+            # 增強分數：如果 embedding 和 feature 都匹配，使用乘法增強
+            # 這可以放大同時匹配的情況
+            enhancement = embedding_score * feature_score * 0.3  # 增強係數 0.3
+            
+            # 最終分數：基礎分數 + 增強分數 + 關鍵字加成
+            hybrid_score = base_score + enhancement + keyword_bonus
+            
+            # 確保分數不超過 1.0
+            hybrid_score = min(1.0, hybrid_score)
         else:
             hybrid_score = embedding_score + keyword_bonus
 
+        # 記錄詳細資訊（用於調試）
+        plant_name = r.payload.get("chinese_name", "未知")
+        if plant_name != "未知":
+            print(f"[API] 候選植物: {plant_name} (id={r.id}) - embedding={embedding_score:.3f}, feature={feature_score:.3f}, hybrid={hybrid_score:.3f}, matched_features={matched_features}")
+        
         results.append({
             "code": r.payload.get("code"),
             "chinese_name": r.payload.get("chinese_name"),

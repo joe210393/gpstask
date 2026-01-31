@@ -3222,6 +3222,15 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 
                 if (hybridResult.results?.length > 0) {
                   console.log(`✅ RAG 找到 ${hybridResult.results.length} 個候選植物`);
+                  // 顯示所有檢測到的植物（用於調試）
+                  console.log('📋 所有檢測到的植物：');
+                  hybridResult.results.forEach((p, idx) => {
+                    console.log(`  ${idx + 1}. ${p.chinese_name} (${p.scientific_name || '無學名'}) - 分數: ${(p.score * 100).toFixed(1)}% (embedding: ${(p.embedding_score * 100).toFixed(1)}%, feature: ${(p.feature_score * 100).toFixed(1)}%)`);
+                    if (p.matched_features && p.matched_features.length > 0) {
+                      console.log(`     匹配特徵: ${p.matched_features.join(', ')}`);
+                    }
+                  });
+                  
                   plantResults = {
                     is_plant: true,
                     search_type: 'hybrid_traits_pre',
