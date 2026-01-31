@@ -181,9 +181,15 @@ class FeatureWeightCalculator:
             # 找出這個文件包含哪些特徵
             found_features = set()
 
-            # 直接檢查 life_form
+            # 直接檢查 life_form（確保是字串）
             if life_form:
-                life_form_lower = life_form.lower()
+                # 確保 life_form 是字串
+                if isinstance(life_form, list):
+                    life_form_str = " ".join([str(lf) for lf in life_form])
+                else:
+                    life_form_str = str(life_form)
+                
+                life_form_lower = life_form_str.lower()
                 if "tree" in life_form_lower or life_form_lower == "喬木":
                     found_features.add("喬木")
                 elif "shrub" in life_form_lower or life_form_lower == "灌木":
