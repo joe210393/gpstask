@@ -3161,8 +3161,10 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
 
     // 3.5. 先進行快速特徵提取和 RAG 搜尋（協同模式）
     // 目標：提高整體辨識率，讓 LM 和 RAG 協同工作
+    // 同時：快速特徵提取的結果會先返回給前端顯示，提升 UX
     let plantResults = null;
     let ragContextForLM = ''; // RAG 結果，將加入 LM prompt
+    let quickFeatures = null; // 快速特徵提取結果，用於前端第一階段顯示
     
     try {
       const embeddingReady = await isEmbeddingApiReady();
@@ -3200,6 +3202,9 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
             const quickData = await quickResponse.json();
             const quickDescription = quickData.choices[0].message.content;
             console.log('📊 快速特徵提取完成，開始 RAG 搜尋...');
+            
+            // 保存快速特徵提取結果，供前端第一階段顯示
+            quickFeatures = quickDescription;
             
             // 使用快速提取的特徵進行 RAG 搜尋
             const traits = parseTraitsFromResponse(quickDescription);
@@ -3587,7 +3592,8 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
     res.json({
       success: true,
       description: description,
-      plant_rag: plantResults
+      plant_rag: plantResults,
+      quick_features: quickFeatures  // 快速特徵提取結果，供前端第一階段顯示
     });
 
   } catch (err) {

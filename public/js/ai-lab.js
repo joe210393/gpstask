@@ -1490,8 +1490,46 @@ success 或 fail (只能二選一，小寫)
                 }
 
                 setThinkingStage('analyze');
+                updateLoadingMessage('🔍 正在分析圖片細節...');
 
-                // 單次 API 請求
+                // 兩段式辨識：先快速提取特徵並顯示，然後進行完整分析
+                // 第一段：快速特徵提取（顯示給用戶看）
+                let quickFeatures = null;
+                try {
+                    const quickFeaturePrompt = `你是一位專業的植物形態學家。請快速分析圖片中的植物特徵，只提取關鍵識別特徵（生活型、葉序、葉形、花序、花色等），不要給出植物名稱。用簡短文字描述即可。`;
+                    
+                    const quickFormData = new FormData();
+                    const quickBlob = await (await fetch(gridImage)).blob();
+                    quickFormData.append('image', quickBlob, 'capture_grid.jpg');
+                    quickFormData.append('systemPrompt', quickFeaturePrompt);
+                    quickFormData.append('userPrompt', '請快速提取這張圖片中植物的關鍵識別特徵（生活型、葉序、葉形、花序、花色等），用簡短文字描述。');
+                    
+                    if (gpsData) {
+                        quickFormData.append('latitude', gpsData.latitude);
+                        quickFormData.append('longitude', gpsData.longitude);
+                    }
+                    
+                    const quickApiRes = await fetch('/api/vision-test', {
+                        method: 'POST',
+                        body: quickFormData
+                    });
+                    
+                    if (quickApiRes.ok) {
+                        const quickResult = await quickApiRes.json();
+                        quickFeatures = quickResult.quick_features || quickResult.description;
+                        
+                        // 顯示第一階段結果（快速特徵提取）
+                        if (quickFeatures) {
+                            showQuickFeatures(quickFeatures);
+                            setThinkingStage('search');
+                            updateLoadingMessage('🔍 正在比對資料庫...');
+                        }
+                    }
+                } catch (quickErr) {
+                    console.warn('⚠️ 快速特徵提取失敗，繼續完整分析:', quickErr);
+                }
+
+                // 第二段：完整分析（在顯示快速特徵的同時進行）
                 const result = await analyzePhotos(gridImage, finalSystemPrompt, finalUserPrompt, gpsData);
 
                 console.log('🤖 API 回應:', result);
