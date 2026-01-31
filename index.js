@@ -3186,7 +3186,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
             ]
           }
         ],
-        max_tokens: 800, // 增加 token 數以容納分析過程
+        max_tokens: 2000, // 增加 token 數以容納完整的分析過程和回答
         temperature: 0.7 // 稍微增加創造力
       })
     });
