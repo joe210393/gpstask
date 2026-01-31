@@ -3585,10 +3585,20 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
     if (lmConfidenceBoost > 0 && plantResults && plantResults.plants) {
       plantResults.lm_confidence_boost = lmConfidenceBoost;
       // 對每個植物結果加上加成
-      plantResults.plants = plantResults.plants.map(p => ({
-        ...p,
-        adjusted_score: Math.min(1.0, p.score + lmConfidenceBoost) // 調整後分數（不超過 1.0）
-      }));
+      // 使用混合方式：加法 + 乘法，確保低分數也能得到足夠的提升
+      // 公式：adjusted_score = min(1.0, score + boost + score * 0.2)
+      // 這樣即使原始分數很低（例如 0.16），也能得到顯著提升
+      plantResults.plants = plantResults.plants.map(p => {
+        const baseBoost = lmConfidenceBoost; // 基礎加成（例如 0.4）
+        const multiplierBoost = p.score * 0.2; // 基於原始分數的額外加成（20%）
+        const totalBoost = baseBoost + multiplierBoost;
+        const adjusted = Math.min(1.0, p.score + totalBoost);
+        console.log(`📊 分數調整: 原始=${(p.score * 100).toFixed(1)}%, 加成=${(totalBoost * 100).toFixed(1)}%, 調整後=${(adjusted * 100).toFixed(1)}%`);
+        return {
+          ...p,
+          adjusted_score: adjusted
+        };
+      });
     }
 
     res.json({
