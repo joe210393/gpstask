@@ -15,9 +15,10 @@ COPY scripts/rag/vectordb/feature_weights.py .
 
 # 建立資料目錄並複製資料檔案（用於特徵權重計算，實際搜尋使用 Qdrant）
 RUN mkdir -p /app/data
-# 優先複製新資料檔案
+# 複製新資料檔案
 COPY scripts/rag/data/plants-forest-gov-tw.jsonl /app/data/plants-forest-gov-tw.jsonl
-# 如果新檔案不存在，會使用舊檔案作為備用（但應該不會發生）
+# 明確刪除舊檔案（如果存在），確保只使用新檔案
+RUN rm -f /app/data/plants-enriched.jsonl
 
 # 不預先下載本地模型：本服務預期使用 Jina API（USE_JINA_API=true + JINA_API_KEY）
 
