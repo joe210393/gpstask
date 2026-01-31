@@ -95,72 +95,75 @@ def main():
         print(f"   - 唯一植物 ID: 4,302 筆")
         print(f"   - 實際 Qdrant 向量: {count:,} 筆")
         
-        # 統計所有資料來源（取樣，最多 1000 筆）
-        sample_size = min(1000, count)
-        print(f"\n📊 正在取樣 {sample_size} 筆資料進行統計...")
-        
-        source_stats = {}
-        forest_gov_tw_count = 0
-        total_sampled = 0
-        
-        # 使用 scroll 分批取樣
-        offset = None
-        batch_size = 100
-        
-        while total_sampled < sample_size:
-            current_batch = min(batch_size, sample_size - total_sampled)
-            try:
-                result = client.scroll(
-                    collection_name=COLLECTION_NAME,
-                    limit=current_batch,
-                    offset=offset,
-                    with_payload=True
-                )
-                points, next_offset = result
+        # 使用 filter 精確統計 forest-gov-tw 的數量
+        print(f"\n📊 精確統計資料來源...")
+        try:
+            from qdrant_client.models import Filter, FieldCondition, MatchValue
+            
+            # 查詢 forest-gov-tw 的數量
+            forest_gov_tw_filter = Filter(
+                must=[
+                    FieldCondition(key="source", match=MatchValue(value="forest-gov-tw"))
+                ]
+            )
+            
+            forest_gov_tw_count_result = client.count(
+                collection_name=COLLECTION_NAME,
+                count_filter=forest_gov_tw_filter,
+                exact=True
+            )
+            forest_gov_tw_count = forest_gov_tw_count_result.count if hasattr(forest_gov_tw_count_result, 'count') else forest_gov_tw_count_result
+            
+            print(f"\n📊 資料來源統計（精確）：")
+            print(f"   forest-gov-tw（新資料）: {forest_gov_tw_count:,} 筆")
+            print(f"   其他來源: {count - forest_gov_tw_count:,} 筆")
+            print(f"   總計: {count:,} 筆")
+            
+            forest_gov_tw_percentage = (forest_gov_tw_count / count) * 100 if count > 0 else 0
+            print(f"\n📈 新資料比例: {forest_gov_tw_percentage:.1f}%")
+            print(f"   預期新資料: 4,670 筆（唯一植物 ID: 4,302 筆）")
+            
+            if forest_gov_tw_count >= 4000:
+                print(f"\n✅ 新資料（forest-gov-tw）已存在於 Qdrant 中")
+                if forest_gov_tw_count > 5000:
+                    print(f"   ⚠️  數量比預期多（{forest_gov_tw_count:,} vs 4,670），可能包含重複資料")
+                    print(f"   💡 這是因為之前使用舊格式時，重複的 source_url 被多次處理")
+                else:
+                    print(f"   ✅ 數量符合預期範圍")
+            elif count >= 4000:
+                print(f"\n⚠️  向量數量足夠，但新資料比例較低（{forest_gov_tw_percentage:.1f}%）")
+            else:
+                print(f"\n⚠️  向量數量較少，可能是舊資料")
                 
-                if len(points) == 0:
-                    break
-                
-                for point in points:
+        except Exception as e:
+            print(f"\n⚠️  無法精確統計（可能不支援 filter）: {e}")
+            print(f"   使用取樣方式...")
+            
+            # 備用方案：取樣統計
+            sample_size = min(100, count)
+            results = client.scroll(
+                collection_name=COLLECTION_NAME,
+                limit=sample_size,
+                with_payload=True
+            )
+            
+            if len(results[0]) > 0:
+                source_stats = {}
+                forest_gov_tw_count = 0
+                for point in results[0]:
                     payload = point.payload
                     source = payload.get('source', 'unknown')
                     source_stats[source] = source_stats.get(source, 0) + 1
                     if source == 'forest-gov-tw':
                         forest_gov_tw_count += 1
                 
-                total_sampled += len(points)
-                offset = next_offset
+                print(f"\n📊 資料來源統計（取樣 {len(results[0])} 筆）：")
+                for source, cnt in sorted(source_stats.items(), key=lambda x: x[1], reverse=True):
+                    percentage = (cnt / len(results[0])) * 100
+                    print(f"   {source}: {cnt} 筆 ({percentage:.1f}%)")
                 
-                if next_offset is None:
-                    break
-            except Exception as e:
-                print(f"   ⚠️  取樣時發生錯誤: {e}")
-                break
-        
-        if total_sampled == 0:
-            print("⚠️  無法取樣資料")
-            return
-        
-        print(f"\n📊 資料來源統計（取樣 {total_sampled} 筆）：")
-        for source, cnt in sorted(source_stats.items(), key=lambda x: x[1], reverse=True):
-            percentage = (cnt / total_sampled) * 100
-            print(f"   {source}: {cnt} 筆 ({percentage:.1f}%)")
-        
-        # 估算總數
-        forest_gov_tw_percentage = (forest_gov_tw_count / total_sampled) * 100
-        estimated_forest_gov_tw = int(count * forest_gov_tw_percentage / 100)
-        print(f"\n📈 估算（基於取樣 {total_sampled} 筆）：")
-        print(f"   forest-gov-tw 資料: 約 {estimated_forest_gov_tw:,} 筆 ({forest_gov_tw_percentage:.1f}%)")
-        print(f"   預期新資料: 4,670 筆（唯一植物 ID: 4,302 筆）")
-        
-        if estimated_forest_gov_tw >= 4000:
-            print(f"\n✅ 新資料（forest-gov-tw）已存在於 Qdrant 中")
-            if estimated_forest_gov_tw > 5000:
-                print(f"   ⚠️  數量比預期多，可能包含重複資料或多次上傳")
-        elif count >= 4000:
-            print(f"\n⚠️  向量數量足夠，但新資料比例較低（{forest_gov_tw_percentage:.1f}%）")
-        else:
-            print(f"\n⚠️  向量數量較少，可能是舊資料")
+                estimated = int(count * (forest_gov_tw_count / len(results[0])))
+                print(f"\n📈 估算 forest-gov-tw: 約 {estimated:,} 筆")
         
     except Exception as e:
         print(f"\n❌ 錯誤: {e}")
