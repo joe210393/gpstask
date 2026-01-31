@@ -3505,6 +3505,13 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                   }))
                 };
                 
+                // 重要：第一次搜尋完成後，保存結果作為 preSearchResults
+                // 這樣後續的 traits-based 搜尋可以與第一次搜尋的結果比較
+                if (!preSearchResults) {
+                  preSearchResults = newResults;
+                  console.log(`💾 保存第一次搜尋結果作為基準（最高分數: ${(newResults.plants[0].score * 100).toFixed(1)}%）`);
+                }
+                
                 // 如果已經有預先搜尋的結果，比較分數，選擇更好的
                 if (preSearchResults && preSearchResults.is_plant && preSearchResults.plants && preSearchResults.plants.length > 0) {
                   const preTopScore = preSearchResults.plants[0].score;
