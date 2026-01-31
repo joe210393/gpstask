@@ -205,6 +205,11 @@ def init_qdrant(client: QdrantClient):
         if existing_dim != EMBEDDING_DIM:
             print(f"⚠️  Collection {COLLECTION_NAME} 已存在，但維度不匹配（現有: {existing_dim}, 需要: {EMBEDDING_DIM}）")
             print(f"   刪除舊 collection 並重新建立...")
+            print(f"   ⚠️  警告：這會刪除所有現有資料！")
+            response = input(f"   確認刪除並重新建立？(yes/no): ")
+            if response.lower() != 'yes':
+                print("   已取消操作")
+                sys.exit(1)
             client.delete_collection(collection_name=COLLECTION_NAME)
             print(f"   ✅ 舊 collection 已刪除")
         else:
