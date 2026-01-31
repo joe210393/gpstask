@@ -3199,6 +3199,12 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
 
     const aiData = await aiResponse.json();
     const description = aiData.choices[0].message.content;
+    const finishReason = aiData.choices[0].finish_reason;
+
+    // 檢查是否因為長度限制被截斷
+    if (finishReason === 'length') {
+      console.warn('⚠️ AI 回應被截斷（finish_reason: length），可能缺少完整的 XML 格式');
+    }
 
     // 4. 從 AI 回應中提取詳細描述（用於 RAG 搜尋）
     // 嘗試從 XML <analysis> 標籤中提取詳細描述
@@ -3208,7 +3214,21 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
       detailedDescription = analysisMatch[1].trim();
       console.log('📋 從 <analysis> 提取詳細描述:', detailedDescription.substring(0, 100) + '...');
     } else {
-      console.log('⚠️ 未找到 <analysis> 標籤，使用完整回應作為描述');
+      // 如果沒有完整的 <analysis> 標籤，嘗試提取部分內容
+      const partialAnalysisMatch = description.match(/<analysis>([\s\S]*)/i);
+      if (partialAnalysisMatch) {
+        detailedDescription = partialAnalysisMatch[1].trim();
+        console.log('⚠️ 找到不完整的 <analysis> 標籤（可能被截斷），使用部分內容');
+      } else {
+        // 嘗試從回應中提取關鍵描述部分
+        const stepMatch = description.match(/第二步：詳細描述圖片細節[^]*?([\s\S]{200,})/i);
+        if (stepMatch) {
+          detailedDescription = stepMatch[1].trim();
+          console.log('⚠️ 未找到 <analysis> 標籤，從「第二步」提取描述');
+        } else {
+          console.log('⚠️ 未找到 <analysis> 標籤，使用完整回應作為描述');
+        }
+      }
     }
 
     // 5. 植物 RAG 搜尋（使用詳細描述，而不是猜測的名稱）
@@ -3280,7 +3300,8 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
             const classification = await classify(detailedDescription);
 
             // 調高門檻：只有 plant_score 足夠高 且 is_plant=true 才搜尋
-            const PLANT_SCORE_THRESHOLD = 0.7;
+            // 但如果 AI 回應被截斷，降低閾值以確保能搜尋
+            const PLANT_SCORE_THRESHOLD = finishReason === 'length' ? 0.5 : 0.7;
 
             if (classification.is_plant && classification.plant_score >= PLANT_SCORE_THRESHOLD) {
               // 確認是植物，使用詳細描述進行完整搜尋
