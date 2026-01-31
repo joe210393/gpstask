@@ -3313,13 +3313,55 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
             message: 'Vision 分析判斷為人造物，已略過植物搜尋'
           };
         } else {
-          // 優先使用 traits-based 判斷（從結構化 JSON 提取）
+          // 重要：先進行傳統搜尋（embedding only）作為基準
+          // 這樣可以確保第一階段的結果不會被後續的 traits-based 搜尋覆蓋
+          console.log('🔍 第一階段：進行傳統搜尋（embedding only）作為基準...');
+          const classification = await classify(detailedDescription);
+          
+          const visionSaysPlant = description && 
+            description.includes('第三步：判斷類別') && 
+            description.includes('植物');
+          
+          const PLANT_SCORE_THRESHOLD = visionSaysPlant ? 0.4 : (finishReason === 'length' ? 0.45 : 0.5);
+
+          if (classification.is_plant && classification.plant_score >= PLANT_SCORE_THRESHOLD) {
+            const ragResult = await smartSearch(detailedDescription, 3);
+
+            if (ragResult.classification?.is_plant && ragResult.results?.length > 0) {
+              console.log(`✅ 第一階段傳統搜尋找到 ${ragResult.results.length} 個結果`);
+              console.log('📋 第一階段檢測到的植物：');
+              ragResult.results.forEach((p, idx) => {
+                console.log(`  ${idx + 1}. ${p.chinese_name} (${p.scientific_name || '無學名'}) - 分數: ${(p.score * 100).toFixed(1)}%`);
+              });
+              
+              const firstStageResults = {
+                is_plant: true,
+                search_type: 'embedding',
+                message: ragResult.message,
+                plants: ragResult.results.map(p => ({
+                  chinese_name: p.chinese_name,
+                  scientific_name: p.scientific_name,
+                  family: p.family,
+                  life_form: p.life_form,
+                  score: p.score,
+                  summary: p.summary
+                }))
+              };
+              
+              // 保存第一階段結果作為基準
+              preSearchResults = firstStageResults;
+              plantResults = firstStageResults;
+              console.log(`💾 第一階段結果已保存作為基準（最高分數: ${(firstStageResults.plants[0].score * 100).toFixed(1)}%）`);
+            }
+          }
+
+          // 第二階段：使用 traits-based 判斷（從結構化 JSON 提取）
           const traits = parseTraitsFromResponse(description);
           let traitsBasedDecision = null;
 
           if (traits) {
             traitsBasedDecision = isPlantFromTraits(traits);
-            console.log(`🌿 Traits 判斷: is_plant=${traitsBasedDecision.is_plant}, confidence=${traitsBasedDecision.confidence.toFixed(2)}, reason=${traitsBasedDecision.reason}`);
+            console.log(`🌿 第二階段 Traits 判斷: is_plant=${traitsBasedDecision.is_plant}, confidence=${traitsBasedDecision.confidence.toFixed(2)}, reason=${traitsBasedDecision.reason}`);
             console.log(`   提取到的 traits: ${Object.keys(traits).join(', ')}`);
 
             if (traitsBasedDecision.is_plant) {
@@ -3335,9 +3377,9 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
               });
 
               if (hybridResult.results?.length > 0) {
-                console.log(`✅ Traits-based 混合搜尋找到 ${hybridResult.results.length} 個結果`);
+                console.log(`✅ 第二階段 Traits-based 混合搜尋找到 ${hybridResult.results.length} 個結果`);
                 // 顯示所有檢測到的植物（用於調試）
-                console.log('📋 所有檢測到的植物：');
+                console.log('📋 第二階段檢測到的植物：');
                 hybridResult.results.forEach((p, idx) => {
                   console.log(`  ${idx + 1}. ${p.chinese_name} (${p.scientific_name || '無學名'}) - 分數: ${(p.score * 100).toFixed(1)}% (embedding: ${(p.embedding_score * 100).toFixed(1)}%, feature: ${(p.feature_score * 100).toFixed(1)}%)`);
                   if (p.matched_features && p.matched_features.length > 0) {
@@ -3364,19 +3406,18 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                   }))
                 };
                 
-                // 如果已經有預先搜尋的結果，比較分數，選擇更好的
+                // 與第一階段結果比較，選擇更好的
                 if (preSearchResults && preSearchResults.is_plant && preSearchResults.plants && preSearchResults.plants.length > 0) {
                   const preTopScore = preSearchResults.plants[0].score;
                   const newTopScore = newResults.plants[0].score;
                   
-                  // 只有當新結果的最高分數明顯高於預先結果（高 15% 以上）時，才使用新結果
-                  // 否則保留預先結果（因為它可能是更可靠的 embedding 搜尋結果）
+                  // 只有當新結果的最高分數明顯高於第一階段結果（高 15% 以上）時，才使用新結果
+                  // 否則保留第一階段結果（因為它可能是更可靠的 embedding 搜尋結果）
                   if (newTopScore > preTopScore + 0.15) {
-                    console.log(`🔄 新搜尋結果分數更高（${(newTopScore * 100).toFixed(1)}% vs ${(preTopScore * 100).toFixed(1)}%），使用新結果`);
+                    console.log(`🔄 第二階段結果分數更高（${(newTopScore * 100).toFixed(1)}% vs ${(preTopScore * 100).toFixed(1)}%），使用第二階段結果`);
                     plantResults = newResults;
                   } else {
-                    console.log(`✅ 保留預先搜尋結果（${(preTopScore * 100).toFixed(1)}% vs ${(newTopScore * 100).toFixed(1)}%），分數差異不足以替換`);
-                    // 保留預先結果，但可以合併一些有用的資訊
+                    console.log(`✅ 保留第一階段結果（${(preTopScore * 100).toFixed(1)}% vs ${(newTopScore * 100).toFixed(1)}%），分數差異不足以替換`);
                     plantResults = preSearchResults;
                   }
                 } else {
@@ -3385,7 +3426,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
               }
             }
           } else {
-            console.log('⚠️ 未提取到 traits JSON，嘗試其他方法...');
+            console.log('⚠️ 未提取到 traits JSON，跳過第二階段 traits-based 搜尋');
           }
 
           // 如果 traits-based 判斷失敗，嘗試舊的 parseVisionResponse 方法
