@@ -140,11 +140,28 @@ class FeatureWeightCalculator:
                 key_features = []
 
             # 合併所有文字欄位（包含英文描述）
+            # morphology 可能是列表，需要正確處理
+            morphology_text = ""
+            if morphology:
+                if isinstance(morphology, list):
+                    # 確保所有元素都是字串
+                    morphology_text = " ".join([str(m) for m in morphology])
+                else:
+                    morphology_text = str(morphology)
+            
+            # key_features 也是列表
+            key_features_text = ""
+            if key_features:
+                if isinstance(key_features, list):
+                    key_features_text = " ".join([str(k) for k in key_features])
+                else:
+                    key_features_text = str(key_features)
+            
             text = " ".join([
                 life_form or "",
-                " ".join(morphology) if morphology else "",
+                morphology_text,
                 description or "",
-                " ".join(key_features) if key_features else "",
+                key_features_text,
             ]).lower()
 
             # 找出這個文件包含哪些特徵
