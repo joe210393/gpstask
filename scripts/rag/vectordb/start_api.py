@@ -289,17 +289,33 @@ def _init_background_impl():
     
     data_path = None
     # 先搜尋新檔案
+    print(f"  搜尋新資料檔案...")
     for path in preferred_paths:
-        if os.path.exists(path):
+        exists = os.path.exists(path)
+        print(f"    檢查: {path} -> {'✅ 存在' if exists else '❌ 不存在'}")
+        if exists:
             data_path = path
+            print(f"    ✅ 找到新資料檔案: {path}")
             break
     
     # 如果新檔案不存在，才使用舊檔案
     if not data_path:
+        print(f"  ⚠️  新檔案不存在，搜尋備用檔案...")
         for path in fallback_paths:
-            if os.path.exists(path):
+            exists = os.path.exists(path)
+            print(f"    檢查: {path} -> {'✅ 存在' if exists else '❌ 不存在'}")
+            if exists:
                 data_path = path
+                print(f"    ⚠️  使用備用檔案: {path}")
                 break
+    
+    # 強制檢查：如果找到舊檔案但新檔案也應該存在，發出警告
+    if data_path and "plants-enriched.jsonl" in data_path:
+        new_file_path = "/app/data/plants-forest-gov-tw.jsonl"
+        if os.path.exists(new_file_path):
+            print(f"  ⚠️  警告：找到舊檔案 {data_path}，但新檔案 {new_file_path} 也存在！")
+            print(f"  🔧 強制使用新檔案: {new_file_path}")
+            data_path = new_file_path
 
     if data_path and FeatureWeightCalculator:
         try:
