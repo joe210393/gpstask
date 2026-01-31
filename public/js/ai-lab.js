@@ -1508,12 +1508,21 @@ success 或 fail (只能二選一，小寫)
                     await new Promise(r => setTimeout(r, 300));
 
                     result.plant_rag.plants.forEach(p => {
-                        allPlants.push(p);
+                        // 如果有調整後分數（LM 與 RAG 匹配），使用調整後分數；否則使用原始分數
+                        allPlants.push({
+                            ...p,
+                            displayScore: p.adjusted_score !== undefined ? p.adjusted_score : p.score
+                        });
                     });
 
-                    // 計算平均信心度
-                    const scores = allPlants.map(p => p.score);
+                    // 計算平均信心度（使用顯示分數）
+                    const scores = allPlants.map(p => p.displayScore || p.score);
                     avgConfidence = scores.reduce((a, b) => a + b, 0) / scores.length;
+                    
+                    // 如果有 LM 信心度加成，在日誌中顯示
+                    if (result.plant_rag.lm_confidence_boost) {
+                        console.log(`📈 LM 與 RAG 匹配，信心度加成: ${(result.plant_rag.lm_confidence_boost * 100).toFixed(0)}%`);
+                    }
 
                     setThinkingStage('search');
                     await new Promise(r => setTimeout(r, 500));

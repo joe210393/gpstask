@@ -3506,6 +3506,59 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
       }
     }
 
+    // 如果 LM 的回答中包含植物名稱，且該名稱在 RAG 結果中，提高信心度
+    let lmConfidenceBoost = 0;
+    if (plantResults && plantResults.is_plant && plantResults.plants && plantResults.plants.length > 0) {
+      // 從 LM 的回答中提取植物名稱（中文名或學名）
+      const lmPlantNames = [];
+      const replyMatch = description.match(/<reply>([\s\S]*?)<\/reply>/i);
+      const replyText = replyMatch ? replyMatch[1] : description;
+      
+      // 提取中文名（常見模式：金魚草、香堇菜、Snapdragon 等）
+      const chineseNameMatch = replyText.match(/([金魚草香堇菜倒鈴花學生花]+|Snapdragon|Antirrhinum majus)/i);
+      if (chineseNameMatch) {
+        lmPlantNames.push(chineseNameMatch[1]);
+      }
+      
+      // 提取學名（常見模式：*Antirrhinum majus*、Antirrhinum majus）
+      const scientificNameMatch = replyText.match(/\*?([A-Z][a-z]+ [a-z]+)\*?/);
+      if (scientificNameMatch) {
+        lmPlantNames.push(scientificNameMatch[1]);
+      }
+      
+      // 檢查 RAG 結果中是否有匹配的植物
+      if (lmPlantNames.length > 0) {
+        for (const plant of plantResults.plants) {
+          const plantNameLower = (plant.chinese_name || '').toLowerCase();
+          const scientificNameLower = (plant.scientific_name || '').toLowerCase();
+          
+          for (const lmName of lmPlantNames) {
+            const lmNameLower = lmName.toLowerCase();
+            if (plantNameLower.includes(lmNameLower) || 
+                scientificNameLower.includes(lmNameLower) ||
+                lmNameLower.includes(plantNameLower) ||
+                lmNameLower.includes(scientificNameLower)) {
+              // LM 提到的植物名稱與 RAG 結果匹配，給予信心度加成
+              lmConfidenceBoost = 0.25; // 加成 0.25（25%）
+              console.log(`✅ LM 與 RAG 匹配: LM提到「${lmName}」，RAG找到「${plant.chinese_name}」，給予信心度加成 ${(lmConfidenceBoost * 100).toFixed(0)}%`);
+              break;
+            }
+          }
+          if (lmConfidenceBoost > 0) break;
+        }
+      }
+    }
+    
+    // 將 LM 信心度加成加入 plantResults
+    if (lmConfidenceBoost > 0 && plantResults && plantResults.plants) {
+      plantResults.lm_confidence_boost = lmConfidenceBoost;
+      // 對每個植物結果加上加成
+      plantResults.plants = plantResults.plants.map(p => ({
+        ...p,
+        adjusted_score: Math.min(1.0, p.score + lmConfidenceBoost) // 調整後分數（不超過 1.0）
+      }));
+    }
+
     res.json({
       success: true,
       description: description,
