@@ -3251,10 +3251,58 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
             message: 'Vision 分析判斷為人造物，已略過植物搜尋'
           };
         } else {
-          // 嘗試解析 Vision AI 的結構化輸出（如果有的話）
-          const visionParsed = parseVisionResponse(description);
+          // 優先使用 traits-based 判斷（從結構化 JSON 提取）
+          const traits = parseTraitsFromResponse(description);
+          let traitsBasedDecision = null;
 
-          if (visionParsed.success && visionParsed.intent === 'plant') {
+          if (traits) {
+            traitsBasedDecision = isPlantFromTraits(traits);
+            console.log(`🌿 Traits 判斷: is_plant=${traitsBasedDecision.is_plant}, confidence=${traitsBasedDecision.confidence.toFixed(2)}, reason=${traitsBasedDecision.reason}`);
+            console.log(`   提取到的 traits: ${Object.keys(traits).join(', ')}`);
+
+            if (traitsBasedDecision.is_plant) {
+              // 使用 traits 轉換的特徵列表進行混合搜尋
+              const features = traitsToFeatureList(traits);
+              console.log(`📊 使用 traits 提取的特徵: ${features.join(', ')}`);
+
+              const hybridResult = await hybridSearch({
+                query: detailedDescription,
+                features: features,
+                guessNames: [],
+                topK: 3
+              });
+
+              if (hybridResult.results?.length > 0) {
+                console.log(`✅ Traits-based 混合搜尋找到 ${hybridResult.results.length} 個結果`);
+                plantResults = {
+                  is_plant: true,
+                  search_type: 'hybrid_traits',
+                  traits: traits,
+                  traits_decision: traitsBasedDecision,
+                  feature_info: hybridResult.feature_info,
+                  plants: hybridResult.results.map(p => ({
+                    chinese_name: p.chinese_name,
+                    scientific_name: p.scientific_name,
+                    family: p.family,
+                    life_form: p.life_form,
+                    score: p.score,
+                    embedding_score: p.embedding_score,
+                    feature_score: p.feature_score,
+                    matched_features: p.matched_features,
+                    summary: p.summary
+                  }))
+                };
+              }
+            }
+          } else {
+            console.log('⚠️ 未提取到 traits JSON，嘗試其他方法...');
+          }
+
+          // 如果 traits-based 判斷失敗，嘗試舊的 parseVisionResponse 方法
+          if (!plantResults) {
+            const visionParsed = parseVisionResponse(description);
+
+            if (visionParsed.success && visionParsed.intent === 'plant') {
             // 使用混合搜尋（結合特徵權重）
             // 重要：使用詳細描述作為 query，而不是 shortCaption 或 guess_names
             console.log(

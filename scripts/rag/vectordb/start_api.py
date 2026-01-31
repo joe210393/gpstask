@@ -219,6 +219,21 @@ def _init_background_impl():
         qdrant_client = get_qdrant_client()
         collections = qdrant_client.get_collections()
         print(f"  ✅ Qdrant 連線成功，共 {len(collections.collections)} 個 collections")
+        
+        # 檢查 collection 維度是否匹配
+        if COLLECTION_NAME in [c.name for c in collections.collections]:
+            collection_info = qdrant_client.get_collection(COLLECTION_NAME)
+            existing_dim = collection_info.config.params.vectors.size
+            
+            # Jina API 返回 1024 維，本地模型可能是 768 維
+            expected_dim = 1024 if USE_JINA_API else 768
+            
+            if existing_dim != expected_dim:
+                print(f"  ⚠️ Collection '{COLLECTION_NAME}' 維度不匹配！")
+                print(f"     現有維度: {existing_dim}")
+                print(f"     期望維度: {expected_dim}")
+                print(f"  ⚠️ 這會導致搜尋失敗，請重新向量化資料或更新 collection")
+                print(f"     建議：運行 embed_plants_forest.py 重新向量化（會自動處理維度）")
     except Exception as e:
         print(f"  ⚠️ Qdrant 連線失敗: {e}")
         print(f"    應用將繼續運行，但搜尋功能不可用")
