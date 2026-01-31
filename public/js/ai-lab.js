@@ -1498,11 +1498,13 @@ success 或 fail (只能二選一，小寫)
                 try {
                     const quickFeaturePrompt = `你是一位專業的植物形態學家。請快速分析圖片中的植物特徵，只提取關鍵識別特徵（生活型、葉序、葉形、花序、花色等），不要給出植物名稱。用簡短文字描述即可。`;
                     
+                    // 快速特徵提取：使用簡化的 prompt，只提取特徵，不給答案
                     const quickFormData = new FormData();
                     const quickBlob = await (await fetch(gridImage)).blob();
                     quickFormData.append('image', quickBlob, 'capture_grid.jpg');
                     quickFormData.append('systemPrompt', quickFeaturePrompt);
                     quickFormData.append('userPrompt', '請快速提取這張圖片中植物的關鍵識別特徵（生活型、葉序、葉形、花序、花色等），用簡短文字描述。');
+                    quickFormData.append('quickOnly', 'true'); // 標記為快速提取模式，後端只返回特徵，不進行 RAG
                     
                     if (gpsData) {
                         quickFormData.append('latitude', gpsData.latitude);
