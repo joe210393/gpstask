@@ -3303,43 +3303,44 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
             const visionParsed = parseVisionResponse(description);
 
             if (visionParsed.success && visionParsed.intent === 'plant') {
-            // 使用混合搜尋（結合特徵權重）
-            // 重要：使用詳細描述作為 query，而不是 shortCaption 或 guess_names
-            console.log(
-              `📊 結構化辨識: intent=${visionParsed.intent}, features=${visionParsed.plant.features.join(',')}`
-            );
+              // 使用混合搜尋（結合特徵權重）
+              // 重要：使用詳細描述作為 query，而不是 shortCaption 或 guess_names
+              console.log(
+                `📊 結構化辨識: intent=${visionParsed.intent}, features=${visionParsed.plant.features.join(',')}`
+              );
 
-            const hybridResult = await hybridSearch({
-              query: detailedDescription, // 使用詳細描述，而不是猜測的名稱
-              features: visionParsed.plant.features || [],
-              guessNames: visionParsed.plant.guess_names || [],
-              topK: 3
-            });
+              const hybridResult = await hybridSearch({
+                query: detailedDescription, // 使用詳細描述，而不是猜測的名稱
+                features: visionParsed.plant.features || [],
+                guessNames: visionParsed.plant.guess_names || [],
+                topK: 3
+              });
 
-            if (hybridResult.results?.length > 0) {
-              console.log(`✅ 混合搜尋找到 ${hybridResult.results.length} 個結果`);
-              plantResults = {
-                is_plant: true,
-                search_type: 'hybrid',
-                vision_parsed: {
-                  intent: visionParsed.intent,
-                  confidence: visionParsed.confidence,
-                  features: visionParsed.plant.features,
-                  guess_names: visionParsed.plant.guess_names
-                },
-                feature_info: hybridResult.feature_info,
-                plants: hybridResult.results.map(p => ({
-                  chinese_name: p.chinese_name,
-                  scientific_name: p.scientific_name,
-                  family: p.family,
-                  life_form: p.life_form,
-                  score: p.score,
-                  embedding_score: p.embedding_score,
-                  feature_score: p.feature_score,
-                  matched_features: p.matched_features,
-                  summary: p.summary
-                }))
-              };
+              if (hybridResult.results?.length > 0) {
+                console.log(`✅ 混合搜尋找到 ${hybridResult.results.length} 個結果`);
+                plantResults = {
+                  is_plant: true,
+                  search_type: 'hybrid',
+                  vision_parsed: {
+                    intent: visionParsed.intent,
+                    confidence: visionParsed.confidence,
+                    features: visionParsed.plant.features,
+                    guess_names: visionParsed.plant.guess_names
+                  },
+                  feature_info: hybridResult.feature_info,
+                  plants: hybridResult.results.map(p => ({
+                    chinese_name: p.chinese_name,
+                    scientific_name: p.scientific_name,
+                    family: p.family,
+                    life_form: p.life_form,
+                    score: p.score,
+                    embedding_score: p.embedding_score,
+                    feature_score: p.feature_score,
+                    matched_features: p.matched_features,
+                    summary: p.summary
+                  }))
+                };
+              }
             }
           }
 
