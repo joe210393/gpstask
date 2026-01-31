@@ -17,8 +17,16 @@ COPY scripts/rag/vectordb/feature_weights.py .
 RUN mkdir -p /app/data
 # 先刪除可能存在的舊檔案
 RUN rm -f /app/data/plants-enriched.jsonl
-# 複製新資料檔案
-COPY scripts/rag/data/plants-forest-gov-tw.jsonl /app/data/plants-forest-gov-tw.jsonl
+# 複製新資料檔案（嘗試多個可能的路徑）
+# 注意：Zeabur 的構建上下文可能是專案根目錄或 scripts/rag/vectordb/
+COPY scripts/rag/data/plants-forest-gov-tw.jsonl /app/data/plants-forest-gov-tw.jsonl || \
+     COPY ../data/plants-forest-gov-tw.jsonl /app/data/plants-forest-gov-tw.jsonl || \
+     COPY ../../data/plants-forest-gov-tw.jsonl /app/data/plants-forest-gov-tw.jsonl || \
+     (echo "❌ 無法找到新資料檔案" && exit 1)
+# 確認新檔案已複製
+RUN ls -lh /app/data/plants-forest-gov-tw.jsonl && \
+    echo "✅ 新資料檔案已複製" || \
+    (echo "❌ 新資料檔案不存在" && exit 1)
 # 再次確認刪除舊檔案（防止從其他來源複製）
 RUN rm -f /app/data/plants-enriched.jsonl && \
     ls -lh /app/data/ && \
