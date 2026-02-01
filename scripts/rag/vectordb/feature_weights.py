@@ -440,7 +440,29 @@ class FeatureWeightCalculator:
         coverage = matched_count / total_query_traits if total_query_traits > 0 else 0.0
         
         # 檢查 must traits 是否全部匹配
-        must_matched = len(must_traits_matched) == len(must_traits_in_query) if must_traits_in_query else True
+        # 重要：如果查詢中有 must traits，但植物沒有對應的 trait_tokens，視為不匹配
+        must_matched = True
+        if must_traits_in_query:
+            # 如果查詢中有 must traits，必須全部匹配
+            must_matched = len(must_traits_matched) == len(must_traits_in_query)
+            
+            # 額外檢查：如果查詢有 life_form，但植物沒有 life_form token，且沒有匹配到，視為不匹配
+            if use_tokens and plant_trait_tokens:
+                query_has_life_form = any(t.startswith("life_form=") for t in query_trait_tokens)
+                plant_has_life_form = any(t.startswith("life_form=") for t in plant_trait_tokens)
+                if query_has_life_form and not plant_has_life_form:
+                    # 查詢有 life_form，但植物沒有，且沒有匹配到（matched_flag=False）
+                    life_form_matched = any("life_form" in m["name"].lower() for m in matched)
+                    if not life_form_matched:
+                        must_matched = False
+                
+                # 同樣檢查 leaf_arrangement
+                query_has_leaf_arr = any(t.startswith("leaf_arrangement=") for t in query_trait_tokens)
+                plant_has_leaf_arr = any(t.startswith("leaf_arrangement=") for t in plant_trait_tokens)
+                if query_has_leaf_arr and not plant_has_leaf_arr:
+                    leaf_arr_matched = any("leaf_arrangement" in m["name"].lower() or "葉序" in m["name"] for m in matched)
+                    if not leaf_arr_matched:
+                        must_matched = False
 
         return {
             "match_score": match_score,

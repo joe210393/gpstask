@@ -678,10 +678,10 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             # 基礎混合分數
             hybrid_score = base_score + enhancement + keyword_bonus
             
-            # Must Gate：如果關鍵特徵（life_form、leaf_arrangement）不匹配，降權
+            # Must Gate：如果關鍵特徵（life_form、leaf_arrangement）不匹配，大幅降權
             if not must_matched:
-                hybrid_score *= 0.65  # 降權 35%
-                print(f"[API] Must Gate 觸發: {r.payload.get('chinese_name', '未知')} - 關鍵特徵不匹配，分數降權")
+                hybrid_score *= 0.3  # 降權 70%（從 35% 提高到 70%，因為關鍵特徵不匹配是嚴重問題）
+                print(f"[API] ⚠️ Must Gate 觸發: {r.payload.get('chinese_name', '未知')} - 關鍵特徵不匹配（must_traits_in_query={match_result.get('must_traits_in_query', [])}, must_traits_matched={match_result.get('must_traits_matched', [])}），分數降權 70%")
             
             # 確保分數不超過 1.0
             hybrid_score = min(1.0, hybrid_score)
