@@ -378,21 +378,51 @@ class FeatureWeightCalculator:
         # 🔥 關鍵修復：直接從 query_features 中提取 trait token 格式的特徵
         # 如果 query_features 已經是 trait token 格式（如 "life_form=herb"），直接使用
         for f in query_features:
-            if "=" in f and f.split("=")[0] in ["life_form", "leaf_arrangement", "leaf_shape", "leaf_margin", "flower_color", "fruit_type"]:
+            if "=" in f:
                 query_trait_tokens.append(f)
         
         # 定義 must traits（高信心、硬條件）
-        # 注意：只有 life_form 和 leaf_arrangement 是真正的 must traits
-        # 其他特徵（leaf_shape, leaf_margin, flower_color, fruit_type）雖然重要，但不是必須匹配的
-        MUST_TRAITS = {"life_form", "leaf_arrangement"}
+        MUST_KEYS = {"life_form", "leaf_arrangement"}
         
-        # 🔥 關鍵修復：直接從 query_trait_tokens 提取 must traits
+        # 🔥 關鍵修復：Value Canonicalization（統一值格式）
+        def canon_value(key: str, val: str) -> str:
+            """正規化 trait 值，特別是 life_form"""
+            if key == "life_form":
+                mapping = {
+                    "草本": "herb", "herbaceous": "herb", "herb": "herb",
+                    "喬木": "tree", "tree": "tree",
+                    "灌木": "shrub", "shrub": "shrub",
+                    "藤本": "vine", "vine": "vine"
+                }
+                return mapping.get(val.lower(), val.lower())
+            return val.strip().lower()
+        
+        def normalize_token(token: str) -> str:
+            """正規化 trait token（如 "life_form=herb"）"""
+            if "=" not in token:
+                return token.strip()
+            k, v = token.split("=", 1)
+            k = k.strip()
+            v = v.strip()
+            v = canon_value(k, v)
+            return f"{k}={v}"
+        
+        # 🔥 關鍵修復：提取查詢中提供的 must traits（只檢查查詢中有的）
         must_traits_in_query = []
+        for f in query_features:
+            if "=" in f:
+                k = f.split("=", 1)[0].strip()
+                if k in MUST_KEYS:
+                    must_traits_in_query.append(normalize_token(f))
+        
+        # 也從 query_trait_tokens 中提取（向後兼容）
         for token in query_trait_tokens:
             if "=" in token:
                 trait, value = token.split("=", 1)
-                if trait in MUST_TRAITS:
-                    must_traits_in_query.append(token)
+                if trait.strip() in MUST_KEYS:
+                    normalized = normalize_token(token)
+                    if normalized not in must_traits_in_query:
+                        must_traits_in_query.append(normalized)
         
         must_traits_matched = []
         
@@ -443,14 +473,19 @@ class FeatureWeightCalculator:
             # 🔥 關鍵修復：直接檢查 query_features 是否已經是 trait token 格式
             if "=" in f:
                 # query_features 已經是 trait token 格式（如 "life_form=herb"）
-                query_trait, query_value = f.split("=", 1)
+                query_token_normalized = normalize_token(f)
+                query_trait, query_value = query_token_normalized.split("=", 1)
                 if use_tokens and plant_trait_tokens:
-                    # 檢查 plant_trait_tokens 中是否有匹配的 token
+                    # 檢查 plant_trait_tokens 中是否有匹配的 token（使用正規化後的值）
                     for plant_token in plant_trait_tokens:
                         if "=" in plant_token:
-                            plant_trait, plant_value = plant_token.split("=", 1)
+                            plant_token_normalized = normalize_token(plant_token)
+                            plant_trait, plant_value = plant_token_normalized.split("=", 1)
                             if query_trait == plant_trait and query_value == plant_value:
                                 matched_flag = True
+                                # 記錄匹配的 must trait
+                                if query_trait in MUST_KEYS and query_token_normalized not in must_traits_matched:
+                                    must_traits_matched.append(query_token_normalized)
                                 break
             
             if not matched_flag and use_tokens and plant_trait_tokens:
@@ -538,49 +573,20 @@ class FeatureWeightCalculator:
         matched_count = len(matched)
         coverage = matched_count / total_query_traits if total_query_traits > 0 else 0.0
         
-        # 🔥 關鍵修復：檢查 must traits 是否全部匹配
-        # 重要：如果查詢中有 must traits，但植物沒有對應的 trait_tokens，視為不匹配
+        # 🔥 關鍵修復：Must Gate 檢查（只檢查查詢中提供的 must traits）
+        # 如果查詢中沒有提供 must traits，不進行 gating
         must_matched = True
         if must_traits_in_query:
-            # 如果查詢中有 must traits，必須全部匹配
-            # 比較時，需要處理 token 格式（"life_form=herb"）和中文名稱（"草本"）的差異
-            matched_count = 0
-            for query_must in must_traits_in_query:
-                # 提取 trait 名稱（例如 "life_form=herb" -> "life_form"）
-                if "=" in query_must:
-                    query_trait = query_must.split("=")[0]
-                    query_value = query_must.split("=")[1]
-                else:
-                    query_trait = None
-                    query_value = query_must
-                
-                # 檢查是否匹配
-                found = False
-                for matched_must in must_traits_matched:
-                    if "=" in matched_must:
-                        matched_trait = matched_must.split("=")[0]
-                        matched_value = matched_must.split("=")[1]
-                        if query_trait and matched_trait == query_trait and matched_value == query_value:
-                            found = True
-                            break
-                    elif matched_must == query_value or query_value in matched_must:
-                        found = True
-                        break
-                
-                if found:
-                    matched_count += 1
-            
-            must_matched = matched_count == len(must_traits_in_query)
-            
-            # 額外檢查：如果查詢有 life_form，但植物沒有 life_form token，且沒有匹配到，視為不匹配
+            # 正規化 plant_trait_tokens（建立集合以便快速查找）
+            plant_set = set()
             if use_tokens and plant_trait_tokens:
-                query_has_life_form = any(t.startswith("life_form=") for t in query_trait_tokens)
-                plant_has_life_form = any(t.startswith("life_form=") for t in plant_trait_tokens)
-                if query_has_life_form and not plant_has_life_form:
-                    # 查詢有 life_form，但植物沒有，且沒有匹配到（matched_flag=False）
-                    life_form_matched = any("life_form" in m["name"].lower() for m in matched)
-                    if not life_form_matched:
-                        must_matched = False
+                for plant_token in plant_trait_tokens:
+                    if "=" in plant_token:
+                        plant_set.add(normalize_token(plant_token))
+            
+            # 檢查所有查詢中的 must traits 是否都在 plant 中
+            # 只要求查詢中提供的 must traits 全部匹配，不要求所有 must traits 都存在
+            must_matched = all(t in plant_set for t in must_traits_in_query)
                 
                 # 同樣檢查 leaf_arrangement
                 query_has_leaf_arr = any(t.startswith("leaf_arrangement=") for t in query_trait_tokens)
