@@ -3294,7 +3294,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
     // 注意：如果預先搜尋已經有結果，應該保留它，不要被後續搜尋覆蓋
     // 除非後續搜尋的分數明顯更高（例如高 15% 以上）
     // 重要：在進行後續搜尋前，保存預先搜尋的結果（如果有的話）
-    const preSearchResults = plantResults; // 保存預先搜尋的結果（在後續搜尋之前）
+    let preSearchResults = plantResults; // 保存預先搜尋的結果（在後續搜尋之前，使用 let 以便後續修改）
     if (!plantResults) {
       try {
         const embeddingReady = await isEmbeddingApiReady();
