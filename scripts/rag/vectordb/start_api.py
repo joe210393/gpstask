@@ -713,6 +713,19 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
 
     # 4. 按混合分數重新排序
     results.sort(key=lambda x: x["score"], reverse=True)
+    
+    # 記錄最終結果（Top K）
+    print(f"\n[API] 🔍 混合搜尋結果（Top {top_k}）：")
+    for i, result in enumerate(results[:top_k], 1):
+        plant_name = result.get("chinese_name", "未知")
+        scientific_name = result.get("scientific_name", "")
+        score = result.get("score", 0.0)
+        embedding_score = result.get("embedding_score", 0.0)
+        feature_score = result.get("feature_score", 0.0)
+        matched_features = result.get("matched_features", [])
+        print(f"  {i}. {plant_name}" + (f" ({scientific_name})" if scientific_name else "") + f" - 總分={score:.3f} (embedding={embedding_score:.3f}, feature={feature_score:.3f}), 匹配特徵={matched_features}")
+    print()  # 空行分隔
+    sys.stdout.flush()
 
     return results[:top_k]
 
