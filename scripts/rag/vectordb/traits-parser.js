@@ -378,6 +378,18 @@ function traitsToFeatureList(traits) {
         traitValue = traitValue.split(',')[0].trim();
       }
       
+      // 處理特殊值（例如：pinkish_white → pink, green_brown → green）
+      if (traitValue.includes('_')) {
+        const parts = traitValue.split('_');
+        // 嘗試匹配主要部分
+        for (const part of parts) {
+          if (traitValueMap[part]) {
+            traitValue = part;
+            break;
+          }
+        }
+      }
+      
       // 優先使用映射表
       const chineseKeyword = traitValueMap[traitValue];
       if (chineseKeyword) {
