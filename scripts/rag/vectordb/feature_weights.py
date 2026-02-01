@@ -344,9 +344,16 @@ class FeatureWeightCalculator:
         
         # 嘗試載入 trait_tokenizer（如果可用）
         try:
-            from trait_tokenizer import key_features_to_trait_tokens
-            use_tokens = True
-        except ImportError:
+            import sys
+            from pathlib import Path
+            # 確保可以導入 trait_tokenizer（從同目錄）
+            tokenizer_path = Path(__file__).parent / "trait_tokenizer.py"
+            if tokenizer_path.exists():
+                from trait_tokenizer import key_features_to_trait_tokens
+                use_tokens = True
+            else:
+                use_tokens = False
+        except (ImportError, Exception):
             use_tokens = False
         
         # 將 query_features 轉換為 trait_tokens（如果使用新方法）

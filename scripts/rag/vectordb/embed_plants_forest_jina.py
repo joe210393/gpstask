@@ -54,8 +54,17 @@ BATCH_SIZE = 16  # 每批處理的資料數量（降低以避免速率限制：�
 
 # 資料路徑
 SCRIPT_DIR = Path(__file__).parent
+# 優先使用 enhanced 資料（如果存在），否則使用原始資料
+ENHANCED_DATA_FILE = SCRIPT_DIR.parent / "data" / "plants-forest-gov-tw-enhanced.jsonl"
 DATA_FILE = SCRIPT_DIR.parent / "data" / "plants-forest-gov-tw.jsonl"
 PROGRESS_FILE = SCRIPT_DIR / "embed_plants_forest_jina_progress.json"
+
+# 選擇資料檔案（優先使用 enhanced）
+if ENHANCED_DATA_FILE.exists():
+    DATA_FILE = ENHANCED_DATA_FILE
+    print(f"✅ 使用增強資料：{ENHANCED_DATA_FILE}")
+else:
+    print(f"⚠️  增強資料不存在，使用原始資料：{DATA_FILE}")
 
 
 def get_qdrant_client():
