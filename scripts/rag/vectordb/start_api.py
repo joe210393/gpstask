@@ -597,13 +597,30 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             keyword_bonus = KEYWORD_BONUS_WEIGHT  # 關鍵字匹配給予較小的加分（0.1），避免過度偏向名稱匹配
             print(f"[API] 關鍵字匹配: {r.payload.get('chinese_name', '未知')} (id={r.id}, bonus={keyword_bonus})")
 
-        # 計算特徵匹配分數
+        # 計算特徵匹配分數（改進版：使用 trait_tokens）
         feature_score = 0.0
         matched_features = []
+        coverage = 1.0
+        must_matched = True
 
         if features and feature_calculator:
-            # 取得植物的描述文字（處理 None 值）
-            # 包含 key_features 以提高匹配率
+            # 取得植物的 trait_tokens（優先使用）
+            plant_trait_tokens = r.payload.get("trait_tokens", [])
+            if not plant_trait_tokens:
+                # 如果沒有 trait_tokens，從 key_features 生成（階段一：向後兼容）
+                try:
+                    import sys
+                    from pathlib import Path
+                    tokenizer_path = Path(__file__).parent / "trait_tokenizer.py"
+                    if tokenizer_path.exists():
+                        from trait_tokenizer import key_features_to_trait_tokens
+                        key_features = r.payload.get("key_features", [])
+                        if key_features and isinstance(key_features, list):
+                            plant_trait_tokens = key_features_to_trait_tokens(key_features)
+                except (ImportError, Exception):
+                    plant_trait_tokens = []
+            
+            # 取得植物的描述文字（備用，如果沒有 trait_tokens 才用）
             key_features = r.payload.get("key_features", [])
             key_features_text = ""
             if key_features:
@@ -616,32 +633,38 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
                 r.payload.get("summary") or "",
                 r.payload.get("life_form") or "",
                 r.payload.get("morphology") or "",
-                key_features_text,  # 新增：加入 key_features
+                key_features_text,
             ]))
 
-            # 計算特徵匹配
-            match_result = feature_calculator.match_plant_features(features, plant_text)
-            feature_score = match_result["match_score"]
+            # 計算特徵匹配（使用 trait_tokens 優先）
+            match_result = feature_calculator.match_plant_features(
+                features, 
+                plant_text=plant_text, 
+                plant_trait_tokens=plant_trait_tokens
+            )
+            feature_score_raw = match_result["match_score"]
             matched_features = [f["name"] for f in match_result["matched_features"]]
+            coverage = match_result.get("coverage", 1.0)
+            must_matched = match_result.get("must_matched", True)
+            
+            # 應用 Coverage 調整
+            feature_score = feature_score_raw * coverage
 
-        # 3. 計算混合分數
-        # 改進公式：使用非線性組合，確保分數更合理
-        # 原公式：(EMBEDDING_WEIGHT * embedding_score) + (FEATURE_WEIGHT * feature_score) + keyword_bonus
-        # 問題：如果 embedding_score 和 feature_score 都很低，總分會過低
-        # 新公式：使用加權平均 + 乘法增強 + 關鍵字加成
-        # - 基礎分數：加權平均（embedding 和 feature 的加權平均）
-        # - 增強分數：如果兩者都匹配，使用乘法增強（例如 embedding * feature）
-        # - 最終分數：基礎分數 + 增強分數 * 增強係數 + 關鍵字加成
+        # 3. 計算混合分數（加入 Coverage 和 Must Gate）
         if features:
             # 基礎分數：加權平均
             base_score = (EMBEDDING_WEIGHT * embedding_score) + (FEATURE_WEIGHT * feature_score)
             
             # 增強分數：如果 embedding 和 feature 都匹配，使用乘法增強
-            # 這可以放大同時匹配的情況
             enhancement = embedding_score * feature_score * 0.3  # 增強係數 0.3
             
-            # 最終分數：基礎分數 + 增強分數 + 關鍵字加成
+            # 基礎混合分數
             hybrid_score = base_score + enhancement + keyword_bonus
+            
+            # Must Gate：如果關鍵特徵（life_form、leaf_arrangement）不匹配，降權
+            if not must_matched:
+                hybrid_score *= 0.65  # 降權 35%
+                print(f"[API] Must Gate 觸發: {r.payload.get('chinese_name', '未知')} - 關鍵特徵不匹配，分數降權")
             
             # 確保分數不超過 1.0
             hybrid_score = min(1.0, hybrid_score)
@@ -651,7 +674,7 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         # 記錄詳細資訊（用於調試）
         plant_name = r.payload.get("chinese_name", "未知")
         if plant_name != "未知":
-            print(f"[API] 候選植物: {plant_name} (id={r.id}) - embedding={embedding_score:.3f}, feature={feature_score:.3f}, hybrid={hybrid_score:.3f}, matched_features={matched_features}")
+            print(f"[API] 候選植物: {plant_name} (id={r.id}) - embedding={embedding_score:.3f}, feature={feature_score:.3f}, coverage={coverage:.2f}, must_matched={must_matched}, hybrid={hybrid_score:.3f}, matched_features={matched_features}")
         
         results.append({
             "code": r.payload.get("code"),
@@ -664,6 +687,8 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             "score": hybrid_score,
             "embedding_score": embedding_score,
             "feature_score": feature_score,
+            "coverage": coverage,
+            "must_matched": must_matched,
             "matched_features": matched_features,
             "summary": r.payload.get("summary", "")[:300],
         })

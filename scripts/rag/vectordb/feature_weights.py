@@ -320,25 +320,46 @@ class FeatureWeightCalculator:
             "matched_count": len(details),
         }
 
-    def match_plant_features(self, query_features: list, plant_text: str) -> dict:
+    def match_plant_features(self, query_features: list, plant_text: str = None, plant_trait_tokens: list = None) -> dict:
         """
-        比對查詢特徵與植物描述的匹配程度
+        比對查詢特徵與植物描述的匹配程度（改進版：優先使用 trait_tokens）
 
         Args:
-            query_features: Vision AI 提取的特徵列表
-            plant_text: 植物的描述文字
+            query_features: Vision AI 提取的特徵列表（中文，如 ["灌木", "互生", "卵形"]）
+            plant_text: 植物的描述文字（備用，如果沒有 trait_tokens 才用）
+            plant_trait_tokens: 植物的標準化 trait_tokens（優先使用，如 ["life_form=shrub", "leaf_arrangement=alternate"]）
 
         Returns:
             {
                 "match_score": 0.xx,
                 "matched_features": [...],
                 "missing_features": [...],
+                "coverage": 0.xx,  # 新增：覆蓋率
+                "must_matched": True/False,  # 新增：must 條件是否全部匹配
             }
         """
         matched = []
         missing = []
         match_score = 0.0
-
+        
+        # 嘗試載入 trait_tokenizer（如果可用）
+        try:
+            from trait_tokenizer import key_features_to_trait_tokens
+            use_tokens = True
+        except ImportError:
+            use_tokens = False
+        
+        # 將 query_features 轉換為 trait_tokens（如果使用新方法）
+        query_trait_tokens = []
+        if use_tokens:
+            query_trait_tokens = key_features_to_trait_tokens(query_features)
+        
+        # 定義 must traits（高信心、硬條件）
+        MUST_TRAITS = {"life_form", "leaf_arrangement"}  # 生活型和葉序是關鍵識別特徵
+        
+        must_traits_in_query = []
+        must_traits_matched = []
+        
         for f in query_features:
             info = FEATURE_INDEX.get(f)
             if not info:
@@ -346,18 +367,82 @@ class FeatureWeightCalculator:
 
             std_name = info["name"]
             weight = self.get_weight(f)
-
-            # 檢查植物描述中是否有這個特徵
-            if std_name in plant_text or info["en"] in plant_text.lower():
-                matched.append({"name": std_name, "weight": weight})
-                match_score += weight
+            
+            # 判斷是否為 must trait
+            is_must = False
+            if use_tokens:
+                # 從 query_trait_tokens 判斷
+                for token in query_trait_tokens:
+                    if token.startswith("life_form=") and "life_form" in std_name.lower():
+                        is_must = True
+                        break
+                    if token.startswith("leaf_arrangement=") and "leaf_arrangement" in std_name.lower():
+                        is_must = True
+                        break
             else:
-                missing.append({"name": std_name, "weight": weight})
+                # 備用判斷：根據特徵名稱
+                if "生活型" in std_name or "life_form" in std_name.lower():
+                    is_must = True
+                elif "葉序" in std_name or "leaf_arrangement" in std_name.lower():
+                    is_must = True
+            
+            if is_must:
+                must_traits_in_query.append(std_name)
+
+            # 優先使用 trait_tokens 匹配
+            matched_flag = False
+            if use_tokens and plant_trait_tokens:
+                # 將 query feature 轉換為 token 格式
+                query_token = None
+                for token in query_trait_tokens:
+                    # 簡單匹配：檢查 token 是否包含對應的 canonical value
+                    if info.get("en") and info["en"].lower() in token.lower():
+                        query_token = token
+                        break
+                
+                if query_token:
+                    # 檢查 plant_trait_tokens 中是否有匹配的 token
+                    for plant_token in plant_trait_tokens:
+                        if query_token == plant_token:
+                            matched_flag = True
+                            break
+                        # 部分匹配：trait 相同即可（例如 life_form=shrub 匹配 life_form=shrub）
+                        if "=" in query_token and "=" in plant_token:
+                            q_trait, q_canon = query_token.split("=", 1)
+                            p_trait, p_canon = plant_token.split("=", 1)
+                            if q_trait == p_trait and q_canon == p_canon:
+                                matched_flag = True
+                                break
+            
+            # 如果 trait_tokens 匹配失敗，回退到全文掃描（向後兼容）
+            if not matched_flag and plant_text:
+                if std_name in plant_text or info.get("en", "").lower() in plant_text.lower():
+                    matched_flag = True
+            
+            if matched_flag:
+                matched.append({"name": std_name, "weight": weight, "is_must": is_must})
+                match_score += weight
+                if is_must:
+                    must_traits_matched.append(std_name)
+            else:
+                missing.append({"name": std_name, "weight": weight, "is_must": is_must})
+        
+        # 計算覆蓋率（只算非 must 的特徵，避免 must 特徵過度影響）
+        total_query_traits = len(query_features)
+        matched_count = len(matched)
+        coverage = matched_count / total_query_traits if total_query_traits > 0 else 0.0
+        
+        # 檢查 must traits 是否全部匹配
+        must_matched = len(must_traits_matched) == len(must_traits_in_query) if must_traits_in_query else True
 
         return {
             "match_score": match_score,
             "matched_features": matched,
             "missing_features": missing,
+            "coverage": coverage,
+            "must_matched": must_matched,
+            "must_traits_in_query": must_traits_in_query,
+            "must_traits_matched": must_traits_matched,
         }
 
 

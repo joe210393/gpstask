@@ -185,22 +185,56 @@ def encode_text_jina(texts: List[str], max_retries: int = 3) -> List[List[float]
 
 def create_plant_text(plant: Dict[str, Any]) -> str:
     """
-    從植物資料建立搜尋文字
+    從植物資料建立搜尋文字（優化版：優先使用 summary 和 key_features）
     適配 plants-forest-gov-tw.jsonl 格式
+    
+    改進策略：
+    1. 優先使用 morphology_summary（如果存在）- 乾淨的摘要
+    2. 其次使用 summary 和 key_features
+    3. 減少原始 morphology 的權重（避免常見詞淹沒）
     """
     parts = []
     
-    # 基本資訊
+    # 基本資訊（保留，但權重較低）
     if plant.get("chinese_name"):
         parts.append(f"中文名：{plant['chinese_name']}")
     if plant.get("scientific_name"):
         parts.append(f"學名：{plant['scientific_name']}")
-    if plant.get("family"):
-        parts.append(f"科：{plant['family']}")
     
-    # 分類資訊
+    # 分類資訊（優先使用乾淨的摘要）
     identification = plant.get("identification", {})
     if isinstance(identification, dict):
+        # 1. 優先使用 morphology_summary（階段二：如果存在）
+        if identification.get("morphology_summary_zh"):
+            parts.append(identification["morphology_summary_zh"])
+        # 2. 其次使用 summary（較乾淨）
+        elif identification.get("summary"):
+            summary = identification["summary"]
+            if isinstance(summary, list):
+                parts.append(" ".join(summary))
+            else:
+                parts.append(summary)
+        
+        # 3. 加入 trait_tokens（如果存在，階段二）
+        trait_tokens = identification.get("trait_tokens", [])
+        if trait_tokens and isinstance(trait_tokens, list):
+            # 只取前 20 個 token，避免過長
+            trait_tokens_limited = trait_tokens[:20]
+            # 轉換為可讀文字（用於 embedding）
+            trait_text = " ".join(trait_tokens_limited)
+            parts.append(f"特徵：{trait_text}")
+        
+        # 4. 加入 key_features（高辨識度特徵，如果沒有 trait_tokens）
+        elif identification.get("key_features"):
+            key_features = identification["key_features"]
+            if isinstance(key_features, list):
+                # 只取前 10 個關鍵特徵，避免過長
+                key_features_limited = key_features[:10]
+                parts.append(f"關鍵特徵：{', '.join(key_features_limited)}")
+            else:
+                parts.append(f"關鍵特徵：{key_features}")
+        
+        # 5. 生活型（重要識別特徵）
         if identification.get("life_form"):
             life_form = identification["life_form"]
             if isinstance(life_form, list):
@@ -208,31 +242,22 @@ def create_plant_text(plant: Dict[str, Any]) -> str:
             else:
                 parts.append(f"生活型：{life_form}")
         
-        if identification.get("morphology"):
-            morphology = identification["morphology"]
-            if isinstance(morphology, list):
-                parts.append(f"形態：{', '.join(morphology)}")
-            else:
-                parts.append(f"形態：{morphology}")
-        
-        if identification.get("summary"):
-            summary = identification["summary"]
-            if isinstance(summary, list):
-                parts.append(f"摘要：{', '.join(summary)}")
-            else:
-                parts.append(f"摘要：{summary}")
-        
-        if identification.get("key_features"):
-            key_features = identification["key_features"]
-            if isinstance(key_features, list):
-                parts.append(f"關鍵特徵：{', '.join(key_features)}")
-            else:
-                parts.append(f"關鍵特徵：{key_features}")
+        # 6. 原始 morphology（備用，權重較低）
+        # 只在沒有 summary 和 morphology_summary 時才使用
+        if not identification.get("morphology_summary_zh") and not identification.get("summary"):
+            if identification.get("morphology"):
+                morphology = identification["morphology"]
+                if isinstance(morphology, list):
+                    # 只取前 3 條，避免過長
+                    morphology_limited = morphology[:3]
+                    parts.append(f"形態：{', '.join(morphology_limited)}")
+                else:
+                    parts.append(f"形態：{morphology}")
     
-    # 分布資訊
-    distribution = plant.get("distribution", {})
-    if isinstance(distribution, dict) and distribution.get("taiwan"):
-        parts.append(f"台灣分布：{distribution['taiwan']}")
+    # 分布資訊（移除，避免干擾）
+    # distribution = plant.get("distribution", {})
+    # if isinstance(distribution, dict) and distribution.get("taiwan"):
+    #     parts.append(f"台灣分布：{distribution['taiwan']}")
     
     return "\n".join(parts)
 
