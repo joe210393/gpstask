@@ -13,7 +13,130 @@ const rateLimit = require('express-rate-limit');
 const webpush = require('web-push');
 const XLSX = require('xlsx');
 const { getDbConfig } = require('./db-config');
-const { smartSearch, classify, hybridSearch, getVisionPrompt, parseVisionResponse, healthCheck, stats: embeddingStats } = require('./scripts/rag/vectordb/plant-search-client');
+// Embedding API 客戶端（直接使用 HTTP 請求，不再依賴 plant-search-client.js）
+const EMBEDDING_API_URL = process.env.EMBEDDING_API_URL || 'http://gpstask-ooffix:8080';
+const http = require('http');
+const https = require('https');
+const { URL } = require('url');
+
+// 簡單的 HTTP 請求函數（不依賴外部庫）
+function httpRequest(url, options = {}) {
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url);
+    const isHttps = urlObj.protocol === 'https:';
+    const httpModule = isHttps ? https : http;
+    
+    const requestOptions = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || (isHttps ? 443 : 80),
+      path: urlObj.pathname + urlObj.search,
+      method: options.method || 'GET',
+      headers: options.headers || {}
+    };
+    
+    const req = httpModule.request(requestOptions, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const jsonData = JSON.parse(data);
+          resolve({ status: res.statusCode, data: jsonData });
+        } catch (e) {
+          resolve({ status: res.statusCode, data: data });
+        }
+      });
+    });
+    
+    req.on('error', (e) => reject(e));
+    
+    if (options.body) {
+      req.write(typeof options.body === 'string' ? options.body : JSON.stringify(options.body));
+    }
+    
+    req.end();
+  });
+}
+
+async function healthCheck() {
+  try {
+    const result = await httpRequest(`${EMBEDDING_API_URL}/health`);
+    return result.data;
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+async function getVisionPrompt() {
+  try {
+    const result = await httpRequest(`${EMBEDDING_API_URL}/vision-prompt`);
+    return result.data;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function classify(query) {
+  try {
+    const result = await httpRequest(`${EMBEDDING_API_URL}/classify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: { query }
+    });
+    return result.data;
+  } catch (e) {
+    return { is_plant: false, plant_score: 0, error: e.message };
+  }
+}
+
+async function smartSearch(query, topK = 5) {
+  try {
+    const result = await httpRequest(`${EMBEDDING_API_URL}/search?q=${encodeURIComponent(query)}&top_k=${topK}&smart=true`);
+    return result.data;
+  } catch (e) {
+    return { classification: { is_plant: false }, results: [], error: e.message };
+  }
+}
+
+async function hybridSearch({ query, features = [], guessNames = [], topK = 5 }) {
+  try {
+    const result = await httpRequest(`${EMBEDDING_API_URL}/hybrid-search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: { query, features, guess_names: guessNames, top_k: topK }
+    });
+    return result.data;
+  } catch (e) {
+    return { results: [], error: e.message };
+  }
+}
+
+function parseVisionResponse(description) {
+  // 簡單的解析邏輯（如果需要更複雜的解析，可以從 traits-parser 導入）
+  try {
+    // 嘗試從 description 中提取 JSON
+    const jsonMatch = description.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        success: true,
+        intent: parsed.intent || 'unknown',
+        plant: parsed.plant || {}
+      };
+    }
+    return { success: false, intent: 'unknown' };
+  } catch (e) {
+    return { success: false, intent: 'unknown', error: e.message };
+  }
+}
+
+async function embeddingStats() {
+  try {
+    const result = await httpRequest(`${EMBEDDING_API_URL}/stats`);
+    return result.data;
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
 const { parseTraitsFromResponse, isPlantFromTraits, traitsToFeatureList } = require('./scripts/rag/vectordb/traits-parser');
 
 // 避免 Embedding API 暫時不可用時，前端不斷重送導致「看起來像無限循環」
