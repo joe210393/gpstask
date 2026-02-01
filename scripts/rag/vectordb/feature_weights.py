@@ -422,8 +422,16 @@ class FeatureWeightCalculator:
                                 break
             
             # 如果 trait_tokens 匹配失敗，回退到全文掃描（向後兼容）
+            # 改進：即使有 trait_tokens，也嘗試全文掃描作為備用（因為 trait_tokens 可能不完整）
             if not matched_flag and plant_text:
-                if std_name in plant_text or info.get("en", "").lower() in plant_text.lower():
+                # 檢查中文名稱
+                if std_name in plant_text:
+                    matched_flag = True
+                # 檢查英文名稱
+                elif info.get("en") and info["en"].lower() in plant_text.lower():
+                    matched_flag = True
+                # 檢查部分匹配（例如「總狀花序」匹配「總狀花序」）
+                elif std_name in plant_text or any(part in plant_text for part in std_name.split() if len(part) > 1):
                     matched_flag = True
             
             if matched_flag:

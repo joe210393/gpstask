@@ -661,8 +661,13 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             )
             feature_score_raw = match_result["match_score"]
             matched_features = [f["name"] for f in match_result["matched_features"]]
+            missing_features = [f["name"] for f in match_result.get("missing_features", [])]
             coverage = match_result.get("coverage", 1.0)
             must_matched = match_result.get("must_matched", True)
+            
+            # 調試日誌：如果匹配率低，顯示詳細資訊
+            if coverage < 0.5 and len(features) > 3:
+                print(f"[API] ⚠️ 低匹配率: {r.payload.get('chinese_name', '未知')} - coverage={coverage:.2f}, 匹配={matched_features}, 缺失={missing_features[:5]}")
             
             # 應用 Coverage 調整
             feature_score = feature_score_raw * coverage

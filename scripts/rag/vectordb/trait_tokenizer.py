@@ -126,12 +126,22 @@ def suggest_rule(tok: str) -> Optional[Tuple[str, str, str]]:
     
     # inflorescence
     if "花序" in tok or tok in ("單生花", "單生"):
+        if "總狀" in tok:
+            return "inflorescence", "raceme", "rule:infl"
+        if "圓錐" in tok:
+            return "inflorescence", "panicle", "rule:infl"
+        if "聚繖" in tok or "聚傘" in tok:
+            return "inflorescence", "cyme", "rule:infl"
         if "繖形" in tok or "傘形" in tok:
             return "inflorescence", "umbel", "rule:infl"
+        if "穗狀" in tok:
+            return "inflorescence", "spike", "rule:infl"
         if "頭狀" in tok:
             return "inflorescence", "capitulum", "rule:infl"
         if "繖房" in tok:
             return "inflorescence", "corymb", "rule:infl"
+        if "佛焰" in tok:
+            return "inflorescence", "spadix", "rule:infl"
         if "單生" in tok:
             return "inflorescence", "solitary", "rule:infl"
     
@@ -152,6 +162,20 @@ def suggest_rule(tok: str) -> Optional[Tuple[str, str, str]]:
             return "leaf_base", "cordate", "rule:base"
         if "圓形" in tok:
             return "leaf_base", "rounded", "rule:base"
+    
+    # flower color (簡單匹配，因為 trait_vocab 中已有完整映射)
+    if "花" in tok and ("白" in tok or tok.startswith("白")):
+        return "flower_color", "white", "rule:flower_color"
+    if "花" in tok and ("黃" in tok or tok.startswith("黃")):
+        return "flower_color", "yellow", "rule:flower_color"
+    if "花" in tok and ("紅" in tok or tok.startswith("紅")):
+        return "flower_color", "red", "rule:flower_color"
+    if "花" in tok and ("紫" in tok or tok.startswith("紫")):
+        return "flower_color", "purple", "rule:flower_color"
+    if "花" in tok and ("粉" in tok or tok.startswith("粉")):
+        return "flower_color", "pink", "rule:flower_color"
+    if "花" in tok and ("橙" in tok or tok.startswith("橙")):
+        return "flower_color", "orange", "rule:flower_color"
     
     # special features
     if "氣生根" in tok or "氣根" in tok:
