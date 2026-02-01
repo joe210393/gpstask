@@ -582,10 +582,36 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             print(f"[API] 關鍵字匹配失敗: {e}，繼續使用 embedding 搜尋")
 
     # 1. 先用 embedding 取得候選
-    # 如果有猜測名稱，加入查詢
-    search_query = query
+    # 🔥 關鍵修復：只使用簡短的 query_text_zh，絕對不要用整段分析文字
+    # 如果 query 太長（>200 字），只取前 200 字
+    # 如果 query 包含步驟文字（第一步、第二步...），只提取實際描述部分
+    search_query = query.strip()
+    
+    # 移除步驟文字和不確定語句
+    if "第一步" in search_query or "第二步" in search_query or "第三步" in search_query:
+        # 嘗試提取實際描述部分（在 <analysis> 標籤內，或去除步驟文字）
+        import re
+        # 移除所有「第X步：」開頭的行
+        lines = search_query.split('\n')
+        clean_lines = []
+        for line in lines:
+            if not re.match(r'^\s*第[一二三四五六七八九十\d]+步[：:]', line):
+                if not re.match(r'^\s*\*\*第[一二三四五六七八九十\d]+步', line):
+                    clean_lines.append(line)
+        search_query = '\n'.join(clean_lines).strip()
+    
+    # 限制長度（最多 200 字元）
+    if len(search_query) > 200:
+        search_query = search_query[:200]
+    
+    # 如果有猜測名稱，加入查詢（但保持簡短）
     if guess_names:
-        search_query = f"{query} {' '.join(guess_names)}"
+        guess_text = ' '.join(guess_names[:2])  # 最多 2 個名稱
+        if len(search_query) + len(guess_text) + 1 <= 200:
+            search_query = f"{search_query} {guess_text}"
+        else:
+            # 如果太長，只保留名稱
+            search_query = guess_text[:200]
 
     t0 = time.perf_counter()
     query_vector = encode_text(search_query)
@@ -637,6 +663,21 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
                 except (ImportError, Exception):
                     plant_trait_tokens = []
             
+            # 🔥 關鍵修復：取得正規化後的 key_features_norm
+            plant_key_features_norm = r.payload.get("key_features_norm", [])
+            if not plant_key_features_norm:
+                # 如果沒有正規化版本，嘗試從 key_features 生成
+                try:
+                    from pathlib import Path
+                    normalize_path = Path(__file__).parent / "normalize_features.py"
+                    if normalize_path.exists():
+                        from normalize_features import normalize_features
+                        key_features = r.payload.get("key_features", [])
+                        if key_features and isinstance(key_features, list):
+                            plant_key_features_norm = normalize_features(key_features)
+                except (ImportError, Exception):
+                    plant_key_features_norm = []
+            
             # 取得植物的描述文字（備用，如果沒有 trait_tokens 才用）
             key_features = r.payload.get("key_features", [])
             key_features_text = ""
@@ -653,11 +694,12 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
                 key_features_text,
             ]))
 
-            # 計算特徵匹配（使用 trait_tokens 優先）
+            # 🔥 關鍵修復：計算特徵匹配（使用 trait_tokens + 正規化特徵）
             match_result = feature_calculator.match_plant_features(
                 features, 
                 plant_text=plant_text, 
-                plant_trait_tokens=plant_trait_tokens
+                plant_trait_tokens=plant_trait_tokens,
+                plant_key_features_norm=plant_key_features_norm  # 新增：正規化後的特徵
             )
             feature_score_raw = match_result["match_score"]
             matched_features = [f["name"] for f in match_result["matched_features"]]
@@ -671,6 +713,11 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             
             # 應用 Coverage 調整
             feature_score = feature_score_raw * coverage
+        else:
+            feature_score = 0.0
+            coverage = 0.0
+            must_matched = True
+            matched_features = []
 
         # 3. 計算混合分數（加入 Coverage 和 Must Gate）
         if features:
@@ -683,10 +730,14 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             # 基礎混合分數
             hybrid_score = base_score + enhancement + keyword_bonus
             
-            # Must Gate：如果關鍵特徵（life_form、leaf_arrangement）不匹配，大幅降權
+            # 🔥 關鍵修復：Must Gate 只應用一次（在最後）
+            # 如果關鍵特徵（life_form、leaf_arrangement、leaf_shape、leaf_margin、flower_color、fruit_type）不匹配，大幅降權
+            MUST_GATE_PENALTY = 0.3  # 降權 70%（從 0.65 改為 0.3，更嚴格的懲罰）
             if not must_matched:
-                hybrid_score *= 0.3  # 降權 70%（從 35% 提高到 70%，因為關鍵特徵不匹配是嚴重問題）
-                print(f"[API] ⚠️ Must Gate 觸發: {r.payload.get('chinese_name', '未知')} - 關鍵特徵不匹配（must_traits_in_query={match_result.get('must_traits_in_query', [])}, must_traits_matched={match_result.get('must_traits_matched', [])}），分數降權 70%")
+                hybrid_score *= MUST_GATE_PENALTY
+                must_traits_in_query = match_result.get('must_traits_in_query', []) if 'match_result' in locals() else []
+                must_traits_matched = match_result.get('must_traits_matched', []) if 'match_result' in locals() else []
+                print(f"[API] ⚠️ Must Gate 觸發: {r.payload.get('chinese_name', '未知')} - 關鍵特徵不匹配（must_traits_in_query={must_traits_in_query}, must_traits_matched={must_traits_matched}），分數降權 70%")
             
             # 確保分數不超過 1.0
             hybrid_score = min(1.0, hybrid_score)
