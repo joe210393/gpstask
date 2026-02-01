@@ -627,7 +627,6 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             if not plant_trait_tokens:
                 # 如果沒有 trait_tokens，從 key_features 生成（階段一：向後兼容）
                 try:
-                    import sys
                     from pathlib import Path
                     tokenizer_path = Path(__file__).parent / "trait_tokenizer.py"
                     if tokenizer_path.exists():
@@ -689,10 +688,11 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         else:
             hybrid_score = embedding_score + keyword_bonus
 
-        # 記錄詳細資訊（用於調試）
+        # 記錄詳細資訊（用於調試）- 顯示所有候選植物
         plant_name = r.payload.get("chinese_name", "未知")
-        if plant_name != "未知":
-            print(f"[API] 候選植物: {plant_name} (id={r.id}) - embedding={embedding_score:.3f}, feature={feature_score:.3f}, coverage={coverage:.2f}, must_matched={must_matched}, hybrid={hybrid_score:.3f}, matched_features={matched_features}")
+        scientific_name = r.payload.get("scientific_name", "")
+        print(f"[API] 候選植物 {len(results)+1}: {plant_name}" + (f" ({scientific_name})" if scientific_name else "") + f" - embedding={embedding_score:.3f}, feature={feature_score:.3f}, coverage={coverage:.2f}, must_matched={must_matched}, hybrid={hybrid_score:.3f}, matched_features={matched_features}")
+        sys.stdout.flush()
         
         results.append({
             "code": r.payload.get("code"),
