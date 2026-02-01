@@ -67,6 +67,15 @@
     "pink": {"zh": ["粉紅花", "粉色花", "粉紅色花"], "en": "pink flower"},
     "orange": {"zh": ["橙花", "橙色花"], "en": "orange flower"}
   },
+  "leaf_color": {
+    "green": {"zh": ["綠葉", "綠色葉", "綠色葉片"], "en": "green leaf"},
+    "purple": {"zh": ["紫葉", "紫色葉", "紫紅色葉"], "en": "purple leaf"},
+    "red": {"zh": ["紅葉", "紅色葉"], "en": "red leaf"},
+    "variegated": {"zh": ["斑葉", "斑駁葉", "花葉"], "en": "variegated leaf"},
+    "silver": {"zh": ["銀葉", "銀色葉", "銀灰色葉"], "en": "silver leaf"},
+    "yellow": {"zh": ["黃葉", "黃色葉"], "en": "yellow leaf"},
+    "green_purple": {"zh": ["綠紫葉", "綠紫色葉", "上綠下紫"], "en": "green and purple leaf"}
+  },
   "fruit_type": {
     "pod": {"zh": ["莢果", "豆莢"], "en": "pod"},
     "berry": {"zh": ["漿果"], "en": "berry"},

@@ -213,8 +213,9 @@ success 或 fail (只能二選一，小寫)
 - 葉序：對生
 - 葉形：橢圓形
 - 葉緣：鋸齒緣
+- **葉片顏色：** 綠色、紫色、斑葉等（必須描述，特別是雙色葉或特殊顏色）
 - 花序：聚繖花序（必須仔細觀察！）
-- 花色：粉紅色
+- **花色：** 粉紅色（注意：只有花朵的顏色才是花色，葉子的顏色不是花色！）
 - **果實類型：** 漿果、核果、莢果等（如果可見）
 - **果實顏色：** 紅色、黑色等（如果可見）
 - **根莖類型：** 直根、鬚根、氣生根、地下莖等（如果可見）
@@ -222,6 +223,11 @@ success 或 fail (只能二選一，小寫)
 - **種子顏色：** 黑色、棕色等（如果可見）
 - 尺寸：高度 50-80 公分，花朵直徑 2-3 公分
 - 其他：有刺、氣生根等
+
+**重要：葉片顏色和花色是不同特徵！**
+- **葉片顏色（leaf_color）**：描述葉子的顏色，如「綠色」、「紫色」、「上綠下紫」
+- **花色（flower_color）**：只描述花朵的顏色，如「粉紅色」、「白色」
+- 如果照片中沒有花朵，請將 flower_color 設為 "unknown"
 
 **第五步：尺寸驗證（僅限植物）**
 檢查生活型與尺寸是否一致：
@@ -248,6 +254,7 @@ success 或 fail (只能二選一，小寫)
   "leaf_texture": {"value":"chartaceous_thick","confidence":0.6,"evidence":"葉片質地厚紙質"},
   "inflorescence": {"value":"corymb_cyme","confidence":0.9,"evidence":"聚繖花序，花朵密集排列成球狀"},
   "flower_color": {"value":"pink","confidence":0.9,"evidence":"花朵呈粉紅色"},
+  "leaf_color": {"value":"green_purple","confidence":0.8,"evidence":"葉片上表面綠色，下表面或新葉呈紫紅色"},
   "fruit_type": {"value":"berry","confidence":0.8,"evidence":"照片可見漿果"},
   "fruit_color": {"value":"red","confidence":0.9,"evidence":"果實呈紅色"},
   "root_type": {"value":"fibrous","confidence":0.7,"evidence":"鬚根系"},
