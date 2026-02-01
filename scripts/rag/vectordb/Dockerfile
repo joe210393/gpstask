@@ -25,20 +25,27 @@ RUN rm -rf /app/data/*.jsonl || true
 # 添加 ARG 強制重新執行 COPY（避免構建快取問題）
 ARG FORCE_REBUILD=2025-02-01-enhanced-v2
 
-# 優先複製 enhanced 資料檔案（包含 morphology_summary_zh 和 trait_tokens）
+# 優先複製 clean 資料檔案（包含 morphology_summary_zh、trait_tokens 和正規化特徵）
 # 注意：Zeabur 的構建上下文是專案根目錄
+# 如果 clean 不存在，則使用 enhanced（向後兼容）
+# 注意：COPY 指令會失敗如果檔案不存在，所以我們先複製 enhanced（因為我們已經替換了它）
 COPY scripts/rag/data/plants-forest-gov-tw-enhanced.jsonl /app/data/plants-forest-gov-tw-enhanced.jsonl
+# 如果 clean 檔案存在，也複製它（優先使用）
+COPY scripts/rag/data/plants-forest-gov-tw-clean.jsonl /app/data/plants-forest-gov-tw-clean.jsonl
 
 # 也複製原始資料作為備用（如果 enhanced 不存在時使用）
 COPY scripts/rag/data/plants-forest-gov-tw.jsonl /app/data/plants-forest-gov-tw.jsonl
 
-# 立即確認 enhanced 檔案已複製（如果失敗會中斷構建）
-RUN ls -lh /app/data/plants-forest-gov-tw-enhanced.jsonl && \
-    echo "✅ Enhanced 資料檔案已複製" || \
-    (echo "❌ 錯誤：Enhanced 資料檔案不存在！COPY 指令可能失敗" && \
-     echo "   請檢查構建日誌中的 COPY 錯誤訊息" && \
-     echo "   構建上下文應該是專案根目錄" && \
-     exit 1)
+# 立即確認資料檔案已複製（優先檢查 clean，然後 enhanced）
+RUN if [ -f /app/data/plants-forest-gov-tw-clean.jsonl ]; then \
+        ls -lh /app/data/plants-forest-gov-tw-clean.jsonl && echo "✅ Clean 資料檔案已複製"; \
+    else \
+        ls -lh /app/data/plants-forest-gov-tw-enhanced.jsonl && echo "✅ Enhanced 資料檔案已複製" || \
+        (echo "❌ 錯誤：資料檔案不存在！COPY 指令可能失敗" && \
+         echo "   請檢查構建日誌中的 COPY 錯誤訊息" && \
+         echo "   構建上下文應該是專案根目錄" && \
+         exit 1); \
+    fi
 
 # 再次確認刪除舊檔案（防止從其他來源複製）
 RUN rm -f /app/data/plants-enriched.jsonl && \

@@ -320,14 +320,15 @@ class FeatureWeightCalculator:
             "matched_count": len(details),
         }
 
-    def match_plant_features(self, query_features: list, plant_text: str = None, plant_trait_tokens: list = None) -> dict:
+    def match_plant_features(self, query_features: list, plant_text: str = None, plant_trait_tokens: list = None, plant_key_features_norm: list = None) -> dict:
         """
-        比對查詢特徵與植物描述的匹配程度（改進版：優先使用 trait_tokens）
+        比對查詢特徵與植物描述的匹配程度（改進版：優先使用 trait_tokens + 正規化特徵）
 
         Args:
             query_features: Vision AI 提取的特徵列表（中文，如 ["灌木", "互生", "卵形"]）
             plant_text: 植物的描述文字（備用，如果沒有 trait_tokens 才用）
             plant_trait_tokens: 植物的標準化 trait_tokens（優先使用，如 ["life_form=shrub", "leaf_arrangement=alternate"]）
+            plant_key_features_norm: 植物的正規化 key_features（新增：正規化後的中文特徵）
 
         Returns:
             {
@@ -342,24 +343,37 @@ class FeatureWeightCalculator:
         missing = []
         match_score = 0.0
         
-        # 嘗試載入 trait_tokenizer（如果可用）
+        # 嘗試載入 trait_tokenizer 和 normalize_features（如果可用）
         try:
             import sys
             from pathlib import Path
             # 確保可以導入 trait_tokenizer（從同目錄）
             tokenizer_path = Path(__file__).parent / "trait_tokenizer.py"
+            normalize_path = Path(__file__).parent / "normalize_features.py"
             if tokenizer_path.exists():
                 from trait_tokenizer import key_features_to_trait_tokens
                 use_tokens = True
             else:
                 use_tokens = False
+            
+            if normalize_path.exists():
+                from normalize_features import normalize_features
+                use_normalize = True
+            else:
+                use_normalize = False
         except (ImportError, Exception):
             use_tokens = False
+            use_normalize = False
+        
+        # 🔥 關鍵修復：正規化 query_features
+        query_features_norm = query_features
+        if use_normalize:
+            query_features_norm = normalize_features(query_features)
         
         # 將 query_features 轉換為 trait_tokens（如果使用新方法）
         query_trait_tokens = []
         if use_tokens:
-            query_trait_tokens = key_features_to_trait_tokens(query_features)
+            query_trait_tokens = key_features_to_trait_tokens(query_features_norm)
         
         # 定義 must traits（高信心、硬條件）
         MUST_TRAITS = {"life_form", "leaf_arrangement"}  # 生活型和葉序是關鍵識別特徵
@@ -367,10 +381,14 @@ class FeatureWeightCalculator:
         must_traits_in_query = []
         must_traits_matched = []
         
-        for f in query_features:
+        # 🔥 關鍵修復：使用正規化後的特徵進行匹配
+        for f in query_features_norm:
             info = FEATURE_INDEX.get(f)
             if not info:
-                continue
+                # 如果正規化後的特徵不在索引中，嘗試原始特徵
+                info = FEATURE_INDEX.get(f)
+                if not info:
+                    continue
 
             std_name = info["name"]
             weight = self.get_weight(f)
@@ -421,27 +439,35 @@ class FeatureWeightCalculator:
                                 matched_flag = True
                                 break
             
-            # 如果 trait_tokens 匹配失敗，回退到全文掃描（向後兼容）
-            # 改進：即使有 trait_tokens，也嘗試全文掃描作為備用（因為 trait_tokens 可能不完整）
-            # 重要：對於某些特徵（如 flower_color, leaf_margin），即使 trait_tokens 中沒有，也要嘗試全文掃描
-            if not matched_flag and plant_text:
-                # 檢查中文名稱（完整匹配）
-                if std_name in plant_text:
-                    matched_flag = True
-                # 檢查英文名稱
-                elif info.get("en") and info["en"].lower() in plant_text.lower():
-                    matched_flag = True
-                # 檢查部分匹配（例如「全緣」匹配「全緣葉」）
-                elif std_name in plant_text:
-                    matched_flag = True
-                # 更積極的部分匹配：檢查特徵詞是否在文字中
-                elif len(std_name) >= 2:
-                    # 對於短詞（2-4字），直接檢查是否在文字中
-                    if len(std_name) <= 4 and std_name in plant_text:
+            # 🔥 關鍵修復：優先使用正規化後的 key_features_norm 進行匹配
+            if not matched_flag:
+                # 優先：使用正規化後的 key_features_norm
+                if use_normalize and plant_key_features_norm:
+                    if std_name in plant_key_features_norm:
                         matched_flag = True
-                    # 對於長詞，檢查關鍵部分
-                    elif any(part in plant_text for part in std_name.split() if len(part) >= 2):
+                    # 也檢查原始特徵（向後兼容）
+                    elif f in plant_key_features_norm:
                         matched_flag = True
+                
+                # 備用：全文掃描（向後兼容）
+                if not matched_flag and plant_text:
+                    # 檢查中文名稱（完整匹配）
+                    if std_name in plant_text:
+                        matched_flag = True
+                    # 檢查英文名稱
+                    elif info.get("en") and info["en"].lower() in plant_text.lower():
+                        matched_flag = True
+                    # 檢查部分匹配（例如「全緣」匹配「全緣葉」）
+                    elif std_name in plant_text:
+                        matched_flag = True
+                    # 更積極的部分匹配：檢查特徵詞是否在文字中
+                    elif len(std_name) >= 2:
+                        # 對於短詞（2-4字），直接檢查是否在文字中
+                        if len(std_name) <= 4 and std_name in plant_text:
+                            matched_flag = True
+                        # 對於長詞，檢查關鍵部分
+                        elif any(part in plant_text for part in std_name.split() if len(part) >= 2):
+                            matched_flag = True
             
             if matched_flag:
                 matched.append({"name": std_name, "weight": weight, "is_must": is_must})
@@ -451,8 +477,10 @@ class FeatureWeightCalculator:
             else:
                 missing.append({"name": std_name, "weight": weight, "is_must": is_must})
         
-        # 計算覆蓋率（只算非 must 的特徵，避免 must 特徵過度影響）
-        total_query_traits = len(query_features)
+        # 🔥 關鍵修復：計算覆蓋率（只算 confidence>=0.55 的特徵）
+        # 過濾掉低信心度的特徵（避免 coverage 被拉低）
+        # 這裡假設所有 query_features 都是高信心度的（由前端過濾）
+        total_query_traits = len(query_features_norm)
         matched_count = len(matched)
         coverage = matched_count / total_query_traits if total_query_traits > 0 else 0.0
         

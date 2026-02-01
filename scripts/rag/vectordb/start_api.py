@@ -290,9 +290,16 @@ def _init_background_impl():
 
     # 5. 載入特徵資料
     import os.path
-    # 優先使用 enhanced 資料檔案（包含 morphology_summary_zh 和 trait_tokens）
+    # 優先使用 clean 資料檔案（包含 morphology_summary_zh、trait_tokens 和正規化特徵）
+    # 如果 clean 不存在，則使用 enhanced（向後兼容）
+    clean_paths = [
+        "/app/data/plants-forest-gov-tw-clean.jsonl",  # Docker 容器中的路徑（優先）
+        os.path.join(os.path.dirname(__file__), "..", "data", "plants-forest-gov-tw-clean.jsonl"),
+        os.path.join(os.path.dirname(__file__), "data", "plants-forest-gov-tw-clean.jsonl"),
+    ]
+    
     enhanced_paths = [
-        "/app/data/plants-forest-gov-tw-enhanced.jsonl",  # Docker 容器中的路徑（優先）
+        "/app/data/plants-forest-gov-tw-enhanced.jsonl",  # Docker 容器中的路徑（備用）
         os.path.join(os.path.dirname(__file__), "..", "data", "plants-forest-gov-tw-enhanced.jsonl"),
         os.path.join(os.path.dirname(__file__), "data", "plants-forest-gov-tw-enhanced.jsonl"),
     ]
@@ -312,15 +319,26 @@ def _init_background_impl():
     ]
     
     data_path = None
-    # 先搜尋 enhanced 檔案
-    print(f"  搜尋 Enhanced 資料檔案...")
-    for path in enhanced_paths:
+    # 先搜尋 clean 檔案（優先）
+    print(f"  搜尋 Clean 資料檔案...")
+    for path in clean_paths:
         exists = os.path.exists(path)
         print(f"    檢查: {path} -> {'✅ 存在' if exists else '❌ 不存在'}")
         if exists:
             data_path = path
-            print(f"    ✅ 找到 Enhanced 資料檔案: {path}")
+            print(f"    ✅ 找到 Clean 資料檔案: {path}")
             break
+    
+    # 如果 clean 不存在，搜尋 enhanced 檔案
+    if not data_path:
+        print(f"  搜尋 Enhanced 資料檔案...")
+        for path in enhanced_paths:
+            exists = os.path.exists(path)
+            print(f"    檢查: {path} -> {'✅ 存在' if exists else '❌ 不存在'}")
+            if exists:
+                data_path = path
+                print(f"    ✅ 找到 Enhanced 資料檔案: {path}")
+                break
     
     # 如果 enhanced 檔案不存在，使用原始資料
     if not data_path:

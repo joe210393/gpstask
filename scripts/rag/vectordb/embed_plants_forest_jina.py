@@ -54,17 +54,21 @@ BATCH_SIZE = 16  # 每批處理的資料數量（降低以避免速率限制：�
 
 # 資料路徑
 SCRIPT_DIR = Path(__file__).parent
-# 優先使用 enhanced 資料（如果存在），否則使用原始資料
+# 優先使用 clean 資料（如果存在），否則使用 enhanced，最後使用原始資料
+CLEAN_DATA_FILE = SCRIPT_DIR.parent / "data" / "plants-forest-gov-tw-clean.jsonl"
 ENHANCED_DATA_FILE = SCRIPT_DIR.parent / "data" / "plants-forest-gov-tw-enhanced.jsonl"
 DATA_FILE = SCRIPT_DIR.parent / "data" / "plants-forest-gov-tw.jsonl"
 PROGRESS_FILE = SCRIPT_DIR / "embed_plants_forest_jina_progress.json"
 
-# 選擇資料檔案（優先使用 enhanced）
-if ENHANCED_DATA_FILE.exists():
+# 選擇資料檔案（優先使用 clean，然後 enhanced，最後原始資料）
+if CLEAN_DATA_FILE.exists():
+    DATA_FILE = CLEAN_DATA_FILE
+    print(f"✅ 使用 Clean 資料檔案: {DATA_FILE}")
+elif ENHANCED_DATA_FILE.exists():
     DATA_FILE = ENHANCED_DATA_FILE
-    print(f"✅ 使用增強資料：{ENHANCED_DATA_FILE}")
+    print(f"✅ 使用 Enhanced 資料檔案: {DATA_FILE}")
 else:
-    print(f"⚠️  增強資料不存在，使用原始資料：{DATA_FILE}")
+    print(f"⚠️  使用原始資料檔案: {DATA_FILE}")
 
 
 def get_qdrant_client():
@@ -213,10 +217,13 @@ def create_plant_text(plant: Dict[str, Any]) -> str:
     # 分類資訊（優先使用乾淨的摘要）
     identification = plant.get("identification", {})
     if isinstance(identification, dict):
-        # 1. 優先使用 morphology_summary（階段二：如果存在）
-        if identification.get("morphology_summary_zh"):
+        # 0. 最優先使用 query_text_zh（清理後的簡短描述，用於 embedding）
+        if identification.get("query_text_zh"):
+            parts.append(identification["query_text_zh"])
+        # 1. 其次使用 morphology_summary（階段二：如果存在）
+        elif identification.get("morphology_summary_zh"):
             parts.append(identification["morphology_summary_zh"])
-        # 2. 其次使用 summary（較乾淨）
+        # 2. 再次使用 summary（較乾淨）
         elif identification.get("summary"):
             summary = identification["summary"]
             if isinstance(summary, list):
