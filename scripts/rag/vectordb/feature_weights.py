@@ -423,16 +423,25 @@ class FeatureWeightCalculator:
             
             # 如果 trait_tokens 匹配失敗，回退到全文掃描（向後兼容）
             # 改進：即使有 trait_tokens，也嘗試全文掃描作為備用（因為 trait_tokens 可能不完整）
+            # 重要：對於某些特徵（如 flower_color, leaf_margin），即使 trait_tokens 中沒有，也要嘗試全文掃描
             if not matched_flag and plant_text:
-                # 檢查中文名稱
+                # 檢查中文名稱（完整匹配）
                 if std_name in plant_text:
                     matched_flag = True
                 # 檢查英文名稱
                 elif info.get("en") and info["en"].lower() in plant_text.lower():
                     matched_flag = True
-                # 檢查部分匹配（例如「總狀花序」匹配「總狀花序」）
-                elif std_name in plant_text or any(part in plant_text for part in std_name.split() if len(part) > 1):
+                # 檢查部分匹配（例如「全緣」匹配「全緣葉」）
+                elif std_name in plant_text:
                     matched_flag = True
+                # 更積極的部分匹配：檢查特徵詞是否在文字中
+                elif len(std_name) >= 2:
+                    # 對於短詞（2-4字），直接檢查是否在文字中
+                    if len(std_name) <= 4 and std_name in plant_text:
+                        matched_flag = True
+                    # 對於長詞，檢查關鍵部分
+                    elif any(part in plant_text for part in std_name.split() if len(part) >= 2):
+                        matched_flag = True
             
             if matched_flag:
                 matched.append({"name": std_name, "weight": weight, "is_must": is_must})

@@ -22,17 +22,57 @@ BACKUP_JSONL = Path(__file__).parent.parent / "data" / "plants-forest-gov-tw-enh
 
 
 def extract_traits_from_text(text: str) -> List[str]:
-    """從文字中提取可能的特徵詞"""
+    """從文字中提取可能的特徵詞（改進版：更積極地提取）"""
     if not text:
         return []
     
     traits = []
-    text_lower = text.lower()
     
     # 檢查 trait_vocab 中的所有詞彙
     for zh_term, (trait, canon) in REVERSE_MAP.items():
+        # 直接匹配
         if zh_term in text:
             traits.append(zh_term)
+        # 部分匹配（例如「全緣」匹配「全緣葉」）
+        elif len(zh_term) >= 2 and zh_term in text:
+            traits.append(zh_term)
+    
+    # 額外檢查：從文字中提取常見特徵模式
+    # 葉緣
+    if "全緣" in text or "全緣葉" in text:
+        if "全緣" not in traits:
+            traits.append("全緣")
+    if "鋸齒" in text or "鋸齒緣" in text:
+        if "鋸齒" not in traits:
+            traits.append("鋸齒")
+    if "波狀" in text or "波狀緣" in text:
+        if "波狀緣" not in traits:
+            traits.append("波狀緣")
+    
+    # 花色（更積極的匹配）
+    if "紫" in text and "花" in text:
+        if "紫花" not in traits:
+            traits.append("紫花")
+    if "紅" in text and "花" in text and "紅花" not in text:
+        if "紅花" not in traits:
+            traits.append("紅花")
+    if "黃" in text and "花" in text:
+        if "黃花" not in traits:
+            traits.append("黃花")
+    if "白" in text and "花" in text:
+        if "白花" not in traits:
+            traits.append("白花")
+    
+    # 花序
+    if "總狀花序" in text:
+        if "總狀花序" not in traits:
+            traits.append("總狀花序")
+    if "圓錐花序" in text:
+        if "圓錐花序" not in traits:
+            traits.append("圓錐花序")
+    if "穗狀花序" in text:
+        if "穗狀花序" not in traits:
+            traits.append("穗狀花序")
     
     return traits
 
@@ -76,10 +116,17 @@ def enhance_trait_tokens(plant: Dict[str, Any]) -> List[str]:
             trait, canon = REVERSE_MAP[trait_zh]
             token = f"{trait}={canon}"
             
-            # 只添加尚未包含的 trait 類別
-            if token not in trait_tokens and trait not in seen_traits:
-                trait_tokens.append(token)
-                seen_traits.add(trait)
+            # 只添加尚未包含的 trait 類別（但允許同一類別有多個值，例如多種花色）
+            # 對於 flower_color 和 inflorescence，允許有多個值
+            if trait in ("flower_color", "inflorescence"):
+                # 允許同一類別有多個值
+                if token not in trait_tokens:
+                    trait_tokens.append(token)
+            else:
+                # 其他類別：只添加尚未包含的 trait 類別
+                if token not in trait_tokens and trait not in seen_traits:
+                    trait_tokens.append(token)
+                    seen_traits.add(trait)
     
     # 4. 確保 life_form 存在（從 life_form 欄位）
     life_form = identification.get("life_form", "")
