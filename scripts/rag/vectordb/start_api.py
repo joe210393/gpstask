@@ -290,32 +290,50 @@ def _init_background_impl():
 
     # 5. 載入特徵資料
     import os.path
-    # 優先使用新的資料檔案，明確排除舊檔案
-    preferred_paths = [
-        "/app/data/plants-forest-gov-tw.jsonl",  # Docker 容器中的路徑（優先）
+    # 優先使用 enhanced 資料檔案（包含 morphology_summary_zh 和 trait_tokens）
+    enhanced_paths = [
+        "/app/data/plants-forest-gov-tw-enhanced.jsonl",  # Docker 容器中的路徑（優先）
+        os.path.join(os.path.dirname(__file__), "..", "data", "plants-forest-gov-tw-enhanced.jsonl"),
+        os.path.join(os.path.dirname(__file__), "data", "plants-forest-gov-tw-enhanced.jsonl"),
+    ]
+    
+    # 備用路徑：原始資料（如果 enhanced 不存在時使用）
+    fallback_paths = [
+        "/app/data/plants-forest-gov-tw.jsonl",
         os.path.join(os.path.dirname(__file__), "..", "data", "plants-forest-gov-tw.jsonl"),
         os.path.join(os.path.dirname(__file__), "data", "plants-forest-gov-tw.jsonl"),
     ]
     
-    # 備用路徑（僅當新檔案不存在時使用）
-    fallback_paths = [
+    # 舊檔案路徑（不建議使用）
+    old_paths = [
         os.path.join(os.path.dirname(__file__), "..", "data", "plants-enriched.jsonl"),
         os.path.join(os.path.dirname(__file__), "data", "plants-enriched.jsonl"),
         "/app/data/plants-enriched.jsonl",
     ]
     
     data_path = None
-    # 先搜尋新檔案
-    print(f"  搜尋新資料檔案...")
-    for path in preferred_paths:
+    # 先搜尋 enhanced 檔案
+    print(f"  搜尋 Enhanced 資料檔案...")
+    for path in enhanced_paths:
         exists = os.path.exists(path)
         print(f"    檢查: {path} -> {'✅ 存在' if exists else '❌ 不存在'}")
         if exists:
             data_path = path
-            print(f"    ✅ 找到新資料檔案: {path}")
+            print(f"    ✅ 找到 Enhanced 資料檔案: {path}")
             break
     
-    # 如果新檔案不存在，才使用舊檔案
+    # 如果 enhanced 檔案不存在，使用原始資料
+    if not data_path:
+        print(f"  ⚠️  Enhanced 檔案不存在，搜尋原始資料檔案...")
+        for path in fallback_paths:
+            exists = os.path.exists(path)
+            print(f"    檢查: {path} -> {'✅ 存在' if exists else '❌ 不存在'}")
+            if exists:
+                data_path = path
+                print(f"    ⚠️  使用原始資料檔案: {path}")
+                break
+    
+    # 如果原始資料也不存在，才使用舊檔案
     if not data_path:
         print(f"  ⚠️  新檔案不存在，搜尋備用檔案...")
         for path in fallback_paths:

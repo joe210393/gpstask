@@ -12,25 +12,34 @@ COPY scripts/rag/vectordb/start_api.py .
 COPY scripts/rag/vectordb/search_plants.py .
 COPY scripts/rag/vectordb/embed_plants.py .
 COPY scripts/rag/vectordb/feature_weights.py .
+# 複製 Trait Tokens 相關檔案（階段一和階段二改進）
+COPY scripts/rag/vectordb/trait_tokenizer.py .
+COPY scripts/rag/vectordb/trait_vocab.json .
+# 複製 Trait Tokens 相關檔案（階段一和階段二改進）
+COPY scripts/rag/vectordb/trait_tokenizer.py .
+COPY scripts/rag/vectordb/trait_vocab.json .
 
 # 建立資料目錄並複製資料檔案（用於特徵權重計算，實際搜尋使用 Qdrant）
 RUN mkdir -p /app/data
-# 先刪除可能存在的舊檔案
-RUN rm -f /app/data/plants-enriched.jsonl
-# 複製新資料檔案（嘗試多個可能的路徑）
-# 注意：Zeabur 的構建上下文可能是專案根目錄或 scripts/rag/vectordb/
-COPY scripts/rag/data/plants-forest-gov-tw.jsonl /app/data/plants-forest-gov-tw.jsonl || \
-     COPY ../data/plants-forest-gov-tw.jsonl /app/data/plants-forest-gov-tw.jsonl || \
-     COPY ../../data/plants-forest-gov-tw.jsonl /app/data/plants-forest-gov-tw.jsonl || \
-     (echo "❌ 無法找到新資料檔案" && exit 1)
-# 確認新檔案已複製
-RUN ls -lh /app/data/plants-forest-gov-tw.jsonl && \
-    echo "✅ 新資料檔案已複製" || \
-    (echo "❌ 新資料檔案不存在" && exit 1)
+# 先刪除可能存在的舊檔案（強制清除，避免快取問題）
+RUN rm -rf /app/data/*.jsonl || true
+# 添加 ARG 強制重新執行 COPY（避免構建快取問題）
+ARG FORCE_REBUILD=2025-02-01-enhanced
+# 優先複製 enhanced 資料檔案（包含 morphology_summary_zh 和 trait_tokens）
+COPY scripts/rag/data/plants-forest-gov-tw-enhanced.jsonl /app/data/plants-forest-gov-tw-enhanced.jsonl
+# 也複製原始資料作為備用（如果 enhanced 不存在時使用）
+COPY scripts/rag/data/plants-forest-gov-tw.jsonl /app/data/plants-forest-gov-tw.jsonl
+# 立即確認 enhanced 檔案已複製（如果失敗會中斷構建）
+RUN ls -lh /app/data/plants-forest-gov-tw-enhanced.jsonl && \
+    echo "✅ Enhanced 資料檔案已複製" || \
+    (echo "❌ 錯誤：Enhanced 資料檔案不存在！COPY 指令可能失敗" && \
+     echo "   請檢查構建日誌中的 COPY 錯誤訊息" && \
+     echo "   構建上下文應該是專案根目錄" && \
+     exit 1)
 # 再次確認刪除舊檔案（防止從其他來源複製）
 RUN rm -f /app/data/plants-enriched.jsonl && \
     ls -lh /app/data/ && \
-    echo "✅ 確認只保留新檔案"
+    echo "✅ 確認資料檔案：enhanced 和原始資料都已複製"
 
 # 不預先下載本地模型：本服務預期使用 Jina API（USE_JINA_API=true + JINA_API_KEY）
 
