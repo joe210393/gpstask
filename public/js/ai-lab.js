@@ -163,10 +163,11 @@ success 或 fail (只能二選一，小寫)
 - 葉緣：全緣、鋸齒緣、波狀緣、裂緣、鈍齒緣、重鋸齒
 - **葉片尺寸：** 長度、寬度（必須具體描述）
 
-**三、根與莖（Root & Stem）**
-- 根的類型：直根、鬚根、氣生根、儲藏根、支柱根
-- 莖的類型：地上莖、地下莖、匍匐莖、直立莖、肉質莖、木質莖
-- 地下莖細分：根莖、球莖、鱗莖、塊莖
+**三、根與莖（Root & Stem）- 非常重要！**
+- **根的類型：** 直根、鬚根、氣生根、儲藏根、支柱根、板根、呼吸根
+- **莖的類型：** 地上莖、地下莖、匍匐莖、直立莖、肉質莖、木質莖、攀緣莖
+- **地下莖細分：** 根莖、球莖、鱗莖、塊莖、塊根
+- **莖的特徵：** 中空、實心、有節、有稜、有刺、有毛、光滑
 
 **四、花（Flower）- 特別注意花序類型！**
 - 花的性別：單性花、雙性花、無性花
@@ -183,9 +184,16 @@ success 或 fail (只能二選一，小寫)
 - **花朵尺寸：** 直徑、長度（必須具體描述）
 
 **五、果實（Fruit）**
-- 乾果：裂果、不裂果、翅果、堅果
+- 乾果：裂果、不裂果、翅果、堅果、蒴果、瘦果
 - 肉果：漿果、核果、梨果、聚合果
 - 果實來源：單果、聚合果、多花果
+- **果實顏色：** 綠色、紅色、黃色、黑色、棕色、紫色等（必須描述）
+
+**六、種子（Seed）- 如果可見，必須描述！**
+- **種子類型：** 有翅種子、無翅種子、具毛種子、具刺種子
+- **種子顏色：** 黑色、棕色、紅色、黃色、白色等
+- **種子大小：** 大、中、小（可估算直徑或長度）
+- **種子形狀：** 圓形、橢圓形、扁平、長條形等
 
 **範例（正確）：**
 「這是一種灌木植物，整體高度約 50-80 公分。葉序為對生，葉形為橢圓形，葉緣為鋸齒緣，葉片長約 5-8 公分。具有聚繖花序，花朵密集排列成球狀，花朵直徑約 2-3 公分，花色為粉紅色。」
@@ -207,6 +215,11 @@ success 或 fail (只能二選一，小寫)
 - 葉緣：鋸齒緣
 - 花序：聚繖花序（必須仔細觀察！）
 - 花色：粉紅色
+- **果實類型：** 漿果、核果、莢果等（如果可見）
+- **果實顏色：** 紅色、黑色等（如果可見）
+- **根莖類型：** 直根、鬚根、氣生根、地下莖等（如果可見）
+- **種子類型：** 有翅、無翅等（如果可見）
+- **種子顏色：** 黑色、棕色等（如果可見）
 - 尺寸：高度 50-80 公分，花朵直徑 2-3 公分
 - 其他：有刺、氣生根等
 
@@ -235,11 +248,21 @@ success 或 fail (只能二選一，小寫)
   "leaf_texture": {"value":"chartaceous_thick","confidence":0.6,"evidence":"葉片質地厚紙質"},
   "inflorescence": {"value":"corymb_cyme","confidence":0.9,"evidence":"聚繖花序，花朵密集排列成球狀"},
   "flower_color": {"value":"pink","confidence":0.9,"evidence":"花朵呈粉紅色"},
-  "fruit_type": {"value":"unknown","confidence":0.1,"evidence":"照片未見果實"},
-  "fruit_color": {"value":"unknown","confidence":0.1,"evidence":"照片未見果實"},
+  "fruit_type": {"value":"berry","confidence":0.8,"evidence":"照片可見漿果"},
+  "fruit_color": {"value":"red","confidence":0.9,"evidence":"果實呈紅色"},
+  "root_type": {"value":"fibrous","confidence":0.7,"evidence":"鬚根系"},
+  "stem_type": {"value":"woody","confidence":0.8,"evidence":"木質莖"},
+  "seed_type": {"value":"winged","confidence":0.6,"evidence":"種子具翅"},
+  "seed_color": {"value":"brown","confidence":0.7,"evidence":"種子呈棕色"},
   "surface_hair": {"value":"glabrous","confidence":0.7,"evidence":"葉片表面光滑無毛"}
 }
 \`\`\`
+
+**注意：**
+- 如果看不到果實，請回傳 "fruit_type": {"value":"unknown","confidence":0.1,"evidence":"照片未見果實"}
+- 如果看不到種子，請回傳 "seed_type": {"value":"unknown","confidence":0.1,"evidence":"照片未見種子"}
+- 如果看不到根莖，請回傳 "root_type": {"value":"unknown","confidence":0.1,"evidence":"照片未見根部"}
+- **根莖類型非常重要，如果照片中可見根部或地下莖，必須描述！**
 
 **重要規則：**
 1. 每個 trait 都要有 value、confidence(0~1)、evidence

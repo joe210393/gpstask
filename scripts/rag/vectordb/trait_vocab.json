@@ -110,5 +110,53 @@
     "buttress": {"zh": ["板根"], "en": "buttress"},
     "viviparous": {"zh": ["胎生苗"], "en": "viviparous"},
     "bract_red": {"zh": ["紅苞葉"], "en": "red bract"}
+  },
+  "root_type": {
+    "taproot": {"zh": ["直根", "主根"], "en": "taproot"},
+    "fibrous": {"zh": ["鬚根", "鬚根系"], "en": "fibrous root"},
+    "aerial": {"zh": ["氣生根"], "en": "aerial root"},
+    "storage": {"zh": ["儲藏根", "塊根"], "en": "storage root"},
+    "prop": {"zh": ["支柱根"], "en": "prop root"},
+    "buttress": {"zh": ["板根"], "en": "buttress root"},
+    "pneumatophore": {"zh": ["呼吸根"], "en": "pneumatophore"}
+  },
+  "stem_type": {
+    "herbaceous": {"zh": ["草質莖", "草質"], "en": "herbaceous stem"},
+    "woody": {"zh": ["木質莖", "木質"], "en": "woody stem"},
+    "succulent": {"zh": ["肉質莖", "多肉莖"], "en": "succulent stem"},
+    "climbing": {"zh": ["攀緣莖"], "en": "climbing stem"},
+    "creeping": {"zh": ["匍匐莖"], "en": "creeping stem"},
+    "erect": {"zh": ["直立莖"], "en": "erect stem"},
+    "hollow": {"zh": ["中空莖", "中空"], "en": "hollow stem"},
+    "solid": {"zh": ["實心莖", "實心"], "en": "solid stem"}
+  },
+  "underground_stem": {
+    "rhizome": {"zh": ["根莖", "地下莖"], "en": "rhizome"},
+    "bulb": {"zh": ["鱗莖", "球莖"], "en": "bulb"},
+    "tuber": {"zh": ["塊莖"], "en": "tuber"},
+    "corm": {"zh": ["球莖"], "en": "corm"}
+  },
+  "seed_type": {
+    "winged": {"zh": ["有翅種子", "具翅"], "en": "winged seed"},
+    "wingless": {"zh": ["無翅種子"], "en": "wingless seed"},
+    "hairy": {"zh": ["具毛種子", "有毛種子"], "en": "hairy seed"},
+    "spiny": {"zh": ["具刺種子", "有刺種子"], "en": "spiny seed"},
+    "smooth": {"zh": ["光滑種子"], "en": "smooth seed"}
+  },
+  "seed_color": {
+    "black": {"zh": ["黑色種子", "黑種子"], "en": "black seed"},
+    "brown": {"zh": ["棕色種子", "褐色種子"], "en": "brown seed"},
+    "red": {"zh": ["紅色種子"], "en": "red seed"},
+    "yellow": {"zh": ["黃色種子"], "en": "yellow seed"},
+    "white": {"zh": ["白色種子"], "en": "white seed"}
+  },
+  "fruit_color": {
+    "red": {"zh": ["紅色果實", "紅果"], "en": "red fruit"},
+    "black": {"zh": ["黑色果實", "黑果"], "en": "black fruit"},
+    "yellow": {"zh": ["黃色果實", "黃果"], "en": "yellow fruit"},
+    "green": {"zh": ["綠色果實", "綠果"], "en": "green fruit"},
+    "purple": {"zh": ["紫色果實", "紫果"], "en": "purple fruit"},
+    "orange": {"zh": ["橙色果實", "橙果"], "en": "orange fruit"},
+    "brown": {"zh": ["棕色果實", "褐色果實"], "en": "brown fruit"}
   }
 }
