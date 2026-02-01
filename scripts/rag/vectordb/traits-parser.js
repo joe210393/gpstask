@@ -63,7 +63,7 @@ function validateTraits(traits) {
     return null;
   }
 
-  // 定義有效的 trait keys
+  // 定義有效的 trait keys（包含所有特徵）
   const validTraits = [
     'life_form',
     'phenology',
@@ -71,10 +71,16 @@ function validateTraits(traits) {
     'leaf_shape',
     'leaf_margin',
     'leaf_texture',
+    'leaf_color',  // 新增：葉片顏色
     'inflorescence',
     'flower_color',
     'fruit_type',
     'fruit_color',
+    'root_type',  // 新增：根類型
+    'stem_type',  // 新增：莖類型
+    'underground_stem',  // 新增：地下莖
+    'seed_type',  // 新增：種子類型
+    'seed_color',  // 新增：種子顏色
     'surface_hair'
   ];
 
@@ -295,6 +301,63 @@ function traitsToFeatureList(traits) {
     'pome': '梨果',
     'aggregate': '聚合果',
     'caryopsis': '穎果',
+    
+    // fruit_color
+    'red': '紅果',
+    'green': '綠果',
+    'yellow': '黃果',
+    'purple': '紫果',
+    'black': '黑果',
+    'brown': '棕果',
+    'orange': '橙果',
+    'green_brown': '綠棕果',
+    'red_brown': '紅棕果',
+    
+    // leaf_color
+    'green': '綠葉',
+    'purple': '紫葉',
+    'red': '紅葉',
+    'variegated': '斑葉',
+    'silver': '銀葉',
+    'yellow': '黃葉',
+    'green_purple': '綠紫葉',
+    
+    // root_type
+    'taproot': '直根',
+    'fibrous': '鬚根',
+    'aerial': '氣生根',
+    'storage': '儲藏根',
+    'prop': '支柱根',
+    'buttress': '板根',
+    'pneumatophore': '呼吸根',
+    
+    // stem_type
+    'woody': '木質莖',
+    'herbaceous': '草質莖',
+    'succulent': '肉質莖',
+    'climbing': '攀緣莖',
+    'creeping': '匍匐莖',
+    'erect': '直立莖',
+    
+    // underground_stem
+    'rhizome': '根莖',
+    'bulb': '鱗莖',
+    'corm': '球莖',
+    'tuber': '塊莖',
+    'tuberous_root': '塊根',
+    
+    // seed_type
+    'winged': '有翅種子',
+    'wingless': '無翅種子',
+    'hairy': '具毛種子',
+    'spiny': '具刺種子',
+    
+    // seed_color
+    'black': '黑種子',
+    'brown': '棕種子',
+    'red': '紅種子',
+    'yellow': '黃種子',
+    'white': '白種子',
     
     // surface_hair
     'glabrous': '無毛',
