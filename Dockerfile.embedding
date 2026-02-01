@@ -10,11 +10,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 複製程式碼
 COPY scripts/rag/vectordb/start_api.py .
 COPY scripts/rag/vectordb/search_plants.py .
-COPY scripts/rag/vectordb/embed_plants.py .
 COPY scripts/rag/vectordb/feature_weights.py .
 # 複製 Trait Tokens 相關檔案（階段一和階段二改進）
 COPY scripts/rag/vectordb/trait_tokenizer.py .
 COPY scripts/rag/vectordb/trait_vocab.json .
+# 複製特徵正規化相關檔案
+COPY scripts/rag/vectordb/normalize_features.py .
 
 # 建立資料目錄並複製資料檔案（用於特徵權重計算，實際搜尋使用 Qdrant）
 RUN mkdir -p /app/data
