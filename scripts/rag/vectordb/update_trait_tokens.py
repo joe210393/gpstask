@@ -37,53 +37,129 @@ def extract_traits_from_text(text: str) -> List[str]:
         elif len(zh_term) >= 2 and zh_term in text:
             traits.append(zh_term)
     
-    # 額外檢查：從文字中提取常見特徵模式
-    # 葉緣
-    if "全緣" in text or "全緣葉" in text:
+    # 額外檢查：從文字中提取常見特徵模式（更積極的匹配）
+    # 葉緣（處理各種描述方式）
+    if "全緣" in text or "全緣葉" in text or "葉全緣" in text or "葉緣全緣" in text or "全緣葉緣" in text:
         if "全緣" not in traits:
             traits.append("全緣")
-    if "鋸齒" in text or "鋸齒緣" in text:
+    if "鋸齒" in text or "鋸齒緣" in text or "葉鋸齒" in text or "鋸齒葉" in text:
         if "鋸齒" not in traits:
             traits.append("鋸齒")
-    if "波狀" in text or "波狀緣" in text:
+    if "波狀" in text or "波狀緣" in text or "葉波狀" in text:
         if "波狀緣" not in traits:
             traits.append("波狀緣")
+    if "缺刻" in text or "缺刻緣" in text:
+        if "缺刻" not in traits:
+            traits.append("缺刻")
     
-    # 花色（更積極的匹配）
-    if "紫" in text and "花" in text:
+    # 葉序（處理各種描述方式）
+    if "互生" in text or "互生葉" in text or "葉互生" in text:
+        if "互生" not in traits:
+            traits.append("互生")
+    if "對生" in text or "對生葉" in text or "葉對生" in text:
+        if "對生" not in traits:
+            traits.append("對生")
+    if "輪生" in text or "輪生葉" in text or "葉輪生" in text:
+        if "輪生" not in traits:
+            traits.append("輪生")
+    if "叢生" in text or "叢生葉" in text:
+        if "叢生" not in traits:
+            traits.append("叢生")
+    
+    # 葉形（處理各種描述方式）
+    if "卵形" in text or "卵形葉" in text or "葉卵形" in text:
+        if "卵形" not in traits:
+            traits.append("卵形")
+    if "橢圓形" in text or "橢圓形葉" in text:
+        if "橢圓形" not in traits:
+            traits.append("橢圓形")
+    if "披針形" in text or "披針形葉" in text:
+        if "披針形" not in traits:
+            traits.append("披針形")
+    if "線形" in text or "線形葉" in text:
+        if "線形" not in traits:
+            traits.append("線形")
+    if "心形" in text or "心形葉" in text:
+        if "心形" not in traits:
+            traits.append("心形")
+    
+    # 花色（更積極的匹配，處理各種描述方式）
+    # 紫花
+    if ("紫" in text and "花" in text) or "紫花" in text or "紫色花" in text or "花紫色" in text:
         if "紫花" not in traits:
             traits.append("紫花")
-    if "紅" in text and "花" in text and "紅花" not in text:
+    # 紅花
+    if ("紅" in text and "花" in text) or "紅花" in text or "紅色花" in text or "花紅色" in text:
         if "紅花" not in traits:
             traits.append("紅花")
-    if "黃" in text and "花" in text:
+    # 黃花
+    if ("黃" in text and "花" in text) or "黃花" in text or "黃色花" in text or "花黃色" in text:
         if "黃花" not in traits:
             traits.append("黃花")
-    if "白" in text and "花" in text:
+    # 白花
+    if ("白" in text and "花" in text) or "白花" in text or "白色花" in text or "花白色" in text:
         if "白花" not in traits:
             traits.append("白花")
+    # 粉花
+    if ("粉" in text and "花" in text) or "粉花" in text or "粉色花" in text or "花粉色" in text:
+        if "粉花" not in traits:
+            traits.append("粉花")
+    # 橙花
+    if ("橙" in text and "花" in text) or "橙花" in text or "橙色花" in text:
+        if "橙花" not in traits:
+            traits.append("橙花")
     
-    # 花序
-    if "總狀花序" in text:
+    # 花序（處理各種描述方式）
+    if "總狀花序" in text or "總狀" in text:
         if "總狀花序" not in traits:
             traits.append("總狀花序")
-    if "圓錐花序" in text:
+    if "圓錐花序" in text or "圓錐" in text:
         if "圓錐花序" not in traits:
             traits.append("圓錐花序")
-    if "穗狀花序" in text:
+    if "穗狀花序" in text or "穗狀" in text:
         if "穗狀花序" not in traits:
             traits.append("穗狀花序")
+    if "聚繖花序" in text or "聚繖" in text:
+        if "聚繖花序" not in traits:
+            traits.append("聚繖花序")
+    if "繖形花序" in text or "繖形" in text:
+        if "繖形花序" not in traits:
+            traits.append("繖形花序")
+    if "頭狀花序" in text or "頭狀" in text:
+        if "頭狀花序" not in traits:
+            traits.append("頭狀花序")
+    if "繖房花序" in text or "繖房" in text:
+        if "繖房花序" not in traits:
+            traits.append("繖房花序")
+    if "單生" in text and "花" in text:
+        if "單生" not in traits:
+            traits.append("單生")
+    
+    # 生活型（處理各種描述方式）
+    if "喬木" in text:
+        if "喬木" not in traits:
+            traits.append("喬木")
+    if "灌木" in text:
+        if "灌木" not in traits:
+            traits.append("灌木")
+    if "草本" in text or "草" in text:
+        if "草本" not in traits:
+            traits.append("草本")
+    if "藤本" in text or "攀緣" in text or "蔓生" in text:
+        if "藤本" not in traits:
+            traits.append("藤本")
     
     return traits
 
 
 def enhance_trait_tokens(plant: Dict[str, Any]) -> List[str]:
     """
-    增強 trait_tokens：從 key_features 和 morphology 提取更多特徵
+    增強 trait_tokens：從所有可能的來源提取特徵
+    來源包括：key_features, morphology, summary, raw_data.morphology 等
     """
     identification = plant.get("identification", {})
     if not isinstance(identification, dict):
-        return []
+        identification = {}
     
     # 1. 從 key_features 生成基礎 trait_tokens
     key_features = identification.get("key_features", [])
@@ -93,21 +169,45 @@ def enhance_trait_tokens(plant: Dict[str, Any]) -> List[str]:
     trait_tokens = key_features_to_trait_tokens(key_features)
     seen_traits = {t.split("=")[0] for t in trait_tokens}  # 已包含的 trait 類別
     
-    # 2. 從 morphology 文字中提取額外特徵
-    morphology_text = ""
+    # 2. 收集所有可能的文字來源
+    text_sources = []
+    
+    # 2.1 identification.morphology
     morphology = identification.get("morphology", [])
     if isinstance(morphology, list):
-        morphology_text = " ".join(morphology)
+        text_sources.append(" ".join(morphology))
     elif morphology:
-        morphology_text = str(morphology)
+        text_sources.append(str(morphology))
     
+    # 2.2 identification.summary
     summary = identification.get("summary", "")
     if isinstance(summary, list):
-        summary = " ".join(summary)
+        text_sources.append(" ".join(summary))
     elif summary:
-        summary = str(summary)
+        text_sources.append(str(summary))
     
-    combined_text = f"{morphology_text} {summary}"
+    # 2.3 raw_data.morphology（原始形態描述，通常更詳細）
+    raw_data = plant.get("raw_data", {})
+    if isinstance(raw_data, dict):
+        raw_morphology = raw_data.get("morphology")
+        if raw_morphology:
+            text_sources.append(str(raw_morphology))
+        
+        # 2.4 raw_data 中的其他欄位
+        for key in ["ecology", "usage", "distribution"]:
+            value = raw_data.get(key)
+            if value:
+                text_sources.append(str(value))
+    
+    # 2.5 common_names（別名中可能包含特徵描述）
+    common_names = plant.get("common_names", [])
+    if isinstance(common_names, list):
+        text_sources.append(" ".join(common_names))
+    elif common_names:
+        text_sources.append(str(common_names))
+    
+    # 合併所有文字來源
+    combined_text = " ".join(text_sources)
     
     # 3. 從文字中提取額外的 trait_tokens（如果 key_features 中沒有）
     additional_traits = extract_traits_from_text(combined_text)
