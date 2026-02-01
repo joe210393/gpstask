@@ -18,14 +18,20 @@ COPY scripts/rag/vectordb/trait_vocab.json .
 
 # 建立資料目錄並複製資料檔案（用於特徵權重計算，實際搜尋使用 Qdrant）
 RUN mkdir -p /app/data
+
 # 先刪除可能存在的舊檔案（強制清除，避免快取問題）
 RUN rm -rf /app/data/*.jsonl || true
+
 # 添加 ARG 強制重新執行 COPY（避免構建快取問題）
-ARG FORCE_REBUILD=2025-02-01-enhanced
+ARG FORCE_REBUILD=2025-02-01-enhanced-v2
+
 # 優先複製 enhanced 資料檔案（包含 morphology_summary_zh 和 trait_tokens）
+# 注意：Zeabur 的構建上下文是專案根目錄
 COPY scripts/rag/data/plants-forest-gov-tw-enhanced.jsonl /app/data/plants-forest-gov-tw-enhanced.jsonl
+
 # 也複製原始資料作為備用（如果 enhanced 不存在時使用）
 COPY scripts/rag/data/plants-forest-gov-tw.jsonl /app/data/plants-forest-gov-tw.jsonl
+
 # 立即確認 enhanced 檔案已複製（如果失敗會中斷構建）
 RUN ls -lh /app/data/plants-forest-gov-tw-enhanced.jsonl && \
     echo "✅ Enhanced 資料檔案已複製" || \
@@ -33,6 +39,7 @@ RUN ls -lh /app/data/plants-forest-gov-tw-enhanced.jsonl && \
      echo "   請檢查構建日誌中的 COPY 錯誤訊息" && \
      echo "   構建上下文應該是專案根目錄" && \
      exit 1)
+
 # 再次確認刪除舊檔案（防止從其他來源複製）
 RUN rm -f /app/data/plants-enriched.jsonl && \
     ls -lh /app/data/ && \
