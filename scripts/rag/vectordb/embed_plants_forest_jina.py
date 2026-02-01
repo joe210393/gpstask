@@ -392,8 +392,20 @@ def main():
     print(f"   您目前剩餘：10,000,000 tokens（免費額度）")
     print(f"   預估消耗比例：{estimated_total_tokens / 10_000_000 * 100:.2f}%")
     print(f"   剩餘 tokens：{10_000_000 - estimated_total_tokens:,} tokens")
-    print(f"\n   繼續向量化？(yes/no): ", end="")
-    response = input().strip().lower()
+    # 支援非互動模式（環境變數 AUTO_CONFIRM=true 或 CI=true）
+    auto_confirm = os.environ.get("AUTO_CONFIRM", "").lower() == "true" or os.environ.get("CI", "").lower() == "true"
+    
+    if auto_confirm:
+        print(f"\n   ✅ 自動確認模式，開始向量化...")
+        response = "yes"
+    else:
+        print(f"\n   繼續向量化？(yes/no): ", end="")
+        try:
+            response = input().strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print("\n   ⚠️  非互動模式，使用自動確認")
+            response = "yes"
+    
     if response != 'yes':
         print("   已取消操作")
         sys.exit(0)
