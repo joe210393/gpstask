@@ -24,7 +24,7 @@ RUN mkdir -p /app/data
 RUN rm -rf /app/data/*.jsonl || true
 
 # 添加 ARG 強制重新執行 COPY（避免構建快取問題）
-ARG FORCE_REBUILD=2025-02-01-enhanced-v2
+ARG FORCE_REBUILD=2025-02-01-clean-v3
 
 # 優先複製 clean 資料檔案（包含 morphology_summary_zh、trait_tokens 和正規化特徵）
 # 注意：Zeabur 的構建上下文是專案根目錄
