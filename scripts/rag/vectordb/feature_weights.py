@@ -587,14 +587,6 @@ class FeatureWeightCalculator:
             # 檢查所有查詢中的 must traits 是否都在 plant 中
             # 只要求查詢中提供的 must traits 全部匹配，不要求所有 must traits 都存在
             must_matched = all(t in plant_set for t in must_traits_in_query)
-                
-                # 同樣檢查 leaf_arrangement
-                query_has_leaf_arr = any(t.startswith("leaf_arrangement=") for t in query_trait_tokens)
-                plant_has_leaf_arr = any(t.startswith("leaf_arrangement=") for t in plant_trait_tokens)
-                if query_has_leaf_arr and not plant_has_leaf_arr:
-                    leaf_arr_matched = any("leaf_arrangement" in m["name"].lower() or "葉序" in m["name"] for m in matched)
-                    if not leaf_arr_matched:
-                        must_matched = False
 
         return {
             "match_score": match_score,
