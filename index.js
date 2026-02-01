@@ -3472,6 +3472,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
               
               const firstStageResults = {
                 is_plant: true,
+                category: 'plant',
                 search_type: 'embedding',
                 message: ragResult.message,
                 plants: ragResult.results.map(p => ({
@@ -3614,6 +3615,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 
                 const newResults = {
                   is_plant: true,
+                  category: 'plant',
                   search_type: 'hybrid_traits',
                   traits: traits,
                   traits_decision: traitsBasedDecision,
@@ -3685,6 +3687,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 
                 const newResults = {
                   is_plant: true,
+                  category: 'plant',
                   search_type: 'hybrid',
                   vision_parsed: {
                     intent: visionParsed.intent,
@@ -3759,6 +3762,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 
                 const newResults = {
                   is_plant: true,
+                  category: 'plant',
                   search_type: 'embedding',
                   message: ragResult.message,
                   plants: ragResult.results.map(p => ({
@@ -3824,6 +3828,14 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
       }
       } catch (ragErr) {
         console.warn('⚠️ 植物 RAG 查詢失敗 (非致命):', ragErr.message);
+        // 如果 Vision AI 明確判斷為植物，即使 RAG 失敗也要設置 category
+        if (!plantResults && description && description.includes('第三步：判斷類別') && description.includes('植物')) {
+          plantResults = {
+            is_plant: true,
+            category: 'plant',
+            message: 'Vision AI 判斷為植物，但 RAG 搜尋失敗'
+          };
+        }
         // RAG 失敗不影響主要回應
       }
     }
