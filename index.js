@@ -3279,6 +3279,12 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
       if (partialAnalysisMatch) {
         detailedDescription = partialAnalysisMatch[1].trim();
         console.log('⚠️ 找到不完整的 <analysis> 標籤（可能被截斷），使用部分內容');
+        // 如果回應被截斷，檢查提取的描述長度
+        if (detailedDescription.length < 100) {
+          console.warn('⚠️ 提取的描述過短（' + detailedDescription.length + ' 字元），可能影響 RAG 搜尋準確度');
+        } else {
+          console.log('✅ 提取的描述長度足夠（' + detailedDescription.length + ' 字元），應該不影響 RAG 搜尋');
+        }
       } else {
         const stepMatch = description.match(/第二步：詳細描述圖片細節[^]*?([\s\S]{200,})/i);
         if (stepMatch) {
@@ -3288,6 +3294,13 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
           console.log('⚠️ 未找到 <analysis> 標籤，使用完整回應作為描述');
         }
       }
+    }
+    
+    // 檢查回應是否被截斷，如果被截斷，發出警告
+    const isTruncated = finishReason === 'length' || (description.length > 3000 && !description.includes('</analysis>'));
+    if (isTruncated) {
+      console.warn('⚠️ AI 回應可能被截斷（finish_reason=' + finishReason + '），RAG 搜尋可能受影響');
+      console.warn('💡 建議：考慮增加 max_tokens 或優化 prompt 長度');
     }
 
     // 6. 如果預先 RAG 沒有結果，進行後續 RAG 搜尋（驗證和補充）
