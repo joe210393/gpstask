@@ -20,12 +20,16 @@ const https = require('https');
 const { URL } = require('url');
 
 // 簡單的 HTTP 請求函數（不依賴外部庫）
+// 預設 60 秒逾時，避免 Embedding API 連線失敗時無限等待
+const EMBEDDING_REQUEST_TIMEOUT_MS = parseInt(process.env.EMBEDDING_REQUEST_TIMEOUT_MS || '60000', 10);
+
 function httpRequest(url, options = {}) {
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url);
     const isHttps = urlObj.protocol === 'https:';
     const httpModule = isHttps ? https : http;
-    
+    const timeoutMs = options.timeout ?? EMBEDDING_REQUEST_TIMEOUT_MS;
+
     const requestOptions = {
       hostname: urlObj.hostname,
       port: urlObj.port || (isHttps ? 443 : 80),
@@ -33,7 +37,7 @@ function httpRequest(url, options = {}) {
       method: options.method || 'GET',
       headers: options.headers || {}
     };
-    
+
     const req = httpModule.request(requestOptions, (res) => {
       let data = '';
       res.on('data', (chunk) => { data += chunk; });
@@ -46,13 +50,18 @@ function httpRequest(url, options = {}) {
         }
       });
     });
-    
+
     req.on('error', (e) => reject(e));
-    
+
+    req.setTimeout(timeoutMs, () => {
+      req.destroy();
+      reject(new Error(`Embedding API 請求逾時 (${timeoutMs / 1000} 秒)`));
+    });
+
     if (options.body) {
       req.write(typeof options.body === 'string' ? options.body : JSON.stringify(options.body));
     }
-    
+
     req.end();
   });
 }
@@ -88,9 +97,22 @@ async function classify(query) {
   }
 }
 
+// URL 長度限制約 2K–8K，長查詢改用 POST 避免被代理截斷
+const SEARCH_GET_MAX_QUERY_LEN = 500;
+
 async function smartSearch(query, topK = 5) {
   try {
-    const result = await httpRequest(`${EMBEDDING_API_URL}/search?q=${encodeURIComponent(query)}&top_k=${topK}&smart=true`);
+    let result;
+    if (query.length > SEARCH_GET_MAX_QUERY_LEN) {
+      // 長查詢用 POST，避免 URL 過長導致代理/負載平衡器截斷
+      result = await httpRequest(`${EMBEDDING_API_URL}/search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: { query, top_k: topK, smart: true }
+      });
+    } else {
+      result = await httpRequest(`${EMBEDDING_API_URL}/search?q=${encodeURIComponent(query)}&top_k=${topK}&smart=true`);
+    }
     return result.data;
   } catch (e) {
     return { classification: { is_plant: false }, results: [], error: e.message };
@@ -3383,8 +3405,32 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
     }
 
     const aiData = await aiResponse.json();
-    const description = aiData.choices[0].message.content;
+    let description = aiData.choices[0].message.content;
     const finishReason = aiData.choices[0].finish_reason;
+
+    // 🔥 關鍵修復：清洗模型回應中的重複垃圾文字（如 "modifiable modifiable..."）
+    // 這種重複迴圈是 Local LLM 常見的崩潰模式，會導致 JSON 解析失敗
+    if (description.length > 500) {
+      // 檢測重複 10 次以上的單字模式
+      const repetitionMatch = description.match(/(\b\w+\b)(?:\s+\1){10,}/);
+      if (repetitionMatch) {
+        console.warn(`⚠️ 檢測到模型重複迴圈 (${repetitionMatch[1]}...)，正在清洗...`);
+        // 截斷重複部分之後的內容（保留前面有用的部分）
+        const loopIndex = description.indexOf(repetitionMatch[0]);
+        if (loopIndex !== -1) {
+          // 保留到重複開始前，並嘗試補上結尾（如果是 JSON 結構）
+          let cleanDesc = description.substring(0, loopIndex);
+          
+          // 如果看起來像是在 JSON 中斷掉，嘗試修復
+          if (cleanDesc.includes('```json') && !cleanDesc.includes('```')) {
+             cleanDesc += '\n}\n```'; // 嘗試強制閉合
+          }
+          
+          description = cleanDesc;
+          console.log('✅ 清洗完成，新長度:', description.length);
+        }
+      }
+    }
 
     // 檢查是否因為長度限制被截斷
     if (finishReason === 'length') {

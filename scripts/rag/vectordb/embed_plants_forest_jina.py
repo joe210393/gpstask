@@ -31,6 +31,8 @@ import sys
 import time
 import random
 import requests
+
+# 建議使用 DEBUG_EMBED=1 或 python -u 執行，避免輸出緩衝導致終端機「看起來卡住」
 from pathlib import Path
 from typing import List, Dict, Any
 from tqdm import tqdm
@@ -378,8 +380,10 @@ def main():
     print(f"📋 已處理: {len(processed)} 筆")
     
     # 連接 Qdrant
-    print(f"\n🔗 連接 Qdrant...")
+    print(f"\n🔗 連接 Qdrant...", flush=True)
+    sys.stdout.flush()
     client = get_qdrant_client()
+    print(f"   ✅ Qdrant 連線成功", flush=True)
     init_qdrant(client)
     
     # 處理資料
@@ -439,7 +443,8 @@ def main():
             # 使用 Jina API 編碼
             batch_num = i // BATCH_SIZE + 1
             total_batches = (len(remaining) + BATCH_SIZE - 1) // BATCH_SIZE
-            print(f"\n📊 處理批次 {batch_num}/{total_batches} ({len(valid_texts)} 筆有效/{len(batch)} 筆總計)...")
+            print(f"\n📊 處理批次 {batch_num}/{total_batches} ({len(valid_texts)} 筆有效/{len(batch)} 筆總計)...", flush=True)
+            sys.stdout.flush()
             vectors = encode_text_jina(valid_texts)
             
             # 建立 Qdrant points（只處理有效的）
