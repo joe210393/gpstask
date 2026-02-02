@@ -269,11 +269,18 @@ function traitsToFeatureList(traits) {
     'raceme': '總狀花序',
     'panicle': '圓錐花序',
     'corymb_cyme': '聚繖花序',
+    'corymb': '繖房花序',
+    'cyme': '聚繖花序',
     'spike': '穗狀花序',
     'umbel': '繖形花序',
     'capitulum': '頭狀花序',
+    'head': '頭狀花序',
     'spadix_spathe': '佛焰花序',
     'catkin': '葇荑花序',
+    'solitary': '單生花',
+    'fascicle': '簇生花序',
+    'terminal_flower': '頂生花', // 新增
+    'axillary_flower': '腋生花', // 新增
     
     // flower_color (支援單一值和複數值)
     'white': '白花',
@@ -395,7 +402,7 @@ function traitsToFeatureList(traits) {
       if (chineseKeyword) {
         features.push(chineseKeyword);
       } else {
-        // 如果沒有映射，嘗試部分匹配（例如：linear_lanceolate 可能匹配 linear 或 lanceolate）
+        // 如果沒有映射，嘗試部分匹配
         const partialMatch = Object.keys(traitValueMap).find(k => 
           traitValue.includes(k) || k.includes(traitValue)
         );
@@ -403,8 +410,9 @@ function traitsToFeatureList(traits) {
           features.push(traitValueMap[partialMatch]);
           console.log(`[TraitsParser] ${key}=${trait.value} 使用部分匹配: ${partialMatch} → ${traitValueMap[partialMatch]}`);
         } else {
-          // 如果還是沒有映射，使用原始 value（可能需要後續處理）
-          console.warn(`[TraitsParser] 未找到 ${key}=${trait.value} 的中文映射`);
+          // 如果還是沒有映射，不要使用原始 value，因為這會干擾 embedding 搜尋
+          // 英文特徵會導致中文資料庫匹配失敗
+          console.warn(`[TraitsParser] 未找到 ${key}=${trait.value} 的中文映射，已忽略此特徵`);
         }
       }
     }
