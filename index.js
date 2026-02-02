@@ -3655,6 +3655,19 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 if (preSearchResults) {
                   console.log('✅ 回退使用第一階段 embedding 結果');
                   plantResults = preSearchResults;
+                } else {
+                  // 如果第一階段也沒有結果，但 Traits 判斷是植物，我們應該保留這個判斷
+                  // 這樣前端至少能顯示「植物」類別，而不是「一般物品」
+                  console.log('⚠️ 兩階段搜尋都無結果，但 Traits 判斷為植物，設置基本植物屬性');
+                  plantResults = {
+                    is_plant: true,
+                    category: 'plant',
+                    search_type: 'traits_only',
+                    traits: traits,
+                    traits_decision: traitsBasedDecision,
+                    message: '檢測到植物特徵，但資料庫中未找到匹配植物',
+                    plants: []
+                  };
                 }
               }
             } else {
