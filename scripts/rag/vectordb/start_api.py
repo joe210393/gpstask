@@ -756,70 +756,12 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             "scientific_name": r.payload.get("scientific_name", "")
         })
 
-    # 🔥 關鍵修復：Must Gate 逐步放寬策略
-    # Level 1: Strict (life_form AND leaf_arrangement)
-    # Level 2: Medium (leaf_arrangement only)
-    # Level 3: Weak (life_form only)
-    # Level 4: No Gate (penalty only)
+    # 🔥 關鍵修復：完全移除 Must Gate 過濾，改為純排序降權
+    # 使用者請求：先把 must Gate 拿掉
+    # 策略：保留所有候選結果，僅對不符合關鍵特徵的結果進行降分
     
-    final_candidates = []
-    
-    # 定義檢查函式
-    def check_gate(candidate, required_keys):
-        # 如果沒有 required_keys，直接通過
-        if not required_keys:
-            return True
-            
-        must_traits_matched = candidate["match_result"].get("must_traits_matched", [])
-        must_traits_in_query = candidate["match_result"].get("must_traits_in_query", [])
-        
-        # 取得查詢中包含的 required keys
-        query_required_keys = set()
-        for token in must_traits_in_query:
-            if "=" in token:
-                key = token.split("=")[0].strip()
-                if key in required_keys:
-                    query_required_keys.add(key)
-            else:
-                # 向後兼容：如果是中文特徵名，很難判斷 key，這裡略過或假設它對應某個 required key
-                pass
-                
-        if not query_required_keys:
-            return True
-            
-        # 檢查是否所有 query_required_keys 都有匹配
-        matched_keys = set()
-        for token in must_traits_matched:
-            if "=" in token:
-                key = token.split("=")[0].strip()
-                if key in query_required_keys:
-                    matched_keys.add(key)
-        
-        return len(matched_keys) == len(query_required_keys)
-
-    # 嘗試不同層級的過濾
-    gate_levels = [
-        {"name": "Strict", "keys": {"life_form", "leaf_arrangement"}},
-        {"name": "Medium", "keys": {"leaf_arrangement"}},
-        {"name": "Weak", "keys": {"life_form"}},
-        {"name": "None", "keys": set()}
-    ]
-    
-    selected_level = "None"
-    
-    for level in gate_levels:
-        filtered = [c for c in scored_candidates if check_gate(c, level["keys"])]
-        if len(filtered) >= 5:
-            final_candidates = filtered
-            selected_level = level["name"]
-            print(f"[API] Must Gate 使用層級: {level['name']} (候選數: {len(filtered)})")
-            break
-            
-    # 如果所有層級都少於 5 個，使用最後一個層級 (None) 的結果（即所有候選）
-    if not final_candidates:
-        final_candidates = scored_candidates
-        selected_level = "None (Fallback)"
-        print(f"[API] Must Gate 使用層級: {selected_level} (候選數: {len(final_candidates)})")
+    final_candidates = scored_candidates
+    print(f"[API] Must Gate 已禁用 (保留所有 {len(final_candidates)} 個候選)")
 
     # 計算最終分數並排序
     for c in final_candidates:
@@ -837,14 +779,14 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         
         hybrid_score = base_score + enhancement + keyword_bonus
         
-        # 如果不是 None 層級，且被選中，說明它通過了該層級的 Gate
-        # 但如果是 None 層級（或 Fallback），我們需要應用懲罰
-        if selected_level.startswith("None"):
-             # 使用原本的 must_matched 判斷
-            if not c["must_matched"]:
-                MUST_GATE_PENALTY = 0.3
-                hybrid_score *= MUST_GATE_PENALTY
-                # log omitted for brevity
+        # 應用 Must Gate 懲罰（軟性降權，而非過濾）
+        # 如果關鍵特徵不匹配，分數打折，但仍然保留在列表中
+        if not c["must_matched"]:
+            MUST_GATE_PENALTY = 0.5  # 降權 50% (原本是 0.3/70% off，現在改溫和一點)
+            hybrid_score *= MUST_GATE_PENALTY
+            # 僅在分數較高時顯示日誌，避免刷屏
+            if hybrid_score > 0.5:
+                print(f"[API] ⚠️ Must Gate 懲罰: {c['plant_name']} - 關鍵特徵不匹配，分數降權")
         
         # 確保分數不超過 1.0
         hybrid_score = min(1.0, hybrid_score)
