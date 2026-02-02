@@ -639,38 +639,46 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         query_vector = query_vector.tolist()
 
     # 取更多候選再重新排序
+    # 🔥 關鍵修復：大幅增加候選數量，避免過早被過濾
+    # 使用 max(60, top_k * 10) 確保至少有 60 個候選
+    candidate_limit = max(60, top_k * 10)
+    
     candidates = qdrant_client.query_points(
         collection_name=COLLECTION_NAME,
         query=query_vector,
-        limit=top_k * 3,  # 取 3 倍候選
+        limit=candidate_limit,
     ).points
     t2 = time.perf_counter()
-    print(f"[API] /hybrid-search encode={(t1 - t0):.3f}s qdrant={(t2 - t1):.3f}s total={(t2 - t0):.3f}s top_k={top_k} features={len(features or [])} guess_names={len(guess_names or [])}")
+    print(f"[API] /hybrid-search encode={(t1 - t0):.3f}s qdrant={(t2 - t1):.3f}s total={(t2 - t0):.3f}s top_k={top_k} limit={candidate_limit} candidates={len(candidates)}")
     sys.stdout.flush()
 
     # 2. 計算每個候選的混合分數
     results = []
+    
+    # 預先計算所有候選的分數和匹配詳情
+    scored_candidates = []
+    
     for r in candidates:
         embedding_score = r.score  # 0~1
         
-        # 關鍵字匹配加分（如果 guess_names 匹配到 chinese_name 或 scientific_name）
-        # 注意：這只是輔助加分，不會過度影響整體匹配結果
+        # 關鍵字匹配加分
         keyword_bonus = 0.0
         if r.id in keyword_matched_ids:
-            keyword_bonus = KEYWORD_BONUS_WEIGHT  # 關鍵字匹配給予較小的加分（0.1），避免過度偏向名稱匹配
+            keyword_bonus = KEYWORD_BONUS_WEIGHT
             print(f"[API] 關鍵字匹配: {r.payload.get('chinese_name', '未知')} (id={r.id}, bonus={keyword_bonus})")
 
-        # 計算特徵匹配分數（改進版：使用 trait_tokens）
+        # 計算特徵匹配分數
         feature_score = 0.0
         matched_features = []
         coverage = 1.0
         must_matched = True
+        match_result = {}
 
         if features and feature_calculator:
+            # ... (特徵提取代碼省略，保持不變) ...
             # 取得植物的 trait_tokens（優先使用）
             plant_trait_tokens = r.payload.get("trait_tokens", [])
             if not plant_trait_tokens:
-                # 如果沒有 trait_tokens，從 key_features 生成（階段一：向後兼容）
                 try:
                     from pathlib import Path
                     tokenizer_path = Path(__file__).parent / "trait_tokenizer.py"
@@ -682,10 +690,9 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
                 except (ImportError, Exception):
                     plant_trait_tokens = []
             
-            # 🔥 關鍵修復：取得正規化後的 key_features_norm
+            # 取得正規化後的 key_features_norm
             plant_key_features_norm = r.payload.get("key_features_norm", [])
             if not plant_key_features_norm:
-                # 如果沒有正規化版本，嘗試從 key_features 生成
                 try:
                     from pathlib import Path
                     normalize_path = Path(__file__).parent / "normalize_features.py"
@@ -697,7 +704,7 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
                 except (ImportError, Exception):
                     plant_key_features_norm = []
             
-            # 取得植物的描述文字（備用，如果沒有 trait_tokens 才用）
+            # 取得植物的描述文字
             key_features = r.payload.get("key_features", [])
             key_features_text = ""
             if key_features:
@@ -713,22 +720,18 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
                 key_features_text,
             ]))
 
-            # 🔥 關鍵修復：計算特徵匹配（使用 trait_tokens + 正規化特徵）
+            # 計算特徵匹配
             match_result = feature_calculator.match_plant_features(
                 features, 
                 plant_text=plant_text, 
                 plant_trait_tokens=plant_trait_tokens,
-                plant_key_features_norm=plant_key_features_norm  # 新增：正規化後的特徵
+                plant_key_features_norm=plant_key_features_norm
             )
             feature_score_raw = match_result["match_score"]
             matched_features = [f["name"] for f in match_result["matched_features"]]
             missing_features = [f["name"] for f in match_result.get("missing_features", [])]
             coverage = match_result.get("coverage", 1.0)
             must_matched = match_result.get("must_matched", True)
-            
-            # 調試日誌：如果匹配率低，顯示詳細資訊
-            if coverage < 0.5 and len(features) > 3:
-                print(f"[API] ⚠️ 低匹配率: {r.payload.get('chinese_name', '未知')} - coverage={coverage:.2f}, 匹配={matched_features}, 缺失={missing_features[:5]}")
             
             # 應用 Coverage 調整
             feature_score = feature_score_raw * coverage
@@ -737,38 +740,116 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             coverage = 0.0
             must_matched = True
             matched_features = []
+            match_result = {}
 
-        # 3. 計算混合分數（加入 Coverage 和 Must Gate）
-        if features:
-            # 基礎分數：加權平均
-            base_score = (EMBEDDING_WEIGHT * embedding_score) + (FEATURE_WEIGHT * feature_score)
-            
-            # 增強分數：如果 embedding 和 feature 都匹配，使用乘法增強
-            enhancement = embedding_score * feature_score * 0.3  # 增強係數 0.3
-            
-            # 基礎混合分數
-            hybrid_score = base_score + enhancement + keyword_bonus
-            
-            # 🔥 關鍵修復：Must Gate 只應用一次（在最後）
-            # 如果關鍵特徵（life_form、leaf_arrangement、leaf_shape、leaf_margin、flower_color、fruit_type）不匹配，大幅降權
-            MUST_GATE_PENALTY = 0.3  # 降權 70%（從 0.65 改為 0.3，更嚴格的懲罰）
-            if not must_matched:
-                hybrid_score *= MUST_GATE_PENALTY
-                must_traits_in_query = match_result.get('must_traits_in_query', []) if 'match_result' in locals() else []
-                must_traits_matched = match_result.get('must_traits_matched', []) if 'match_result' in locals() else []
-                print(f"[API] ⚠️ Must Gate 觸發: {r.payload.get('chinese_name', '未知')} - 關鍵特徵不匹配（must_traits_in_query={must_traits_in_query}, must_traits_matched={must_traits_matched}），分數降權 70%")
-            
-            # 確保分數不超過 1.0
-            hybrid_score = min(1.0, hybrid_score)
-        else:
-            hybrid_score = embedding_score + keyword_bonus
+        # 暫存結果，稍後進行過濾和排序
+        scored_candidates.append({
+            "point": r,
+            "embedding_score": embedding_score,
+            "feature_score": feature_score,
+            "keyword_bonus": keyword_bonus,
+            "coverage": coverage,
+            "must_matched": must_matched,
+            "match_result": match_result,
+            "matched_features": matched_features,
+            "plant_name": r.payload.get("chinese_name", "未知"),
+            "scientific_name": r.payload.get("scientific_name", "")
+        })
 
-        # 記錄詳細資訊（用於調試）- 顯示所有候選植物
-        plant_name = r.payload.get("chinese_name", "未知")
-        scientific_name = r.payload.get("scientific_name", "")
-        print(f"[API] 候選植物 {len(results)+1}: {plant_name}" + (f" ({scientific_name})" if scientific_name else "") + f" - embedding={embedding_score:.3f}, feature={feature_score:.3f}, coverage={coverage:.2f}, must_matched={must_matched}, hybrid={hybrid_score:.3f}, matched_features={matched_features}")
-        sys.stdout.flush()
+    # 🔥 關鍵修復：Must Gate 逐步放寬策略
+    # Level 1: Strict (life_form AND leaf_arrangement)
+    # Level 2: Medium (leaf_arrangement only)
+    # Level 3: Weak (life_form only)
+    # Level 4: No Gate (penalty only)
+    
+    final_candidates = []
+    
+    # 定義檢查函式
+    def check_gate(candidate, required_keys):
+        # 如果沒有 required_keys，直接通過
+        if not required_keys:
+            return True
+            
+        must_traits_matched = candidate["match_result"].get("must_traits_matched", [])
+        must_traits_in_query = candidate["match_result"].get("must_traits_in_query", [])
         
+        # 取得查詢中包含的 required keys
+        query_required_keys = set()
+        for token in must_traits_in_query:
+            if "=" in token:
+                key = token.split("=")[0].strip()
+                if key in required_keys:
+                    query_required_keys.add(key)
+            else:
+                # 向後兼容：如果是中文特徵名，很難判斷 key，這裡略過或假設它對應某個 required key
+                pass
+                
+        if not query_required_keys:
+            return True
+            
+        # 檢查是否所有 query_required_keys 都有匹配
+        matched_keys = set()
+        for token in must_traits_matched:
+            if "=" in token:
+                key = token.split("=")[0].strip()
+                if key in query_required_keys:
+                    matched_keys.add(key)
+        
+        return len(matched_keys) == len(query_required_keys)
+
+    # 嘗試不同層級的過濾
+    gate_levels = [
+        {"name": "Strict", "keys": {"life_form", "leaf_arrangement"}},
+        {"name": "Medium", "keys": {"leaf_arrangement"}},
+        {"name": "Weak", "keys": {"life_form"}},
+        {"name": "None", "keys": set()}
+    ]
+    
+    selected_level = "None"
+    
+    for level in gate_levels:
+        filtered = [c for c in scored_candidates if check_gate(c, level["keys"])]
+        if len(filtered) >= 5:
+            final_candidates = filtered
+            selected_level = level["name"]
+            print(f"[API] Must Gate 使用層級: {level['name']} (候選數: {len(filtered)})")
+            break
+            
+    # 如果所有層級都少於 5 個，使用最後一個層級 (None) 的結果（即所有候選）
+    if not final_candidates:
+        final_candidates = scored_candidates
+        selected_level = "None (Fallback)"
+        print(f"[API] Must Gate 使用層級: {selected_level} (候選數: {len(final_candidates)})")
+
+    # 計算最終分數並排序
+    for c in final_candidates:
+        r = c["point"]
+        embedding_score = c["embedding_score"]
+        feature_score = c["feature_score"]
+        keyword_bonus = c["keyword_bonus"]
+        match_result = c["match_result"]
+        
+        # 基礎分數
+        base_score = (EMBEDDING_WEIGHT * embedding_score) + (FEATURE_WEIGHT * feature_score)
+        
+        # 增強分數
+        enhancement = embedding_score * feature_score * 0.3
+        
+        hybrid_score = base_score + enhancement + keyword_bonus
+        
+        # 如果不是 None 層級，且被選中，說明它通過了該層級的 Gate
+        # 但如果是 None 層級（或 Fallback），我們需要應用懲罰
+        if selected_level.startswith("None"):
+             # 使用原本的 must_matched 判斷
+            if not c["must_matched"]:
+                MUST_GATE_PENALTY = 0.3
+                hybrid_score *= MUST_GATE_PENALTY
+                # log omitted for brevity
+        
+        # 確保分數不超過 1.0
+        hybrid_score = min(1.0, hybrid_score)
+        
+        # 記錄結果
         results.append({
             "code": r.payload.get("code"),
             "chinese_name": r.payload.get("chinese_name"),
@@ -780,11 +861,13 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             "score": hybrid_score,
             "embedding_score": embedding_score,
             "feature_score": feature_score,
-            "coverage": coverage,
-            "must_matched": must_matched,
-            "matched_features": matched_features,
+            "coverage": c["coverage"],
+            "must_matched": c["must_matched"],
+            "matched_features": c["matched_features"],
             "summary": r.payload.get("summary", "")[:300],
         })
+
+    # 4. 按混合分數重新排序
 
     # 4. 按混合分數重新排序
     results.sort(key=lambda x: x["score"], reverse=True)

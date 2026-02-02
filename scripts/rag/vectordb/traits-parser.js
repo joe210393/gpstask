@@ -264,6 +264,8 @@ function traitsToFeatureList(traits) {
     'pubescent': '有毛',
     'rough': '粗糙',
     'waxy': '蠟質',
+    'coriaceous': '革質',  // 新增
+    'leathery': '革質',    // 新增
     
     // inflorescence
     'raceme': '總狀花序',
