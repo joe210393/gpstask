@@ -1848,14 +1848,29 @@ success 或 fail (只能二選一，小寫)
 
             // 如果沒有 <reply> 標籤，嘗試其他方式
             if (!finalReplyText) {
-                // 嘗試提取 </analysis> 後的內容
-                const analysisEndIndex = fullText.indexOf('</analysis>');
+                // 嘗試提取 </analysis> 後的內容（<reply> 通常在 </analysis> 之後）
+                // 先找到最後一個 </analysis> 的位置（因為可能有多個）
+                let analysisEndIndex = -1;
+                let searchIndex = 0;
+                while (true) {
+                    const found = fullText.indexOf('</analysis>', searchIndex);
+                    if (found === -1) break;
+                    analysisEndIndex = found;
+                    searchIndex = found + 11;
+                }
+                
                 if (analysisEndIndex !== -1) {
-                    finalReplyText = fullText.substring(analysisEndIndex + 11).trim();
-                    // 移除可能的結尾 ``` 標記
-                    finalReplyText = finalReplyText.replace(/\s*```$/i, '');
+                    // 從 </analysis> 之後提取內容
+                    let afterAnalysis = fullText.substring(analysisEndIndex + 11).trim();
+                    // 移除可能的結尾 ``` 標記和 JSON 區塊
+                    afterAnalysis = afterAnalysis.replace(/\s*\*\*第七步[^]*?```json[^]*?```[^]*?<\/analysis>\s*$/i, '');
+                    afterAnalysis = afterAnalysis.replace(/\s*```$/i, '');
                     // 移除 <reply> 和 </reply> 標記如果存在
-                    finalReplyText = finalReplyText.replace(/<\/?reply>/gi, '').trim();
+                    afterAnalysis = afterAnalysis.replace(/<\/?reply>/gi, '').trim();
+                    // 如果還有內容，使用它
+                    if (afterAnalysis && afterAnalysis.length > 10) {
+                        finalReplyText = afterAnalysis;
+                    }
                 }
             }
 
