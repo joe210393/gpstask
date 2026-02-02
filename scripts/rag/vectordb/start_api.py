@@ -518,36 +518,46 @@ def classify_query(query: str) -> dict:
 def search_plants(query: str, top_k: int = 5):
     """搜尋植物（純 embedding）"""
     if qdrant_client is None:
+        print("[API] ⚠️ search_plants: Qdrant 未連線")
         return []  # Qdrant 未連線，返回空結果
-    t0 = time.perf_counter()
-    query_vector = encode_text(query)
-    t1 = time.perf_counter()
-    if not isinstance(query_vector, list):
-        query_vector = query_vector.tolist()
+        
+    try:
+        t0 = time.perf_counter()
+        query_vector = encode_text(query)
+        t1 = time.perf_counter()
+        if not isinstance(query_vector, list):
+            query_vector = query_vector.tolist()
 
-    results = qdrant_client.query_points(
-        collection_name=COLLECTION_NAME,
-        query=query_vector,
-        limit=top_k,
-    ).points
-    t2 = time.perf_counter()
-    print(f"[API] /search encode={(t1 - t0):.3f}s qdrant={(t2 - t1):.3f}s total={(t2 - t0):.3f}s top_k={top_k}")
-    sys.stdout.flush()
+        # 增加 timeout 處理
+        results = qdrant_client.query_points(
+            collection_name=COLLECTION_NAME,
+            query=query_vector,
+            limit=top_k,
+        ).points
+        t2 = time.perf_counter()
+        print(f"[API] /search encode={(t1 - t0):.3f}s qdrant={(t2 - t1):.3f}s total={(t2 - t0):.3f}s top_k={top_k} results={len(results)}")
+        sys.stdout.flush()
 
-    return [
-        {
-            "code": r.payload.get("code"),
-            "chinese_name": r.payload.get("chinese_name"),
-            "scientific_name": r.payload.get("scientific_name"),
-            "family": r.payload.get("family"),
-            "family_en": r.payload.get("family_en"),
-            "genus": r.payload.get("genus"),
-            "life_form": r.payload.get("life_form"),
-            "score": r.score,
-            "summary": r.payload.get("summary", "")[:300],
-        }
-        for r in results
-    ]
+        return [
+            {
+                "code": r.payload.get("code"),
+                "chinese_name": r.payload.get("chinese_name"),
+                "scientific_name": r.payload.get("scientific_name"),
+                "family": r.payload.get("family"),
+                "family_en": r.payload.get("family_en"),
+                "genus": r.payload.get("genus"),
+                "life_form": r.payload.get("life_form"),
+                "score": r.score,
+                "summary": r.payload.get("summary", "")[:300],
+            }
+            for r in results
+        ]
+    except Exception as e:
+        print(f"[API] ❌ search_plants 錯誤: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.stdout.flush()
+        return []
 
 
 def hybrid_search(query: str, features: list = None, guess_names: list = None, top_k: int = 5):
@@ -643,11 +653,19 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
     # 使用 max(60, top_k * 10) 確保至少有 60 個候選
     candidate_limit = max(60, top_k * 10)
     
-    candidates = qdrant_client.query_points(
-        collection_name=COLLECTION_NAME,
-        query=query_vector,
-        limit=candidate_limit,
-    ).points
+    try:
+        candidates = qdrant_client.query_points(
+            collection_name=COLLECTION_NAME,
+            query=query_vector,
+            limit=candidate_limit,
+        ).points
+    except Exception as e:
+        print(f"[API] ❌ hybrid_search Qdrant 查詢錯誤: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.stdout.flush()
+        return []
+        
     t2 = time.perf_counter()
     print(f"[API] /hybrid-search encode={(t1 - t0):.3f}s qdrant={(t2 - t1):.3f}s total={(t2 - t0):.3f}s top_k={top_k} limit={candidate_limit} candidates={len(candidates)}")
     sys.stdout.flush()
