@@ -3650,10 +3650,25 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 } else {
                   plantResults = newResults;
                 }
+              } else {
+                console.log('⚠️ 第二階段搜尋無結果（可能是 Must Gate 過濾太嚴格），檢查是否有第一階段結果');
+                if (preSearchResults) {
+                  console.log('✅ 回退使用第一階段 embedding 結果');
+                  plantResults = preSearchResults;
+                }
+              }
+            } else {
+              // Traits 判斷不是植物，但也許第一階段認為是
+              if (preSearchResults) {
+                console.log('⚠️ Traits 判斷非植物，但第一階段 embedding 認為是，使用第一階段結果');
+                plantResults = preSearchResults;
               }
             }
           } else {
             console.log('⚠️ 未提取到 traits JSON，跳過第二階段 traits-based 搜尋');
+            if (preSearchResults) {
+              plantResults = preSearchResults;
+            }
           }
 
           // 如果 traits-based 判斷失敗，嘗試舊的 parseVisionResponse 方法
