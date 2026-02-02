@@ -1585,9 +1585,10 @@ success 或 fail (只能二選一，小寫)
                         });
                     });
 
-                    // 計算平均信心度（使用顯示分數）
+                    // 使用「最佳匹配」的分數作為信心度（不用平均，避免稀釋）
+                    // 例：三色堇 90%、香堇菜 82% → 顯示 90%，而非平均 86%
                     const scores = allPlants.map(p => p.displayScore || p.score);
-                    avgConfidence = scores.reduce((a, b) => a + b, 0) / scores.length;
+                    avgConfidence = scores.length > 0 ? Math.max(...scores) : 0;
                     
                     // 如果有 LM 信心度加成，在日誌中顯示
                     if (result.plant_rag.lm_confidence_boost) {
@@ -1596,7 +1597,7 @@ success 或 fail (只能二選一，小寫)
 
                     setThinkingStage('search');
                     await new Promise(r => setTimeout(r, 500));
-                    console.log(`🌿 植物結果: ${allPlants.length} 個, 平均信心度: ${Math.round(avgConfidence * 100)}%`);
+                    console.log(`🌿 植物結果: ${allPlants.length} 個, 最佳信心度: ${Math.round(avgConfidence * 100)}%`);
                 } else {
                     // 非植物情況也要顯示動畫進度
                     setThinkingStage('analyze');
@@ -1624,7 +1625,7 @@ success 或 fail (只能二選一，小寫)
                 }
                 
                 if (hasPlantResult && avgConfidence >= CONFIDENCE_HIGH) {
-                    // 高信心度植物：直接顯示答案
+                    // 高信心度植物 (≥85%)：直接顯示答案
                     showHighConfidenceResult(allResults, allPlants, avgConfidence);
                 } else if (hasPlantResult && avgConfidence >= CONFIDENCE_MEDIUM) {
                     // 中等信心度植物：請求補拍
@@ -1758,16 +1759,18 @@ success 或 fail (只能二選一，小寫)
                 </div>
             `;
 
-            // 顯示目前猜測
+            // 顯示目前猜測（使用 displayScore = LM 加成後的調整分數）
             if (plants.length > 0) {
                 html += `
                     <div style="margin-top: 12px; padding: 12px; background: #fff8e1; border-radius: 8px; border: 1px solid #ffe082;">
                         <div style="font-size: 13px; color: #f57c00; margin-bottom: 8px;">目前推測:</div>
-                        ${plants.slice(0, 2).map(p => `
+                        ${plants.slice(0, 2).map(p => {
+                            const score = (p.displayScore !== undefined ? p.displayScore : p.score) * 100;
+                            return `
                             <div style="font-size: 14px; color: #333;">
-                                • ${p.chinese_name || p.scientific_name} <span style="color:#999">(${Math.round(p.score * 100)}%)</span>
+                                • ${p.chinese_name || p.scientific_name} <span style="color:#999">(${Math.round(score)}%)</span>
                             </div>
-                        `).join('')}
+                        `}).join('')}
                     </div>
                 `;
             }

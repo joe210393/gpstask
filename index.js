@@ -3616,10 +3616,18 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
               
               console.log(`📝 構建的 query_text_zh (${queryTextZh.length} 字元): ${queryTextZh.substring(0, 50)}...`);
 
+              // 將第一階段 RAG 結果的植物名稱傳入第二階段，供 hybrid-search 做關鍵字匹配與查詢增強
+              const guessNamesFromFirst = (preSearchResults?.plants || [])
+                .map(p => p.chinese_name || p.scientific_name)
+                .filter(Boolean);
+              if (guessNamesFromFirst.length > 0) {
+                console.log(`[RAG] 第二階段使用第一階段候選: ${guessNamesFromFirst.join('、')}`);
+              }
+
               const hybridResult = await hybridSearch({
-                query: queryTextZh,  // 🔥 關鍵修復：使用簡短的 query_text_zh，而不是 detailedDescription
+                query: queryTextZh,
                 features: features,
-                guessNames: [],
+                guessNames: guessNamesFromFirst,
                 topK: 3
               });
 
