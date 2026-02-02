@@ -9,6 +9,7 @@
 
 啟動方式：
   python start_api.py
+  (Trigger redeploy: 2026-02-02)
 
 API 端點：
   POST /search
