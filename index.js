@@ -103,8 +103,8 @@ const SEARCH_GET_MAX_QUERY_LEN = 500;
 async function smartSearch(query, topK = 5) {
   try {
     let result;
-    if (query.length > SEARCH_GET_MAX_QUERY_LEN) {
-      // 長查詢用 POST，避免 URL 過長導致代理/負載平衡器截斷
+    const usePost = query.length > SEARCH_GET_MAX_QUERY_LEN;
+    if (usePost) {
       result = await httpRequest(`${EMBEDDING_API_URL}/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -113,8 +113,13 @@ async function smartSearch(query, topK = 5) {
     } else {
       result = await httpRequest(`${EMBEDDING_API_URL}/search?q=${encodeURIComponent(query)}&top_k=${topK}&smart=true`);
     }
-    return result.data;
+    const data = result.data;
+    if (data && data.error) {
+      console.error('[RAG] 第一階段 smartSearch API 回傳錯誤:', data.error);
+    }
+    return data;
   } catch (e) {
+    console.error('[RAG] 第一階段 smartSearch 連線/請求失敗:', e.message);
     return { classification: { is_plant: false }, results: [], error: e.message };
   }
 }
@@ -126,8 +131,13 @@ async function hybridSearch({ query, features = [], guessNames = [], topK = 5 })
       headers: { 'Content-Type': 'application/json' },
       body: { query, features, guess_names: guessNames, top_k: topK }
     });
-    return result.data;
+    const data = result.data;
+    if (data && data.error) {
+      console.error('[RAG] 第二階段 hybridSearch API 回傳錯誤:', data.error);
+    }
+    return data;
   } catch (e) {
+    console.error('[RAG] 第二階段 hybridSearch 連線/請求失敗:', e.message);
     return { results: [], error: e.message };
   }
 }
@@ -3485,6 +3495,13 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
         plantResults = { is_plant: false, message: 'Embedding API 未就緒，暫時跳過植物搜尋' };
       } else {
         console.log('🌿 正在查詢植物 RAG（使用詳細描述）...');
+        try {
+          const urlHost = new URL(EMBEDDING_API_URL).hostname;
+          console.log(`[RAG] Embedding API: ${urlHost} (查詢長度: ${detailedDescription?.length || 0} 字元)`);
+        } catch (_) {}
+        if (!EMBEDDING_API_URL || EMBEDDING_API_URL.includes('gpstask-ooffix') || EMBEDDING_API_URL.includes('localhost')) {
+          console.warn('[RAG] ⚠️ EMBEDDING_API_URL 可能錯誤，應為 https://gps-task-embedding.zeabur.app');
+        }
 
         // 先用 Vision 的文字結果做一次「粗分類」，如果明確寫出是人造物，就完全跳過 RAG
         if (description && description.includes('第三步：判斷類別') && description.includes('人造物')) {
@@ -3508,6 +3525,13 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
 
           if (classification.is_plant && classification.plant_score >= PLANT_SCORE_THRESHOLD) {
             const ragResult = await smartSearch(detailedDescription, 3);
+
+            if (ragResult?.error) {
+              console.warn('[RAG] 第一階段失敗:', ragResult.error);
+            }
+            if (ragResult?.results?.length === 0 && !ragResult?.error) {
+              console.log('[RAG] 第一階段 API 回傳 0 筆結果（非連線錯誤）');
+            }
 
             if (ragResult.classification?.is_plant && ragResult.results?.length > 0) {
               console.log(`✅ 第一階段傳統搜尋找到 ${ragResult.results.length} 個結果`);
