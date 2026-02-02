@@ -30,12 +30,24 @@ function httpRequest(url, options = {}) {
     const httpModule = isHttps ? https : http;
     const timeoutMs = options.timeout ?? EMBEDDING_REQUEST_TIMEOUT_MS;
 
+    let bodyBuffer = null;
+    if (options.body) {
+      bodyBuffer = Buffer.from(
+        typeof options.body === 'string' ? options.body : JSON.stringify(options.body),
+        'utf8'
+      );
+    }
+    const headers = { ...options.headers };
+    if (bodyBuffer) {
+      headers['Content-Length'] = bodyBuffer.length;
+      if (!headers['Content-Type']) headers['Content-Type'] = 'application/json';
+    }
     const requestOptions = {
       hostname: urlObj.hostname,
       port: urlObj.port || (isHttps ? 443 : 80),
       path: urlObj.pathname + urlObj.search,
       method: options.method || 'GET',
-      headers: options.headers || {}
+      headers
     };
 
     const req = httpModule.request(requestOptions, (res) => {
@@ -58,10 +70,7 @@ function httpRequest(url, options = {}) {
       reject(new Error(`Embedding API 請求逾時 (${timeoutMs / 1000} 秒)`));
     });
 
-    if (options.body) {
-      req.write(typeof options.body === 'string' ? options.body : JSON.stringify(options.body));
-    }
-
+    if (bodyBuffer) req.write(bodyBuffer);
     req.end();
   });
 }
