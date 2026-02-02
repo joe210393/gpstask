@@ -1829,8 +1829,19 @@ success 或 fail (只能二選一，小寫)
 
             // XML 解析邏輯
             function extractTag(text, tag) {
-                const match = text.match(new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'i'));
-                return match ? match[1].trim() : null;
+                // 使用非貪婪匹配，但確保匹配到正確的結束標籤
+                // 先找到所有可能的標籤位置
+                const openTag = `<${tag}>`;
+                const closeTag = `</${tag}>`;
+                const openIndex = text.indexOf(openTag);
+                if (openIndex === -1) return null;
+                
+                // 從開始標籤之後開始搜尋結束標籤
+                const startPos = openIndex + openTag.length;
+                const closeIndex = text.indexOf(closeTag, startPos);
+                if (closeIndex === -1) return null;
+                
+                return text.substring(startPos, closeIndex).trim();
             }
 
             let finalReplyText = extractTag(fullText, 'reply');
