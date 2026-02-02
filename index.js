@@ -3507,90 +3507,32 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
               console.log(`📊 使用 traits 提取的特徵: ${features.join(', ')}`);
 
               // 🔥 關鍵修復：構建簡短的 query_text_zh（只用於 embedding）
-              // 絕對不要用整段 detailedDescription（包含步驟文字、不確定語句等）
+              // 直接使用 traitsToFeatureList 轉換後的中文特徵，避免重複定義不完整的 Map
               let queryTextZh = '';
               
-              // 從 traits 構建簡潔描述（1-2 句）
-              const traitParts = [];
-              
-              // 1. 生活型（最重要）
-              if (traits.life_form && traits.life_form.value && traits.life_form.value !== 'unknown') {
-                const lifeFormMap = {
-                  'tree': '喬木', 'shrub': '灌木', 'herb': '草本', 'herbaceous': '草本',
-                  'vine': '藤本', 'aquatic': '水生植物'
-                };
-                const lifeFormZh = lifeFormMap[traits.life_form.value] || traits.life_form.value;
-                traitParts.push(lifeFormZh);
+              // 優先使用轉換後的特徵列表（已經處理過翻譯和特殊值）
+              // 取前 15 個特徵（通常已包含最重要的特徵）
+              if (features.length > 0) {
+                queryTextZh = features.slice(0, 15).join('、');
               }
               
-              // 2. 葉序
-              if (traits.leaf_arrangement && traits.leaf_arrangement.value && traits.leaf_arrangement.value !== 'unknown') {
-                const leafArrMap = {
-                  'alternate': '互生', 'opposite': '對生', 'whorled': '輪生'
-                };
-                const leafArrZh = leafArrMap[traits.leaf_arrangement.value] || traits.leaf_arrangement.value;
-                traitParts.push(`葉${leafArrZh}`);
-              }
-              
-              // 3. 葉形
-              if (traits.leaf_shape && traits.leaf_shape.value && traits.leaf_shape.value !== 'unknown') {
-                const leafShapeMap = {
-                  'ovate': '卵形', 'elliptic': '橢圓形', 'lanceolate': '披針形',
-                  'linear': '線形', 'cordate': '心形', 'orbicular': '圓形'
-                };
-                const leafShapeZh = leafShapeMap[traits.leaf_shape.value] || traits.leaf_shape.value;
-                traitParts.push(`葉${leafShapeZh}`);
-              }
-              
-              // 4. 葉緣
-              if (traits.leaf_margin && traits.leaf_margin.value && traits.leaf_margin.value !== 'unknown') {
-                const leafMarginMap = {
-                  'entire': '全緣', 'serrate': '鋸齒', 'wavy': '波狀緣'
-                };
-                const leafMarginZh = leafMarginMap[traits.leaf_margin.value] || traits.leaf_margin.value;
-                traitParts.push(`葉緣${leafMarginZh}`);
-              }
-              
-              // 5. 花色
-              if (traits.flower_color && traits.flower_color.value && traits.flower_color.value !== 'unknown') {
-                const flowerColorMap = {
-                  'white': '白花', 'yellow': '黃花', 'red': '紅花', 'purple': '紫花',
-                  'pink': '粉紅花', 'orange': '橙花'
-                };
-                const flowerColorZh = flowerColorMap[traits.flower_color.value] || traits.flower_color.value;
-                traitParts.push(flowerColorZh);
-              }
-              
-              // 6. 花序
-              if (traits.inflorescence && traits.inflorescence.value && traits.inflorescence.value !== 'unknown') {
-                const infloMap = {
-                  'raceme': '總狀花序', 'panicle': '圓錐花序', 'spike': '穗狀花序',
-                  'umbel': '繖形花序', 'capitulum': '頭狀花序', 'solitary': '單生花'
-                };
-                const infloZh = infloMap[traits.inflorescence.value] || traits.inflorescence.value;
-                traitParts.push(infloZh);
-              }
-              
-              // 組合（最多 10 個特徵，確保簡潔）
-              queryTextZh = traitParts.slice(0, 10).join('、');
-              
-              // 如果沒有特徵，使用簡短的 morphology_summary（如果存在）
-              if (!queryTextZh || queryTextZh.length < 5) {
-                // 從 detailedDescription 提取簡短描述（去除步驟文字）
+              // 如果特徵太少，嘗試補充 detailedDescription 的簡短摘要
+              if (!queryTextZh || queryTextZh.length < 10) {
                 const cleanDesc = detailedDescription
                   .replace(/第[一二三四五六七八九十\d]+步[：:]/g, '')
                   .replace(/\*\*[^*]+\*\*/g, '')
                   .replace(/推測|估計|無法判斷|可能/g, '')
                   .trim()
                   .substring(0, 100);  // 最多 100 字
+                
                 if (cleanDesc) {
-                  queryTextZh = cleanDesc;
+                  queryTextZh = queryTextZh ? `${queryTextZh}。${cleanDesc}` : cleanDesc;
                 }
               }
               
-              // 限制長度（最多 150 字元）
-              if (queryTextZh.length > 150) {
-                queryTextZh = queryTextZh.substring(0, 150);
+              // 限制長度（最多 200 字元）
+              if (queryTextZh.length > 200) {
+                queryTextZh = queryTextZh.substring(0, 200);
               }
               
               console.log(`📝 構建的 query_text_zh (${queryTextZh.length} 字元): ${queryTextZh.substring(0, 50)}...`);
