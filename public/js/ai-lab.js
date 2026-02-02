@@ -1862,11 +1862,27 @@ success 或 fail (只能二選一，小寫)
                 if (analysisEndIndex !== -1) {
                     // 從 </analysis> 之後提取內容
                     let afterAnalysis = fullText.substring(analysisEndIndex + 11).trim();
-                    // 移除可能的結尾 ``` 標記和 JSON 區塊
-                    afterAnalysis = afterAnalysis.replace(/\s*\*\*第七步[^]*?```json[^]*?```[^]*?<\/analysis>\s*$/i, '');
+                    
+                    // 🔥 關鍵修復：移除 JSON 區塊 (```json ... ```)
+                    // 很多時候模型會在 </analysis> 後面接 JSON，然後才是 <reply> 或直接結束
+                    // 我們需要把 JSON 區塊移除，以免它被當成回覆顯示
+                    const jsonBlockStart = afterAnalysis.indexOf('```json');
+                    if (jsonBlockStart !== -1) {
+                        const jsonBlockEnd = afterAnalysis.indexOf('```', jsonBlockStart + 7);
+                        if (jsonBlockEnd !== -1) {
+                            // 移除 JSON 區塊，保留前後內容
+                            afterAnalysis = afterAnalysis.substring(0, jsonBlockStart) + afterAnalysis.substring(jsonBlockEnd + 3);
+                        } else {
+                            // 如果 JSON 區塊沒閉合，直接截斷
+                            afterAnalysis = afterAnalysis.substring(0, jsonBlockStart);
+                        }
+                    }
+                    
+                    // 移除可能的結尾 ``` 標記
                     afterAnalysis = afterAnalysis.replace(/\s*```$/i, '');
                     // 移除 <reply> 和 </reply> 標記如果存在
                     afterAnalysis = afterAnalysis.replace(/<\/?reply>/gi, '').trim();
+                    
                     // 如果還有內容，使用它
                     if (afterAnalysis && afterAnalysis.length > 10) {
                         finalReplyText = afterAnalysis;
