@@ -586,7 +586,45 @@ class FeatureWeightCalculator:
             
             # 檢查所有查詢中的 must traits 是否都在 plant 中
             # 只要求查詢中提供的 must traits 全部匹配，不要求所有 must traits 都存在
-            must_matched = all(t in plant_set for t in must_traits_in_query)
+            # 🔥 寬鬆檢查：如果植物資料中沒有該特徵的任何資訊（plant_set 中沒有該類別的任何特徵），則視為 unknown，不視為不匹配
+            # 只有當植物資料中有該類別的其他特徵，但不包含查詢的特徵時，才視為不匹配
+            
+            # 首先，將 plant traits 按類別分組
+            plant_traits_by_category = {}
+            if use_tokens and plant_trait_tokens:
+                for plant_token in plant_trait_tokens:
+                    if "=" in plant_token:
+                        k, v = plant_token.split("=", 1)
+                        k = k.strip()
+                        if k not in plant_traits_by_category:
+                            plant_traits_by_category[k] = set()
+                        plant_traits_by_category[k].add(normalize_token(plant_token))
+            
+            must_matched = True
+            for query_token in must_traits_in_query:
+                if "=" in query_token:
+                    q_trait, q_val = query_token.split("=", 1)
+                    q_trait = q_trait.strip()
+                    
+                    # 如果植物資料中完全沒有這個類別的特徵（例如缺失 leaf_arrangement），視為 unknown -> pass
+                    if q_trait not in plant_traits_by_category:
+                        continue
+                        
+                    # 如果有這個類別的特徵，則必須匹配其中之一
+                    # 使用 normalize_token 確保格式一致
+                    normalized_query = normalize_token(query_token)
+                    
+                    # 檢查是否有匹配
+                    # 注意：這裡使用嚴格匹配（value 必須一致）
+                    # 但考慮到 canon_value 可能已經處理了部分同義詞
+                    if normalized_query not in plant_traits_by_category[q_trait]:
+                        must_matched = False
+                        break
+                else:
+                    # 對於非 token 格式的 must trait（向後兼容），保持原邏輯
+                    if query_token not in plant_set:
+                        must_matched = False
+                        break
 
         return {
             "match_score": match_score,
