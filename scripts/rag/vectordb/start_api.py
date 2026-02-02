@@ -291,10 +291,17 @@ def _init_background_impl():
 
     # 5. 載入特徵資料
     import os.path
-    # 優先使用 clean 資料檔案（包含 morphology_summary_zh、trait_tokens 和正規化特徵）
-    # 如果 clean 不存在，則使用 enhanced（向後兼容）
+    # 優先使用 final-4302 資料檔案（只包含已成功向量化的 4302 筆植物）
+    # 如果 final-4302 不存在，則使用 clean（向後兼容）
+    final_4302_paths = [
+        "/app/data/plants-forest-gov-tw-final-4302.jsonl",  # Docker 容器中的路徑（最高優先級）
+        os.path.join(os.path.dirname(__file__), "..", "data", "plants-forest-gov-tw-final-4302.jsonl"),
+        os.path.join(os.path.dirname(__file__), "data", "plants-forest-gov-tw-final-4302.jsonl"),
+    ]
+    
+    # 備用：clean 資料檔案（包含 morphology_summary_zh、trait_tokens 和正規化特徵）
     clean_paths = [
-        "/app/data/plants-forest-gov-tw-clean.jsonl",  # Docker 容器中的路徑（優先）
+        "/app/data/plants-forest-gov-tw-clean.jsonl",  # Docker 容器中的路徑
         os.path.join(os.path.dirname(__file__), "..", "data", "plants-forest-gov-tw-clean.jsonl"),
         os.path.join(os.path.dirname(__file__), "data", "plants-forest-gov-tw-clean.jsonl"),
     ]
@@ -320,15 +327,26 @@ def _init_background_impl():
     ]
     
     data_path = None
-    # 先搜尋 clean 檔案（優先）
-    print(f"  搜尋 Clean 資料檔案...")
-    for path in clean_paths:
+    # 先搜尋 final-4302 檔案（最高優先級，只包含已向量化的 4302 筆）
+    print(f"  搜尋 Final-4302 資料檔案（已向量化的 4302 筆植物）...")
+    for path in final_4302_paths:
         exists = os.path.exists(path)
         print(f"    檢查: {path} -> {'✅ 存在' if exists else '❌ 不存在'}")
         if exists:
             data_path = path
-            print(f"    ✅ 找到 Clean 資料檔案: {path}")
+            print(f"    ✅ 找到 Final-4302 資料檔案: {path}")
             break
+    
+    # 如果 final-4302 不存在，搜尋 clean 檔案（備用）
+    if not data_path:
+        print(f"  搜尋 Clean 資料檔案...")
+        for path in clean_paths:
+            exists = os.path.exists(path)
+            print(f"    檢查: {path} -> {'✅ 存在' if exists else '❌ 不存在'}")
+            if exists:
+                data_path = path
+                print(f"    ✅ 找到 Clean 資料檔案: {path}")
+                break
     
     # 如果 clean 不存在，搜尋 enhanced 檔案
     if not data_path:
