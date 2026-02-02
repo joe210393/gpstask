@@ -851,6 +851,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             embedding_ready = model is not None or (USE_JINA_API and JINA_API_KEY)
 
             self._send_json({
+                "ok": True,
                 "status": "ok",
                 "model": EMBEDDING_MODEL,
                 "use_jina_api": USE_JINA_API,
