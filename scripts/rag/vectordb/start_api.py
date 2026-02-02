@@ -455,7 +455,7 @@ def _init_background_impl():
 def init():
     """啟動背景初始化線程，立即返回讓 HTTP 服務器啟動"""
     print("=" * 60)
-    print("🌿 植物向量搜尋 API")
+    print("🌿 植物向量搜尋 API (版本: NO_MUST_GATE_V2)")
     print("=" * 60)
     sys.stdout.flush()
 

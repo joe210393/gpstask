@@ -3593,7 +3593,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                   plantResults = newResults;
                 }
               } else {
-                console.log('⚠️ 第二階段搜尋無結果（可能是 Must Gate 過濾太嚴格），檢查是否有第一階段結果');
+                console.log('⚠️ 第二階段搜尋無結果（API 回傳空陣列），檢查是否有第一階段結果');
                 if (preSearchResults) {
                   console.log('✅ 回退使用第一階段 embedding 結果');
                   plantResults = preSearchResults;
