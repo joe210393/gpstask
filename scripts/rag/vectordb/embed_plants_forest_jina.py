@@ -56,21 +56,16 @@ BATCH_SIZE = 16  # 每批處理的資料數量（降低以避免速率限制：�
 
 # 資料路徑
 SCRIPT_DIR = Path(__file__).parent
-# 優先使用 clean 資料（如果存在），否則使用 enhanced，最後使用原始資料
-CLEAN_DATA_FILE = SCRIPT_DIR.parent / "data" / "plants-forest-gov-tw-clean.jsonl"
-ENHANCED_DATA_FILE = SCRIPT_DIR.parent / "data" / "plants-forest-gov-tw-enhanced.jsonl"
-DATA_FILE = SCRIPT_DIR.parent / "data" / "plants-forest-gov-tw.jsonl"
+# 只使用 final-4302（已向量化的 4302 筆植物，與 Qdrant 一致）
+FINAL_4302_FILE = SCRIPT_DIR.parent / "data" / "plants-forest-gov-tw-final-4302.jsonl"
+DATA_FILE = SCRIPT_DIR.parent / "data" / "plants-forest-gov-tw-final-4302.jsonl"
 PROGRESS_FILE = SCRIPT_DIR / "embed_plants_forest_jina_progress.json"
 
-# 選擇資料檔案（優先使用 clean，然後 enhanced，最後原始資料）
-if CLEAN_DATA_FILE.exists():
-    DATA_FILE = CLEAN_DATA_FILE
-    print(f"✅ 使用 Clean 資料檔案: {DATA_FILE}")
-elif ENHANCED_DATA_FILE.exists():
-    DATA_FILE = ENHANCED_DATA_FILE
-    print(f"✅ 使用 Enhanced 資料檔案: {DATA_FILE}")
+if FINAL_4302_FILE.exists():
+    DATA_FILE = FINAL_4302_FILE
+    print(f"✅ 使用 Final-4302 資料檔案: {DATA_FILE}")
 else:
-    print(f"⚠️  使用原始資料檔案: {DATA_FILE}")
+    print(f"❌ 資料檔案不存在: {FINAL_4302_FILE}")
 
 
 def get_qdrant_client():

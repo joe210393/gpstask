@@ -15,21 +15,61 @@ function parseTraitsFromResponse(visionResponse) {
 
   try {
     // 方法 1: 嘗試找到 ```json ... ``` 區塊
-    const jsonBlockMatch = visionResponse.match(/```json\s*([\s\S]*?)\s*```/i);
+    // 增強：支援後面跟著垃圾文字的情況
+    const jsonBlockMatch = visionResponse.match(/```json\s*([\s\S]*?)```/i);
     if (jsonBlockMatch) {
       const jsonStr = jsonBlockMatch[1].trim();
-      const parsed = JSON.parse(jsonStr);
-      return validateTraits(parsed);
+      try {
+        const parsed = JSON.parse(jsonStr);
+        return validateTraits(parsed);
+      } catch (e) {
+        // 如果標準解析失敗，嘗試修復 JSON（例如多餘的逗號或未閉合的括號）
+        console.warn('[TraitsParser] JSON 區塊解析失敗，嘗試修復:', e.message);
+      }
     }
 
-    // 方法 2: 嘗試找到 { ... } JSON 物件（在 </reply> 之後）
-    const replyEndIndex = visionResponse.indexOf('</reply>');
-    if (replyEndIndex !== -1) {
-      const afterReply = visionResponse.substring(replyEndIndex + 7);
-      const jsonMatch = afterReply.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return validateTraits(parsed);
+    // 方法 2: 嘗試找到 { ... } JSON 物件（在 </reply> 之後，或任何地方）
+    // 增強：尋找最後一個完整的 JSON 物件結構
+    // 策略：尋找 "life_form" 附近的 { ... } 結構
+    if (visionResponse.includes('"life_form"')) {
+      const startIdx = visionResponse.indexOf('{');
+      if (startIdx !== -1) {
+        // 嘗試從這裡開始解析，直到找到合法的 JSON
+        let bestParsed = null;
+        let bestLen = 0;
+        
+        // 簡單的括號計數法來找結束點
+        let bracketCount = 0;
+        let inString = false;
+        let escape = false;
+        let endIdx = -1;
+        
+        for (let i = startIdx; i < visionResponse.length; i++) {
+          const char = visionResponse[i];
+          if (!inString) {
+            if (char === '{') bracketCount++;
+            else if (char === '}') {
+              bracketCount--;
+              if (bracketCount === 0) {
+                // 找到一個潛在的完整物件
+                const potentialJson = visionResponse.substring(startIdx, i + 1);
+                try {
+                  const parsed = JSON.parse(potentialJson);
+                  // 驗證是否包含我們需要的欄位
+                  if (parsed.life_form || parsed.leaf_arrangement) {
+                    return validateTraits(parsed);
+                  }
+                } catch (e) {
+                  // 忽略解析錯誤，繼續尋找更大的物件
+                }
+              }
+            } else if (char === '"') inString = true;
+          } else {
+            if (escape) escape = false;
+            else if (char === '\\') escape = true;
+            else if (char === '"') inString = false;
+          }
+        }
       }
     }
 
@@ -69,9 +109,10 @@ function validateTraits(traits) {
     'phenology',
     'leaf_arrangement',
     'leaf_shape',
+    'leaf_type',   // 單葉/複葉（simple/compound/pinnate/palmate）
     'leaf_margin',
     'leaf_texture',
-    'leaf_color',  // 新增：葉片顏色
+    'leaf_color',  // 葉片顏色
     'inflorescence',
     'flower_color',
     'fruit_type',
@@ -228,7 +269,15 @@ function traitsToFeatureList(traits) {
     'fascicled': '叢生',
     'basal': '基生',
     'clustered': '簇生',
-    
+    'spiral': '螺旋葉序',       // Vision 可能輸出 spiral
+    'pinnate': '羽狀複葉',      // 葉序/葉型混用時
+    'pinnately_compound': '羽狀複葉',
+
+    // leaf_type（單葉/複葉，與 leaf_shape 區分）
+    'simple': '單葉',
+    'compound': '複葉',
+    'trifoliate': '三出複葉',
+
     // leaf_shape
     'ovate': '卵形',
     'obovate': '倒卵形',
@@ -269,6 +318,7 @@ function traitsToFeatureList(traits) {
     
     // inflorescence
     'raceme': '總狀花序',
+    'racemose': '總狀花序',     // Vision 可能輸出 racemose
     'panicle': '圓錐花序',
     'corymb_cyme': '聚繖花序',
     'corymb': '繖房花序',
@@ -402,7 +452,12 @@ function traitsToFeatureList(traits) {
       // 優先使用映射表
       const chineseKeyword = traitValueMap[traitValue];
       if (chineseKeyword) {
-        features.push(chineseKeyword);
+        // flower_color 誤塞種子顏色時丟棄（紅種子、白種子、黃種子等會干擾搜尋）
+        if (key === 'flower_color' && /種子/.test(chineseKeyword)) {
+          console.warn(`[TraitsParser] flower_color 含種子顏色 (${chineseKeyword})，已忽略`);
+        } else {
+          features.push(chineseKeyword);
+        }
       } else {
         // 如果沒有映射，嘗試部分匹配
         const partialMatch = Object.keys(traitValueMap).find(k => 

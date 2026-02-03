@@ -37,4 +37,6 @@ services:
     env:
       QDRANT_URL: https://gps-task-qdrant.zeabur.app
       QDRANT_API_KEY: ${QDRANT_API_KEY}
+      USE_JINA_API: "true"
+      JINA_API_KEY: ${JINA_API_KEY}
       PORT: "8080"

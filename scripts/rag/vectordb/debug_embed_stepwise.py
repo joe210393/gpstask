@@ -116,9 +116,7 @@ def main():
     # Step 3: 讀取一筆資料並向量化
     def test_one_embed():
         script_dir = Path(__file__).parent
-        data_file = script_dir.parent / "data" / "plants-forest-gov-tw-clean.jsonl"
-        if not data_file.exists():
-            data_file = script_dir.parent / "data" / "plants-forest-gov-tw.jsonl"
+        data_file = script_dir.parent / "data" / "plants-forest-gov-tw-final-4302.jsonl"
         if not data_file.exists():
             log("   ⚠️ 找不到資料檔案，跳過此步驟")
             return None

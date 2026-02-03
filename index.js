@@ -109,7 +109,10 @@ async function classify(query) {
 // URL 長度限制約 2K–8K，長查詢改用 POST 避免被代理截斷
 const SEARCH_GET_MAX_QUERY_LEN = 500;
 
-async function smartSearch(query, topK = 5) {
+// RAG 每階段取回數量（擴大以提升召回，正確答案常落在 4~60 名）
+const RAG_TOP_K = parseInt(process.env.RAG_TOP_K || '30', 10);
+
+async function smartSearch(query, topK = RAG_TOP_K) {
   try {
     let result;
     const usePost = query.length > SEARCH_GET_MAX_QUERY_LEN;
@@ -133,7 +136,7 @@ async function smartSearch(query, topK = 5) {
   }
 }
 
-async function hybridSearch({ query, features = [], guessNames = [], topK = 5 }) {
+async function hybridSearch({ query, features = [], guessNames = [], topK = RAG_TOP_K }) {
   try {
     const result = await httpRequest(`${EMBEDDING_API_URL}/hybrid-search`, {
       method: 'POST',
@@ -149,6 +152,31 @@ async function hybridSearch({ query, features = [], guessNames = [], topK = 5 })
     console.error('[RAG] 第二階段 hybridSearch 連線/請求失敗:', e.message);
     return { results: [], error: e.message };
   }
+}
+
+/**
+ * 合併兩階段 RAG 結果，依 score 排序，去重（同種取較高分）
+ * @param {Array} prePlants - 第一階段結果
+ * @param {Array} newPlants - 第二階段結果
+ * @param {number} limit - 回傳筆數上限
+ * @returns {Array} 合併後依分數排序的植物列表
+ */
+function mergePlantResults(prePlants, newPlants, limit = RAG_TOP_K) {
+  const byKey = new Map();
+  function add(p) {
+    const key = (p.chinese_name || p.scientific_name || '').trim();
+    if (!key) return;
+    const score = p.score ?? p.embedding_score ?? 0;
+    const existing = byKey.get(key);
+    if (!existing || score > (existing.score ?? existing.embedding_score ?? 0)) {
+      byKey.set(key, { ...p, score: p.score ?? score });
+    }
+  }
+  (prePlants || []).forEach(add);
+  (newPlants || []).forEach(add);
+  return Array.from(byKey.values())
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+    .slice(0, limit);
 }
 
 function parseVisionResponse(description) {
@@ -3533,7 +3561,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
           const PLANT_SCORE_THRESHOLD = visionSaysPlant ? 0.4 : (finishReason === 'length' ? 0.45 : 0.5);
 
           if (classification.is_plant && classification.plant_score >= PLANT_SCORE_THRESHOLD) {
-            const ragResult = await smartSearch(detailedDescription, 3);
+            const ragResult = await smartSearch(detailedDescription, RAG_TOP_K);
 
             if (ragResult?.error) {
               console.warn('[RAG] 第一階段失敗:', ragResult.error);
@@ -3628,7 +3656,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 query: queryTextZh,
                 features: features,
                 guessNames: guessNamesFromFirst,
-                topK: 3
+                topK: RAG_TOP_K
               });
 
               if (hybridResult.results?.length > 0) {
@@ -3662,20 +3690,11 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                   }))
                 };
                 
-                // 與第一階段結果比較，選擇更好的
+                // 合併兩階段候選，依分數排序（移除 +0.15 gate）
                 if (preSearchResults && preSearchResults.is_plant && preSearchResults.plants && preSearchResults.plants.length > 0) {
-                  const preTopScore = preSearchResults.plants[0].score;
-                  const newTopScore = newResults.plants[0].score;
-                  
-                  // 只有當新結果的最高分數明顯高於第一階段結果（高 15% 以上）時，才使用新結果
-                  // 否則保留第一階段結果（因為它可能是更可靠的 embedding 搜尋結果）
-                  if (newTopScore > preTopScore + 0.15) {
-                    console.log(`🔄 第二階段結果分數更高（${(newTopScore * 100).toFixed(1)}% vs ${(preTopScore * 100).toFixed(1)}%），使用第二階段結果`);
-                    plantResults = newResults;
-                  } else {
-                    console.log(`✅ 保留第一階段結果（${(preTopScore * 100).toFixed(1)}% vs ${(newTopScore * 100).toFixed(1)}%），分數差異不足以替換`);
-                    plantResults = preSearchResults;
-                  }
+                  const merged = mergePlantResults(preSearchResults.plants, newResults.plants);
+                  console.log(`🔄 合併兩階段結果：第一階段 ${preSearchResults.plants.length} 筆 + 第二階段 ${newResults.plants.length} 筆 → 去重後 ${merged.length} 筆`);
+                  plantResults = { ...newResults, plants: merged };
                 } else {
                   plantResults = newResults;
                 }
@@ -3728,7 +3747,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 query: detailedDescription, // 使用詳細描述，而不是猜測的名稱
                 features: visionParsed.plant.features || [],
                 guessNames: visionParsed.plant.guess_names || [],
-                topK: 3
+                topK: RAG_TOP_K
               });
 
               if (hybridResult.results?.length > 0) {
@@ -3766,18 +3785,11 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                   }))
                 };
                 
-                // 如果已經有預先搜尋的結果，比較分數，選擇更好的
+                // 合併兩階段候選，依分數排序
                 if (preSearchResults && preSearchResults.is_plant && preSearchResults.plants && preSearchResults.plants.length > 0) {
-                  const preTopScore = preSearchResults.plants[0].score;
-                  const newTopScore = newResults.plants[0].score;
-                  
-                  if (newTopScore > preTopScore + 0.15) {
-                    console.log(`🔄 新搜尋結果分數更高（${(newTopScore * 100).toFixed(1)}% vs ${(preTopScore * 100).toFixed(1)}%），使用新結果`);
-                    plantResults = newResults;
-                  } else {
-                    console.log(`✅ 保留預先搜尋結果（${(preTopScore * 100).toFixed(1)}% vs ${(newTopScore * 100).toFixed(1)}%），分數差異不足以替換`);
-                    plantResults = preSearchResults;
-                  }
+                  const merged = mergePlantResults(preSearchResults.plants, newResults.plants);
+                  console.log(`🔄 合併兩階段結果（vision 解析）: ${preSearchResults.plants.length} + ${newResults.plants.length} → ${merged.length} 筆`);
+                  plantResults = { ...newResults, plants: merged };
                 } else {
                   plantResults = newResults;
                 }
@@ -3807,7 +3819,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                   3
                 )} >= ${PLANT_SCORE_THRESHOLD})，使用詳細描述進行 RAG 搜尋...`
               );
-              const ragResult = await smartSearch(detailedDescription, 3);
+              const ragResult = await smartSearch(detailedDescription, RAG_TOP_K);
 
               if (ragResult.classification?.is_plant && ragResult.results?.length > 0) {
                 console.log(`✅ 傳統搜尋找到 ${ragResult.results.length} 個結果`);
@@ -3839,18 +3851,11 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                   console.log(`💾 保存第一次搜尋結果作為基準（最高分數: ${(newResults.plants[0].score * 100).toFixed(1)}%）`);
                 }
                 
-                // 如果已經有預先搜尋的結果，比較分數，選擇更好的
+                // 合併兩階段候選（若 preSearchResults 來自同流程的第一次搜尋）
                 if (preSearchResults && preSearchResults.is_plant && preSearchResults.plants && preSearchResults.plants.length > 0) {
-                  const preTopScore = preSearchResults.plants[0].score;
-                  const newTopScore = newResults.plants[0].score;
-                  
-                  if (newTopScore > preTopScore + 0.15) {
-                    console.log(`🔄 新搜尋結果分數更高（${(newTopScore * 100).toFixed(1)}% vs ${(preTopScore * 100).toFixed(1)}%），使用新結果`);
-                    plantResults = newResults;
-                  } else {
-                    console.log(`✅ 保留預先搜尋結果（${(preTopScore * 100).toFixed(1)}% vs ${(newTopScore * 100).toFixed(1)}%），分數差異不足以替換`);
-                    plantResults = preSearchResults;
-                  }
+                  const merged = mergePlantResults(preSearchResults.plants, newResults.plants);
+                  console.log(`🔄 合併搜尋結果: ${preSearchResults.plants.length} + ${newResults.plants.length} → ${merged.length} 筆`);
+                  plantResults = { ...newResults, plants: merged };
                 } else {
                   plantResults = newResults;
                 }

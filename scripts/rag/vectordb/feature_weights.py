@@ -676,7 +676,7 @@ def get_vision_prompt():
 # 測試用
 if __name__ == "__main__":
     # 測試計算器
-    data_path = Path(__file__).parent.parent / "data" / "plants-enriched.jsonl"
+    data_path = Path(__file__).parent.parent / "data" / "plants-forest-gov-tw-final-4302.jsonl"
 
     if data_path.exists():
         calc = FeatureWeightCalculator(str(data_path))
