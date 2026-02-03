@@ -767,7 +767,14 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
                 except (ImportError, Exception):
                     plant_key_features_norm = []
             
-            # 取得植物的描述文字
+            # 取得植物的描述文字（payload 欄位可能為 str 或 list，統一轉成 str）
+            def _to_str(v):
+                if v is None:
+                    return ""
+                if isinstance(v, list):
+                    return " ".join(str(x) for x in v if x is not None)
+                return str(v)
+
             key_features = r.payload.get("key_features", [])
             key_features_text = ""
             if key_features:
@@ -775,11 +782,11 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
                     key_features_text = " ".join([str(kf) for kf in key_features])
                 else:
                     key_features_text = str(key_features)
-            
+
             plant_text = " ".join(filter(None, [
-                r.payload.get("summary") or "",
-                r.payload.get("life_form") or "",
-                r.payload.get("morphology") or "",
+                _to_str(r.payload.get("summary")),
+                _to_str(r.payload.get("life_form")),
+                _to_str(r.payload.get("morphology")),
                 key_features_text,
             ]))
 
