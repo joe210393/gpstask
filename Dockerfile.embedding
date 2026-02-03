@@ -25,7 +25,8 @@ RUN rm -rf /app/data/*.jsonl || true
 
 # 添加 ARG 強制重新執行 COPY（避免構建快取問題）
 # 每次需要清除快取時，修改這個值即可
-ARG FORCE_REBUILD=2025-02-02-final-4302-v1
+# 修改此值可強制 Zeabur 清除構建快取
+ARG FORCE_REBUILD=2025-02-03-no-multi-jsonl-v1
 
 # 複製 final-4302 資料檔案（4302 筆已向量化植物，與 Qdrant 一致）
 # 注意：Zeabur 的構建上下文是專案根目錄
