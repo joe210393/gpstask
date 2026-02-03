@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 """
-植物資料向量化腳本（使用 Jina API，1024 維）
+植物資料向量化腳本（支援 Jina API 或本機模型）
 適配新的 plants-forest-gov-tw.jsonl 格式
 
-**重要：此腳本使用 Jina API（1024 維），會消耗 Jina API tokens**
-**但 1024 維能提供更好的細節辨識精度**
+**重要：**
+- USE_JINA_API=true 會使用 Jina API（會消耗 token）
+- USE_JINA_API=false 會使用本機模型（不消耗 token）
 
 使用方式：
 1. 設定環境變數：
-   export QDRANT_URL="https://gps-task-qdrant.zeabur.app"
-   export QDRANT_API_KEY="your_qdrant_api_key"
-   export JINA_API_KEY="your_jina_api_key"
+   export QDRANT_URL="http://localhost:6333"
+   export QDRANT_API_KEY="your_qdrant_api_key"  # 若本機可省略
+   export USE_JINA_API="false"                  # 使用本機模型
+   export EMBEDDING_MODEL="jinaai/jina-embeddings-v3"
 
 2. 執行：
    python embed_plants_forest_jina.py
@@ -19,7 +21,7 @@
    - 在 embedding-api 服務中設定：USE_JINA_API=true（或 auto）
    - 這樣生產環境也會使用 Jina API（1024 維），與向量化資料匹配
 
-Token 消耗估算：
+Token 消耗估算（僅 Jina API 模式）：
    - 約 4,670 筆資料
    - 每筆約 200-500 tokens
    - 總計約 1,000,000 - 2,000,000 tokens（約 10-20% 的免費額度）
@@ -48,9 +50,13 @@ from qdrant_client.models import (
 # 設定
 QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6333")
 QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY", None)
+_use_jina_env = os.environ.get("USE_JINA_API", "true").lower()
+USE_JINA_API = _use_jina_env == "true"
 JINA_API_KEY = os.environ.get("JINA_API_KEY", None)
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "jinaai/jina-embeddings-v3")
+_default_dim = 1024 if "jina-embeddings-v3" in EMBEDDING_MODEL else 768
+EMBEDDING_DIM = int(os.environ.get("EMBEDDING_DIM", str(_default_dim)))
 COLLECTION_NAME = "taiwan_plants"
-EMBEDDING_DIM = 1024  # Jina embeddings-v3 維度
 
 BATCH_SIZE = 16  # 每批處理的資料數量（降低以避免速率限制：每分鐘 100K tokens）
 
@@ -94,6 +100,27 @@ def get_qdrant_client():
             prefer_grpc=False,
             timeout=120
         )
+
+
+_local_model = None
+
+
+def get_local_model():
+    global _local_model
+    if _local_model is not None:
+        return _local_model
+    try:
+        from sentence_transformers import SentenceTransformer
+        _local_model = SentenceTransformer(EMBEDDING_MODEL, trust_remote_code=True)
+        return _local_model
+    except Exception as e:
+        raise RuntimeError(f"本機模型載入失敗: {e}")
+
+
+def encode_text_local(texts: List[str]) -> List[List[float]]:
+    model = get_local_model()
+    embeddings = model.encode(texts, show_progress_bar=False, convert_to_numpy=True)
+    return [emb.tolist() for emb in embeddings]
 
 
 def encode_text_jina(texts: List[str], max_retries: int = 3) -> List[List[float]]:
@@ -352,10 +379,11 @@ def init_qdrant(client: QdrantClient):
 
 def main():
     print("=" * 60)
-    print("🌿 植物資料向量化（使用 Jina API）")
+    mode_text = "Jina API" if USE_JINA_API else "本機模型"
+    print(f"🌿 植物資料向量化（使用 {mode_text}）")
     print("=" * 60)
     
-    if not JINA_API_KEY:
+    if USE_JINA_API and not JINA_API_KEY:
         print("❌ 錯誤：JINA_API_KEY 未設定")
         print("   請設定環境變數：export JINA_API_KEY='your_key'")
         sys.exit(1)
@@ -389,15 +417,16 @@ def main():
         print("✅ 所有資料已處理完成！")
         return
     
-    # 估算總 tokens（粗略估算）
-    print(f"\n💰 Token 消耗估算：")
-    sample_texts = [create_plant_text(p) for p in remaining[:10]]
-    avg_chars = sum(len(t) for t in sample_texts) / len(sample_texts) if sample_texts else 0
-    estimated_total_tokens = int(len(remaining) * avg_chars / 1.5)  # 中文字符約 1.5 字符 = 1 token
-    print(f"   預估總 tokens：{estimated_total_tokens:,} tokens")
-    print(f"   您目前剩餘：10,000,000 tokens（免費額度）")
-    print(f"   預估消耗比例：{estimated_total_tokens / 10_000_000 * 100:.2f}%")
-    print(f"   剩餘 tokens：{10_000_000 - estimated_total_tokens:,} tokens")
+    if USE_JINA_API:
+        # 估算總 tokens（粗略估算）
+        print(f"\n💰 Token 消耗估算：")
+        sample_texts = [create_plant_text(p) for p in remaining[:10]]
+        avg_chars = sum(len(t) for t in sample_texts) / len(sample_texts) if sample_texts else 0
+        estimated_total_tokens = int(len(remaining) * avg_chars / 1.5)  # 中文字符約 1.5 字符 = 1 token
+        print(f"   預估總 tokens：{estimated_total_tokens:,} tokens")
+        print(f"   您目前剩餘：10,000,000 tokens（免費額度）")
+        print(f"   預估消耗比例：{estimated_total_tokens / 10_000_000 * 100:.2f}%")
+        print(f"   剩餘 tokens：{10_000_000 - estimated_total_tokens:,} tokens")
     # 支援非互動模式（環境變數 AUTO_CONFIRM=true 或 CI=true）
     auto_confirm = os.environ.get("AUTO_CONFIRM", "").lower() == "true" or os.environ.get("CI", "").lower() == "true"
     
@@ -440,7 +469,10 @@ def main():
             total_batches = (len(remaining) + BATCH_SIZE - 1) // BATCH_SIZE
             print(f"\n📊 處理批次 {batch_num}/{total_batches} ({len(valid_texts)} 筆有效/{len(batch)} 筆總計)...", flush=True)
             sys.stdout.flush()
-            vectors = encode_text_jina(valid_texts)
+            if USE_JINA_API:
+                vectors = encode_text_jina(valid_texts)
+            else:
+                vectors = encode_text_local(valid_texts)
             
             # 建立 Qdrant points（只處理有效的）
             points = []

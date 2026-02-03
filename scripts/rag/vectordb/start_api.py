@@ -43,6 +43,8 @@ QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY", None)  # Zeabur Qdrant API Key
 COLLECTION_NAME = "taiwan_plants"
 # 允許用環境變數覆蓋模型，避免在 Zeabur 上因為記憶體不足造成反覆重啟
 EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "jinaai/jina-embeddings-v3")
+_default_dim = 1024 if "jina-embeddings-v3" in EMBEDDING_MODEL else 768
+EMBEDDING_DIM = int(os.environ.get("EMBEDDING_DIM", str(_default_dim)))
 JINA_API_KEY = os.environ.get("JINA_API_KEY", None)  # Jina AI API Key
 # USE_JINA_API:
 # - "true": 強制使用 Jina API
@@ -228,8 +230,8 @@ def _init_background_impl():
             collection_info = qdrant_client.get_collection(COLLECTION_NAME)
             existing_dim = collection_info.config.params.vectors.size
             
-            # Jina API 返回 1024 維，本地模型可能是 768 維
-            expected_dim = 1024 if USE_JINA_API else 768
+            # 依模型設定的維度，避免本機模型與 Jina v3 不一致
+            expected_dim = EMBEDDING_DIM
             
             if existing_dim != expected_dim:
                 print(f"  ⚠️ Collection '{COLLECTION_NAME}' 維度不匹配！")

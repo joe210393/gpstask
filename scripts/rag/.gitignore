@@ -3,6 +3,10 @@ __pycache__/
 *.pyc
 *.pyo
 venv/
+.venv/
+
+# 本機 Qdrant 資料
+qdrant_storage/
 
 # 進度檔案（不需要上傳）
 data/progress.json

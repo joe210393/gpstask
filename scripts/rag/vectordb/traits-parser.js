@@ -3,6 +3,13 @@
  * 參考：image_traits_prompt.md
  */
 
+const KEY_TRAITS = ['leaf_arrangement', 'leaf_shape', 'inflorescence', 'leaf_type'];
+const SECONDARY_TRAITS = ['life_form', 'leaf_margin', 'flower_color'];
+const GENERIC_TRAITS = new Set([
+  'life_form', 'phenology', 'leaf_color', 'leaf_texture', 'stem_type',
+  'root_type', 'underground_stem', 'seed_type', 'seed_color',
+]);
+
 /**
  * 從 Vision AI 回應中提取 traits JSON
  * @param {string} visionResponse - Vision AI 的原始回應
@@ -103,22 +110,7 @@ function validateTraits(traits) {
     return null;
   }
 
-  // 定義有效的 trait keys（包含所有特徵）
-const KEY_TRAITS = ['leaf_arrangement', 'leaf_shape', 'inflorescence', 'leaf_type'];
-const SECONDARY_TRAITS = ['life_form', 'leaf_margin', 'flower_color'];
-const GENERIC_TRAITS = new Set([
-  'life_form',
-  'phenology',
-  'leaf_color',
-  'leaf_texture',
-  'stem_type',
-  'root_type',
-  'underground_stem',
-  'seed_type',
-  'seed_color',
-]);
-
-const validTraits = [
+  const validTraits = [
     'life_form',
     'phenology',
     'leaf_arrangement',
