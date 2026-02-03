@@ -578,7 +578,148 @@ def search_plants(query: str, top_k: int = 5):
         return []
 
 
-def hybrid_search(query: str, features: list = None, guess_names: list = None, top_k: int = 5):
+# SOFT 矛盾規則（只取最嚴重 2 條扣分）
+SOFT_RULES = [
+    {"id": "S1", "trait": "leaf_arrangement", "conf_min": 0.5, "penalty": 0.20},
+    {"id": "S2", "trait": "life_form", "conf_min": 0.6, "penalty": 0.12},
+]
+MAX_SOFT_COUNT = 2
+
+# 葉序互斥群組：同群組=一致，不同群組=矛盾
+LEAF_ARRANGEMENT_GROUP_IDS = {
+    "alternate": "g1",
+    "spiral": "g1",
+    "opposite": "g2",
+    "whorled": "g3",
+    "fascicled": "g4",
+    "basal": "g5",
+}
+
+LIFE_FORM_GROUPS = {
+    "herb": ["草本"],
+    "herbaceous": ["草本"],
+    "annual_herb": ["草本"],
+    "perennial_herb": ["草本"],
+    "shrub": ["灌木", "亞灌木"],
+    "subshrub": ["灌木", "亞灌木"],
+    "tree": ["喬木", "小喬木"],
+    "small_tree": ["喬木", "小喬木"],
+    "vine": ["藤本"],
+    "climbing_vine": ["藤本"],
+    "aquatic": ["水生", "水生植物"],
+}
+
+
+def _to_str(v):
+    if v is None:
+        return ""
+    if isinstance(v, list):
+        return " ".join(str(x) for x in v if x is not None)
+    return str(v)
+
+
+def _get_plant_leaf_arrangement(payload):
+    kf = payload.get("key_features") or []
+    kf_norm = payload.get("key_features_norm") or []
+    text = " ".join(_to_str(x) for x in kf + kf_norm)
+    if "對生" in text:
+        return "opposite"
+    if "輪生" in text:
+        return "whorled"
+    if "互生" in text or "螺旋" in text:
+        return "alternate"
+    return None
+
+
+def _get_plant_life_form_group(payload):
+    lf = _to_str(payload.get("life_form", "")).strip()
+    if not lf:
+        return None
+    for en, zh_list in LIFE_FORM_GROUPS.items():
+        if any(z in lf for z in zh_list):
+            return en
+    if "草本" in lf:
+        return "herb"
+    if "灌木" in lf or "亞灌木" in lf:
+        return "shrub"
+    if "喬木" in lf:
+        return "tree"
+    if "藤本" in lf:
+        return "vine"
+    if "水生" in lf:
+        return "aquatic"
+    return None
+
+
+def compute_soft_contradiction_penalty(traits, payload):
+    if not traits or not isinstance(traits, dict):
+        return []
+    penalties = []
+    for rule in SOFT_RULES:
+        trait_key = rule["trait"]
+        conf_min = rule["conf_min"]
+        penalty_val = rule["penalty"]
+        t = traits.get(trait_key)
+        if not t or not isinstance(t, dict):
+            continue
+        conf = t.get("confidence", 0) or 0
+        if conf < conf_min:
+            continue
+        q_val = (t.get("value") or "").strip().lower()
+        if not q_val:
+            continue
+        if trait_key == "leaf_arrangement":
+            q_gid = LEAF_ARRANGEMENT_GROUP_IDS.get(q_val)
+            if not q_gid:
+                continue
+            plant_val = _get_plant_leaf_arrangement(payload)
+            if plant_val is None:
+                continue
+            plant_gid = LEAF_ARRANGEMENT_GROUP_IDS.get(plant_val)
+            if not plant_gid:
+                continue
+            if q_gid == plant_gid:
+                continue
+            penalties.append((rule["id"], penalty_val))
+        elif trait_key == "life_form":
+            q_group = LIFE_FORM_GROUPS.get(q_val)
+            if not q_group:
+                continue
+            plant_group = _get_plant_life_form_group(payload)
+            if plant_group is None:
+                continue
+            if q_val == plant_group:
+                continue
+            plant_zh = LIFE_FORM_GROUPS.get(plant_group, [])
+            if set(q_group) & set(plant_zh):
+                continue
+            penalties.append((rule["id"], penalty_val))
+    return sorted(penalties, key=lambda x: -x[1])[:MAX_SOFT_COUNT]
+
+
+def resolve_weights(weights):
+    if not weights:
+        return EMBEDDING_WEIGHT, FEATURE_WEIGHT
+
+    raw_embedding = weights.get("embedding")
+    raw_feature = weights.get("feature")
+
+    if isinstance(raw_embedding, (int, float)) and isinstance(raw_feature, (int, float)):
+        total = raw_embedding + raw_feature
+        if total > 0:
+            embedding = raw_embedding / total
+            feature = raw_feature / total
+            embedding = max(0.1, min(0.9, embedding))
+            feature = max(0.1, min(0.9, feature))
+            norm_total = embedding + feature
+            embedding /= norm_total
+            feature /= norm_total
+            return float(embedding), float(feature)
+
+    return EMBEDDING_WEIGHT, FEATURE_WEIGHT
+
+
+def hybrid_search(query: str, features: list = None, guess_names: list = None, top_k: int = 5, weights: dict | None = None, traits: dict | None = None):
     """
     混合搜尋：結合 embedding 相似度 + 特徵權重 + 關鍵字匹配
 
@@ -593,7 +734,10 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
     """
     features = features or []
     guess_names = guess_names or []
-    print(f"[API] hybrid_search 入參: query_len={len(query or '')}, features={len(features)}, guess_names={len(guess_names)}, top_k={top_k}")
+    weights = weights or {}
+    embedding_weight = weights.get("embedding", EMBEDDING_WEIGHT)
+    feature_weight = weights.get("feature", FEATURE_WEIGHT)
+    print(f"[API] hybrid_search 入參: query_len={len(query or '')}, features={len(features)}, guess_names={len(guess_names)}, top_k={top_k}, weights=E:{embedding_weight:.2f}/F:{feature_weight:.2f}")
     sys.stdout.flush()
 
     if qdrant_client is None:
@@ -842,7 +986,7 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         match_result = c["match_result"]
         
         # 基礎分數
-        base_score = (EMBEDDING_WEIGHT * embedding_score) + (FEATURE_WEIGHT * feature_score)
+        base_score = (embedding_weight * embedding_score) + (feature_weight * feature_score)
         
         # 增強分數
         enhancement = embedding_score * feature_score * 0.3
@@ -860,6 +1004,15 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             # 僅在分數較高時顯示日誌，避免刷屏
             if hybrid_score > 0.4:
                 print(f"[API] ⚠️ Must Gate 懲罰: {c['plant_name']} - 關鍵特徵不匹配，分數大幅降權 (x0.3)")
+
+        # SOFT 矛盾重罰：life_form / leaf_arrangement 不一致時扣分（取最嚴重 2 條）
+        if traits:
+            soft_penalties = compute_soft_contradiction_penalty(traits, r.payload)
+            if soft_penalties:
+                total_penalty = sum(p for _, p in soft_penalties)
+                hybrid_score = max(0.0, hybrid_score - total_penalty)
+                if hybrid_score > 0.2:
+                    print(f"[API] SOFT 矛盾懲罰: {c['plant_name']} - {[rid for rid, _ in soft_penalties]}, 共扣 {total_penalty:.2f}")
         
         # 確保分數不超過 1.0
         hybrid_score = min(1.0, hybrid_score)
@@ -1078,6 +1231,8 @@ class RequestHandler(BaseHTTPRequestHandler):
             features = data.get("features", []) or []
             guess_names = data.get("guess_names", []) or []
             top_k = data.get("top_k", 5)
+            requested_weights = data.get("weights")
+            embedding_weight, feature_weight = resolve_weights(requested_weights)
             print(f"[API] POST /hybrid-search 收到: query_len={len(query) if query else 0}, features={len(features)}, guess_names={len(guess_names)}, top_k={top_k}")
             sys.stdout.flush()
 
@@ -1093,11 +1248,17 @@ class RequestHandler(BaseHTTPRequestHandler):
                 feature_info = feature_calculator.calculate_feature_score(features)
 
             # 執行混合搜尋
+            traits = data.get("traits")
             results = hybrid_search(
                 query=query or " ".join(guess_names),
                 features=features,
                 guess_names=guess_names,
-                top_k=top_k
+                top_k=top_k,
+                weights={
+                    "embedding": embedding_weight,
+                    "feature": feature_weight
+                },
+                traits=traits
             )
 
             self._send_json({
@@ -1107,8 +1268,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 "feature_info": feature_info,
                 "results": results,
                 "weights": {
-                    "embedding": EMBEDDING_WEIGHT,
-                    "feature": FEATURE_WEIGHT
+                    "embedding": embedding_weight,
+                    "feature": feature_weight
                 }
             })
 

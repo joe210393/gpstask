@@ -104,7 +104,21 @@ function validateTraits(traits) {
   }
 
   // 定義有效的 trait keys（包含所有特徵）
-  const validTraits = [
+const KEY_TRAITS = ['leaf_arrangement', 'leaf_shape', 'inflorescence', 'leaf_type'];
+const SECONDARY_TRAITS = ['life_form', 'leaf_margin', 'flower_color'];
+const GENERIC_TRAITS = new Set([
+  'life_form',
+  'phenology',
+  'leaf_color',
+  'leaf_texture',
+  'stem_type',
+  'root_type',
+  'underground_stem',
+  'seed_type',
+  'seed_color',
+]);
+
+const validTraits = [
     'life_form',
     'phenology',
     'leaf_arrangement',
@@ -478,9 +492,67 @@ function traitsToFeatureList(traits) {
   return features;
 }
 
+function average(values) {
+  if (!values || values.length === 0) return 0;
+  const sum = values.reduce((acc, cur) => acc + cur, 0);
+  return sum / values.length;
+}
+
+function evaluateTraitQuality(traits) {
+  if (!traits || Object.keys(traits).length === 0) {
+    return {
+      quality: 0,
+      coverage: 0,
+      keyAverage: 0,
+      secondaryAverage: 0,
+      totalValidTraits: 0,
+      genericRatio: 1
+    };
+  }
+
+  const totalValidTraits = Object.keys(traits).length;
+  const coverage = Math.min(1, totalValidTraits / 6);
+
+  const getConfidence = (key) => {
+    if (!traits[key]) return 0;
+    return Math.max(0, Math.min(1, traits[key].confidence || 0));
+  };
+
+  const getEffectiveConfidence = (key) => {
+    if (key === 'flower_color' && traits[key]) {
+      const val = (traits[key].value || '').toString();
+      if (/種子|籽|葉/.test(val)) {
+        return 0;
+      }
+    }
+    return getConfidence(key);
+  };
+
+  const keyConfs = KEY_TRAITS.map(getEffectiveConfidence).filter(c => c > 0);
+  const secondaryConfs = SECONDARY_TRAITS.map(getEffectiveConfidence).filter(c => c > 0);
+
+  const keyAverage = average(keyConfs);
+  const secondaryAverage = average(secondaryConfs);
+
+  const quality = Math.max(0, Math.min(1, (0.55 * keyAverage) + (0.25 * secondaryAverage) + (0.20 * coverage)));
+
+  const genericCount = Object.keys(traits).filter(key => GENERIC_TRAITS.has(key)).length;
+  const genericRatio = totalValidTraits ? genericCount / totalValidTraits : 1;
+
+  return {
+    quality,
+    coverage,
+    keyAverage,
+    secondaryAverage,
+    totalValidTraits,
+    genericRatio
+  };
+}
+
 module.exports = {
   parseTraitsFromResponse,
   validateTraits,
   isPlantFromTraits,
-  traitsToFeatureList
+  traitsToFeatureList,
+  evaluateTraitQuality
 };

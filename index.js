@@ -23,6 +23,45 @@ const { URL } = require('url');
 // 預設 60 秒逾時，避免 Embedding API 連線失敗時無限等待
 const EMBEDDING_REQUEST_TIMEOUT_MS = parseInt(process.env.EMBEDDING_REQUEST_TIMEOUT_MS || '60000', 10);
 
+const DYNAMIC_WEIGHT_SEGMENTS = [
+  { threshold: 0.4, embedding: 0.75, feature: 0.25 },
+  { threshold: 0.6, embedding: 0.60, feature: 0.40 },
+  { threshold: 0.75, embedding: 0.45, feature: 0.55 },
+  { threshold: 1.01, embedding: 0.30, feature: 0.70 }
+];
+
+// Step 9: 學名／中文名對應表（LM 學名可匹配 RAG 中文）
+let _plantNameMapping = null;
+function getPlantNameMapping() {
+  if (_plantNameMapping) return _plantNameMapping;
+  try {
+    const mappingPath = path.join(__dirname, 'scripts', 'rag', 'data', 'plant-name-mapping.json');
+    if (fs.existsSync(mappingPath)) {
+      _plantNameMapping = JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
+      return _plantNameMapping;
+    }
+  } catch (e) {
+    console.warn('[RAG] 學名對應表載入失敗:', e.message);
+  }
+  _plantNameMapping = { allNames: {} };
+  return _plantNameMapping;
+}
+
+/** LM 名稱經對應表擴展後，是否與 RAG 植物匹配 */
+function isMatchViaPlantMapping(lmName, plant, allNames) {
+  if (!allNames || typeof allNames !== 'object') return false;
+  const expanded = allNames[lmName] || allNames[lmName.toLowerCase()] || [];
+  if (expanded.length === 0) return false;
+  const plantChinese = (plant.chinese_name || '').trim();
+  const plantScientific = (plant.scientific_name || '').trim();
+  return expanded.some(n => {
+    const nStr = String(n || '').trim();
+    if (!nStr || nStr.length < 2) return false;
+    if (/[\u4e00-\u9fff]/.test(nStr)) return plantChinese === nStr;
+    return plantScientific.toLowerCase() === nStr.toLowerCase();
+  });
+}
+
 function httpRequest(url, options = {}) {
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url);
@@ -136,12 +175,12 @@ async function smartSearch(query, topK = RAG_TOP_K) {
   }
 }
 
-async function hybridSearch({ query, features = [], guessNames = [], topK = RAG_TOP_K }) {
+async function hybridSearch({ query, features = [], guessNames = [], topK = RAG_TOP_K, weights = null, traits = null }) {
   try {
     const result = await httpRequest(`${EMBEDDING_API_URL}/hybrid-search`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: { query, features, guess_names: guessNames, top_k: topK }
+      body: { query, features, guess_names: guessNames, top_k: topK, weights, traits }
     });
     const data = result.data;
     if (data && data.error) {
@@ -179,6 +218,37 @@ function mergePlantResults(prePlants, newPlants, limit = RAG_TOP_K) {
     .slice(0, limit);
 }
 
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function determineDynamicWeights(traitQuality = {}) {
+  const q = traitQuality.quality ?? 0;
+  const genericRatio = traitQuality.genericRatio ?? 1;
+  let selected = DYNAMIC_WEIGHT_SEGMENTS.find(segment => q < segment.threshold);
+  if (!selected) {
+    selected = DYNAMIC_WEIGHT_SEGMENTS[DYNAMIC_WEIGHT_SEGMENTS.length - 1];
+  }
+  let embeddingWeight = selected.embedding;
+  let featureWeight = selected.feature;
+
+  if (typeof genericRatio === 'number' && genericRatio >= 0.6 && featureWeight > 0.55) {
+    featureWeight = 0.55;
+    embeddingWeight = 1 - featureWeight;
+  }
+
+  const total = embeddingWeight + featureWeight;
+  if (total !== 1) {
+    embeddingWeight = embeddingWeight / total;
+    featureWeight = featureWeight / total;
+  }
+
+  embeddingWeight = clamp(Number(embeddingWeight.toFixed(3)), 0.1, 0.9);
+  featureWeight = clamp(Number(featureWeight.toFixed(3)), 0.1, 0.9);
+
+  return { embedding: embeddingWeight, feature: featureWeight };
+}
+
 function parseVisionResponse(description) {
   // 簡單的解析邏輯（如果需要更複雜的解析，可以從 traits-parser 導入）
   try {
@@ -206,7 +276,7 @@ async function embeddingStats() {
     return { ok: false, error: e.message };
   }
 }
-const { parseTraitsFromResponse, isPlantFromTraits, traitsToFeatureList } = require('./scripts/rag/vectordb/traits-parser');
+const { parseTraitsFromResponse, isPlantFromTraits, traitsToFeatureList, evaluateTraitQuality } = require('./scripts/rag/vectordb/traits-parser');
 
 // 避免 Embedding API 暫時不可用時，前端不斷重送導致「看起來像無限循環」
 let _embeddingHealthCache = { ts: 0, ok: null, ready: null };
@@ -3613,6 +3683,10 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
               const features = traitsToFeatureList(traits);
               console.log(`📊 使用 traits 提取的特徵: ${features.join(', ')}`);
 
+              const traitQuality = evaluateTraitQuality(traits);
+              const dynamicWeights = determineDynamicWeights(traitQuality);
+              console.log(`[RAG] traits 品質: Q=${traitQuality.quality.toFixed(2)}, coverage=${traitQuality.coverage.toFixed(2)}, generic_ratio=${traitQuality.genericRatio?.toFixed(2) ?? 'n/a'}, wE=${dynamicWeights.embedding.toFixed(2)}, wF=${dynamicWeights.feature.toFixed(2)}`);
+
               // 🔥 關鍵修復：構建簡短的 query_text_zh（只用於 embedding）
               // 直接使用 traitsToFeatureList 轉換後的中文特徵，避免重複定義不完整的 Map
               let queryTextZh = '';
@@ -3657,8 +3731,15 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 query: queryTextZh,
                 features: features,
                 guessNames: guessNamesFromFirst,
-                topK: RAG_TOP_K
+                topK: RAG_TOP_K,
+                weights: dynamicWeights,
+                traits: traits
               });
+              if (hybridResult?.weights) {
+                const usedE = hybridResult.weights.embedding ?? dynamicWeights.embedding;
+                const usedF = hybridResult.weights.feature ?? dynamicWeights.feature;
+                console.log(`[RAG] 第二階段實際權重: E=${Number(usedE).toFixed(2)}, F=${Number(usedF).toFixed(2)}`);
+              }
 
               if (hybridResult.results?.length > 0) {
                 console.log(`✅ 第二階段 Traits-based 混合搜尋找到 ${hybridResult.results.length} 個結果`);
@@ -3751,7 +3832,8 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 query: detailedDescription, // 使用詳細描述，而不是猜測的名稱
                 features: visionParsed.plant.features || [],
                 guessNames: visionParsed.plant.guess_names || [],
-                topK: RAG_TOP_K
+                topK: RAG_TOP_K,
+                weights: determineDynamicWeights()
               });
 
               if (hybridResult.results?.length > 0) {
@@ -3952,6 +4034,8 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
       }
       
       // 檢查 RAG 結果中是否有匹配的植物
+      const nameMapping = getPlantNameMapping();
+      const allNames = nameMapping.allNames || {};
       if (lmPlantNames.length > 0) {
         for (const plant of plantResults.plants) {
           const plantNameLower = (plant.chinese_name || '').toLowerCase();
@@ -3959,22 +4043,20 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
           
           for (const lmName of lmPlantNames) {
             const lmNameLower = lmName.toLowerCase();
-            // 嚴格匹配：只有當名稱完全匹配或高度相似時才給予加成
-            // 避免「木麻黃」匹配到「錦帶花」這種錯誤情況
+            // 嚴格匹配：完全匹配或高度相似
             const isExactMatch = plantNameLower === lmNameLower || 
                                  scientificNameLower === lmNameLower ||
                                  (plantNameLower.includes(lmNameLower) && lmNameLower.length >= 3) ||
                                  (lmNameLower.includes(plantNameLower) && plantNameLower.length >= 3);
+            // Step 9: 學名/中文名對應表，LM 學名可匹配 RAG 中文
+            const isMatchViaMapping = isMatchViaPlantMapping(lmName, plant, allNames);
             
-            if (isExactMatch) {
-              // LM 提到的植物名稱與 RAG 結果匹配，給予信心度加成
-              // 使用更高的加成（0.4 = 40%），因為 LM 和 RAG 都正確識別了植物
-              // 這表示辨識結果非常可靠
-              lmConfidenceBoost = 0.4; // 加成 0.4（40%）
-              console.log(`✅ LM 與 RAG 匹配: LM提到「${lmName}」，RAG找到「${plant.chinese_name}」，給予信心度加成 ${(lmConfidenceBoost * 100).toFixed(0)}%`);
+            if (isExactMatch || isMatchViaMapping) {
+              lmConfidenceBoost = 0.4;
+              const via = isMatchViaMapping ? ' (經學名對應表)' : '';
+              console.log(`✅ LM 與 RAG 匹配: LM提到「${lmName}」，RAG找到「${plant.chinese_name}」${via}，給予信心度加成 ${(lmConfidenceBoost * 100).toFixed(0)}%`);
               break;
             } else {
-              // 記錄不匹配的情況，用於調試
               console.log(`⚠️ LM 提到「${lmName}」，但 RAG 找到「${plant.chinese_name}」，名稱不匹配，不給予加成`);
             }
           }

@@ -14,9 +14,11 @@
 | 4 | 移除 +0.15 gate，改合併打分 | ✅ 完成 | mergePlantResults 合併兩階段候選 |
 | 5 | 測試 10~15 筆驗證 | ✅ 完成 | 12 筆，見 RAG_TEST_CASES_RECORD.md 新一輪摘要 |
 | **5.5** | **hybrid 空陣列診斷與修正** | ✅ 完成 | 日誌、空 query 兜底、encode 失敗/0 候選時回傳與日誌 |
-| 6 | 動態權重（w_embed/w_feat + 動態 top_k） | 待進行 | 依 traits 品質 Q 調整 |
-| 7 | 矛盾重罰（先 penalty，不硬刪） | 待進行 | 規則表 + 懲罰倍率 |
-| 8 | Must Gate（少數高辨識力 trait） | 待進行 | 依 Step 7 效果再上 |
+| 6 | 動態權重（w_embed/w_feat + 動態 top_k） | ✅ 完成 | traits 品質 Q → 動態權重，傳入 hybrid-search |
+| 7 | 矛盾重罰（先 penalty，不硬刪） | ✅ 完成 | life_form / leaf_arrangement SOFT，取 top2 扣分 |
+| 8 | Must Gate（少數高辨識力 trait） | 暫緩 | **建議先測試 Step 6/7/9 後再評估** |
+| 9 | 學名／中文名對應表 | ✅ 完成 | LM 學名可匹配 RAG 中文，build 腳本 + index.js 載入 |
+| 10 | LM 加成條件收斂 | 暫緩 | **建議先測試 Step 6/7/9 後再評估** |
 
 ---
 
@@ -58,3 +60,19 @@
 - **補齊映射不需重新向量化**：只影響查詢端
 - **準確度優先**：速度優化延後
 - **每步獨立 commit**：便於回滾
+- **Step 8/10**：先完成 Step 6/7/9 測試，再依結果決定是否實作
+
+---
+
+## Zeabur Egress 優化建議
+
+若 egress 費用暴增（如一天 ~$20），可能原因與對策：
+
+| 原因 | 對策 |
+|------|------|
+| **線上向量化**（embed 腳本在 Zeabur 跑，反覆呼叫 Jina API） | 改為**本地向量化**：在本機跑 `embed_plants_forest_jina.py`，向量上傳到 Qdrant，Jina 流量不經 Zeabur |
+| **每次搜尋都呼叫 Jina**（hybrid-search / smartSearch） | 查詢 embedding 難以避免；可考慮對熱門 query 做 cache（Redis） |
+| **gpstask ↔ embedding 用公網 URL** | 確認 `EMBEDDING_API_URL` 使用 Zeabur 內部位址（如 `http://gpstask-ooffix:8080`），避免走公網 |
+| **Qdrant 在外部** | 若 Qdrant 與 embedding 都在 Zeabur，確保用內部連線 |
+
+**建議優先**：將向量化改到本機執行，完成後一次上傳到 Qdrant。
