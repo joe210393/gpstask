@@ -3651,6 +3651,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
               if (guessNamesFromFirst.length > 0) {
                 console.log(`[RAG] 第二階段使用第一階段候選: ${guessNamesFromFirst.join('、')}`);
               }
+              console.log(`[RAG] 第二階段請求: query=${queryTextZh.length}字 features=${features.length} guess_names=${guessNamesFromFirst.length} topK=${RAG_TOP_K}`);
 
               const hybridResult = await hybridSearch({
                 query: queryTextZh,
@@ -3699,7 +3700,10 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                   plantResults = newResults;
                 }
               } else {
-                console.log('⚠️ 第二階段搜尋無結果（API 回傳空陣列），檢查是否有第一階段結果');
+                const why = hybridResult.error
+                  ? `API 錯誤: ${hybridResult.error}`
+                  : (Array.isArray(hybridResult.results) ? `results.length=0` : 'results 未定義');
+                console.log(`⚠️ 第二階段搜尋無結果（${why}），檢查是否有第一階段結果`);
                 if (preSearchResults) {
                   console.log('✅ 回退使用第一階段 embedding 結果');
                   plantResults = preSearchResults;

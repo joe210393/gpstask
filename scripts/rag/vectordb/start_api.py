@@ -591,7 +591,14 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
     Returns:
         搜尋結果列表，包含混合分數
     """
+    features = features or []
+    guess_names = guess_names or []
+    print(f"[API] hybrid_search 入參: query_len={len(query or '')}, features={len(features)}, guess_names={len(guess_names)}, top_k={top_k}")
+    sys.stdout.flush()
+
     if qdrant_client is None:
+        print(f"[API] hybrid_search 跳過: Qdrant 未連線，回傳空結果")
+        sys.stdout.flush()
         return []  # Qdrant 未連線，返回空結果
 
     # 0. 如果有 guess_names，先進行關鍵字匹配（輔助提高辨識率）
@@ -632,8 +639,16 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
     # 🔥 關鍵修復：只使用簡短的 query_text_zh，絕對不要用整段分析文字
     # 如果 query 太長（>200 字），只取前 200 字
     # 如果 query 包含步驟文字（第一步、第二步...），只提取實際描述部分
-    search_query = query.strip()
-    
+    search_query = (query or "").strip()
+    if not search_query and guess_names:
+        search_query = " ".join(str(n).strip() for n in guess_names[:5] if n)
+    if not search_query and features:
+        search_query = " ".join(str(f).strip() for f in features[:15] if f)
+    if not search_query:
+        print(f"[API] hybrid_search 警告: query 為空且無 guess_names/features 可兜底，無法 embedding")
+        sys.stdout.flush()
+        return []
+
     # 移除步驟文字和不確定語句
     if "第一步" in search_query or "第二步" in search_query or "第三步" in search_query:
         # 嘗試提取實際描述部分（在 <analysis> 標籤內，或去除步驟文字）
@@ -661,7 +676,14 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             search_query = guess_text[:200]
 
     t0 = time.perf_counter()
-    query_vector = encode_text(search_query)
+    try:
+        query_vector = encode_text(search_query)
+    except Exception as e:
+        print(f"[API] ❌ hybrid_search encode_text 失敗: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.stdout.flush()
+        return []
     t1 = time.perf_counter()
     if not isinstance(query_vector, list):
         query_vector = query_vector.tolist()
@@ -681,6 +703,11 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         print(f"[API] ❌ hybrid_search Qdrant 查詢錯誤: {e}")
         import traceback
         traceback.print_exc()
+        sys.stdout.flush()
+        return []
+    
+    if not candidates:
+        print(f"[API] hybrid_search 空候選: Qdrant 回傳 0 筆 (query 前 50 字: {search_query[:50]!r})")
         sys.stdout.flush()
         return []
         
@@ -1041,11 +1068,15 @@ class RequestHandler(BaseHTTPRequestHandler):
         elif parsed.path == "/hybrid-search":
             # 混合搜尋：結合 embedding + 特徵權重
             query = data.get("query", "")
-            features = data.get("features", [])  # Vision AI 提取的特徵
-            guess_names = data.get("guess_names", [])  # Vision AI 猜測的名稱
+            features = data.get("features", []) or []
+            guess_names = data.get("guess_names", []) or []
             top_k = data.get("top_k", 5)
+            print(f"[API] POST /hybrid-search 收到: query_len={len(query) if query else 0}, features={len(features)}, guess_names={len(guess_names)}, top_k={top_k}")
+            sys.stdout.flush()
 
             if not query and not features and not guess_names:
+                print(f"[API] POST /hybrid-search 400: 缺少 query/features/guess_names (body keys: {list(data.keys())})")
+                sys.stdout.flush()
                 self._send_json({"error": "Missing 'query', 'features', or 'guess_names'"}, 400)
                 return
 
