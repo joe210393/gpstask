@@ -260,6 +260,8 @@ function parseVisionResponse(description) {
       return {
         success: true,
         intent: parsed.intent || 'unknown',
+        confidence: parsed.confidence,
+        short_caption: parsed.short_caption || parsed.shortCaption,
         plant: parsed.plant || {}
       };
     }
@@ -3812,9 +3814,84 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
               }
             }
           } else {
-            console.log('⚠️ 未提取到 traits JSON，跳過第二階段 traits-based 搜尋');
-            if (preSearchResults) {
-              plantResults = preSearchResults;
+            // traits JSON 抽取失敗：常見於 Vision Prompt 只輸出「router JSON」（intent/guess_names/features）
+            // 但這類 JSON 仍可用來做第二階段 hybrid-search（避免永遠只走 embedding）
+            console.log('⚠️ 未提取到 traits JSON，改用結構化 JSON 嘗試第二階段混合搜尋');
+
+            const visionParsed = parseVisionResponse(description);
+            const visionFeatures = Array.isArray(visionParsed?.plant?.features)
+              ? visionParsed.plant.features.filter(Boolean)
+              : [];
+            const visionGuessNames = Array.isArray(visionParsed?.plant?.guess_names)
+              ? visionParsed.plant.guess_names.filter(Boolean)
+              : [];
+
+            if (visionParsed.success && visionParsed.intent === 'plant' && (visionFeatures.length > 0 || visionGuessNames.length > 0)) {
+              // 沒有 traits 品質分數時，用 features 數量做一個保守估計，讓 hybrid 有機會拉開差距
+              const q = Math.min(1, Math.max(0, visionFeatures.length / 6));
+              const weights = determineDynamicWeights({ quality: q, genericRatio: 0.6 });
+              const queryForHybrid = visionParsed.short_caption || detailedDescription;
+
+              console.log(
+                `📊 結構化 JSON 混合搜尋: features=${visionFeatures.length}, guess_names=${visionGuessNames.length}, q≈${q.toFixed(2)}, wE=${weights.embedding.toFixed(2)}, wF=${weights.feature.toFixed(2)}`
+              );
+
+              const hybridResult = await hybridSearch({
+                query: queryForHybrid,
+                features: visionFeatures,
+                guessNames: visionGuessNames,
+                topK: RAG_TOP_K,
+                weights
+              });
+
+              if (hybridResult.results?.length > 0) {
+                console.log(`✅ 混合搜尋找到 ${hybridResult.results.length} 個結果（structured JSON）`);
+
+                const newResults = {
+                  is_plant: true,
+                  category: 'plant',
+                  search_type: 'hybrid_structured_json',
+                  vision_parsed: {
+                    intent: visionParsed.intent,
+                    confidence: visionParsed.confidence,
+                    short_caption: visionParsed.short_caption,
+                    features: visionFeatures,
+                    guess_names: visionGuessNames
+                  },
+                  feature_info: hybridResult.feature_info,
+                  plants: hybridResult.results.map(p => ({
+                    chinese_name: p.chinese_name,
+                    scientific_name: p.scientific_name,
+                    family: p.family,
+                    life_form: p.life_form,
+                    score: p.score,
+                    embedding_score: p.embedding_score,
+                    feature_score: p.feature_score,
+                    matched_features: p.matched_features,
+                    summary: p.summary
+                  }))
+                };
+
+                // 合併兩階段候選，依分數排序
+                if (preSearchResults && preSearchResults.is_plant && preSearchResults.plants && preSearchResults.plants.length > 0) {
+                  const merged = mergePlantResults(preSearchResults.plants, newResults.plants);
+                  console.log(`🔄 合併兩階段結果（structured JSON）: ${preSearchResults.plants.length} + ${newResults.plants.length} → ${merged.length} 筆`);
+                  plantResults = { ...newResults, plants: merged };
+                } else {
+                  plantResults = newResults;
+                }
+              } else {
+                const why = hybridResult?.error ? `API 錯誤: ${hybridResult.error}` : 'results.length=0';
+                console.log(`⚠️ 混合搜尋無結果（structured JSON, ${why}），回退使用第一階段 embedding`);
+                if (preSearchResults) {
+                  plantResults = preSearchResults;
+                }
+              }
+            } else {
+              console.log('⚠️ 結構化 JSON 不足以混合搜尋（缺少 features/guess_names），回退使用第一階段 embedding');
+              if (preSearchResults) {
+                plantResults = preSearchResults;
+              }
             }
           }
 
