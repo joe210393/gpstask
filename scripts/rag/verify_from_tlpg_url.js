@@ -114,7 +114,9 @@ function extractLmGuess(description) {
 const COMMON_NAME_SYNONYMS = [
   ['風鈴草', '風鈴花'],
   // 使用者回報：棕竹 = 棕樹（驗證視為同一類）
-  ['棕竹', '棕樹']
+  ['棕竹', '棕樹'],
+  // 紫花長穗木即長穗木（Stachytarpheta jamaicensis）的別名
+  ['長穗木', '紫花長穗木']
 ];
 
 function isMatch(expected, actual, scientificName) {
@@ -283,6 +285,10 @@ async function verifyOne(pageUrl, verbose = false) {
   const matched = top1 && isMatch(parsed.plantName, top1.chinese_name, top1.scientific_name);
   const top1Name = top1 ? `${top1.chinese_name || ''} (${top1.scientific_name || '無學名'})` : '無結果';
 
+  if (plants.length === 0) {
+    const msg = plantRag.message || (plantRag.is_plant === false ? '判斷非植物' : '未知');
+    console.log('  ⚠️ RAG 無結果:', msg);
+  }
   console.log('  RAG Top1:', top1Name);
   if (verbose) {
     const desc = data?.description;

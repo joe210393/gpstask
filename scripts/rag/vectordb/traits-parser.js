@@ -578,48 +578,86 @@ function evaluateTraitQuality(traits) {
 }
 
 /**
- * 當 traits JSON 解析失敗時，從 LM 描述文字擷取強特徵關鍵字
- * 目的：讓棕櫚/果實/花序等 case 仍能進 hybrid（否則會 fallback 到純 embedding）
+ * 從 LM 描述文字擷取強特徵關鍵字（keyword-assist）
+ * 目的：讓棕櫚/果實/花序等 case 進 hybrid，與 traits 合併後使用
+ * 規則：D1 強特徵優先、花序只留1個、fruit 需果 guard；D2 羽狀裂≠羽狀複葉
  * @param {string} description - Vision/LM 的完整描述
- * @returns {string[]} 特徵列表，若無匹配則返回空陣列
+ * @returns {string[]} 特徵列表
  */
 function extractFeaturesFromDescriptionKeywords(description) {
   if (!description || typeof description !== 'string') return [];
   const text = description;
   const features = [];
 
-  // 棕櫚/複葉相關（優先，區辨力高）
-  if (/棕櫚|扇形|羽片|叢生|棕櫚科|棕櫚幹/.test(text)) {
-    features.push('棕櫚');
-  }
-  if (/羽狀複葉|羽狀裂|羽狀/.test(text)) {
-    features.push('羽狀複葉');
-  }
-  if (/掌狀複葉|掌狀裂|掌狀深裂/.test(text)) {
-    features.push('掌狀複葉');
-  }
-  if (/二回羽狀/.test(text)) features.push('二回羽狀');
-  if (/三出複葉|三出/.test(text)) features.push('三出複葉');
+  // D2 避坑：羽狀裂、羽狀葉脈 為葉緣，不當羽狀複葉
+  const hasPinnatifid = /羽狀裂|羽狀葉脈/.test(text);
 
-  // 果實相關（火筒樹、西印度櫻桃、金露花等）
+  // A1 棕櫚/複葉（優先，依具體→泛用）
+  if (/棕櫚|扇形|羽片|棕櫚科|棕櫚幹/.test(text)) features.push('棕櫚');
+  if (/二回羽狀|二回複葉/.test(text)) features.push('二回羽狀');
+  else if (/三出複葉|三小葉|三出/.test(text)) features.push('三出複葉');
+  else if (/掌狀複葉|掌狀裂|掌狀深裂|小葉放射狀/.test(text)) features.push('掌狀複葉');
+  else if (!hasPinnatifid && /羽狀複葉|小葉成對排列|小葉密集排列|羽狀[^裂葉脈]/.test(text)) features.push('羽狀複葉');
+  else if (/複葉/.test(text)) features.push('複葉'); // D1: 有強複葉則上面已加，不會到這裡
+
+  // 扇形葉、扇狀葉 → 棕櫚（棕竹等）
+  if (/扇形葉|扇狀葉|扇形裂片/.test(text) && !features.includes('棕櫚')) features.push('棕櫚');
+
+  // A2 果實（fruit_color 需搭配 果/果實/結實/成熟）
+  const hasFruitContext = /果實|果\s|結實|成熟/.test(text);
   if (/漿果|多漿果/.test(text)) features.push('漿果');
-  if (/核果/.test(text)) features.push('核果');
-  if (/蒴果/.test(text)) features.push('蒴果');
-  // P2: 支援「橙紅色的果實」等（允許「的」在顏色與果實之間）
-  if (/(?:紅色|鮮紅|紫黑|深紅|橙紅)色的?果實|紅果|鮮紅色果|紫黑色果|橙紅色的果實|橙紅色果/.test(text) && !features.includes('漿果') && !features.includes('核果')) {
-    features.push('漿果'); // 紅/橙紅/紫黑果實多為漿果
+  else if (/核果/.test(text)) features.push('核果');
+  else if (/蒴果|朔果/.test(text)) features.push('蒴果'); // 朔果=錯字
+  else if (/翅果|具翅/.test(text)) features.push('翅果');
+  else if (hasFruitContext && /(?:紅色|鮮紅|紫黑|深紅|橙紅)[色的]*(?:果實|果)|紅果|橙紅色的果實|橙紅.*果實/.test(text) && !features.includes('漿果') && !features.includes('核果')) {
+    features.push('漿果');
   }
 
-  // 花序類型（P1-2：總狀 vs 圓錐 vs 聚繖，避免硬塞圓錐）
-  if (/穗狀花序|穗狀/.test(text)) features.push('穗狀花序');
-  if (/總狀花序|總狀/.test(text)) features.push('總狀花序');
-  if (/聚繖花序|聚繖|繖房花序|繖房/.test(text)) features.push('聚繖花序');
-  if (/頭狀花序|頭狀/.test(text)) features.push('頭狀花序');
-  if (/繖形花序|繖形/.test(text)) features.push('繖形花序');
+  // A3 花序：D1 只保留 1 個，優先序 繖房>聚繖>穗狀>繖形>頭狀>總狀>圓錐
+  if (/繖房花序|繖房/.test(text)) features.push('繖房花序');
+  else if (/聚繖花序|聚繖/.test(text)) features.push('聚繖花序');
+  else if (/穗狀花序|穗狀/.test(text)) features.push('穗狀花序');
+  else if (/繖形花序|傘形花序|繖狀/.test(text)) features.push('繖形花序');
+  else if (/頭狀花序|頭狀/.test(text)) features.push('頭狀花序');
+  else if (/總狀花序|總狀/.test(text)) features.push('總狀花序');
+  else if (/圓錐花序|圓錐/.test(text)) features.push('圓錐花序');
 
-  // 葉緣（鋸齒 vs 全緣 可拉開差距）
-  if (/鋸齒|鋸齒緣|粗鋸齒/.test(text)) features.push('鋸齒');
+  // B1 葉序（最多 1 個）
+  if (/輪生/.test(text)) features.push('輪生');
+  else if (/對生/.test(text)) features.push('對生');
+  else if (/互生/.test(text)) features.push('互生');
+  else if (/叢生|葉叢生/.test(text)) features.push('叢生');
 
+  // B2 葉緣
+  if (/鋸齒緣|鋸齒|粗鋸齒/.test(text)) features.push('鋸齒');
+  else if (/波狀緣|波狀/.test(text)) features.push('波狀');
+  else if (/全緣/.test(text)) features.push('全緣');
+
+  // B3 生活型（最多 1 個，低權重）
+  if (/藤本|攀緣|蔓性/.test(text)) features.push('藤本');
+  else if (/喬木/.test(text)) features.push('喬木');
+  else if (/灌木/.test(text)) features.push('灌木');
+  else if (/草本/.test(text)) features.push('草本');
+
+  // C1 刺/乳汁
+  if (/有刺|具刺|刺狀|刺多/.test(text)) features.push('有刺');
+  if (/乳汁|白色汁液/.test(text)) features.push('乳汁');
+
+  return features;
+}
+
+/**
+ * 合併後矛盾處理：有複葉特徵時移除單葉（避免 traits + keyword-assist 合併後衝突）
+ * @param {string[]} features
+ * @returns {string[]} 處理後的陣列（可為原地修改或新陣列）
+ */
+function removeCompoundSimpleContradiction(features) {
+  if (!Array.isArray(features)) return features;
+  const COMPOUND_TOKENS = ['羽狀複葉', '掌狀複葉', '二回羽狀', '三出複葉', '複葉'];
+  const hasCompound = COMPOUND_TOKENS.some((t) => features.includes(t));
+  if (hasCompound && features.includes('單葉')) {
+    return features.filter((f) => f !== '單葉');
+  }
   return features;
 }
 
@@ -629,5 +667,6 @@ module.exports = {
   isPlantFromTraits,
   traitsToFeatureList,
   evaluateTraitQuality,
-  extractFeaturesFromDescriptionKeywords
+  extractFeaturesFromDescriptionKeywords,
+  removeCompoundSimpleContradiction
 };

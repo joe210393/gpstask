@@ -282,7 +282,7 @@ async function embeddingStats() {
     return { ok: false, error: e.message };
   }
 }
-const { parseTraitsFromResponse, isPlantFromTraits, traitsToFeatureList, evaluateTraitQuality, extractFeaturesFromDescriptionKeywords } = require('./scripts/rag/vectordb/traits-parser');
+const { parseTraitsFromResponse, isPlantFromTraits, traitsToFeatureList, evaluateTraitQuality, extractFeaturesFromDescriptionKeywords, removeCompoundSimpleContradiction } = require('./scripts/rag/vectordb/traits-parser');
 
 // 避免 Embedding API 暫時不可用時，前端不斷重送導致「看起來像無限循環」
 let _embeddingHealthCache = { ts: 0, ok: null, ready: null };
@@ -3696,6 +3696,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                   console.log(`📊 keyword_assist 補強: +[${added.join(', ')}] → ${features.join(', ')}`);
                 }
               }
+              features = removeCompoundSimpleContradiction(features);
               console.log(`📊 使用 traits 提取的特徵: ${features.join(', ')}`);
 
               const traitQuality = evaluateTraitQuality(traits);
@@ -3883,6 +3884,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                   console.log(`📊 keyword_assist (structured): +[${added.join(', ')}]`);
                 }
               }
+              visionFeatures = removeCompoundSimpleContradiction(visionFeatures);
 
               if (visionParsed.success && visionParsed.intent === 'plant' && (visionFeatures.length > 0 || visionGuessNames.length > 0)) {
               // 沒有 traits 品質分數時，用 features 數量做一個保守估計，讓 hybrid 有機會拉開差距
