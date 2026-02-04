@@ -641,6 +641,7 @@ class FeatureWeightCalculator:
 # 目的：
 # - 讓模型「判定」與「回覆」一致（<analysis>/<reply>）
 # - 並穩定輸出 traits JSON，供後端 traits-parser/hybrid-search 使用
+# - 僅用於「植物辨識」路徑，不影響一般 chat-text API
 VISION_ROUTER_PROMPT = """你是一位專業的植物形態學家與生態研究員。
 
 **重要：你必須按照以下步驟進行分析，絕對不能跳過任何步驟！**
