@@ -1074,10 +1074,16 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         gate_triggered = query_has_palm_compound
         has_palm = _plant_has_palm_compound(r.payload)
         before_score = hybrid_score
-        # P1: 動態強度 - 強複葉(羽狀/掌狀/二回/三出)用 0.35，泛用用 0.6
+        # P1: 動態強度 - 羽狀複葉+棕櫚 用 0.25，其他強複葉 0.35，泛用 0.6
         STRONG_PALM_TOKENS = frozenset({"羽狀複葉", "掌狀複葉", "二回羽狀", "三出複葉"})
         has_strong = bool(features and any(f in STRONG_PALM_TOKENS for f in features))
-        gate_penalty = 0.35 if has_strong else 0.6
+        has_palm_in_query = bool(features and "棕櫚" in features)
+        if has_strong and has_palm_in_query:
+            gate_penalty = 0.25  # 黃椰子等：query 明確有羽狀複葉+棕櫚，非棕櫚候選重罰
+        elif has_strong:
+            gate_penalty = 0.35
+        else:
+            gate_penalty = 0.6
         if gate_triggered and not has_palm:
             hybrid_score *= gate_penalty
         if gate_triggered:

@@ -592,8 +592,8 @@ function extractFeaturesFromDescriptionKeywords(description) {
   // D2 避坑：羽狀裂、羽狀葉脈 為葉緣，不當羽狀複葉
   const hasPinnatifid = /羽狀裂|羽狀葉脈/.test(text);
 
-  // A1 棕櫚/複葉（優先，依具體→泛用）
-  if (/棕櫚|扇形|羽片|棕櫚科|棕櫚幹/.test(text)) features.push('棕櫚');
+  // A1 棕櫚/複葉（優先，依具體→泛用；棕櫚屬=棕櫚科）
+  if (/棕櫚|扇形|羽片|棕櫚科|棕櫚屬|棕櫚幹/.test(text)) features.push('棕櫚');
   if (/二回羽狀|二回複葉/.test(text)) features.push('二回羽狀');
   else if (/三出複葉|三小葉|三出/.test(text)) features.push('三出複葉');
   else if (/掌狀複葉|掌狀裂|掌狀深裂|小葉放射狀/.test(text)) features.push('掌狀複葉');
@@ -604,13 +604,16 @@ function extractFeaturesFromDescriptionKeywords(description) {
   if (/扇形葉|扇狀葉|扇形裂片/.test(text) && !features.includes('棕櫚')) features.push('棕櫚');
 
   // A2 果實（fruit_color 需搭配 果/果實/結實/成熟）
-  const hasFruitContext = /果實|果\s|結實|成熟/.test(text);
+  const hasFruitContext = /果實|結實|成熟|紅果|橙紅.*果/.test(text);
   if (/漿果|多漿果/.test(text)) features.push('漿果');
   else if (/核果/.test(text)) features.push('核果');
   else if (/蒴果|朔果/.test(text)) features.push('蒴果'); // 朔果=錯字
   else if (/翅果|具翅/.test(text)) features.push('翅果');
-  else if (hasFruitContext && /(?:紅色|鮮紅|紫黑|深紅|橙紅)[色的]*(?:果實|果)|紅果|橙紅色的果實|橙紅.*果實/.test(text) && !features.includes('漿果') && !features.includes('核果')) {
-    features.push('漿果');
+  else if (hasFruitContext && !features.includes('漿果') && !features.includes('核果')) {
+    // 果實...紅色 / 成熟...紅色 / 紅色...果實（雙向）均可觸發漿果
+    if (/(?:紅色|鮮紅|紫黑|深紅|橙紅)[色的]*(?:果實|果)|紅果|橙紅色的果實|橙紅.*果實/.test(text)) features.push('漿果');
+    else if (/(?:果實|果).*(?:紅色|鮮紅|橙紅|紫黑|鮮豔)/.test(text)) features.push('漿果');
+    else if (/成熟.*(?:紅色|鮮紅|橙紅|紫黑)|變成.*(?:紅色|鮮紅).*果/.test(text)) features.push('漿果');
   }
 
   // A3 花序：D1 只保留 1 個，優先序 繖房>聚繖>穗狀>繖形>頭狀>總狀>圓錐
@@ -647,6 +650,56 @@ function extractFeaturesFromDescriptionKeywords(description) {
 }
 
 /**
+ * 從 LM 描述擷取猜測植物名稱（可能是 A、B 或 C）
+ * 用於合併進 guess_names 以提升關鍵字匹配
+ * @param {string} description
+ * @returns {string[]}
+ */
+function extractGuessNamesFromDescription(description) {
+  if (!description || typeof description !== 'string') return [];
+  const names = [];
+  // 可能是 X、Y 或 Z / 初步猜測...可能是 X、Y / 推測為 X
+  const patterns = [
+    /可能(?:是|為)\s*([^。\n]+?)(?:\.|。|$)/g,
+    /初步猜測[^。]*?(?:可能)?(?:是|為)\s*([^。\n]+?)(?:\.|。|$)/g,
+    /推測[^。]*?(?:可能)?(?:是|為)\s*([^。\n]+?)(?:\.|。|$)/g,
+    /(?:很可能|或許)是\s*([^。\n、，]+)/g
+  ];
+  const seen = new Set();
+  for (const re of patterns) {
+    let m;
+    while ((m = re.exec(description)) !== null) {
+      const segment = m[1].trim();
+      if (!segment || segment.length < 2) continue;
+      for (const part of segment.split(/[、，或及與和]/)) {
+        let name = part.replace(/\s+/g, '').replace(/^某種?|的?品種?|的?一種?|一種?$/g, '').trim();
+        name = name.replace(/屬$|科$|的$|植物$/g, '').trim();
+        if (/科|的/.test(name)) name = name.split(/科|的/)[0].trim();
+        if (name.length >= 2 && name.length <= 12 && !seen.has(name)) {
+          seen.add(name);
+          names.push(name);
+        }
+      }
+    }
+  }
+  // LM 常見誤寫 → 正確學名/俗名（便於 keyword 匹配）
+  const LM_GUESS_SYNONYMS = {
+    '紫花蔓達': '紫花長穗木',
+    '金光藤': '紫花長穗木',
+    '金雀花': '小金雀花'  // 小金雀花 常被簡稱 金雀花
+  };
+  const expanded = [];
+  for (const n of names) {
+    expanded.push(n);
+    if (LM_GUESS_SYNONYMS[n] && !seen.has(LM_GUESS_SYNONYMS[n])) {
+      expanded.push(LM_GUESS_SYNONYMS[n]);
+      seen.add(LM_GUESS_SYNONYMS[n]);
+    }
+  }
+  return expanded.slice(0, 8);  // 最多 8 個
+}
+
+/**
  * 合併後矛盾處理：有複葉特徵時移除單葉（避免 traits + keyword-assist 合併後衝突）
  * @param {string[]} features
  * @returns {string[]} 處理後的陣列（可為原地修改或新陣列）
@@ -668,5 +721,6 @@ module.exports = {
   traitsToFeatureList,
   evaluateTraitQuality,
   extractFeaturesFromDescriptionKeywords,
+  extractGuessNamesFromDescription,
   removeCompoundSimpleContradiction
 };

@@ -282,7 +282,7 @@ async function embeddingStats() {
     return { ok: false, error: e.message };
   }
 }
-const { parseTraitsFromResponse, isPlantFromTraits, traitsToFeatureList, evaluateTraitQuality, extractFeaturesFromDescriptionKeywords, removeCompoundSimpleContradiction } = require('./scripts/rag/vectordb/traits-parser');
+const { parseTraitsFromResponse, isPlantFromTraits, traitsToFeatureList, evaluateTraitQuality, extractFeaturesFromDescriptionKeywords, extractGuessNamesFromDescription, removeCompoundSimpleContradiction } = require('./scripts/rag/vectordb/traits-parser');
 
 // 避免 Embedding API 暫時不可用時，前端不斷重送導致「看起來像無限循環」
 let _embeddingHealthCache = { ts: 0, ok: null, ready: null };
@@ -3738,15 +3738,20 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
               const guessNamesFromFirst = (preSearchResults?.plants || [])
                 .map(p => p.chinese_name || p.scientific_name)
                 .filter(Boolean);
-              if (guessNamesFromFirst.length > 0) {
-                console.log(`[RAG] 第二階段使用第一階段候選: ${guessNamesFromFirst.join('、')}`);
+              const guessFromLm = extractGuessNamesFromDescription(description);
+              const guessNames = [...new Set([...guessFromLm, ...guessNamesFromFirst])].slice(0, 12);
+              if (guessFromLm.length > 0) {
+                console.log(`[RAG] LM 猜名補強 guess_names: +[${guessFromLm.join(', ')}]`);
               }
-              console.log(`[RAG] 第二階段請求: query=${queryTextZh.length}字 features=${features.length} guess_names=${guessNamesFromFirst.length} topK=${RAG_TOP_K}`);
+              if (guessNames.length > 0) {
+                console.log(`[RAG] 第二階段 guess_names: ${guessNames.join('、')}`);
+              }
+              console.log(`[RAG] 第二階段請求: query=${queryTextZh.length}字 features=${features.length} guess_names=${guessNames.length} topK=${RAG_TOP_K}`);
 
               const hybridResult = await hybridSearch({
                 query: queryTextZh,
                 features: features,
-                guessNames: guessNamesFromFirst,
+                guessNames: guessNames,
                 topK: RAG_TOP_K,
                 weights: dynamicWeights,
                 traits: traits
@@ -3834,11 +3839,13 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
               const guessNamesFromFirst = preSearchResults.plants
                 .map(p => p.chinese_name || p.scientific_name)
                 .filter(Boolean);
+              const guessFromLm = extractGuessNamesFromDescription(description);
+              const guessNamesFallback = [...new Set([...guessFromLm, ...guessNamesFromFirst])].slice(0, 12);
               const queryTextZh = keywordFeatures.join('、') + '、' + (detailedDescription || '').substring(0, 80);
               const hybridResult = await hybridSearch({
                 query: queryTextZh.substring(0, 200),
                 features: keywordFeatures,
-                guessNames: guessNamesFromFirst,
+                guessNames: guessNamesFallback,
                 topK: RAG_TOP_K,
                 weights: determineDynamicWeights({ quality: 0.6, genericRatio: 0.3 })
               });
@@ -3872,9 +3879,14 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
               let visionFeatures = Array.isArray(visionParsed?.plant?.features)
                 ? visionParsed.plant.features.filter(Boolean)
                 : [];
-              const visionGuessNames = Array.isArray(visionParsed?.plant?.guess_names)
+              let visionGuessNames = Array.isArray(visionParsed?.plant?.guess_names)
                 ? visionParsed.plant.guess_names.filter(Boolean)
                 : [];
+              const guessFromLmAlt = extractGuessNamesFromDescription(description);
+              if (guessFromLmAlt.length > 0) {
+                visionGuessNames = [...new Set([...guessFromLmAlt, ...visionGuessNames])].slice(0, 12);
+                console.log(`[RAG] LM 猜名補強 (structured): +[${guessFromLmAlt.join(', ')}]`);
+              }
               // P1-1 關鍵字輔助：補強果實/花序
               const keywordAssistAlt = extractFeaturesFromDescriptionKeywords(description);
               if (keywordAssistAlt.length > 0) {
