@@ -7,7 +7,17 @@
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 VEC_DIR="$SCRIPT_DIR/vectordb"
+
+# 若有 .venv 則使用其 Python（確保使用已安裝 sentence_transformers 的環境）
+if [ -f "$PROJECT_ROOT/.venv/bin/python" ]; then
+  PYTHON="$PROJECT_ROOT/.venv/bin/python"
+elif [ -f "$PROJECT_ROOT/.venv/bin/python3" ]; then
+  PYTHON="$PROJECT_ROOT/.venv/bin/python3"
+else
+  PYTHON="python3"
+fi
 
 # 檢查環境變數
 export USE_JINA_API="${USE_JINA_API:-false}"
@@ -38,4 +48,4 @@ else
 fi
 echo ""
 echo "開始本機向量化..."
-python3 "$VEC_DIR/embed_plants_forest_jina.py"
+"$PYTHON" "$VEC_DIR/embed_plants_forest_jina.py"

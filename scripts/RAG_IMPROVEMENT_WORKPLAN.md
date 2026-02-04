@@ -19,6 +19,14 @@
 | 8 | Must Gate（少數高辨識力 trait） | 暫緩 | **建議先測試 Step 6/7/9 後再評估** |
 | 9 | 學名／中文名對應表 | ✅ 完成 | LM 學名可匹配 RAG 中文，build 腳本 + index.js 載入 |
 | 10 | LM 加成條件收斂 | 暫緩 | **建議先測試 Step 6/7/9 後再評估** |
+| **P0** | **資料清理：移除 XX屬／XX科** | ✅ 腳本完成 | clean_plant_data.js，見 P0_CLEAN_RUNBOOK.md |
+| **P3-2a** | **LM 加成僅對匹配候選** | ✅ 完成 | 棕竹案例：僅對名稱匹配的候選加成 |
+| **P3-2b** | **LM 加成門檻制** | ✅ 完成 | feature match≥2 才加成 |
+| **P2-ext** | **TraitsParser 映射補齊** | ✅ 完成 | lavender、prostrate、paniculate、terminal_paniculate、spring_flowering |
+| **Phase2** | **動態權重改版** | ✅ 完成 | Q 公式含 spec、新權重區間 |
+| **Phase2** | **Soft 矛盾擴充** | ✅ 完成 | leaf_type 複葉 vs 單葉 |
+
+**詳細規格**：見 `RAG_NEXT_OPTIMIZATION_STEPS.md`
 
 ---
 
@@ -28,6 +36,16 @@
 |------|------|----------|
 | **動態權重** | 依 traits 品質調整 embed/feature 權重，需定義品質門檻與權重區間 | Step 6 |
 | **矛盾規則具體化** | 定義哪些 trait 組合視為矛盾、規則列表與優先順序 | Step 7、8 |
+
+---
+
+## P0 資料清理（最高優先）
+
+**現象**：Top30 充斥「柃木屬」「柏科」「紅豆杉科」等無效資料，擠掉正確物種。
+
+**對策**：執行 `npm run clean:plant-data`，剔除 chinese_name 結尾為 屬、科、亞科、族、亞屬、綱、目 的紀錄。詳見 `scripts/rag/P0_CLEAN_RUNBOOK.md`。
+
+**驗收**：Top30 不得再出現 XX屬／XX科（0% 出現率）。
 
 ---
 

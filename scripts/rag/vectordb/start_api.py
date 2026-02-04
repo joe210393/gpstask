@@ -293,17 +293,19 @@ def _init_background_impl():
 
     # 5. 載入特徵資料
     import os.path
-    # 優先使用 final-4302 資料檔案（只包含已成功向量化的 4302 筆植物）
-    # 如果 final-4302 不存在，則使用 clean（向後兼容）
+    # P0.5 去重 > P0 clean > final-4302，與 embed 腳本一致
+    dedup_paths = [
+        "/app/data/plants-forest-gov-tw-dedup.jsonl",
+        os.path.join(os.path.dirname(__file__), "..", "data", "plants-forest-gov-tw-dedup.jsonl"),
+        os.path.join(os.path.dirname(__file__), "data", "plants-forest-gov-tw-dedup.jsonl"),
+    ]
     final_4302_paths = [
-        "/app/data/plants-forest-gov-tw-final-4302.jsonl",  # Docker 容器中的路徑（最高優先級）
+        "/app/data/plants-forest-gov-tw-final-4302.jsonl",
         os.path.join(os.path.dirname(__file__), "..", "data", "plants-forest-gov-tw-final-4302.jsonl"),
         os.path.join(os.path.dirname(__file__), "data", "plants-forest-gov-tw-final-4302.jsonl"),
     ]
-    
-    # 備用：clean 資料檔案（包含 morphology_summary_zh、trait_tokens 和正規化特徵）
     clean_paths = [
-        "/app/data/plants-forest-gov-tw-clean.jsonl",  # Docker 容器中的路徑
+        "/app/data/plants-forest-gov-tw-clean.jsonl",
         os.path.join(os.path.dirname(__file__), "..", "data", "plants-forest-gov-tw-clean.jsonl"),
         os.path.join(os.path.dirname(__file__), "data", "plants-forest-gov-tw-clean.jsonl"),
     ]
@@ -329,25 +331,30 @@ def _init_background_impl():
     ]
     
     data_path = None
-    # 先搜尋 final-4302 檔案（最高優先級，只包含已向量化的 4302 筆）
-    print(f"  搜尋 Final-4302 資料檔案（已向量化的 4302 筆植物）...")
-    for path in final_4302_paths:
-        exists = os.path.exists(path)
-        print(f"    檢查: {path} -> {'✅ 存在' if exists else '❌ 不存在'}")
+    # P0.5 去重 > P0 clean > final-4302
+    print(f"  搜尋資料檔案（P0.5 去重 > P0 clean > final-4302）...")
+    for p in dedup_paths:
+        exists = os.path.exists(p)
+        print(f"    檢查: {p} -> {'✅ 存在' if exists else '❌ 不存在'}")
         if exists:
-            data_path = path
-            print(f"    ✅ 找到 Final-4302 資料檔案: {path}")
+            data_path = p
+            print(f"    ✅ 找到 P0.5 去重後資料: {p}")
             break
-    
-    # 如果 final-4302 不存在，搜尋 clean 檔案（備用）
     if not data_path:
-        print(f"  搜尋 Clean 資料檔案...")
-        for path in clean_paths:
+        for p in clean_paths:
+            exists = os.path.exists(p)
+            print(f"    檢查: {p} -> {'✅ 存在' if exists else '❌ 不存在'}")
+            if exists:
+                data_path = p
+                print(f"    ✅ 找到 P0 清理後資料: {p}")
+                break
+    if not data_path:
+        for path in final_4302_paths:
             exists = os.path.exists(path)
             print(f"    檢查: {path} -> {'✅ 存在' if exists else '❌ 不存在'}")
             if exists:
                 data_path = path
-                print(f"    ✅ 找到 Clean 資料檔案: {path}")
+                print(f"    ✅ 找到 Final-4302 資料檔案: {path}")
                 break
     
     # 如果 clean 不存在，搜尋 enhanced 檔案
@@ -584,6 +591,7 @@ def search_plants(query: str, top_k: int = 5):
 SOFT_RULES = [
     {"id": "S1", "trait": "leaf_arrangement", "conf_min": 0.5, "penalty": 0.20},
     {"id": "S2", "trait": "life_form", "conf_min": 0.6, "penalty": 0.12},
+    {"id": "S3", "trait": "leaf_type", "conf_min": 0.7, "penalty": 0.25},
 ]
 MAX_SOFT_COUNT = 2
 
@@ -653,6 +661,20 @@ def _get_plant_life_form_group(payload):
     return None
 
 
+def _get_plant_leaf_type(payload):
+    """從 payload 推斷葉型：simple(單葉) 或 compound(複葉)。"""
+    raw = payload.get("raw_data") or {}
+    ident = raw.get("identification") or {}
+    kf = ident.get("key_features") or []
+    kf_norm = ident.get("key_features_norm") or []
+    text = " ".join(_to_str(x) for x in kf + kf_norm)
+    if any(x in text for x in ["羽狀複葉", "掌狀複葉", "掌狀", "三出複", "複葉"]):
+        return "compound"
+    if any(x in text for x in ["單葉"]):
+        return "simple"
+    return None
+
+
 def compute_soft_contradiction_penalty(traits, payload):
     if not traits or not isinstance(traits, dict):
         return []
@@ -694,6 +716,15 @@ def compute_soft_contradiction_penalty(traits, payload):
                 continue
             plant_zh = LIFE_FORM_GROUPS.get(plant_group, [])
             if set(q_group) & set(plant_zh):
+                continue
+            penalties.append((rule["id"], penalty_val))
+        elif trait_key == "leaf_type":
+            plant_lt = _get_plant_leaf_type(payload)
+            if plant_lt is None:
+                continue
+            q_compound = q_val in ("compound", "pinnate", "pinnately_compound", "palmate", "trifoliate")
+            plant_compound = plant_lt == "compound"
+            if q_compound == plant_compound:
                 continue
             penalties.append((rule["id"], penalty_val))
     return sorted(penalties, key=lambda x: -x[1])[:MAX_SOFT_COUNT]

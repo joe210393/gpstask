@@ -262,6 +262,7 @@ function traitsToFeatureList(traits) {
     
     // phenology
     'annual': '一年生',
+    'spring_flowering': '春華',
     'biennial': '二年生',
     'perennial': '多年生',
     'annual_perennial': '一年生或多年生',  // 新增
@@ -324,8 +325,10 @@ function traitsToFeatureList(traits) {
     
     // inflorescence
     'raceme': '總狀花序',
-    'racemose': '總狀花序',     // Vision 可能輸出 racemose
+    'racemose': '總狀花序',
     'panicle': '圓錐花序',
+    'paniculate': '圓錐花序',
+    'terminal_paniculate': '頂生圓錐花序',
     'corymb_cyme': '聚繖花序',
     'corymb': '繖房花序',
     'cyme': '聚繖花序',
@@ -342,6 +345,7 @@ function traitsToFeatureList(traits) {
     
     // flower_color (支援單一值和複數值)
     'white': '白花',
+    'lavender': '淡紫色',
     'yellow': '黃花',
     'red': '紅花',
     'purple': '紫花',
@@ -402,6 +406,7 @@ function traitsToFeatureList(traits) {
     'succulent': '肉質莖',
     'climbing': '攀緣莖',
     'creeping': '匍匐莖',
+    'prostrate': '匍匐',
     'erect': '直立莖',
     
     // underground_stem
@@ -490,6 +495,12 @@ function average(values) {
   return sum / values.length;
 }
 
+/** 高頻、低區辨力的中文特徵（value 層級） */
+const GENERIC_VALUES = new Set([
+  '互生', '對生', '喬木', '灌木', '草本', '全緣', '鋸齒', '卵形', '橢圓形', '披針形',
+  '常綠', '落葉', '革質', '光滑', '無毛', '木質莖', '草質莖', '基生', '輪生', '叢生', '簇生'
+]);
+
 function evaluateTraitQuality(traits) {
   if (!traits || Object.keys(traits).length === 0) {
     return {
@@ -513,23 +524,24 @@ function evaluateTraitQuality(traits) {
   const getEffectiveConfidence = (key) => {
     if (key === 'flower_color' && traits[key]) {
       const val = (traits[key].value || '').toString();
-      if (/種子|籽|葉/.test(val)) {
-        return 0;
-      }
+      if (/種子|籽|葉/.test(val)) return 0;
     }
     return getConfidence(key);
   };
 
   const keyConfs = KEY_TRAITS.map(getEffectiveConfidence).filter(c => c > 0);
   const secondaryConfs = SECONDARY_TRAITS.map(getEffectiveConfidence).filter(c => c > 0);
-
   const keyAverage = average(keyConfs);
   const secondaryAverage = average(secondaryConfs);
+  const avgConf = keyConfs.length > 0 ? keyAverage : secondaryAverage;
 
-  const quality = Math.max(0, Math.min(1, (0.55 * keyAverage) + (0.25 * secondaryAverage) + (0.20 * coverage)));
+  const features = traitsToFeatureList(traits);
+  const genericCount = features.filter((f) => GENERIC_VALUES.has(f)).length;
+  const genericRatio = features.length > 0 ? genericCount / features.length : 1;
 
-  const genericCount = Object.keys(traits).filter(key => GENERIC_TRAITS.has(key)).length;
-  const genericRatio = totalValidTraits ? genericCount / totalValidTraits : 1;
+  const conf = Math.max(0, Math.min(1, (avgConf - 0.45) / 0.35));
+  const spec = 1 - Math.max(0, Math.min(1, (genericRatio - 0.4) / 0.5));
+  const quality = Math.max(0, Math.min(1, 0.4 * coverage + 0.4 * conf + 0.2 * spec));
 
   return {
     quality,

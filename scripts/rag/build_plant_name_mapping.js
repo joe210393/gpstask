@@ -13,7 +13,11 @@
 const fs = require('fs');
 const path = require('path');
 
-const JSONL_PATH = path.join(__dirname, 'data', 'plants-forest-gov-tw-final-4302.jsonl');
+// P0.5 去重 > P0 clean > final-4302，與 embed 腳本一致
+const DEDUP_PATH = path.join(__dirname, 'data', 'plants-forest-gov-tw-dedup.jsonl');
+const CLEAN_PATH = path.join(__dirname, 'data', 'plants-forest-gov-tw-clean.jsonl');
+const FINAL_PATH = path.join(__dirname, 'data', 'plants-forest-gov-tw-final-4302.jsonl');
+const JSONL_PATH = fs.existsSync(DEDUP_PATH) ? DEDUP_PATH : (fs.existsSync(CLEAN_PATH) ? CLEAN_PATH : FINAL_PATH);
 const OUTPUT_PATH = path.join(__dirname, 'data', 'plant-name-mapping.json');
 
 function normalizeScientific(s) {
@@ -77,12 +81,13 @@ for (const line of lines) {
   }
 }
 
+const sourceName = path.basename(JSONL_PATH);
 const output = {
   byScientific,
   byChinese,
   allNames,
-  meta: { generatedAt: new Date().toISOString(), source: 'plants-forest-gov-tw-final-4302.jsonl', count: lines.length }
+  meta: { generatedAt: new Date().toISOString(), source: sourceName, count: lines.length }
 };
 
 fs.writeFileSync(OUTPUT_PATH, JSON.stringify(output, null, 2), 'utf8');
-console.log(`✅ 已生成 ${OUTPUT_PATH}，共 ${Object.keys(byScientific).length} 學名、${Object.keys(byChinese).length} 中文名`);
+console.log(`✅ 已生成 ${OUTPUT_PATH}（來源: ${sourceName}），共 ${Object.keys(byScientific).length} 學名、${Object.keys(byChinese).length} 中文名`);

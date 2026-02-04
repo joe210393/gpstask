@@ -23,10 +23,11 @@ const { URL } = require('url');
 // 預設 60 秒逾時，避免 Embedding API 連線失敗時無限等待
 const EMBEDDING_REQUEST_TIMEOUT_MS = parseInt(process.env.EMBEDDING_REQUEST_TIMEOUT_MS || '60000', 10);
 
+// 動態權重區間（Q 越低越依賴 embedding，避免爛 traits 亂帶）
 const DYNAMIC_WEIGHT_SEGMENTS = [
-  { threshold: 0.4, embedding: 0.75, feature: 0.25 },
-  { threshold: 0.6, embedding: 0.60, feature: 0.40 },
-  { threshold: 0.75, embedding: 0.45, feature: 0.55 },
+  { threshold: 0.30, embedding: 0.90, feature: 0.10 },
+  { threshold: 0.55, embedding: 0.70, feature: 0.30 },
+  { threshold: 0.75, embedding: 0.50, feature: 0.50 },
   { threshold: 1.01, embedding: 0.30, feature: 0.70 }
 ];
 
@@ -4033,66 +4034,61 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
         }
       }
       
-      // 檢查 RAG 結果中是否有匹配的植物
+      // P3-2a/2b: LM 加成僅對「名稱匹配」的候選，且須 feature match >= 2 才加成
       const nameMapping = getPlantNameMapping();
       const allNames = nameMapping.allNames || {};
+      const LM_BOOST = 0.4;
+      const LM_FEATURE_MATCH_THRESHOLD = 2;
+
+      const matchingPlantIndices = new Set();
       if (lmPlantNames.length > 0) {
-        for (const plant of plantResults.plants) {
+        for (let i = 0; i < plantResults.plants.length; i++) {
+          const plant = plantResults.plants[i];
           const plantNameLower = (plant.chinese_name || '').toLowerCase();
           const scientificNameLower = (plant.scientific_name || '').toLowerCase();
-          
+
           for (const lmName of lmPlantNames) {
             const lmNameLower = lmName.toLowerCase();
-            // 嚴格匹配：完全匹配或高度相似
-            const isExactMatch = plantNameLower === lmNameLower || 
-                                 scientificNameLower === lmNameLower ||
-                                 (plantNameLower.includes(lmNameLower) && lmNameLower.length >= 3) ||
-                                 (lmNameLower.includes(plantNameLower) && plantNameLower.length >= 3);
-            // Step 9: 學名/中文名對應表，LM 學名可匹配 RAG 中文
+            const isExactMatch = plantNameLower === lmNameLower ||
+              scientificNameLower === lmNameLower ||
+              (plantNameLower.includes(lmNameLower) && lmNameLower.length >= 3) ||
+              (lmNameLower.includes(plantNameLower) && plantNameLower.length >= 3);
             const isMatchViaMapping = isMatchViaPlantMapping(lmName, plant, allNames);
-            
+
             if (isExactMatch || isMatchViaMapping) {
-              lmConfidenceBoost = 0.4;
-              const via = isMatchViaMapping ? ' (經學名對應表)' : '';
-              console.log(`✅ LM 與 RAG 匹配: LM提到「${lmName}」，RAG找到「${plant.chinese_name}」${via}，給予信心度加成 ${(lmConfidenceBoost * 100).toFixed(0)}%`);
+              const matchedCount = (plant.matched_features || []).length;
+              const passesThreshold = matchedCount >= LM_FEATURE_MATCH_THRESHOLD;
+              if (passesThreshold) {
+                matchingPlantIndices.add(i);
+                const via = isMatchViaMapping ? ' (經學名對應表)' : '';
+                console.log(`✅ LM 與 RAG 匹配: LM提到「${lmName}」，RAG找到「${plant.chinese_name}」${via}，feature 匹配=${matchedCount}，給予加成`);
+              } else {
+                console.log(`⚠️ LM 提到「${lmName}」且 RAG 找到「${plant.chinese_name}」，但 feature 匹配=${matchedCount} < ${LM_FEATURE_MATCH_THRESHOLD}，不給予加成`);
+              }
               break;
-            } else {
-              console.log(`⚠️ LM 提到「${lmName}」，但 RAG 找到「${plant.chinese_name}」，名稱不匹配，不給予加成`);
             }
           }
-          if (lmConfidenceBoost > 0) break;
         }
       }
-    }
-    
-    // 將 LM 信心度加成加入 plantResults
-    // 重要：只有在原始分數足夠高時（>= 0.5），才應用 LM 加成
-    // 避免低分數的結果因為 LM 匹配而被過度提升
-    if (lmConfidenceBoost > 0 && plantResults && plantResults.plants) {
-      const topScore = plantResults.plants[0]?.score || 0;
-      
-      // 只有當最高分數 >= 0.5 時，才應用 LM 加成
-      // 這可以避免低分數結果（例如 0.41）被過度提升，超過高分數結果（例如 0.72）
-      if (topScore >= 0.5) {
-        plantResults.lm_confidence_boost = lmConfidenceBoost;
-        // 對每個植物結果加上加成
-        // 使用混合方式：加法 + 乘法，但限制調整幅度，保留分數差異
-        // 公式：adjusted_score = min(1.0, score + boost * (1 - score) * 0.5)
-        // 這樣可以提升分數，但不會讓所有分數都變成 100%，保留相對差異
-        plantResults.plants = plantResults.plants.map(p => {
-          // 使用漸進式加成：高分數的植物獲得較少加成，低分數的植物獲得較多加成
-          // 但總加成不會超過原始分數的 50%，避免過度調整
-          const maxBoost = p.score * 0.5; // 最多加成原始分數的 50%
-          const actualBoost = Math.min(lmConfidenceBoost, maxBoost);
-          const adjusted = Math.min(1.0, p.score + actualBoost);
-          console.log(`📊 分數調整: 原始=${(p.score * 100).toFixed(1)}%, 加成=${(actualBoost * 100).toFixed(1)}%, 調整後=${(adjusted * 100).toFixed(1)}%`);
-          return {
-            ...p,
-            adjusted_score: adjusted
-          };
-        });
-      } else {
-        console.log(`⚠️ 最高分數 ${(topScore * 100).toFixed(1)}% < 50%，跳過 LM 加成，避免低分數結果被過度提升`);
+
+      // 僅對匹配候選加成
+      if (matchingPlantIndices.size > 0 && plantResults.plants) {
+        const topScore = plantResults.plants[0]?.score || 0;
+        if (topScore >= 0.5) {
+          plantResults.lm_confidence_boost = LM_BOOST;
+          plantResults.plants = plantResults.plants.map((p, i) => {
+            if (!matchingPlantIndices.has(i)) {
+              return { ...p, adjusted_score: p.score };
+            }
+            const maxBoost = p.score * 0.5;
+            const actualBoost = Math.min(LM_BOOST, maxBoost);
+            const adjusted = Math.min(1.0, p.score + actualBoost);
+            console.log(`📊 分數調整: ${p.chinese_name} 原始=${(p.score * 100).toFixed(1)}%, 加成=${(actualBoost * 100).toFixed(1)}%, 調整後=${(adjusted * 100).toFixed(1)}%`);
+            return { ...p, adjusted_score: adjusted };
+          });
+        } else {
+          console.log(`⚠️ 最高分數 ${(topScore * 100).toFixed(1)}% < 50%，跳過 LM 加成`);
+        }
       }
     }
 

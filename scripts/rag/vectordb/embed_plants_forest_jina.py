@@ -62,16 +62,25 @@ BATCH_SIZE = 16  # 每批處理的資料數量（降低以避免速率限制：�
 
 # 資料路徑
 SCRIPT_DIR = Path(__file__).parent
-# 只使用 final-4302（已向量化的 4302 筆植物，與 Qdrant 一致）
-FINAL_4302_FILE = SCRIPT_DIR.parent / "data" / "plants-forest-gov-tw-final-4302.jsonl"
-DATA_FILE = SCRIPT_DIR.parent / "data" / "plants-forest-gov-tw-final-4302.jsonl"
+DATA_DIR = SCRIPT_DIR.parent / "data"
+# P0.5 去重 > P0 clean > final-4302
+DEDUP_FILE = DATA_DIR / "plants-forest-gov-tw-dedup.jsonl"
+CLEAN_FILE = DATA_DIR / "plants-forest-gov-tw-clean.jsonl"
+FINAL_4302_FILE = DATA_DIR / "plants-forest-gov-tw-final-4302.jsonl"
 PROGRESS_FILE = SCRIPT_DIR / "embed_plants_forest_jina_progress.json"
 
-if FINAL_4302_FILE.exists():
+if DEDUP_FILE.exists():
+    DATA_FILE = DEDUP_FILE
+    print(f"✅ 使用 P0.5 去重後資料: {DATA_FILE}")
+elif CLEAN_FILE.exists():
+    DATA_FILE = CLEAN_FILE
+    print(f"✅ 使用 P0 清理後資料: {DATA_FILE}")
+elif FINAL_4302_FILE.exists():
     DATA_FILE = FINAL_4302_FILE
     print(f"✅ 使用 Final-4302 資料檔案: {DATA_FILE}")
 else:
-    print(f"❌ 資料檔案不存在: {FINAL_4302_FILE}")
+    DATA_FILE = FINAL_4302_FILE  # 會在下文檢查時失敗
+    print(f"❌ 資料檔案不存在，請先執行 dedup 或 clean 或確認 final-4302: {FINAL_4302_FILE}")
 
 
 def get_qdrant_client():
@@ -343,24 +352,33 @@ def load_plants() -> List[Dict[str, Any]]:
     return plants
 
 
+FORCE_RECREATE = os.environ.get("FORCE_RECREATE", "").lower() in ("1", "true", "yes")
+
+
 def init_qdrant(client: QdrantClient):
     """初始化 Qdrant collection"""
     collections = client.get_collections().collections
     collection_names = [c.name for c in collections]
 
     if COLLECTION_NAME in collection_names:
-        # 檢查現有 collection 的維度
-        existing_collection = client.get_collection(COLLECTION_NAME)
-        existing_dim = existing_collection.config.params.vectors.size
-        
-        if existing_dim != EMBEDDING_DIM:
-            print(f"⚠️  Collection {COLLECTION_NAME} 已存在，但維度不匹配（現有: {existing_dim}, 需要: {EMBEDDING_DIM}）")
-            print(f"   刪除舊 collection 並重新建立...")
+        # P0 整庫重建：FORCE_RECREATE=1 時刪除舊 collection
+        if FORCE_RECREATE:
+            print(f"⚠️  FORCE_RECREATE=1，刪除舊 collection 並重建...")
             client.delete_collection(collection_name=COLLECTION_NAME)
             print(f"   ✅ 舊 collection 已刪除")
         else:
-            print(f"✅ Collection {COLLECTION_NAME} 已存在（維度: {EMBEDDING_DIM}）")
-            return
+            # 檢查現有 collection 的維度
+            existing_collection = client.get_collection(COLLECTION_NAME)
+            existing_dim = existing_collection.config.params.vectors.size
+
+            if existing_dim != EMBEDDING_DIM:
+                print(f"⚠️  Collection {COLLECTION_NAME} 已存在，但維度不匹配（現有: {existing_dim}, 需要: {EMBEDDING_DIM}）")
+                print(f"   刪除舊 collection 並重新建立...")
+                client.delete_collection(collection_name=COLLECTION_NAME)
+                print(f"   ✅ 舊 collection 已刪除")
+            else:
+                print(f"✅ Collection {COLLECTION_NAME} 已存在（維度: {EMBEDDING_DIM}）")
+                return
 
     # 建立新的 collection
     print(f"建立 collection: {COLLECTION_NAME}（維度: {EMBEDDING_DIM}）")
