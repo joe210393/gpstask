@@ -77,7 +77,10 @@ function httpRequest(url, options = {}) {
         'utf8'
       );
     }
-    const headers = { ...options.headers };
+    const headers = {
+      'User-Agent': 'GPS-Task-Embedding-Client/1.0',
+      ...options.headers
+    };
     if (bodyBuffer) {
       headers['Content-Length'] = bodyBuffer.length;
       if (!headers['Content-Type']) headers['Content-Type'] = 'application/json';
@@ -279,7 +282,7 @@ async function embeddingStats() {
     return { ok: false, error: e.message };
   }
 }
-const { parseTraitsFromResponse, isPlantFromTraits, traitsToFeatureList, evaluateTraitQuality } = require('./scripts/rag/vectordb/traits-parser');
+const { parseTraitsFromResponse, isPlantFromTraits, traitsToFeatureList, evaluateTraitQuality, extractFeaturesFromDescriptionKeywords } = require('./scripts/rag/vectordb/traits-parser');
 
 // 避免 Embedding API 暫時不可用時，前端不斷重送導致「看起來像無限循環」
 let _embeddingHealthCache = { ts: 0, ok: null, ready: null };
@@ -3814,19 +3817,56 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
               }
             }
           } else {
-            // traits JSON 抽取失敗：常見於 Vision Prompt 只輸出「router JSON」（intent/guess_names/features）
-            // 但這類 JSON 仍可用來做第二階段 hybrid-search（避免永遠只走 embedding）
-            console.log('⚠️ 未提取到 traits JSON，改用結構化 JSON 嘗試第二階段混合搜尋');
+            // traits JSON 抽取失敗：先嘗試從 LM 描述擷取棕櫚/複葉關鍵字（P0：讓棕櫚類進 hybrid）
+            const keywordFeatures = extractFeaturesFromDescriptionKeywords(description);
+            if (keywordFeatures.length > 0 && preSearchResults?.plants?.length > 0) {
+              console.log(`[RAG] P0 fallback: 從描述擷取特徵 [${keywordFeatures.join(', ')}]，進入 hybrid`);
+              const guessNamesFromFirst = preSearchResults.plants
+                .map(p => p.chinese_name || p.scientific_name)
+                .filter(Boolean);
+              const queryTextZh = keywordFeatures.join('、') + '、' + (detailedDescription || '').substring(0, 80);
+              const hybridResult = await hybridSearch({
+                query: queryTextZh.substring(0, 200),
+                features: keywordFeatures,
+                guessNames: guessNamesFromFirst,
+                topK: RAG_TOP_K,
+                weights: determineDynamicWeights({ quality: 0.6, genericRatio: 0.3 })
+              });
+              if (hybridResult?.results?.length > 0) {
+                console.log(`✅ 混合搜尋找到 ${hybridResult.results.length} 個結果（keyword fallback）`);
+                const newResults = {
+                  is_plant: true,
+                  category: 'plant',
+                  search_type: 'hybrid_traits',
+                  plants: hybridResult.results.map(p => ({
+                    chinese_name: p.chinese_name,
+                    scientific_name: p.scientific_name,
+                    family: p.family,
+                    life_form: p.life_form,
+                    score: p.score,
+                    embedding_score: p.embedding_score,
+                    feature_score: p.feature_score,
+                    matched_features: p.matched_features,
+                    summary: p.summary
+                  }))
+                };
+                const merged = mergePlantResults(preSearchResults.plants, newResults.plants);
+                plantResults = { ...newResults, plants: merged };
+              }
+            }
 
-            const visionParsed = parseVisionResponse(description);
-            const visionFeatures = Array.isArray(visionParsed?.plant?.features)
-              ? visionParsed.plant.features.filter(Boolean)
-              : [];
-            const visionGuessNames = Array.isArray(visionParsed?.plant?.guess_names)
-              ? visionParsed.plant.guess_names.filter(Boolean)
-              : [];
+            if (!plantResults) {
+              // 結構化 JSON 路徑
+              console.log('⚠️ 未提取到 traits JSON，改用結構化 JSON 嘗試第二階段混合搜尋');
+              const visionParsed = parseVisionResponse(description);
+              const visionFeatures = Array.isArray(visionParsed?.plant?.features)
+                ? visionParsed.plant.features.filter(Boolean)
+                : [];
+              const visionGuessNames = Array.isArray(visionParsed?.plant?.guess_names)
+                ? visionParsed.plant.guess_names.filter(Boolean)
+                : [];
 
-            if (visionParsed.success && visionParsed.intent === 'plant' && (visionFeatures.length > 0 || visionGuessNames.length > 0)) {
+              if (visionParsed.success && visionParsed.intent === 'plant' && (visionFeatures.length > 0 || visionGuessNames.length > 0)) {
               // 沒有 traits 品質分數時，用 features 數量做一個保守估計，讓 hybrid 有機會拉開差距
               const q = Math.min(1, Math.max(0, visionFeatures.length / 6));
               const weights = determineDynamicWeights({ quality: q, genericRatio: 0.6 });
@@ -3887,10 +3927,11 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                   plantResults = preSearchResults;
                 }
               }
-            } else {
-              console.log('⚠️ 結構化 JSON 不足以混合搜尋（缺少 features/guess_names），回退使用第一階段 embedding');
-              if (preSearchResults) {
-                plantResults = preSearchResults;
+              } else {
+                console.log('⚠️ 結構化 JSON 不足以混合搜尋（缺少 features/guess_names），回退使用第一階段 embedding');
+                if (preSearchResults) {
+                  plantResults = preSearchResults;
+                }
               }
             }
           }

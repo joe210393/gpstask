@@ -176,20 +176,27 @@ function isPlantFromTraits(traits) {
     };
   }
 
-  // 關鍵特徵（高權重）
-  const keyTraits = ['leaf_arrangement', 'leaf_shape', 'inflorescence'];
-  
+  // 關鍵特徵（高權重）：leaf_type 納入以支援棕櫚/複葉類
+  const keyTraits = ['leaf_arrangement', 'leaf_shape', 'inflorescence', 'leaf_type'];
+
   // 次要特徵（中等權重）
   const secondaryTraits = ['life_form', 'leaf_margin', 'flower_color'];
-  
+
+  // leaf_type 複葉相關值（棕櫚/羽狀/掌狀等，強植物指標）
+  const COMPOUND_LEAF_VALUES = new Set(['compound', 'pinnate', 'palmate', 'pinnately_compound', 'trifoliate', 'bipinnate']);
+
   // 檢查關鍵特徵
   let highConfidenceKeyTraits = 0;
   let mediumConfidenceKeyTraits = 0;
-  
+
   for (const key of keyTraits) {
     if (traits[key]) {
       const conf = traits[key].confidence;
-      if (conf >= 0.75) {
+      const val = (traits[key].value || '').toString().toLowerCase();
+      // leaf_type 的 compound/pinnate/palmate 視為強植物特徵（棕櫚類關鍵）
+      if (key === 'leaf_type' && COMPOUND_LEAF_VALUES.has(val)) {
+        if (conf >= 0.5) mediumConfidenceKeyTraits++;
+      } else if (conf >= 0.75) {
         highConfidenceKeyTraits++;
       } else if (conf >= 0.5) {
         mediumConfidenceKeyTraits++;
@@ -561,10 +568,30 @@ function evaluateTraitQuality(traits) {
   };
 }
 
+/**
+ * 當 traits JSON 解析失敗時，從 LM 描述文字擷取棕櫚/複葉關鍵字
+ * 目的：讓棕櫚類 case 仍能進 hybrid（否則會 fallback 到純 embedding）
+ * @param {string} description - Vision/LM 的完整描述
+ * @returns {string[]} 特徵列表，若無匹配則返回空陣列
+ */
+function extractFeaturesFromDescriptionKeywords(description) {
+  if (!description || typeof description !== 'string') return [];
+  const text = description;
+  const features = [];
+  // 棕櫚/複葉相關（優先，區辨力高）
+  if (/棕櫚|扇形|羽狀複葉|掌狀複葉|二回羽狀|三出複葉/.test(text)) {
+    if (/羽狀複葉|羽狀/.test(text)) features.push('羽狀複葉');
+    else if (/掌狀複葉|掌狀/.test(text)) features.push('掌狀複葉');
+    else if (/棕櫚|扇形/.test(text)) features.push('羽狀複葉'); // 棕櫚多為羽狀或扇形
+  }
+  return features;
+}
+
 module.exports = {
   parseTraitsFromResponse,
   validateTraits,
   isPlantFromTraits,
   traitsToFeatureList,
-  evaluateTraitQuality
+  evaluateTraitQuality,
+  extractFeaturesFromDescriptionKeywords
 };
