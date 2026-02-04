@@ -696,10 +696,25 @@ VISION_ROUTER_PROMPT = """你是一位專業的植物形態學家與生態研究
 </reply>
 
 第七步：輸出結構化特徵（僅限植物，必須輸出 JSON）
-如果第三步判斷為「植物」，請在最後輸出：
+如果第三步判斷為「植物」，請在最後輸出。**果實必須遵守兩段式 Gate：**
+
+### 果實 Gate（必做，禁止跳過）
+
+**第一步（可見性判斷）— Fruit Visibility Gate：**
+你先判斷照片中「果實是否清楚可見」。
+- 若看不到果實、果實太小、被遮擋、像素不足、或無法確定是否為果 → 直接輸出 fruit_visible=false，fruit_type 與 fruit_color 必須為 unknown，confidence ≤ 0.3
+- 只有當你能指出果實的**位置**（例如：右下/枝條末端/成串）、**形狀**（球形/橢圓）、並且確定是果實時，才允許 fruit_visible=true
+
+**第二步（僅當 fruit_visible=true 時）— Fruit Classification：**
+fruit_type 只能從：berry/drupe/capsule/legume/samara/unknown 選
+fruit_color 只能從：red/orange/yellow/green/purple/black/brown/unknown 選
+若無法分辨類型或顏色 → 填 unknown
+
+**證據檢查：** 若 fruit_type != unknown，evidence 必須同時包含「果/果實/結實」任一字 + 位置或形狀描述，否則一律改回 unknown。
 
 ```json
 {
+  "fruit_visible": {"value":"false","confidence":0.2,"evidence":"照片未見果實"},
   "life_form": {"value":"shrub","confidence":0.8,"evidence":"..."},
   "phenology": {"value":"unknown","confidence":0.2,"evidence":"..."},
   "leaf_arrangement": {"value":"opposite","confidence":0.9,"evidence":"..."},
@@ -727,6 +742,15 @@ VISION_ROUTER_PROMPT = """你是一位專業的植物形態學家與生態研究
 4) 寧可輸出 2–4 個有證據的強特徵，不要湊滿 5 個通用特徵（灌木/單葉/全緣/圓錐）
 5) 強特徵優先：複葉類型、果實、花序型、葉緣鋸齒等比生活型更具鑑別力
 6) 若第三步判斷為「動物/人造物/其他」，請輸出空 JSON：{}
+7) fruit_visible=false 時，fruit_type 與 fruit_color 必須為 unknown
+
+### 果實輸出範例（照做可避免亂猜）
+
+例1：看不到果實（只有葉、花）→ fruit_visible=false，fruit_type/color=unknown，evidence：「照片未見果實」
+
+例2：疑似有小點但無法確認 → fruit_visible=false，fruit_type/color=unknown，evidence：「右上有疑似小點但無法確認為果實」
+
+例3：清楚看到紅色圓形漿果於枝條末端 → fruit_visible=true，fruit_type=berry，fruit_color=red，evidence：「枝條末端有成串紅色球形漿果」
 """
 
 

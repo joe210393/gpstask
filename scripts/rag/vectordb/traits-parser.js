@@ -95,6 +95,62 @@ function parseTraitsFromResponse(visionResponse) {
   }
 }
 
+/** 果實類型允許值（英文/中文） */
+const ALLOWED_FRUIT_TYPES = new Set([
+  'unknown', 'berry', 'drupe', 'capsule', 'legume', 'samara', 'achene', 'nut', 'pome',
+  '漿果', '核果', '蒴果', '莢果', '翅果', '瘦果', '堅果', '梨果'
+]);
+
+/** evidence 必須包含果實關鍵字，否則視為猜測（避免 \b 在 CJK 邊界問題） */
+const EVIDENCE_FRUIT_REQUIRED = /果實|結實|漿果|核果|蒴果|莢果|果/;
+
+/**
+ * 果實可見性降級：當證據不足時強制 fruit_type / fruit_color 為 unknown
+ * 規則：fruit_visible=false → 強制 unknown；fruit_type!=unknown 但 evidence 不含果 → 強制 unknown
+ * @param {Object} traits - 原始 traits（會就地修改）
+ */
+function applyFruitVisibilityDowngrade(traits) {
+  if (!traits || typeof traits !== 'object') return;
+  const fv = traits.fruit_visible;
+  const fvVal = (fv && typeof fv.value === 'string') ? fv.value.toLowerCase().trim() : '';
+  const explicitlyNotVisible = fvVal === 'false' || fvVal === '0';
+
+  // 規則 1：fruit_visible 明確為 false → 強制 unknown
+  if (explicitlyNotVisible && (traits.fruit_type || traits.fruit_color)) {
+    if (traits.fruit_type) {
+      traits.fruit_type = { value: 'unknown', confidence: 0.1, evidence: traits.fruit_type.evidence || 'fruit_visible=false，強制降級' };
+    }
+    if (traits.fruit_color) {
+      traits.fruit_color = { value: 'unknown', confidence: 0.1, evidence: traits.fruit_color.evidence || 'fruit_visible=false，強制降級' };
+    }
+    return;
+  }
+
+  const ft = traits.fruit_type;
+  if (!ft || !ft.value || String(ft.value).toLowerCase() === 'unknown') return;
+
+  const val = String(ft.value).toLowerCase().trim();
+  const evidence = String(ft.evidence || '');
+
+  // 規則 2：evidence 不含 果/果實/結實 → 強制 unknown
+  if (!EVIDENCE_FRUIT_REQUIRED.test(evidence)) {
+    traits.fruit_type = { value: 'unknown', confidence: 0.2, evidence: evidence || 'evidence 缺乏果實關鍵字，強制降級' };
+    if (traits.fruit_color) {
+      traits.fruit_color = { value: 'unknown', confidence: 0.2, evidence: traits.fruit_color.evidence || '與 fruit_type 連動降級' };
+    }
+    return;
+  }
+
+  // 規則 3：fruit_type 值不在允許集合 → unknown
+  const normalizedVal = val.replace(/\s/g, '');
+  if (!ALLOWED_FRUIT_TYPES.has(val) && !ALLOWED_FRUIT_TYPES.has(normalizedVal)) {
+    traits.fruit_type = { value: 'unknown', confidence: 0.2, evidence: 'fruit_type 不在允許集合，強制降級' };
+    if (traits.fruit_color) {
+      traits.fruit_color = { value: 'unknown', confidence: 0.2, evidence: traits.fruit_color.evidence || '與 fruit_type 連動降級' };
+    }
+  }
+}
+
 /**
  * 驗證並清理 traits 物件
  * @param {Object} traits - 原始 traits 物件
@@ -109,6 +165,9 @@ function validateTraits(traits) {
   if (Object.keys(traits).length === 0) {
     return null;
   }
+
+  // 果實可見性降級（在主要驗證前執行）
+  applyFruitVisibilityDowngrade(traits);
 
   const validTraits = [
     'life_form',
