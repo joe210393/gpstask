@@ -675,6 +675,22 @@ def _get_plant_leaf_type(payload):
     return None
 
 
+# Gate-A：棕櫚/複葉 gate 關鍵字（query 有則候選需有）
+PALM_COMPOUND_QUERY_TOKENS = frozenset({"羽狀複葉", "掌狀複葉", "二回羽狀", "三出複葉", "複葉"})
+PALM_COMPOUND_PLANT_KEYWORDS = (
+    "羽狀複葉", "掌狀複葉", "棕櫚", "扇形", "複葉", "棕櫚科", "掌狀", "三出複"
+)
+
+
+def _plant_has_palm_compound(payload) -> bool:
+    """候選植物是否有棕櫚/複葉相關描述。"""
+    kf = payload.get("key_features") or []
+    kf_norm = payload.get("key_features_norm") or []
+    summary = _to_str(payload.get("summary", ""))
+    text = " ".join(_to_str(x) for x in kf + kf_norm) + " " + summary
+    return any(kw in text for kw in PALM_COMPOUND_PLANT_KEYWORDS)
+
+
 def compute_soft_contradiction_penalty(traits, payload):
     if not traits or not isinstance(traits, dict):
         return []
@@ -1048,6 +1064,16 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             # 僅在分數較高時顯示日誌，避免刷屏
             if hybrid_score > 0.4:
                 print(f"[API] ⚠️ Must Gate 懲罰: {c['plant_name']} - 關鍵特徵不匹配，分數大幅降權 (x0.3)")
+
+        # Gate-A：棕櫚/複葉 gate（query 有複葉/棕櫚則候選需有，否則降權）
+        query_has_palm_compound = (
+            (features and any(f in PALM_COMPOUND_QUERY_TOKENS for f in features))
+            or ("棕櫚" in (query or ""))
+        )
+        if query_has_palm_compound and not _plant_has_palm_compound(r.payload):
+            hybrid_score *= 0.6
+            if hybrid_score > 0.3:
+                print(f"[API] Gate-A 棕櫚/複葉降權: {c['plant_name']} - 無複葉/棕櫚描述 (x0.6)")
 
         # SOFT 矛盾重罰：life_form / leaf_arrangement 不一致時扣分（取最嚴重 2 條）
         if traits:

@@ -21,12 +21,12 @@ from pathlib import Path
 
 # 特徵詞庫（固定詞彙，與 Vision Prompt 對應）
 FEATURE_VOCAB = {
-    # 生命型態
+    # 生命型態（工項 B：降權，減少佔用鑑別力）
     "life_form": {
-        "喬木": {"en": "tree", "base_w": 0.05, "max_cap": 0.05},
-        "灌木": {"en": "shrub", "base_w": 0.05, "max_cap": 0.05},
-        "草本": {"en": "herb", "base_w": 0.05, "max_cap": 0.05},
-        "藤本": {"en": "vine", "base_w": 0.06, "max_cap": 0.06},
+        "喬木": {"en": "tree", "base_w": 0.02, "max_cap": 0.03},
+        "灌木": {"en": "shrub", "base_w": 0.02, "max_cap": 0.03},
+        "草本": {"en": "herb", "base_w": 0.02, "max_cap": 0.03},
+        "藤本": {"en": "vine", "base_w": 0.03, "max_cap": 0.04},
     },
     # 葉序
     "leaf_arrangement": {
@@ -34,13 +34,14 @@ FEATURE_VOCAB = {
         "對生": {"en": "opposite", "base_w": 0.05, "max_cap": 0.06},
         "輪生": {"en": "whorled", "base_w": 0.06, "max_cap": 0.09},
     },
-    # 葉型
+    # 葉型（工項 C：強特徵權重提升，複葉區辨力高）
     "leaf_type": {
         "單葉": {"en": "simple leaf", "base_w": 0.05, "max_cap": 0.08},
-        "複葉": {"en": "compound leaf", "base_w": 0.05, "max_cap": 0.08},
-        "羽狀複葉": {"en": "pinnate leaves", "base_w": 0.05, "max_cap": 0.07},
-        "二回羽狀": {"en": "bipinnate leaves", "base_w": 0.08, "max_cap": 0.12},
-        "掌狀複葉": {"en": "palmate leaves", "base_w": 0.07, "max_cap": 0.10},
+        "複葉": {"en": "compound leaf", "base_w": 0.06, "max_cap": 0.10},
+        "羽狀複葉": {"en": "pinnate leaves", "base_w": 0.07, "max_cap": 0.12},
+        "二回羽狀": {"en": "bipinnate leaves", "base_w": 0.10, "max_cap": 0.15},
+        "掌狀複葉": {"en": "palmate leaves", "base_w": 0.08, "max_cap": 0.12},
+        "三出複葉": {"en": "trifoliate", "base_w": 0.08, "max_cap": 0.12},
     },
     # 葉緣
     "leaf_margin": {
@@ -54,14 +55,20 @@ FEATURE_VOCAB = {
         "紅花": {"en": "red flower", "base_w": 0.05, "max_cap": 0.07},
         "紫花": {"en": "purple flower", "base_w": 0.05, "max_cap": 0.07},
     },
-    # 花序
+    # 花序（工項 C：頭狀/繖形/穗狀較稀有，權重略高）
     "flower_inflo": {
         "總狀花序": {"en": "raceme", "base_w": 0.06, "max_cap": 0.09},
         "圓錐花序": {"en": "panicle", "base_w": 0.06, "max_cap": 0.09},
+        "頭狀花序": {"en": "capitulum", "base_w": 0.08, "max_cap": 0.12},
+        "繖形花序": {"en": "umbel", "base_w": 0.07, "max_cap": 0.11},
+        "穗狀花序": {"en": "spike", "base_w": 0.07, "max_cap": 0.11},
     },
-    # 果實
+    # 果實（工項 C：強特徵權重提升）
     "fruit_type": {
         "莢果": {"en": "pod", "base_w": 0.08, "max_cap": 0.12},
+        "漿果": {"en": "berry", "base_w": 0.08, "max_cap": 0.12},
+        "核果": {"en": "drupe", "base_w": 0.07, "max_cap": 0.11},
+        "蒴果": {"en": "capsule", "base_w": 0.07, "max_cap": 0.11},
     },
     # 根/樹幹
     "trunk_root": {
