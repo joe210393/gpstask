@@ -676,7 +676,7 @@ def _get_plant_leaf_type(payload):
 
 
 # Gate-A：棕櫚/複葉 gate 關鍵字（query 有則候選需有）
-PALM_COMPOUND_QUERY_TOKENS = frozenset({"羽狀複葉", "掌狀複葉", "二回羽狀", "三出複葉", "複葉"})
+PALM_COMPOUND_QUERY_TOKENS = frozenset({"羽狀複葉", "掌狀複葉", "二回羽狀", "三出複葉", "複葉", "棕櫚"})
 PALM_COMPOUND_PLANT_KEYWORDS = (
     "羽狀複葉", "掌狀複葉", "棕櫚", "扇形", "複葉", "棕櫚科", "掌狀", "三出複"
 )

@@ -291,6 +291,13 @@ function traitsToFeatureList(traits) {
     'simple': '單葉',
     'compound': '複葉',
     'trifoliate': '三出複葉',
+    'palmate_compound': '掌狀複葉',
+    'palmately_compound': '掌狀複葉',
+
+    // 棕櫚/科（Vision 可能輸出 palm、arecaceae）
+    'palm': '棕櫚',
+    'arecaceae': '棕櫚',
+    'palm_like': '棕櫚',
 
     // leaf_shape
     'ovate': '卵形',
@@ -308,7 +315,9 @@ function traitsToFeatureList(traits) {
     'spatulate': '匙形',
     'fiddle': '提琴形',
     'palmate': '掌狀',
+    'palmately_compound': '掌狀複葉',
     'acicular': '針形',
+    'fan_shaped': '棕櫚',  // 棕櫚扇形葉
     
     // leaf_margin
     'entire': '全緣',
@@ -569,8 +578,8 @@ function evaluateTraitQuality(traits) {
 }
 
 /**
- * 當 traits JSON 解析失敗時，從 LM 描述文字擷取棕櫚/複葉關鍵字
- * 目的：讓棕櫚類 case 仍能進 hybrid（否則會 fallback 到純 embedding）
+ * 當 traits JSON 解析失敗時，從 LM 描述文字擷取強特徵關鍵字
+ * 目的：讓棕櫚/果實/花序等 case 仍能進 hybrid（否則會 fallback 到純 embedding）
  * @param {string} description - Vision/LM 的完整描述
  * @returns {string[]} 特徵列表，若無匹配則返回空陣列
  */
@@ -578,12 +587,36 @@ function extractFeaturesFromDescriptionKeywords(description) {
   if (!description || typeof description !== 'string') return [];
   const text = description;
   const features = [];
+
   // 棕櫚/複葉相關（優先，區辨力高）
-  if (/棕櫚|扇形|羽狀複葉|掌狀複葉|二回羽狀|三出複葉/.test(text)) {
-    if (/羽狀複葉|羽狀/.test(text)) features.push('羽狀複葉');
-    else if (/掌狀複葉|掌狀/.test(text)) features.push('掌狀複葉');
-    else if (/棕櫚|扇形/.test(text)) features.push('羽狀複葉'); // 棕櫚多為羽狀或扇形
+  if (/棕櫚|扇形|羽片|叢生|棕櫚科|棕櫚幹/.test(text)) {
+    features.push('棕櫚');
   }
+  if (/羽狀複葉|羽狀裂|羽狀/.test(text)) {
+    features.push('羽狀複葉');
+  }
+  if (/掌狀複葉|掌狀裂|掌狀深裂/.test(text)) {
+    features.push('掌狀複葉');
+  }
+  if (/二回羽狀/.test(text)) features.push('二回羽狀');
+  if (/三出複葉|三出/.test(text)) features.push('三出複葉');
+
+  // 果實相關（火筒樹、西印度櫻桃、金露花等）
+  if (/漿果|多漿果/.test(text)) features.push('漿果');
+  if (/核果/.test(text)) features.push('核果');
+  if (/蒴果/.test(text)) features.push('蒴果');
+  if (/紅色果實|紅果|鮮紅色果|紫黑色果|深紅/.test(text) && !features.includes('漿果') && !features.includes('核果')) {
+    features.push('漿果'); // 紅色果實多為漿果
+  }
+
+  // 花序類型（長穗木=穗狀、菊科=頭狀等）
+  if (/穗狀花序|穗狀/.test(text)) features.push('穗狀花序');
+  if (/頭狀花序|頭狀/.test(text)) features.push('頭狀花序');
+  if (/繖形花序|繖形|繖房/.test(text)) features.push('繖形花序');
+
+  // 葉緣（鋸齒 vs 全緣 可拉開差距）
+  if (/鋸齒|鋸齒緣|粗鋸齒/.test(text)) features.push('鋸齒');
+
   return features;
 }
 

@@ -3517,7 +3517,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
           }
         ],
         max_tokens: 2000,
-        temperature: 0.7
+        temperature: 0
       })
     });
 
