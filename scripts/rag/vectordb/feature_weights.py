@@ -637,35 +637,80 @@ class FeatureWeightCalculator:
         }
 
 
-# Vision AI 的結構化 Prompt
-VISION_ROUTER_PROMPT = """你是一位植物辨識專家。請分析這張圖片，輸出 JSON 格式的結構化資訊。
+# Vision AI 的結構化 Prompt（對齊前端 ai-lab 自由探索模式的輸出規格）
+# 目的：
+# - 讓模型「判定」與「回覆」一致（<analysis>/<reply>）
+# - 並穩定輸出 traits JSON，供後端 traits-parser/hybrid-search 使用
+VISION_ROUTER_PROMPT = """你是一位專業的植物形態學家與生態研究員。
 
-**只輸出 JSON，不要加任何其他文字。**
+**重要：你必須按照以下步驟進行分析，絕對不能跳過任何步驟！**
 
+請依照以下 XML 格式回答，並在最後輸出結構化的 traits JSON：
+
+<analysis>
+第一步：尺寸判斷（必須完成，用於驗證生活型）
+- 請估算：整體高度、葉片長度、花朵直徑（若可見）
+- 喬木通常 > 3m；灌木約 0.5–3m；草本通常 < 0.5m
+
+第二步：詳細描述圖片細節（必須完成）
+- 如果是植物，必須使用專業形態學術語描述（生活型、葉序、葉形、葉緣、花序、果實等）
+- 花序請盡量判斷（總狀 / 圓錐 / 繖形 / 頭狀 / 單生花...）
+
+第三步：判斷類別（必須完成）
+明確指出：植物 / 動物 / 人造物 / 其他
+
+第四步：提取關鍵識別特徵（僅限植物）
+- 生活型（與尺寸一致）
+- 葉序（互生/對生/輪生）
+- 葉形（披針/卵形/橢圓/心形/線形/圓形...）
+- 葉緣（全緣/鋸齒/波狀/裂緣...）
+- 花序（總狀/圓錐/繖形/頭狀/聚繖/單生花...）
+- 花色（只描述花朵顏色；沒有花就 unknown）
+- 葉色（leaf_color）與花色（flower_color）是不同特徵
+
+第五步：尺寸驗證（僅限植物）
+檢查生活型與尺寸是否一致，若不一致請修正。
+
+第六步：初步猜測（僅限植物）
+可提出 1–3 個候選名稱（中文為主），但要標註為「猜測」。
+</analysis>
+
+<reply>
+用親切、專業但通俗的語氣介紹你看到的東西。
+重要：在 <reply> 中只能根據 <analysis> 的細節來介紹，不要把「猜測」當成定論。
+</reply>
+
+第七步：輸出結構化特徵（僅限植物，必須輸出 JSON）
+如果第三步判斷為「植物」，請在最後輸出：
+
+```json
 {
-  "intent": "plant 或 animal 或 object 或 unknown",
-  "confidence": 0.0 到 1.0,
-  "short_caption": "一句話描述畫面",
-  "plant": {
-    "guess_names": ["候選名稱1", "候選名稱2"],
-    "features": ["從詞庫選擇的特徵"]
-  }
+  "life_form": {"value":"shrub","confidence":0.8,"evidence":"..."},
+  "phenology": {"value":"unknown","confidence":0.2,"evidence":"..."},
+  "leaf_arrangement": {"value":"opposite","confidence":0.9,"evidence":"..."},
+  "leaf_shape": {"value":"ovate","confidence":0.8,"evidence":"..."},
+  "leaf_type": {"value":"simple","confidence":0.6,"evidence":"..."},
+  "leaf_margin": {"value":"entire","confidence":0.85,"evidence":"..."},
+  "leaf_texture": {"value":"glabrous","confidence":0.6,"evidence":"..."},
+  "leaf_color": {"value":"green","confidence":0.7,"evidence":"..."},
+  "inflorescence": {"value":"panicle","confidence":0.7,"evidence":"..."},
+  "flower_color": {"value":"purple","confidence":0.8,"evidence":"..."},
+  "fruit_type": {"value":"unknown","confidence":0.1,"evidence":"照片未見果實"},
+  "fruit_color": {"value":"unknown","confidence":0.1,"evidence":"照片未見果實"},
+  "root_type": {"value":"unknown","confidence":0.1,"evidence":"照片未見根部"},
+  "stem_type": {"value":"unknown","confidence":0.1,"evidence":"..."},
+  "seed_type": {"value":"unknown","confidence":0.1,"evidence":"照片未見種子"},
+  "seed_color": {"value":"unknown","confidence":0.1,"evidence":"照片未見種子"},
+  "surface_hair": {"value":"unknown","confidence":0.1,"evidence":"..."}
 }
+```
 
-**特徵詞庫（只能從這裡選，看不清楚就不要填）：**
-- 生命型態：喬木, 灌木, 草本, 藤本
-- 葉序：互生, 對生, 輪生
-- 葉型：單葉, 複葉, 羽狀複葉, 二回羽狀, 掌狀複葉
-- 葉緣：全緣, 鋸齒
-- 花色：白花, 黃花, 紅花, 紫花
-- 花序：總狀花序, 圓錐花序
-- 特殊：莢果, 板根, 氣生根, 有刺, 胎生苗
-
-**規則：**
-1. intent=plant 時才填 plant 欄位
-2. features 只填看得清楚的，不確定就留空
-3. guess_names 給 1~3 個候選（中文為主）
-4. 看不清楚時降低 confidence"""
+重要規則：
+1) 每個 trait 都要有 value、confidence(0~1)、evidence
+2) 看不到/無法判斷請用 value=unknown 並給低 confidence（0.1–0.3）
+3) 只填能清楚觀察到的特徵，不確定就 unknown
+4) 若第三步判斷為「動物/人造物/其他」，請輸出空 JSON：{}
+"""
 
 
 def get_vision_prompt():
