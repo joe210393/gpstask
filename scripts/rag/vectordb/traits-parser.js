@@ -605,14 +605,16 @@ function extractFeaturesFromDescriptionKeywords(description) {
   if (/漿果|多漿果/.test(text)) features.push('漿果');
   if (/核果/.test(text)) features.push('核果');
   if (/蒴果/.test(text)) features.push('蒴果');
-  if (/紅色果實|紅果|鮮紅色果|紫黑色果|深紅/.test(text) && !features.includes('漿果') && !features.includes('核果')) {
-    features.push('漿果'); // 紅色果實多為漿果
+  if (/(?:紅色|鮮紅|紫黑|深紅|橙紅)色?果實|紅果|鮮紅色果|紫黑色果|橙紅色果/.test(text) && !features.includes('漿果') && !features.includes('核果')) {
+    features.push('漿果'); // 紅/橙紅/紫黑果實多為漿果
   }
 
-  // 花序類型（長穗木=穗狀、菊科=頭狀等）
+  // 花序類型（P1-2：總狀 vs 圓錐 vs 聚繖，避免硬塞圓錐）
   if (/穗狀花序|穗狀/.test(text)) features.push('穗狀花序');
+  if (/總狀花序|總狀/.test(text)) features.push('總狀花序');
+  if (/聚繖花序|聚繖|繖房花序|繖房/.test(text)) features.push('聚繖花序');
   if (/頭狀花序|頭狀/.test(text)) features.push('頭狀花序');
-  if (/繖形花序|繖形|繖房/.test(text)) features.push('繖形花序');
+  if (/繖形花序|繖形/.test(text)) features.push('繖形花序');
 
   // 葉緣（鋸齒 vs 全緣 可拉開差距）
   if (/鋸齒|鋸齒緣|粗鋸齒/.test(text)) features.push('鋸齒');

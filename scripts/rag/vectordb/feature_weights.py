@@ -55,10 +55,11 @@ FEATURE_VOCAB = {
         "紅花": {"en": "red flower", "base_w": 0.05, "max_cap": 0.07},
         "紫花": {"en": "purple flower", "base_w": 0.05, "max_cap": 0.07},
     },
-    # 花序（工項 C：頭狀/繖形/穗狀較稀有，權重略高）
+    # 花序（工項 C：頭狀/繖形/穗狀較稀有，權重略高；P1-2 補聚繖）
     "flower_inflo": {
         "總狀花序": {"en": "raceme", "base_w": 0.06, "max_cap": 0.09},
         "圓錐花序": {"en": "panicle", "base_w": 0.06, "max_cap": 0.09},
+        "聚繖花序": {"en": "cyme", "base_w": 0.06, "max_cap": 0.09},
         "頭狀花序": {"en": "capitulum", "base_w": 0.08, "max_cap": 0.12},
         "繖形花序": {"en": "umbel", "base_w": 0.07, "max_cap": 0.11},
         "穗狀花序": {"en": "spike", "base_w": 0.07, "max_cap": 0.11},

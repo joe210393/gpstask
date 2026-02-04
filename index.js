@@ -3686,7 +3686,16 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
 
             if (traitsBasedDecision.is_plant) {
               // 使用 traits 轉換的特徵列表進行混合搜尋
-              const features = traitsToFeatureList(traits);
+              let features = traitsToFeatureList(traits);
+              // P1-1 關鍵字輔助：無論 traits 成功與否，從 LM 描述補強果實/花序（LM 常描述但 JSON 未抽到）
+              const keywordAssist = extractFeaturesFromDescriptionKeywords(description);
+              if (keywordAssist.length > 0) {
+                const added = keywordAssist.filter((k) => !features.includes(k));
+                if (added.length > 0) {
+                  features = [...features, ...added];
+                  console.log(`📊 keyword_assist 補強: +[${added.join(', ')}] → ${features.join(', ')}`);
+                }
+              }
               console.log(`📊 使用 traits 提取的特徵: ${features.join(', ')}`);
 
               const traitQuality = evaluateTraitQuality(traits);
@@ -3859,12 +3868,21 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
               // 結構化 JSON 路徑
               console.log('⚠️ 未提取到 traits JSON，改用結構化 JSON 嘗試第二階段混合搜尋');
               const visionParsed = parseVisionResponse(description);
-              const visionFeatures = Array.isArray(visionParsed?.plant?.features)
+              let visionFeatures = Array.isArray(visionParsed?.plant?.features)
                 ? visionParsed.plant.features.filter(Boolean)
                 : [];
               const visionGuessNames = Array.isArray(visionParsed?.plant?.guess_names)
                 ? visionParsed.plant.guess_names.filter(Boolean)
                 : [];
+              // P1-1 關鍵字輔助：補強果實/花序
+              const keywordAssistAlt = extractFeaturesFromDescriptionKeywords(description);
+              if (keywordAssistAlt.length > 0) {
+                const added = keywordAssistAlt.filter((k) => !visionFeatures.includes(k));
+                if (added.length > 0) {
+                  visionFeatures = [...visionFeatures, ...added];
+                  console.log(`📊 keyword_assist (structured): +[${added.join(', ')}]`);
+                }
+              }
 
               if (visionParsed.success && visionParsed.intent === 'plant' && (visionFeatures.length > 0 || visionGuessNames.length > 0)) {
               // 沒有 traits 品質分數時，用 features 數量做一個保守估計，讓 hybrid 有機會拉開差距
