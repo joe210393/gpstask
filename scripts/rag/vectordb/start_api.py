@@ -677,8 +677,9 @@ def _get_plant_leaf_type(payload):
 
 # Gate-A：棕櫚/複葉 gate 關鍵字（query 有則候選需有）
 PALM_COMPOUND_QUERY_TOKENS = frozenset({"羽狀複葉", "掌狀複葉", "二回羽狀", "三出複葉", "複葉", "棕櫚"})
+# P1b: 移除單一「掌狀」避免烏桕(掌狀葉)誤判為棕櫚；改用「掌狀複」
 PALM_COMPOUND_PLANT_KEYWORDS = (
-    "羽狀複葉", "掌狀複葉", "棕櫚", "扇形", "複葉", "棕櫚科", "掌狀", "三出複"
+    "羽狀複葉", "掌狀複葉", "棕櫚", "扇形", "複葉", "棕櫚科", "掌狀複", "三出複"
 )
 
 
@@ -1070,10 +1071,19 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             (features and any(f in PALM_COMPOUND_QUERY_TOKENS for f in features))
             or ("棕櫚" in (query or ""))
         )
-        if query_has_palm_compound and not _plant_has_palm_compound(r.payload):
-            hybrid_score *= 0.6
-            if hybrid_score > 0.3:
-                print(f"[API] Gate-A 棕櫚/複葉降權: {c['plant_name']} - 無複葉/棕櫚描述 (x0.6)")
+        gate_triggered = query_has_palm_compound
+        has_palm = _plant_has_palm_compound(r.payload)
+        before_score = hybrid_score
+        # P1: 動態強度 - 強複葉(羽狀/掌狀/二回/三出)用 0.35，泛用用 0.6
+        STRONG_PALM_TOKENS = frozenset({"羽狀複葉", "掌狀複葉", "二回羽狀", "三出複葉"})
+        has_strong = bool(features and any(f in STRONG_PALM_TOKENS for f in features))
+        gate_penalty = 0.35 if has_strong else 0.6
+        if gate_triggered and not has_palm:
+            hybrid_score *= gate_penalty
+        if gate_triggered:
+            print(f"[API] Gate-A debug {c['plant_name']}: has_palm={has_palm} penalty={gate_penalty} before={before_score:.4f} after={hybrid_score:.4f}")
+        if gate_triggered and not has_palm and hybrid_score > 0.3:
+            print(f"[API] Gate-A 棕櫚/複葉降權: {c['plant_name']} - 無複葉/棕櫚描述 (x{gate_penalty})")
 
         # SOFT 矛盾重罰：life_form / leaf_arrangement 不一致時扣分（取最嚴重 2 條）
         if traits:

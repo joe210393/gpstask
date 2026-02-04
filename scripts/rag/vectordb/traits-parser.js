@@ -605,7 +605,8 @@ function extractFeaturesFromDescriptionKeywords(description) {
   if (/漿果|多漿果/.test(text)) features.push('漿果');
   if (/核果/.test(text)) features.push('核果');
   if (/蒴果/.test(text)) features.push('蒴果');
-  if (/(?:紅色|鮮紅|紫黑|深紅|橙紅)色?果實|紅果|鮮紅色果|紫黑色果|橙紅色果/.test(text) && !features.includes('漿果') && !features.includes('核果')) {
+  // P2: 支援「橙紅色的果實」等（允許「的」在顏色與果實之間）
+  if (/(?:紅色|鮮紅|紫黑|深紅|橙紅)色的?果實|紅果|鮮紅色果|紫黑色果|橙紅色的果實|橙紅色果/.test(text) && !features.includes('漿果') && !features.includes('核果')) {
     features.push('漿果'); // 紅/橙紅/紫黑果實多為漿果
   }
 
