@@ -892,6 +892,14 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
     print(f"[API] /hybrid-search encode={(t1 - t0):.3f}s qdrant={(t2 - t1):.3f}s total={(t2 - t0):.3f}s top_k={top_k} limit={candidate_limit} candidates={len(candidates)}")
     sys.stdout.flush()
 
+    # 預先計算 query 特徵總權重（用於 feature_score 標準化：matched/query_total 拉開差距）
+    query_total_weight = 0.0
+    if features and feature_calculator:
+        fi = feature_calculator.calculate_feature_score(features)
+        query_total_weight = fi.get("total_score", 0) or 0
+        if query_total_weight > 0:
+            print(f"[API] feature_score 標準化: query_total_weight={query_total_weight:.4f}")
+
     # 2. 計算每個候選的混合分數
     results = []
     
@@ -980,8 +988,11 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             coverage = match_result.get("coverage", 1.0)
             must_matched = match_result.get("must_matched", True)
             
-            # 應用 Coverage 調整
-            feature_score = feature_score_raw * coverage
+            # Feature score 標準化：matched / query_total 拉開差距（0~1）
+            if query_total_weight > 0:
+                feature_score = min(1.0, feature_score_raw / query_total_weight)
+            else:
+                feature_score = feature_score_raw * coverage
         else:
             feature_score = 0.0
             coverage = 0.0

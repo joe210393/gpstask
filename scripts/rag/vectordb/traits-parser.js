@@ -486,6 +486,14 @@ function traitsToFeatureList(traits) {
     }
   }
 
+  // 矛盾處理 v0：羽狀/掌狀複葉與單葉互斥，保留複葉（區辨力較高）
+  const COMPOUND_LEAF_TOKENS = ['羽狀複葉', '掌狀複葉', '二回羽狀', '三出複葉', '複葉'];
+  const hasCompound = COMPOUND_LEAF_TOKENS.some((t) => features.includes(t));
+  if (hasCompound && features.includes('單葉')) {
+    features = features.filter((f) => f !== '單葉');
+    console.log('[TraitsParser] 矛盾處理: 有複葉特徵，已移除「單葉」');
+  }
+
   return features;
 }
 
