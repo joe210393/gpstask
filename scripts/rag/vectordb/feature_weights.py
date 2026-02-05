@@ -21,7 +21,8 @@ from pathlib import Path
 
 # 特徵詞庫（固定詞彙，與 Vision Prompt 對應）
 FEATURE_VOCAB = {
-    # 生命型態（工項 B：降權，減少佔用鑑別力）
+    # 生命型態：改為主要作為 Gate，用於矛盾/排除，不再參與正向加分
+    # （例如「灌木/喬木/草本」超高 df，適合當 must / penalty，而不是拉高 feature_score）
     "life_form": {
         "喬木": {"en": "tree", "base_w": 0.02, "max_cap": 0.03},
         "灌木": {"en": "shrub", "base_w": 0.02, "max_cap": 0.03},
@@ -106,6 +107,9 @@ def build_feature_index():
     return index
 
 FEATURE_INDEX = build_feature_index()
+
+# 僅作為 Gate 使用的類別：這些特徵主要用於 MUST / 矛盾排除，不參與正向加分
+GATE_ONLY_CATEGORIES = {"life_form"}
 
 
 class FeatureWeightCalculator:
@@ -344,6 +348,9 @@ class FeatureWeightCalculator:
                 continue
             info = FEATURE_INDEX.get(f, {})
             cat = info.get("category", "unknown")
+            # Gate-only 類別（例如 life_form）只用於 MUST/Gate，不參與正向加分
+            if cat in GATE_ONLY_CATEGORIES:
+                continue
             prev = per_category_best.get(cat)
             if not prev or weight > prev["weight"]:
                 per_category_best[cat] = {

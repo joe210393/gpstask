@@ -46,6 +46,8 @@ EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "jinaai/jina-embeddings-v3")
 _default_dim = 1024 if "jina-embeddings-v3" in EMBEDDING_MODEL else 768
 EMBEDDING_DIM = int(os.environ.get("EMBEDDING_DIM", str(_default_dim)))
 JINA_API_KEY = os.environ.get("JINA_API_KEY", None)  # Jina AI API Key
+# 可選：指定特徵權重計算用的資料檔路徑（只影響 df/idf 統計，不影響 Qdrant 向量）
+FEATURE_DATA_PATH = os.environ.get("FEATURE_DATA_PATH", "").strip()
 # USE_JINA_API:
 # - "true": 強制使用 Jina API
 # - "false": 強制本地模型
@@ -336,15 +338,22 @@ def _init_background_impl():
     ]
     
     data_path = None
-    # P0.6 強化 > P0.5 去重 > P0 clean > final-4302
-    print(f"  搜尋資料檔案（P0.6 強化 > P0.5 去重 > P0 clean > final-4302）...")
-    for p in enriched_paths:
-        exists = os.path.exists(p)
-        print(f"    檢查: {p} -> {'✅ 存在' if exists else '❌ 不存在'}")
+    # 若有指定 FEATURE_DATA_PATH，優先使用（只影響特徵權重統計）
+    if FEATURE_DATA_PATH:
+        exists = os.path.exists(FEATURE_DATA_PATH)
+        print(f"  FEATURE_DATA_PATH 指定檔案: {FEATURE_DATA_PATH} -> {'✅ 存在' if exists else '❌ 不存在'}")
         if exists:
-            data_path = p
-            print(f"    ✅ 找到 P0.6 強化後資料: {p}")
-            break
+            data_path = FEATURE_DATA_PATH
+    # 否則依預設優先順序：P0.6 強化 > P0.5 去重 > P0 clean > final-4302
+    if not data_path:
+        print(f"  搜尋資料檔案（P0.6 強化 > P0.5 去重 > P0 clean > final-4302）...")
+        for p in enriched_paths:
+            exists = os.path.exists(p)
+            print(f"    檢查: {p} -> {'✅ 存在' if exists else '❌ 不存在'}")
+            if exists:
+                data_path = p
+                print(f"    ✅ 找到 P0.6 強化後資料: {p}")
+                break
     if not data_path:
         for p in dedup_paths:
             exists = os.path.exists(p)
@@ -569,14 +578,28 @@ def search_plants(query: str, top_k: int = 5):
             query_vector = query_vector.tolist()
 
         # 增加 timeout 處理
-        results = qdrant_client.query_points(
+        raw_results = qdrant_client.query_points(
             collection_name=COLLECTION_NAME,
             query=query_vector,
             limit=top_k,
         ).points
         t2 = time.perf_counter()
-        print(f"[API] /search encode={(t1 - t0):.3f}s qdrant={(t2 - t1):.3f}s total={(t2 - t0):.3f}s top_k={top_k} results={len(results)}")
+        print(f"[API] /search encode={(t1 - t0):.3f}s qdrant={(t2 - t1):.3f}s total={(t2 - t0):.3f}s top_k={top_k} results={len(raw_results)}")
         sys.stdout.flush()
+
+        # 物種層級去重：同一 canonical key 只保留一筆候選（避免同物種重複出現在第一階段列表）
+        seen_canonical = set()
+        dedup_results = []
+        for r in raw_results:
+            key = _canonical_name(r.payload or {})
+            if not key:
+                key = str(r.id)
+            if key in seen_canonical:
+                continue
+            seen_canonical.add(key)
+            dedup_results.append(r)
+            if len(dedup_results) >= top_k:
+                break
 
         return [
             {
@@ -590,7 +613,7 @@ def search_plants(query: str, top_k: int = 5):
                 "score": r.score,
                 "summary": r.payload.get("summary", "")[:300],
             }
-            for r in results
+            for r in dedup_results
         ]
     except Exception as e:
         print(f"[API] ❌ search_plants 錯誤: {e}")
