@@ -337,21 +337,29 @@ function traitsToFeatureList(traits) {
     
     // leaf_arrangement
     'alternate': '互生',
+    'alternating': '互生',  // 變體
     'opposite': '對生',
+    'opposite_decussate': '對生',  // 變體
     'whorled': '輪生',
+    'verticillate': '輪生',  // 變體
     'fascicled': '叢生',
     'basal': '基生',
     'clustered': '簇生',
     'spiral': '螺旋葉序',       // Vision 可能輸出 spiral
-    'pinnate': '羽狀複葉',      // 葉序/葉型混用時
+    'spirally_arranged': '螺旋葉序',  // 變體
+    'pinnate': '羽狀複葉',      // 葉序/葉型混用時（注意：這應該對應到 leaf_type，但保留以兼容）
     'pinnately_compound': '羽狀複葉',
 
     // leaf_type（單葉/複葉，與 leaf_shape 區分）
     'simple': '單葉',
     'compound': '複葉',
     'trifoliate': '三出複葉',
+    'trifoliolate': '三出複葉',  // 變體
     'palmate_compound': '掌狀複葉',
     'palmately_compound': '掌狀複葉',
+    'bipinnate': '二回羽狀',  // 新增：二回羽狀複葉
+    'bipinnately_compound': '二回羽狀',  // 新增
+    'pinnately_compound': '羽狀複葉',  // 新增：明確的羽狀複葉
 
     // 棕櫚/科（Vision 可能輸出 palm、arecaceae）
     'palm': '棕櫚',
@@ -380,10 +388,15 @@ function traitsToFeatureList(traits) {
     
     // leaf_margin
     'entire': '全緣',
+    'smooth': '全緣',  // 新增：smooth margin = entire
     'serrate': '鋸齒',
-    'serrated': '鋸齒',  // 新增：serrated = serrate
+    'serrated': '鋸齒',
+    'dentate': '鋸齒',  // 新增：齒狀（類似鋸齒）
+    'denticulate': '細鋸齒',  // 新增：細鋸齒
     'undulate': '波狀緣',
+    'wavy': '波狀',  // 新增：wavy = undulate
     'crenate': '圓鋸齒',
+    'crenulate': '細圓鋸齒',  // 新增
     'shallow_lobed': '淺裂',
     'deep_lobed': '深裂',
     'pinnatifid': '羽狀裂',
@@ -401,22 +414,31 @@ function traitsToFeatureList(traits) {
     // inflorescence
     'raceme': '總狀花序',
     'racemose': '總狀花序',
+    'racemous': '總狀花序',  // 變體
     'panicle': '圓錐花序',
     'paniculate': '圓錐花序',
     'terminal_paniculate': '頂生圓錐花序',
     'corymb_cyme': '聚繖花序',
     'corymb': '繖房花序',
+    'corymbose': '繖房花序',  // 變體
     'cyme': '聚繖花序',
+    'cymose': '聚繖花序',  // 變體
     'spike': '穗狀花序',
+    'spicate': '穗狀花序',  // 變體
     'umbel': '繖形花序',
+    'umbellate': '繖形花序',  // 變體
     'capitulum': '頭狀花序',
     'head': '頭狀花序',
     'spadix_spathe': '佛焰花序',
+    'spadix': '佛焰花序',  // 簡化形式
     'catkin': '葇荑花序',
+    'ament': '葇荑花序',  // 同義詞
     'solitary': '單生花',
     'fascicle': '簇生花序',
-    'terminal_flower': '頂生花', // 新增
-    'axillary_flower': '腋生花', // 新增
+    'terminal_flower': '頂生花',
+    'axillary_flower': '腋生花',
+    'pendulous': '下垂花序',  // 新增：下垂花序（長穗木等）
+    'drooping': '下垂花序',  // 新增：下垂花序
     
     // flower_color (支援單一值和複數值)
     'white': '白花',

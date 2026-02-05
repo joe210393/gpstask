@@ -7,6 +7,10 @@
 - USE_JINA_API=true 會使用 Jina API（會消耗 token）
 - USE_JINA_API=false 會使用本機模型（不消耗 token）
 
+**執行方式：**
+- 使用虛擬環境：source ../../.venv-rag/bin/activate && python embed_plants_forest_jina.py
+- 或直接：../../.venv-rag/bin/python embed_plants_forest_jina.py
+
 使用方式：
 1. 設定環境變數：
    export QDRANT_URL="http://localhost:6333"
@@ -410,6 +414,16 @@ def main():
         print("   請設定環境變數：export JINA_API_KEY='your_key'")
         sys.exit(1)
     
+    if not USE_JINA_API:
+        # 檢查本地模型依賴
+        try:
+            import sentence_transformers
+        except ImportError:
+            print("❌ 錯誤：未安裝 sentence_transformers")
+            print("   選項 1：安裝依賴：pip install sentence-transformers")
+            print("   選項 2：使用 Jina API（推薦）：export USE_JINA_API=true && export JINA_API_KEY='your_key'")
+            sys.exit(1)
+    
     print(f"\n📦 資料檔案: {DATA_FILE}")
     print(f"📊 Collection: {COLLECTION_NAME}")
     print(f"🔗 Qdrant URL: {QDRANT_URL}")
@@ -419,6 +433,34 @@ def main():
     print(f"\n📖 載入植物資料...")
     plants = load_plants()
     print(f"✅ 載入 {len(plants)} 筆植物資料")
+    
+    # 步驟 5：資料庫去重（以 canonical key 為主鍵，同一物種只保留一筆）
+    print(f"\n🔍 執行資料去重（以學名為主鍵）...")
+    canonical_seen = {}
+    deduplicated_plants = []
+    duplicates_removed = 0
+    for plant in plants:
+        canonical_key = get_canonical_key(plant)
+        if not canonical_key:
+            # 沒有 canonical key 的資料保留（可能是資料品質問題）
+            deduplicated_plants.append(plant)
+            continue
+        if canonical_key not in canonical_seen:
+            canonical_seen[canonical_key] = plant
+            deduplicated_plants.append(plant)
+        else:
+            duplicates_removed += 1
+            # 保留資料品質較高的（有 summary/key_features 的優先）
+            existing = canonical_seen[canonical_key]
+            existing_quality = len(existing.get("identification", {}).get("summary", "") or "")
+            new_quality = len(plant.get("identification", {}).get("summary", "") or "")
+            if new_quality > existing_quality:
+                # 替換成品質更高的
+                deduplicated_plants.remove(existing)
+                deduplicated_plants.append(plant)
+                canonical_seen[canonical_key] = plant
+    print(f"   ✅ 去重完成：原始 {len(plants)} 筆 → 去重後 {len(deduplicated_plants)} 筆（移除 {duplicates_removed} 筆重複）")
+    plants = deduplicated_plants
     
     # 載入進度
     processed = load_progress()
@@ -552,8 +594,46 @@ def main():
     print(f"\n🎉 向量化完成！共處理 {len(processed)} 筆資料")
 
 
+def normalize_scientific_name(sci: str) -> str:
+    """正規化學名：移除變種標記（var./subsp./f.）並標準化格式"""
+    if not sci:
+        return ""
+    sci = sci.strip()
+    # 移除常見的變種標記（var. / subsp. / f. / cv. / '）
+    import re
+    # 移除 var. / subsp. / f. / cv. 及其後面的內容（保留到 species 為止）
+    sci = re.sub(r'\s+(var\.|subsp\.|ssp\.|f\.|cv\.|cultivar)', '', sci, flags=re.IGNORECASE)
+    # 移除單引號（栽培種標記）
+    sci = sci.replace("'", "").replace('"', '')
+    # 移除多餘空格
+    sci = " ".join(sci.split())
+    return sci.lower()
+
+
+def get_canonical_key(plant: Dict[str, Any]) -> str:
+    """取得植物的 canonical key（用於去重）：優先學名，fallback 到中文名+科+屬"""
+    sci = (plant.get("scientific_name") or "").strip()
+    if sci:
+        sci_normalized = normalize_scientific_name(sci)
+        if sci_normalized:
+            parts = sci_normalized.split()
+            if len(parts) >= 2:
+                # 只取 genus + species（忽略變種、亞種等）
+                return f"{parts[0]} {parts[1]}"
+            return sci_normalized
+    # Fallback：中文名 + 科 + 屬
+    cname = (plant.get("chinese_name") or "").strip()
+    family = (plant.get("family") or "").strip()
+    genus = (plant.get("genus") or "").strip()
+    import re
+    if cname:
+        cname = re.sub(r'[\s\-_]+', '', cname)
+    key_parts = [p for p in (cname, family, genus) if p]
+    return " | ".join(key_parts) if key_parts else ""
+
+
 def get_plant_id(plant: Dict[str, Any]) -> str:
-    """取得植物的唯一 ID"""
+    """取得植物的唯一 ID（保留原始邏輯用於進度追蹤，但去重改用 canonical_key）"""
     source_url = plant.get("source_url", "")
     chinese_name = plant.get("chinese_name", "")
     scientific_name = plant.get("scientific_name", "")

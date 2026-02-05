@@ -782,19 +782,44 @@ def resolve_weights(weights):
     return EMBEDDING_WEIGHT, FEATURE_WEIGHT
 
 
+def _normalize_scientific_name(sci: str) -> str:
+    """正規化學名：移除變種標記（var./subsp./f.）並標準化格式"""
+    if not sci:
+        return ""
+    sci = sci.strip()
+    # 移除常見的變種標記（var. / subsp. / f. / cv. / '）
+    import re
+    # 移除 var. / subsp. / f. / cv. 及其後面的內容（保留到 species 為止）
+    sci = re.sub(r'\s+(var\.|subsp\.|ssp\.|f\.|cv\.|cultivar)', '', sci, flags=re.IGNORECASE)
+    # 移除單引號（栽培種標記）
+    sci = sci.replace("'", "").replace('"', '')
+    # 移除多餘空格
+    sci = " ".join(sci.split())
+    return sci.lower()
+
+
 def _canonical_name(payload: dict) -> str:
     """以學名優先建立物種 canonical key，學名缺失時退回中文名+科+屬。"""
     if not isinstance(payload, dict):
         return ""
     sci = (payload.get("scientific_name") or "").strip()
     if sci:
-        parts = sci.split()
-        if len(parts) >= 2:
-            return f"{parts[0].lower()} {parts[1].lower()}"
-        return sci.lower()
+        # 正規化學名（移除變種標記）
+        sci_normalized = _normalize_scientific_name(sci)
+        if sci_normalized:
+            parts = sci_normalized.split()
+            if len(parts) >= 2:
+                # 只取 genus + species（忽略變種、亞種等）
+                return f"{parts[0]} {parts[1]}"
+            return sci_normalized
+    # Fallback：中文名 + 科 + 屬（正規化：移除空格/標點）
     cname = (payload.get("chinese_name") or "").strip()
     family = (payload.get("family") or "").strip()
     genus = (payload.get("genus") or "").strip()
+    # 正規化中文名（移除空格、標點）
+    if cname:
+        import re
+        cname = re.sub(r'[\s\-_]+', '', cname)
     key_parts = [p for p in (cname, family, genus) if p]
     return " | ".join(key_parts)
 
