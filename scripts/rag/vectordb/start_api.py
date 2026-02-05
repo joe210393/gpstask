@@ -100,7 +100,7 @@ qdrant_client = None
 category_embeddings = None  # 預計算的類別向量
 feature_calculator = None  # 特徵權重計算器
 
-# 混合評分權重
+# 混合評分權重（初始預設：embedding 稍高，特徵為輔）
 EMBEDDING_WEIGHT = 0.6  # embedding 相似度權重
 FEATURE_WEIGHT = 0.4    # 特徵匹配權重
 KEYWORD_BONUS_WEIGHT = 0.1  # 關鍵字匹配加分權重（較小，避免過度偏向名稱匹配）
@@ -782,6 +782,23 @@ def resolve_weights(weights):
     return EMBEDDING_WEIGHT, FEATURE_WEIGHT
 
 
+def _canonical_name(payload: dict) -> str:
+    """以學名優先建立物種 canonical key，學名缺失時退回中文名+科+屬。"""
+    if not isinstance(payload, dict):
+        return ""
+    sci = (payload.get("scientific_name") or "").strip()
+    if sci:
+        parts = sci.split()
+        if len(parts) >= 2:
+            return f"{parts[0].lower()} {parts[1].lower()}"
+        return sci.lower()
+    cname = (payload.get("chinese_name") or "").strip()
+    family = (payload.get("family") or "").strip()
+    genus = (payload.get("genus") or "").strip()
+    key_parts = [p for p in (cname, family, genus) if p]
+    return " | ".join(key_parts)
+
+
 def hybrid_search(query: str, features: list = None, guess_names: list = None, top_k: int = 5, weights: dict | None = None, traits: dict | None = None):
     """
     混合搜尋：結合 embedding 相似度 + 特徵權重 + 關鍵字匹配
@@ -796,7 +813,22 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         搜尋結果列表，包含混合分數
     """
     features = features or []
-    guess_names = guess_names or []
+    # 清洗 guess_names（再次保險，Node 端已做初步清洗）
+    raw_guess_names = guess_names or []
+    guess_names = []
+    for name in raw_guess_names:
+        if not name:
+            continue
+        n = str(name).strip()
+        if not n:
+            continue
+        if len(n) < 2 or len(n) > 12:
+            continue
+        # 避免描述性片語再次混入
+        if any(bad in n for bad in ("例如", "比如", "像是", "這是一株", "這種植物", "整體呈現")):
+            continue
+        guess_names.append(n)
+    guess_names = list(dict.fromkeys(guess_names))  # 去重保序
     weights = weights or {}
     embedding_weight = weights.get("embedding", EMBEDDING_WEIGHT)
     feature_weight = weights.get("feature", FEATURE_WEIGHT)
@@ -848,7 +880,7 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
     # 如果 query 包含步驟文字（第一步、第二步...），只提取實際描述部分
     search_query = (query or "").strip()
     if not search_query and guess_names:
-        search_query = " ".join(str(n).strip() for n in guess_names[:5] if n)
+        search_query = " ".join(str(n).strip() for n in guess_names[:3] if n)
     if not search_query and features:
         search_query = " ".join(str(f).strip() for f in features[:15] if f)
     if not search_query:
@@ -930,13 +962,19 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         if query_total_weight > 0:
             print(f"[API] feature_score 標準化: query_total_weight={query_total_weight:.4f}")
 
-    # 2. 計算每個候選的混合分數
+    # 2. 計算每個候選的混合分數（先在物種層級去重，再排序）
     results = []
-    
-    # 預先計算所有候選的分數和匹配詳情
     scored_candidates = []
+    seen_canonical = set()
     
     for r in candidates:
+        key = _canonical_name(r.payload or {})
+        if not key:
+            key = str(r.id)
+        if key in seen_canonical:
+            # 物種層級去重：同一 canonical key 只保留一筆候選
+            continue
+        seen_canonical.add(key)
         embedding_score = r.score  # 0~1
         
         # 關鍵字匹配加分

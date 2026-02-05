@@ -179,12 +179,31 @@ async function smartSearch(query, topK = RAG_TOP_K) {
   }
 }
 
+function cleanGuessNames(rawNames = []) {
+  if (!Array.isArray(rawNames)) return [];
+  const cleaned = [];
+  for (const n of rawNames) {
+    if (!n) continue;
+    let name = String(n).trim();
+    if (!name) continue;
+    // 移除明顯描述性或非名稱片語
+    if (/例如|比如|像是|可能是|可能為|這種植物|這是一株|整體呈現|看起來像/.test(name)) continue;
+    // 移除內含空白/標點過多的長句
+    if (/[。！？；：,，]/.test(name) && name.length > 8) continue;
+    // 長度過短或過長的略過（例如「植物」「一種植物」等）
+    if (name.length < 2 || name.length > 12) continue;
+    cleaned.push(name);
+  }
+  return Array.from(new Set(cleaned));
+}
+
 async function hybridSearch({ query, features = [], guessNames = [], topK = RAG_TOP_K, weights = null, traits = null }) {
   try {
+    const safeGuessNames = cleanGuessNames(guessNames);
     const result = await httpRequest(`${EMBEDDING_API_URL}/hybrid-search`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: { query, features, guess_names: guessNames, top_k: topK, weights, traits }
+      body: { query, features, guess_names: safeGuessNames, top_k: topK, weights, traits }
     });
     const data = result.data;
     if (data && data.error) {
@@ -3740,7 +3759,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 .map(p => p.chinese_name || p.scientific_name)
                 .filter(Boolean);
               const guessFromLm = extractGuessNamesFromDescription(description);
-              const guessNames = [...new Set([...guessFromLm, ...guessNamesFromFirst])].slice(0, 12);
+              const guessNames = cleanGuessNames([...guessFromLm, ...guessNamesFromFirst]).slice(0, 12);
               if (guessFromLm.length > 0) {
                 console.log(`[RAG] LM 猜名補強 guess_names: +[${guessFromLm.join(', ')}]`);
               }
@@ -3843,7 +3862,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 .map(p => p.chinese_name || p.scientific_name)
                 .filter(Boolean);
               const guessFromLm = extractGuessNamesFromDescription(description);
-              const guessNamesFallback = [...new Set([...guessFromLm, ...guessNamesFromFirst])].slice(0, 12);
+              const guessNamesFallback = cleanGuessNames([...guessFromLm, ...guessNamesFromFirst]).slice(0, 12);
               const queryTextZh = keywordFeatures.join('、') + '、' + (detailedDescription || '').substring(0, 80);
               const hybridResult = await hybridSearch({
                 query: queryTextZh.substring(0, 200),
@@ -3887,7 +3906,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 : [];
               const guessFromLmAlt = extractGuessNamesFromDescription(description);
               if (guessFromLmAlt.length > 0) {
-                visionGuessNames = [...new Set([...guessFromLmAlt, ...visionGuessNames])].slice(0, 12);
+                visionGuessNames = cleanGuessNames([...guessFromLmAlt, ...visionGuessNames]).slice(0, 12);
                 console.log(`[RAG] LM 猜名補強 (structured): +[${guessFromLmAlt.join(', ')}]`);
               }
               // P1-1 關鍵字輔助：補強果實/花序

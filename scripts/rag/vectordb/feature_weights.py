@@ -336,16 +336,25 @@ class FeatureWeightCalculator:
         details = []
         total = 0.0
 
+        # 欄位級計分：同一 category 只計一次分（避免同義詞重複加分）
+        per_category_best = {}
         for f in features:
             weight = self.get_weight(f)
-            if weight > 0:
-                info = FEATURE_INDEX.get(f, {})
-                details.append({
+            if weight <= 0:
+                continue
+            info = FEATURE_INDEX.get(f, {})
+            cat = info.get("category", "unknown")
+            prev = per_category_best.get(cat)
+            if not prev or weight > prev["weight"]:
+                per_category_best[cat] = {
                     "name": info.get("name", f),
                     "weight": weight,
-                    "category": info.get("category", "unknown"),
-                })
-                total += weight
+                    "category": cat,
+                }
+
+        for cat, item in per_category_best.items():
+            details.append(item)
+            total += item["weight"]
 
         return {
             "total_score": total,
