@@ -1010,6 +1010,16 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         if query_total_weight > 0:
             print(f"[API] feature_score 標準化: query_total_weight={query_total_weight:.4f}")
 
+    # A. 強特徵 Gate：Query 若沒有任何「強特徵」（果實/花序/特殊/根型），不讓 feature 壓過 embedding
+    STRONG_SCORE_CATEGORIES = frozenset({"fruit_type", "flower_inflo", "trunk_root", "special"})
+    has_strong_in_query = bool(
+        features and FEATURE_INDEX and
+        any((FEATURE_INDEX.get(f) or {}).get("category") in STRONG_SCORE_CATEGORIES for f in features)
+    )
+    effective_feature_weight = feature_weight if has_strong_in_query else min(feature_weight, 0.25)
+    if not has_strong_in_query and features:
+        print(f"[API] 強特徵 Gate: Query 無強特徵（果實/花序/特殊/根型），feature 權重壓低為 {effective_feature_weight:.2f}")
+
     # 2. 計算每個候選的混合分數（先在物種層級去重，再排序）
     results = []
     scored_candidates = []
@@ -1054,8 +1064,13 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
                 except (ImportError, Exception):
                     plant_trait_tokens = []
             
-            # 取得正規化後的 key_features_norm
+            # 取得正規化後的 key_features_norm（D. 只保留合法 FEATURE_VOCAB，避免亂碼導致匹配失真）
             plant_key_features_norm = r.payload.get("key_features_norm", [])
+            if plant_key_features_norm and FEATURE_INDEX:
+                plant_key_features_norm = [
+                    x for x in plant_key_features_norm
+                    if isinstance(x, str) and x.strip() and x in FEATURE_INDEX and "\ufffd" not in x
+                ]
             if not plant_key_features_norm:
                 try:
                     from pathlib import Path
@@ -1145,8 +1160,8 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         keyword_bonus = c["keyword_bonus"]
         match_result = c["match_result"]
         
-        # 基礎分數
-        base_score = (embedding_weight * embedding_score) + (feature_weight * feature_score)
+        # 基礎分數（無強特徵時用壓低後的 feature 權重，避免灌木/互生/總狀灌滿分）
+        base_score = (embedding_weight * embedding_score) + (effective_feature_weight * feature_score)
         
         # 增強分數
         enhancement = embedding_score * feature_score * 0.3

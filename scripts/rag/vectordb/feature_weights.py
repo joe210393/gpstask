@@ -740,14 +740,17 @@ VISION_ROUTER_PROMPT = """你是一位專業的植物形態學家與生態研究
 
 ### 果實 Gate（必做，禁止跳過）
 
+**必填欄位（不可整段省略）：** fruit_visible、fruit_type、fruit_color 必須永遠出現在 JSON 中；看不到果實則填 value=unknown，不可省略這三個欄位。
+
 **第一步（可見性判斷）— Fruit Visibility Gate：**
 你先判斷照片中「果實是否清楚可見」。
 - 若看不到果實、果實太小、被遮擋、像素不足、或無法確定是否為果 → 直接輸出 fruit_visible=false，fruit_type 與 fruit_color 必須為 unknown，confidence ≤ 0.3
 - 只有當你能指出果實的**位置**（例如：右下/枝條末端/成串）、**形狀**（球形/橢圓）、並且確定是果實時，才允許 fruit_visible=true
 
 **第二步（僅當 fruit_visible=true 時）— Fruit Classification：**
-fruit_type 只能從：berry/drupe/capsule/legume/samara/unknown 選
+fruit_type 只能從：berry/drupe/capsule/legume/samara/achene/nut/pome/unknown 選
 fruit_color 只能從：red/orange/yellow/green/purple/black/brown/unknown 選
+fruit_arrangement（可選）：solitary/cluster/raceme/unknown，描述果實為單生、成串或總狀排列
 若無法分辨類型或顏色 → 填 unknown
 
 **證據檢查：** 若 fruit_type != unknown，evidence 必須同時包含「果/果實/結實」任一字 + 位置或形狀描述，否則一律改回 unknown。
@@ -767,6 +770,7 @@ fruit_color 只能從：red/orange/yellow/green/purple/black/brown/unknown 選
   "flower_color": {"value":"purple","confidence":0.8,"evidence":"..."},
   "fruit_type": {"value":"unknown","confidence":0.1,"evidence":"照片未見果實"},
   "fruit_color": {"value":"unknown","confidence":0.1,"evidence":"照片未見果實"},
+  "fruit_arrangement": {"value":"unknown","confidence":0.1,"evidence":"照片未見果實"},
   "root_type": {"value":"unknown","confidence":0.1,"evidence":"照片未見根部"},
   "stem_type": {"value":"unknown","confidence":0.1,"evidence":"..."},
   "seed_type": {"value":"unknown","confidence":0.1,"evidence":"照片未見種子"},

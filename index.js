@@ -303,6 +303,31 @@ async function embeddingStats() {
 }
 const { parseTraitsFromResponse, isPlantFromTraits, traitsToFeatureList, evaluateTraitQuality, extractFeaturesFromDescriptionKeywords, extractGuessNamesFromDescription, removeCompoundSimpleContradiction, capByCategoryAndResolveContradictions } = require('./scripts/rag/vectordb/traits-parser');
 
+/** C. 二段式果實補抽：僅用文字描述向 AI 詢問果實類型，回傳 { fruit_type } 或 null */
+async function fetchFruitTypeFromDescription(description, aiUrl, aiKey, model) {
+  const prompt = `根據以下植物描述，只判斷果實類型。請只回傳一個 JSON 物件，格式為 {"fruit_type": "berry"|"drupe"|"capsule"|"legume"|"samara"|"achene"|"nut"|"pome"|"unknown"}。若無法判斷則填 unknown。不要輸出其他文字。\n\n描述：\n${(description || '').substring(0, 800)}`;
+  const res = await fetch(`${aiUrl}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${aiKey}` },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 80,
+      temperature: 0
+    })
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  const text = data.choices?.[0]?.message?.content?.trim() || '';
+  const jsonMatch = text.match(/\{[\s\S]*?\}/);
+  if (!jsonMatch) return null;
+  try {
+    const parsed = JSON.parse(jsonMatch[0]);
+    if (parsed.fruit_type && parsed.fruit_type !== 'unknown') return parsed;
+  } catch (_) {}
+  return null;
+}
+
 // 避免 Embedding API 暫時不可用時，前端不斷重送導致「看起來像無限循環」
 let _embeddingHealthCache = { ts: 0, ok: null, ready: null };
 async function isEmbeddingApiReady({ ttlMs = 15000 } = {}) {
@@ -3695,7 +3720,23 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
           }
 
           // 第二階段：使用 traits-based 判斷（從結構化 JSON 提取）
-          const traits = parseTraitsFromResponse(description);
+          let traits = parseTraitsFromResponse(description);
+          // C. 二段式果實補抽：LM 有提到果實但 trait 無 fruit_type 時，再問一次只答果實
+          if (traits && AI_API_URL && AI_MODEL) {
+            const descMentionsFruit = /果實|漿果|核果|蒴果|莢果|小果實|結實|紅果|綠.*果/.test(description);
+            const fruitMissing = !traits.fruit_type || String(traits.fruit_type.value || '').toLowerCase() === 'unknown';
+            if (descMentionsFruit && fruitMissing) {
+              try {
+                const fruitOnly = await fetchFruitTypeFromDescription(description, AI_API_URL, AI_API_KEY, AI_MODEL);
+                if (fruitOnly && fruitOnly.fruit_type) {
+                  traits.fruit_type = { value: fruitOnly.fruit_type, confidence: 0.5, evidence: '二段式果實補抽' };
+                  console.log('[RAG] 二段式果實補抽: fruit_type=' + fruitOnly.fruit_type);
+                }
+              } catch (e) {
+                console.warn('[RAG] 二段式果實補抽失敗:', e.message);
+              }
+            }
+          }
           let traitsBasedDecision = null;
 
           if (traits) {
