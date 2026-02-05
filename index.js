@@ -282,7 +282,7 @@ async function embeddingStats() {
     return { ok: false, error: e.message };
   }
 }
-const { parseTraitsFromResponse, isPlantFromTraits, traitsToFeatureList, evaluateTraitQuality, extractFeaturesFromDescriptionKeywords, extractGuessNamesFromDescription, removeCompoundSimpleContradiction } = require('./scripts/rag/vectordb/traits-parser');
+const { parseTraitsFromResponse, isPlantFromTraits, traitsToFeatureList, evaluateTraitQuality, extractFeaturesFromDescriptionKeywords, extractGuessNamesFromDescription, removeCompoundSimpleContradiction, capByCategoryAndResolveContradictions } = require('./scripts/rag/vectordb/traits-parser');
 
 // 避免 Embedding API 暫時不可用時，前端不斷重送導致「看起來像無限循環」
 let _embeddingHealthCache = { ts: 0, ok: null, ready: null };
@@ -3697,6 +3697,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 }
               }
               features = removeCompoundSimpleContradiction(features);
+              features = capByCategoryAndResolveContradictions(features);
               console.log(`📊 使用 traits 提取的特徵: ${features.join(', ')}`);
 
               const traitQuality = evaluateTraitQuality(traits);
@@ -3833,8 +3834,10 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
             }
           } else {
             // traits JSON 抽取失敗：先嘗試從 LM 描述擷取棕櫚/複葉關鍵字（P0：讓棕櫚類進 hybrid）
-            const keywordFeatures = extractFeaturesFromDescriptionKeywords(description);
+            let keywordFeatures = extractFeaturesFromDescriptionKeywords(description);
             if (keywordFeatures.length > 0 && preSearchResults?.plants?.length > 0) {
+              keywordFeatures = removeCompoundSimpleContradiction(keywordFeatures);
+              keywordFeatures = capByCategoryAndResolveContradictions(keywordFeatures);
               console.log(`[RAG] P0 fallback: 從描述擷取特徵 [${keywordFeatures.join(', ')}]，進入 hybrid`);
               const guessNamesFromFirst = preSearchResults.plants
                 .map(p => p.chinese_name || p.scientific_name)
@@ -3897,6 +3900,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 }
               }
               visionFeatures = removeCompoundSimpleContradiction(visionFeatures);
+              visionFeatures = capByCategoryAndResolveContradictions(visionFeatures);
 
               if (visionParsed.success && visionParsed.intent === 'plant' && (visionFeatures.length > 0 || visionGuessNames.length > 0)) {
               // 沒有 traits 品質分數時，用 features 數量做一個保守估計，讓 hybrid 有機會拉開差距

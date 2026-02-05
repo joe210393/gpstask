@@ -513,8 +513,19 @@ function traitsToFeatureList(traits) {
     'scaly': '鱗片'
   };
 
+  // B: 強特徵門檻 - fruit/inflo/special/trunk 需 ≥ 0.55，其餘 ≥ 0.35；evidence < 6 字 → ×0.8
+  const STRONG_TRAIT_KEYS = new Set(['fruit_type', 'inflorescence', 'root_type', 'special_features', 'surface_hair']);
+  const WEAK_MIN = 0.35;
+  const STRONG_MIN = 0.55;
+
   for (const [key, trait] of Object.entries(traits)) {
     if (trait && trait.value && trait.value !== 'unknown') {
+      let conf = Math.max(0, Number(trait.confidence) || 0);
+      const evidence = String(trait.evidence || '').trim();
+      if (evidence.length > 0 && evidence.length < 6) conf *= 0.8;
+      const minConf = STRONG_TRAIT_KEYS.has(key) ? STRONG_MIN : WEAK_MIN;
+      if (conf < minConf) continue;
+
       let traitValue = trait.value;
       
       // 處理複數值（用逗號分隔的情況）
@@ -538,6 +549,9 @@ function traitsToFeatureList(traits) {
       // 優先使用映射表
       const chineseKeyword = traitValueMap[traitValue];
       if (chineseKeyword) {
+        const STRONG_OUTPUTS = new Set(['有刺', '乳汁', '棕櫚', '胎生苗', '氣生根', '板根']);
+        const reqMin = STRONG_OUTPUTS.has(chineseKeyword) ? STRONG_MIN : minConf;
+        if (conf < reqMin) continue;
         // flower_color 誤塞種子顏色時丟棄（紅種子、白種子、黃種子等會干擾搜尋）
         if (key === 'flower_color' && /種子/.test(chineseKeyword)) {
           console.warn(`[TraitsParser] flower_color 含種子顏色 (${chineseKeyword})，已忽略`);
@@ -550,8 +564,12 @@ function traitsToFeatureList(traits) {
           traitValue.includes(k) || k.includes(traitValue)
         );
         if (partialMatch) {
-          features.push(traitValueMap[partialMatch]);
-          console.log(`[TraitsParser] ${key}=${trait.value} 使用部分匹配: ${partialMatch} → ${traitValueMap[partialMatch]}`);
+          const kw = traitValueMap[partialMatch];
+          const reqMin2 = (new Set(['有刺','乳汁','棕櫚','胎生苗','氣生根','板根'])).has(kw) ? STRONG_MIN : minConf;
+          if (conf < reqMin2) { /* skip */ } else {
+            features.push(kw);
+            console.log(`[TraitsParser] ${key}=${trait.value} 使用部分匹配: ${partialMatch} → ${kw}`);
+          }
         } else {
           // 如果還是沒有映射，不要使用原始 value，因為這會干擾 embedding 搜尋
           // 英文特徵會導致中文資料庫匹配失敗
@@ -758,6 +776,79 @@ function extractGuessNamesFromDescription(description) {
   return expanded.slice(0, 8);  // 最多 8 個
 }
 
+/** A + D: 類別上限（每類最多 1–2 個）+ 矛盾處理（互斥、包含）→ 壓成 12–18 個高品質特徵 */
+const FEATURE_CATEGORY = {
+  life_form: ['喬木', '灌木', '草本', '藤本'],
+  leaf_arrangement: ['互生', '對生', '輪生', '叢生'],
+  leaf_type: ['單葉', '複葉', '羽狀複葉', '掌狀複葉', '二回羽狀', '三出複葉'],
+  leaf_margin: ['全緣', '鋸齒', '波狀'],
+  flower_inflo: ['總狀花序', '圓錐花序', '聚繖花序', '繖房花序', '頭狀花序', '繖形花序', '穗狀花序', '佛焰花序'],
+  fruit_type: ['莢果', '漿果', '核果', '蒴果', '翅果', '瘦果', '堅果', '梨果'],
+  flower_color: ['白花', '黃花', '紅花', '紫花', '粉紅花', '橙花'],
+  trunk_root: ['板根', '氣生根'],
+  special: ['有刺', '乳汁', '胎生苗', '棕櫚', '紅苞葉'],
+};
+const CATEGORY_CAP = { special: 2 };
+const INFLORESCO_PRIORITY = ['繖房花序', '聚繖花序', '穗狀花序', '繖形花序', '頭狀花序', '佛焰花序', '總狀花序', '圓錐花序'];
+// 互斥類別內的優先順序（越特殊越前面）
+const LEAF_ARRANGEMENT_PRIORITY = ['輪生', '對生', '叢生', '互生'];
+const LEAF_MARGIN_PRIORITY = ['鋸齒', '波狀', '全緣'];
+
+function getCategory(f) {
+  for (const [cat, list] of Object.entries(FEATURE_CATEGORY)) {
+    if (list.includes(f)) return cat;
+  }
+  return null;
+}
+
+function capByCategoryAndResolveContradictions(features) {
+  if (!Array.isArray(features) || features.length === 0) return features;
+  let list = [...features];
+
+  // D 包含：有細類複葉則刪「複葉」
+  const compoundFine = ['羽狀複葉', '掌狀複葉', '二回羽狀', '三出複葉'];
+  if (compoundFine.some((t) => list.includes(t)) && list.includes('複葉')) {
+    list = list.filter((f) => f !== '複葉');
+  }
+
+   // D 互斥：surface_hair 無毛 vs 有毛（若同時出現，保留「有毛」側，移除「無毛」）
+   const HAIR_POSITIVE_TOKENS = ['柔毛', '絨毛', '粗毛'];
+   const hasHairPositive = HAIR_POSITIVE_TOKENS.some((t) => list.includes(t));
+   if (hasHairPositive && list.includes('無毛')) {
+     list = list.filter((f) => f !== '無毛');
+   }
+
+  // D 互斥 + A 類別上限：每類只保留 1 個（special 最多 2）
+  const byCat = {};
+  for (const f of list) {
+    const cat = getCategory(f);
+    if (!cat) continue;
+    if (!byCat[cat]) byCat[cat] = [];
+    if (!byCat[cat].includes(f)) byCat[cat].push(f);
+  }
+
+  const out = [];
+  for (const [cat, arr] of Object.entries(byCat)) {
+    const cap = CATEGORY_CAP[cat] ?? 1;
+    let chosen = arr;
+    if (cat === 'flower_inflo' && arr.length > 1) {
+      const ordered = INFLORESCO_PRIORITY.filter((p) => arr.includes(p));
+      chosen = ordered.length ? [ordered[0]] : [arr[0]];
+    } else if (cat === 'leaf_arrangement' && arr.length > 1) {
+      const ordered = LEAF_ARRANGEMENT_PRIORITY.filter((p) => arr.includes(p));
+      chosen = ordered.length ? [ordered[0]] : [arr[0]];
+    } else if (cat === 'leaf_margin' && arr.length > 1) {
+      const ordered = LEAF_MARGIN_PRIORITY.filter((p) => arr.includes(p));
+      chosen = ordered.length ? [ordered[0]] : [arr[0]];
+    } else if (arr.length > cap) {
+      chosen = arr.slice(0, cap);
+    }
+    out.push(...chosen);
+  }
+
+  return out.length > 0 ? out : features;
+}
+
 /**
  * 合併後矛盾處理：有複葉特徵時移除單葉（避免 traits + keyword-assist 合併後衝突）
  * @param {string[]} features
@@ -781,5 +872,6 @@ module.exports = {
   evaluateTraitQuality,
   extractFeaturesFromDescriptionKeywords,
   extractGuessNamesFromDescription,
-  removeCompoundSimpleContradiction
+  removeCompoundSimpleContradiction,
+  capByCategoryAndResolveContradictions
 };

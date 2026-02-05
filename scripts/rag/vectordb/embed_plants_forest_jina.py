@@ -63,13 +63,17 @@ BATCH_SIZE = 16  # 每批處理的資料數量（降低以避免速率限制：�
 # 資料路徑
 SCRIPT_DIR = Path(__file__).parent
 DATA_DIR = SCRIPT_DIR.parent / "data"
-# P0.5 去重 > P0 clean > final-4302
+# P0.6 強化 > P0.5 去重 > P0 clean > final-4302
+ENRICHED_FILE = DATA_DIR / "plants-forest-gov-tw-enriched.jsonl"
 DEDUP_FILE = DATA_DIR / "plants-forest-gov-tw-dedup.jsonl"
 CLEAN_FILE = DATA_DIR / "plants-forest-gov-tw-clean.jsonl"
 FINAL_4302_FILE = DATA_DIR / "plants-forest-gov-tw-final-4302.jsonl"
 PROGRESS_FILE = SCRIPT_DIR / "embed_plants_forest_jina_progress.json"
 
-if DEDUP_FILE.exists():
+if ENRICHED_FILE.exists():
+    DATA_FILE = ENRICHED_FILE
+    print(f"✅ 使用 P0.6 強化後資料: {DATA_FILE}")
+elif DEDUP_FILE.exists():
     DATA_FILE = DEDUP_FILE
     print(f"✅ 使用 P0.5 去重後資料: {DATA_FILE}")
 elif CLEAN_FILE.exists():
@@ -499,22 +503,25 @@ def main():
                 plant_id = batch_ids[text_idx]
                 vector = vectors[vec_idx]
                 
-                points.append(PointStruct(
-                    id=hash(plant_id) % (2**63),  # Qdrant ID 必須是 int64
-                    vector=vector,
-                    payload={
-                        "chinese_name": plant.get("chinese_name", ""),
-                        "scientific_name": plant.get("scientific_name", ""),
-                        "family": plant.get("family", ""),
-                        "life_form": plant.get("identification", {}).get("life_form", ""),
-                        "summary": plant.get("identification", {}).get("summary", ""),
-                        "key_features": plant.get("identification", {}).get("key_features", []),
-                        "source": plant.get("source", "forest-gov-tw"),
-                        "source_url": plant.get("source_url", ""),
-                        "plant_id": plant_id,
-                        "raw_data": plant
-                    }
-                ))
+                ident = plant.get("identification", {})
+                payload = {
+                    "chinese_name": plant.get("chinese_name", ""),
+                    "scientific_name": plant.get("scientific_name", ""),
+                    "family": plant.get("family", ""),
+                    "life_form": ident.get("life_form", ""),
+                    "summary": ident.get("summary", ""),
+                    "key_features": ident.get("key_features", []),
+                    "key_features_norm": ident.get("key_features_norm", []),
+                    "trait_tokens": ident.get("trait_tokens", []),
+                    "source": plant.get("source", "forest-gov-tw"),
+                    "source_url": plant.get("source_url", ""),
+                    "plant_id": plant_id,
+                    "raw_data": plant
+                }
+                qs = plant.get("_quality_score")
+                if qs is not None:
+                    payload["quality_score"] = float(qs)
+                points.append(PointStruct(id=hash(plant_id) % (2**63), vector=vector, payload=payload))
             
             # 上傳到 Qdrant
             client.upsert(

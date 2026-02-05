@@ -293,7 +293,12 @@ def _init_background_impl():
 
     # 5. 載入特徵資料
     import os.path
-    # P0.5 去重 > P0 clean > final-4302，與 embed 腳本一致
+    # P0.6 強化 > P0.5 去重 > P0 clean > final-4302，與 embed 腳本一致
+    enriched_paths = [
+        "/app/data/plants-forest-gov-tw-enriched.jsonl",
+        os.path.join(os.path.dirname(__file__), "..", "data", "plants-forest-gov-tw-enriched.jsonl"),
+        os.path.join(os.path.dirname(__file__), "data", "plants-forest-gov-tw-enriched.jsonl"),
+    ]
     dedup_paths = [
         "/app/data/plants-forest-gov-tw-dedup.jsonl",
         os.path.join(os.path.dirname(__file__), "..", "data", "plants-forest-gov-tw-dedup.jsonl"),
@@ -331,15 +336,23 @@ def _init_background_impl():
     ]
     
     data_path = None
-    # P0.5 去重 > P0 clean > final-4302
-    print(f"  搜尋資料檔案（P0.5 去重 > P0 clean > final-4302）...")
-    for p in dedup_paths:
+    # P0.6 強化 > P0.5 去重 > P0 clean > final-4302
+    print(f"  搜尋資料檔案（P0.6 強化 > P0.5 去重 > P0 clean > final-4302）...")
+    for p in enriched_paths:
         exists = os.path.exists(p)
         print(f"    檢查: {p} -> {'✅ 存在' if exists else '❌ 不存在'}")
         if exists:
             data_path = p
-            print(f"    ✅ 找到 P0.5 去重後資料: {p}")
+            print(f"    ✅ 找到 P0.6 強化後資料: {p}")
             break
+    if not data_path:
+        for p in dedup_paths:
+            exists = os.path.exists(p)
+            print(f"    檢查: {p} -> {'✅ 存在' if exists else '❌ 不存在'}")
+            if exists:
+                data_path = p
+                print(f"    ✅ 找到 P0.5 去重後資料: {p}")
+                break
     if not data_path:
         for p in clean_paths:
             exists = os.path.exists(p)
@@ -1099,6 +1112,11 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
                 hybrid_score = max(0.0, hybrid_score - total_penalty)
                 if hybrid_score > 0.2:
                     print(f"[API] SOFT 矛盾懲罰: {c['plant_name']} - {[rid for rid, _ in soft_penalties]}, 共扣 {total_penalty:.2f}")
+
+        # 資料品質降權：低品質筆（缺乏描述、推測等）乘 quality_score
+        qs = r.payload.get("quality_score")
+        if qs is not None and isinstance(qs, (int, float)) and 0 < qs < 1:
+            hybrid_score *= qs
         
         # 確保分數不超過 1.0
         hybrid_score = min(1.0, hybrid_score)

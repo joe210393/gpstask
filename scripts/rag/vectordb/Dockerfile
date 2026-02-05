@@ -26,10 +26,12 @@ RUN rm -rf /app/data/*.jsonl || true
 # 添加 ARG 強制重新執行 COPY（避免構建快取問題）
 ARG FORCE_REBUILD=2025-02-02-no-gate-v1
 
-# 複製資料檔案（embed/start_api 會優先使用 clean 若存在）
+# 複製資料檔案（embed/start_api 會優先使用 enriched > dedup > clean）
+# P0.6 強化：trait 瘦身、原子化、低品質 Gate（建議使用）
+COPY scripts/rag/data/plants-forest-gov-tw-enriched.jsonl /app/data/plants-forest-gov-tw-enriched.jsonl
+# 備用
+COPY scripts/rag/data/plants-forest-gov-tw-dedup.jsonl /app/data/plants-forest-gov-tw-dedup.jsonl
 COPY scripts/rag/data/plants-forest-gov-tw-final-4302.jsonl /app/data/plants-forest-gov-tw-final-4302.jsonl
-# P0：若已執行 npm run clean:plant-data 並提交 clean.jsonl，可取消下行註解
-# COPY scripts/rag/data/plants-forest-gov-tw-clean.jsonl /app/data/plants-forest-gov-tw-clean.jsonl
 
 RUN ls -lh /app/data/*.jsonl 2>/dev/null || true && echo "✅ 資料檔案已複製"
 

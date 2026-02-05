@@ -66,6 +66,7 @@ FEATURE_VOCAB = {
         "頭狀花序": {"en": "capitulum", "base_w": 0.08, "max_cap": 0.12},
         "繖形花序": {"en": "umbel", "base_w": 0.07, "max_cap": 0.11},
         "穗狀花序": {"en": "spike", "base_w": 0.07, "max_cap": 0.11},
+        "佛焰花序": {"en": "spadix", "base_w": 0.07, "max_cap": 0.11},
     },
     # 果實（工項 C：強特徵權重提升）
     "fruit_type": {
@@ -74,6 +75,9 @@ FEATURE_VOCAB = {
         "核果": {"en": "drupe", "base_w": 0.07, "max_cap": 0.11},
         "蒴果": {"en": "capsule", "base_w": 0.07, "max_cap": 0.11},
         "翅果": {"en": "samara", "base_w": 0.07, "max_cap": 0.11},
+        "瘦果": {"en": "achene", "base_w": 0.07, "max_cap": 0.11},
+        "堅果": {"en": "nut", "base_w": 0.07, "max_cap": 0.11},
+        "梨果": {"en": "pome", "base_w": 0.07, "max_cap": 0.11},
     },
     # 根/樹幹
     "trunk_root": {
@@ -192,72 +196,87 @@ class FeatureWeightCalculator:
                 key_features_text,
             ]).lower()
 
-            # 找出這個文件包含哪些特徵
+            # 找出這個文件包含哪些特徵（對齊 FEATURE_INDEX）
             found_features = set()
 
-            # 直接檢查 life_form（確保是字串）
-            if life_form:
-                # 確保 life_form 是字串
-                if isinstance(life_form, list):
-                    life_form_str = " ".join([str(lf) for lf in life_form])
+            # 1. key_features_norm / key_features（中文特徵，直接對應 FEATURE_INDEX）
+            kfn = identification.get("key_features_norm") or identification.get("key_features") or []
+            kf_list = kfn if isinstance(kfn, list) else [kfn] if kfn else []
+            for item in kf_list:
+                if not item or not isinstance(item, str):
+                    continue
+                item = item.strip()
+                if len(item) < 2:
+                    continue
+                # 精確匹配
+                if item in FEATURE_INDEX:
+                    found_features.add(FEATURE_INDEX[item]["name"])
                 else:
-                    life_form_str = str(life_form)
-                
-                life_form_lower = life_form_str.lower()
-                if "tree" in life_form_lower or life_form_lower == "喬木":
+                    # 部分匹配：穗狀→穗狀花序、總狀→總狀花序 等
+                    for zh_name in FEATURE_INDEX:
+                        if isinstance(zh_name, str) and (item in zh_name or zh_name.startswith(item)):
+                            found_features.add(FEATURE_INDEX[zh_name]["name"])
+                            break
+
+            # 2. trait_tokens（k=v 格式 → 對應 FEATURE_INDEX 中文）
+            tt = identification.get("trait_tokens") or []
+            tt_list = tt if isinstance(tt, list) else []
+            # trait_vocab 映射: inflorescence=spike -> 穗狀花序, fruit_type=capsule -> 蒴果
+            TRAIT_TO_ZH = {
+                "raceme": "總狀花序", "panicle": "圓錐花序", "cyme": "聚繖花序",
+                "umbel": "繖形花序", "spike": "穗狀花序", "capitulum": "頭狀花序",
+                "corymb": "繖房花序", "spadix": "佛焰花序", "solitary": "單生花",
+                "alternate": "互生", "opposite": "對生", "whorled": "輪生", "basal": "叢生",
+                "simple": "單葉", "compound": "複葉", "pinnate": "羽狀複葉",
+                "bipinnate": "二回羽狀", "palmate": "掌狀複葉", "trifoliate": "三出複葉",
+                "entire": "全緣", "serrate": "鋸齒", "serrated": "鋸齒", "wavy": "波狀",
+                "pod": "莢果", "berry": "漿果", "drupe": "核果", "capsule": "蒴果",
+                "samara": "翅果", "achene": "瘦果", "nut": "堅果", "pome": "梨果",
+                "shrub": "灌木", "tree": "喬木", "herb": "草本", "vine": "藤本",
+                "white": "白花", "yellow": "黃花", "red": "紅花", "purple": "紫花",
+                "pink": "粉紅花", "orange": "橙花",
+                "aerial_root": "氣生根", "aerial": "氣生根", "buttress": "板根",
+                "viviparous": "胎生苗", "bract_red": "紅苞葉",
+            }
+            for tok in tt_list:
+                if not tok or "=" not in str(tok):
+                    continue
+                k, v = str(tok).split("=", 1)
+                v = v.strip().lower()
+                zh = TRAIT_TO_ZH.get(v)
+                if zh and zh in FEATURE_INDEX:
+                    found_features.add(zh)
+
+            # 3. life_form 備援
+            if life_form:
+                lf_str = " ".join(life_form) if isinstance(life_form, list) else str(life_form)
+                lf_lower = lf_str.lower()
+                if "喬木" in lf_str or "tree" in lf_lower:
                     found_features.add("喬木")
-                elif "shrub" in life_form_lower or life_form_lower == "灌木":
+                if "灌木" in lf_str or "shrub" in lf_lower:
                     found_features.add("灌木")
-                elif "herb" in life_form_lower or life_form_lower == "草本":
+                if "草本" in lf_str or "herb" in lf_lower:
                     found_features.add("草本")
-                elif "vine" in life_form_lower or "climber" in life_form_lower or life_form_lower == "藤本":
+                if "藤本" in lf_str or "vine" in lf_lower or "climber" in lf_lower:
                     found_features.add("藤本")
 
-            # 用英文關鍵字搜尋
-            en_patterns = {
-                # 葉序
-                "alternate": "互生",
-                "opposite": "對生",
-                "whorled": "輪生",
-                # 葉型
-                "simple lea": "單葉",
-                "compound lea": "複葉",
-                "pinnate": "羽狀複葉",
-                "bipinnate": "二回羽狀",
-                "palmate": "掌狀複葉",
-                # 葉緣
-                "entire": "全緣",
-                "serrat": "鋸齒",
-                "dentate": "鋸齒",
-                # 花色 (需要更精確的匹配)
-                "white flower": "白花",
-                "yellow flower": "黃花",
-                "red flower": "紅花",
-                "purple flower": "紫花",
-                # 花序
-                "raceme": "總狀花序",
-                "panicle": "圓錐花序",
-                # 果實
-                "pod": "莢果",
-                "legume": "莢果",
-                # 根/樹幹
-                "buttress": "板根",
-                "aerial root": "氣生根",
-                "prop root": "氣生根",
-                # 特殊
-                "thorn": "有刺",
-                "spine": "有刺",
-                "prickl": "有刺",
-                "vivipar": "胎生苗",
-            }
-
-            for pattern, feature in en_patterns.items():
-                if pattern in text:
-                    found_features.add(feature)
+            # 4. 全文中文關鍵字（補充 key_features 遺漏）
+            zh_patterns = [
+                "總狀花序", "圓錐花序", "穗狀花序", "聚繖花序", "繖房花序", "繖形花序", "頭狀花序",
+                "漿果", "核果", "蒴果", "莢果", "翅果", "瘦果", "堅果", "梨果",
+                "互生", "對生", "輪生", "叢生",
+                "羽狀複葉", "掌狀複葉", "二回羽狀", "三出複葉", "複葉", "單葉",
+                "全緣", "鋸齒", "波狀", "白花", "黃花", "紅花", "紫花", "棕櫚", "有刺", "乳汁",
+                "氣生根", "板根", "胎生苗", "紅苞葉", "佛焰花序",
+            ]
+            for zh in zh_patterns:
+                if zh in text or zh in key_features_text:
+                    found_features.add(zh)
 
             # 更新 df
             for feature in found_features:
-                self.df[feature] += 1
+                if feature in FEATURE_INDEX:
+                    self.df[feature] += 1
 
         # 計算 IDF 和 RareCoef
         for feature in self.df:
@@ -379,15 +398,16 @@ class FeatureWeightCalculator:
             use_tokens = False
             use_normalize = False
         
-        # 🔥 關鍵修復：正規化 query_features
+        # 🔥 關鍵修復：正規化 query_features（僅用於 key_features 轉換）
+        # 注意：花序/果實類（總狀花序、穗狀花序、蒴果等）不要過度正規化，否則 FEATURE_INDEX 查不到
         query_features_norm = query_features
         if use_normalize:
             query_features_norm = normalize_features(query_features)
         
-        # 將 query_features 轉換為 trait_tokens（如果使用新方法）
+        # 將 query_features 轉換為 trait_tokens（用原始特徵，避免 花序/果 被 strip 掉）
         query_trait_tokens = []
         if use_tokens:
-            query_trait_tokens = key_features_to_trait_tokens(query_features_norm)
+            query_trait_tokens = key_features_to_trait_tokens(query_features)
         
         # 🔥 關鍵修復：直接從 query_features 中提取 trait token 格式的特徵
         # 如果 query_features 已經是 trait token 格式（如 "life_form=herb"），直接使用
@@ -440,14 +460,15 @@ class FeatureWeightCalculator:
         
         must_traits_matched = []
         
-        # 🔥 關鍵修復：使用正規化後的特徵進行匹配
-        for f in query_features_norm:
+        # 🔥 關鍵修復：用「原始」query_features 迭代，避免 normalize 把 總狀花序→總狀、蒴果→蒴 導致 FEATURE_INDEX 查不到
+        for f in query_features:
             info = FEATURE_INDEX.get(f)
+            if not info and use_normalize:
+                norm_list = normalize_features([f])
+                if norm_list:
+                    info = FEATURE_INDEX.get(norm_list[0])
             if not info:
-                # 如果正規化後的特徵不在索引中，嘗試原始特徵
-                info = FEATURE_INDEX.get(f)
-                if not info:
-                    continue
+                continue
 
             std_name = info["name"]
             weight = self.get_weight(f)
@@ -528,11 +549,14 @@ class FeatureWeightCalculator:
             # 🔥 關鍵修復：優先使用正規化後的 key_features_norm 進行匹配
             if not matched_flag:
                 # 優先：使用正規化後的 key_features_norm
-                if use_normalize and plant_key_features_norm:
-                    if std_name in plant_key_features_norm:
+                if plant_key_features_norm:
+                    if std_name in plant_key_features_norm or f in plant_key_features_norm:
                         matched_flag = True
-                    # 也檢查原始特徵（向後兼容）
-                    elif f in plant_key_features_norm:
+                    # 部分匹配：植物端有「穗狀」可匹配 query「穗狀花序」、有「蒴」可匹配「蒴果」
+                    elif any(
+                        kfn in std_name or std_name.startswith(kfn) or (len(kfn) >= 2 and kfn in std_name)
+                        for kfn in plant_key_features_norm
+                    ):
                         matched_flag = True
                 
                 # 備用：全文掃描（向後兼容）
