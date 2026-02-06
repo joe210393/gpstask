@@ -1198,6 +1198,22 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
                 feature_score = min(1.0, feature_score_raw / query_total_weight)
             else:
                 feature_score = feature_score_raw * coverage
+            
+            # 🔥 防飽和機制：當 Query traits 太少時，feature_score 上限封頂
+            # 避免「3 個特徵就滿分」導致錯誤候選霸榜（如馬纓丹 case 中水漆 100%）
+            if features:
+                trait_count = len(features)
+                # 如果 traits < 4，feature_score 上限遞減
+                if trait_count < 4:
+                    max_feature_score = 0.55 + (trait_count - 1) * 0.15  # 1個→0.55, 2個→0.70, 3個→0.85
+                    if feature_score > max_feature_score:
+                        feature_score = max_feature_score
+                        print(f"[API] 防飽和: Query 只有 {trait_count} 個特徵，feature_score 封頂為 {max_feature_score:.2f}")
+                elif trait_count == 4:
+                    # 4 個特徵時，上限為 0.90
+                    if feature_score > 0.90:
+                        feature_score = 0.90
+                # 5 個以上特徵時，允許達到 1.0
         else:
             feature_score = 0.0
             coverage = 0.0

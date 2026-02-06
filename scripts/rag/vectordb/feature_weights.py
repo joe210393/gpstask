@@ -345,7 +345,7 @@ class FeatureWeightCalculator:
             print(f"  {feature:12} df={df:4} idf={idf:.3f} coef={coef:.3f} → 權重={weight:.4f}")
 
     def get_weight(self, feature_name: str) -> float:
-        """取得特徵的最終權重"""
+        """取得特徵的最終權重（使用 IDF 權重調整）"""
         # 找到標準化的特徵名稱
         info = FEATURE_INDEX.get(feature_name)
         if not info:
@@ -357,6 +357,11 @@ class FeatureWeightCalculator:
 
         # 如果沒有計算過 df，使用預設 coef=1.0
         coef = self.rare_coef.get(std_name, 1.0)
+        
+        # 🔥 IDF 權重調整：越常見的特徵（df 大 → idf 小 → coef 小）權重越低
+        # 例如：「灌木」「互生」「全緣」「總狀花序」這些高頻特徵，coef 會接近 0.2-0.5
+        # 而「鐘形花」「繖房花序」「下垂花序」這些稀有特徵，coef 會接近 1.5-2.5
+        # 這樣可以讓稀有特徵的權重明顯高於常見特徵，避免「3 個通用特徵就滿分」
 
         return min(base_w * coef, max_cap)
 
@@ -765,16 +770,25 @@ VISION_ROUTER_PROMPT = """你是一位專業的植物形態學家與生態研究
 明確指出：植物 / 動物 / 人造物 / 其他
 
 第四步：提取關鍵識別特徵（僅限植物）
+**重要：只提取你能清楚觀察到的特徵，不確定就標註 unknown，絕對不要猜測**
+
 - 生活型（與尺寸一致）
 - 葉序（互生/對生/輪生）
+  * **如果看不到葉片排列方式或角度不清楚** → 標註 unknown
+  * 不要因為「看起來像」就猜測
 - 葉形（披針/卵形/橢圓/心形/線形/圓形...）
+  * **如果葉形不清楚** → 標註 unknown
 - 葉緣（全緣/鋸齒/波狀/裂緣...）
-- **花序類型（必須仔細判斷，這是關鍵鑑別特徵）**：
-  * 觀察花朵排列：是沿主軸排列（總狀/穗狀）？還是從同一點發出（繖形）？
+  * **如果看不到葉緣細節** → 標註 unknown
+  * 不要因為「看起來像」就猜測全緣或鋸齒
+- **花序類型（必須仔細判斷，這是關鍵鑑別特徵，但不要猜測）**：
+  * **如果看不到整個花序輪廓、看不到花梗排列方式、或無法判斷開花順序** → 必須標註 inflorescence=unknown
+  * 觀察花朵排列：是沿主軸排列（總狀/穗狀）？還是從同一點發出（繖形）？還是排列在一個平面上（繖房）？
   * 觀察開花順序：外圍先開（繖房）？中央先開（聚繖）？下部先開（總狀）？
   * 觀察花序方向：是向上（直立）？還是向下（下垂）？
-  * 如果花序向下垂掛，必須標註 inflorescence_orientation=drooping
-  * 如果花朵排列在一個平面上且外圍先開，必須標註 inflorescence=corymb（繖房花序）
+  * **如果花序向下垂掛且清楚可見**，必須標註 inflorescence_orientation=drooping
+  * **如果花朵排列在一個平面上且外圍先開且清楚可見**，必須標註 inflorescence=corymb（繖房花序）
+  * **如果不確定，請標註 unknown，不要用常識補完**
 - 花色（只描述花朵顏色；沒有花就 unknown）
 - 葉色（leaf_color）與花色（flower_color）是不同特徵
 
@@ -931,13 +945,15 @@ fruit_arrangement（可選）：solitary/cluster/raceme/unknown，描述果實�
 }
 ```
 
-重要規則：
+重要規則（嚴格遵守，違反會導致辨識錯誤）：
 1) 每個 trait 都要有 value、confidence(0~1)、evidence
-2) 看不到/無法判斷請用 value=unknown 並給低 confidence（0.1–0.3）
-3) 只填能清楚觀察到的特徵，不確定就 unknown；禁止猜測補齊
-4) 寧可輸出 2–4 個有證據的強特徵，不要湊滿 5 個通用特徵（灌木/單葉/全緣/圓錐）
-5) 強特徵優先：複葉類型、果實、花序型（特別是繖房花序、下垂花序）、葉緣鋸齒等比生活型更具鑑別力
-6) **花序類型特別重要（這是火筒樹、長穗木等植物的關鍵鑑別特徵）**：
+2) **看不到/無法判斷請用 value=unknown 並給低 confidence（0.1–0.3）**
+3) **只填能清楚觀察到的特徵，不確定就 unknown；絕對禁止猜測補齊**
+4) **寧可輸出 2–4 個有證據的強特徵，不要湊滿 5 個通用特徵（灌木/單葉/全緣/圓錐）**
+5) **錯的特徵比漏掉更致命**：如果你不確定花序類型，請標註 unknown，不要隨便猜測「總狀花序」或「圓錐花序」
+6) **強特徵優先**：複葉類型、果實、花序型（特別是繖房花序、下垂花序）、葉緣鋸齒等比生活型更具鑑別力
+7) **花序類型特別重要（這是火筒樹、長穗木等植物的關鍵鑑別特徵）**：
+   * **如果看不到整個花序輪廓、看不到花梗排列方式、或無法判斷開花順序** → 必須標註 inflorescence=unknown，confidence ≤ 0.3
    * **如果看到花序向下垂掛、懸垂、或向下彎曲** → 必須標註 inflorescence_orientation=drooping（下垂花序），confidence ≥ 0.7
    * **如果看到花朵排列在一個平面上且外圍先開** → 必須標註 inflorescence=corymb（繖房花序），confidence ≥ 0.7
    * 如果看到中央先開 → 必須標註 inflorescence=cyme（聚繖花序）
@@ -945,9 +961,12 @@ fruit_arrangement（可選）：solitary/cluster/raceme/unknown，描述果實�
      - 花朵沿主軸排列（不是平面排列）
      - 下部先開（不是外圍先開）
      - 花梗長度相近（不是外長內短）
-   * 如果花序類型不明確，請標註 unknown，不要隨便猜測
-7) 若第三步判斷為「動物/人造物/其他」，請輸出空 JSON：{}
-8) fruit_visible=false 時，fruit_type 與 fruit_color 必須為 unknown
+   * **如果花序類型不明確，請標註 unknown，不要用常識補完（例如很多花就說總狀）**
+8) **葉序/葉緣判斷**：
+   * 如果看不到葉片排列方式或葉緣細節 → 標註 unknown
+   * 不要因為「看起來像」就猜測互生/對生或全緣/鋸齒
+9) 若第三步判斷為「動物/人造物/其他」，請輸出空 JSON：{}
+10) fruit_visible=false 時，fruit_type 與 fruit_color 必須為 unknown
 
 ### 果實輸出範例（照做可避免亂猜）
 

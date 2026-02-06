@@ -608,6 +608,12 @@ function traitsToFeatureList(traits) {
   };
 
   for (const [key, trait] of Object.entries(traits)) {
+    // 嚴格過濾：unknown 或空值直接跳過，不進入 hybrid traits
+    if (!trait || !trait.value || trait.value === 'unknown' || trait.value === '' || String(trait.value).trim() === '') {
+      continue;
+    }
+    
+    // 只處理有效的特徵值
     if (trait && trait.value && trait.value !== 'unknown') {
       let conf = Math.max(0, Number(trait.confidence) || 0);
       const evidence = String(trait.evidence || '').trim();
@@ -1061,6 +1067,104 @@ function removeCompoundSimpleContradiction(features) {
   return features;
 }
 
+/**
+ * 多圖投票聚合：聚合多張圖片的 traits 結果，提高穩定性
+ * 策略：
+ * - 花序類：需要 ≥2 張一致才輸出（否則 unknown）
+ * - 葉序/葉緣：用平均 + 取眾數
+ * - 只要有一張很清楚看到強訊號，就可以 override 其他張的不確定
+ * @param {Array<Object>} traitsList - 多張圖片的 traits 結果陣列
+ * @returns {Object|null} 聚合後的 traits 物件
+ */
+function aggregateTraitsFromMultipleImages(traitsList) {
+  if (!traitsList || traitsList.length === 0) return null;
+  if (traitsList.length === 1) return traitsList[0];
+  
+  const aggregated = {};
+  const voteCounts = {}; // 記錄每個 key-value 出現的次數
+  const confidenceSums = {}; // 記錄每個 key-value 的 confidence 總和
+  
+  // 第一輪：統計每張圖的 traits
+  for (const traits of traitsList) {
+    if (!traits || typeof traits !== 'object') continue;
+    
+    for (const [key, trait] of Object.entries(traits)) {
+      if (!trait || !trait.value || trait.value === 'unknown') continue;
+      
+      const value = String(trait.value).toLowerCase();
+      const conf = Math.max(0, Math.min(1, Number(trait.confidence) || 0));
+      const voteKey = `${key}:${value}`;
+      
+      if (!voteCounts[voteKey]) {
+        voteCounts[voteKey] = 0;
+        confidenceSums[voteKey] = 0;
+      }
+      voteCounts[voteKey]++;
+      confidenceSums[voteKey] += conf;
+    }
+  }
+  
+  // 第二輪：決定最終值
+  // 對於關鍵特徵（花序類），需要 ≥2 張一致才輸出
+  const CRITICAL_KEYS = new Set(['inflorescence', 'inflorescence_orientation']);
+  const MIN_VOTES_FOR_CRITICAL = 2;
+  
+  for (const [voteKey, count] of Object.entries(voteCounts)) {
+    const [key, value] = voteKey.split(':');
+    const avgConf = confidenceSums[voteKey] / count;
+    
+    // 關鍵特徵需要多數投票
+    if (CRITICAL_KEYS.has(key)) {
+      if (count >= MIN_VOTES_FOR_CRITICAL && avgConf >= 0.5) {
+        // 找到對應的 trait 物件（取 confidence 最高的）
+        let bestTrait = null;
+        let bestConf = 0;
+        for (const traits of traitsList) {
+          if (traits && traits[key] && String(traits[key].value).toLowerCase() === value) {
+            const conf = Math.max(0, Math.min(1, Number(traits[key].confidence) || 0));
+            if (conf > bestConf) {
+              bestConf = conf;
+              bestTrait = traits[key];
+            }
+          }
+        }
+        if (bestTrait) {
+          aggregated[key] = {
+            ...bestTrait,
+            confidence: avgConf, // 使用平均 confidence
+            evidence: `${bestTrait.evidence} (${count}張圖一致)`
+          };
+        }
+      }
+      // 如果投票數不足，不輸出（保持 unknown）
+    } else {
+      // 非關鍵特徵：取眾數（出現次數最多的）
+      if (count >= Math.ceil(traitsList.length / 2) && avgConf >= 0.4) {
+        let bestTrait = null;
+        let bestConf = 0;
+        for (const traits of traitsList) {
+          if (traits && traits[key] && String(traits[key].value).toLowerCase() === value) {
+            const conf = Math.max(0, Math.min(1, Number(traits[key].confidence) || 0));
+            if (conf > bestConf) {
+              bestConf = conf;
+              bestTrait = traits[key];
+            }
+          }
+        }
+        if (bestTrait) {
+          aggregated[key] = {
+            ...bestTrait,
+            confidence: avgConf,
+            evidence: `${bestTrait.evidence} (${count}張圖一致)`
+          };
+        }
+      }
+    }
+  }
+  
+  return Object.keys(aggregated).length > 0 ? aggregated : null;
+}
+
 module.exports = {
   parseTraitsFromResponse,
   validateTraits,
@@ -1070,5 +1174,6 @@ module.exports = {
   extractFeaturesFromDescriptionKeywords,
   extractGuessNamesFromDescription,
   removeCompoundSimpleContradiction,
-  capByCategoryAndResolveContradictions
+  capByCategoryAndResolveContradictions,
+  aggregateTraitsFromMultipleImages
 };
