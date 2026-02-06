@@ -180,6 +180,7 @@ function validateTraits(traits) {
     'leaf_color',  // 葉片顏色
     'inflorescence',
     'flower_color',
+    'flower_shape',  // 鐘形花（風鈴草等）
     'fruit_type',
     'fruit_color',
     'root_type',  // 新增：根類型
@@ -456,6 +457,15 @@ function traitsToFeatureList(traits) {
     'pink, white': '粉紅花',
     'red, pink': '紅花',
     
+    // flower_shape（鐘形花：風鈴草等）
+    'bell': '鐘形花',
+    'campanulate': '鐘形花',
+    'tubular': '鐘形花',
+    'bell-shaped': '鐘形花',
+    'bell shape': '鐘形花',
+    'bellshaped': '鐘形花',
+    'campanula': '鐘形花',
+    
     // fruit_type
     'drupe': '核果',
     'capsule': '蒴果',
@@ -536,16 +546,22 @@ function traitsToFeatureList(traits) {
   };
 
   // B: 強特徵門檻 - fruit/inflo/special/trunk 需 ≥ 0.55，其餘 ≥ 0.35；evidence < 6 字 → ×0.8
-  const STRONG_TRAIT_KEYS = new Set(['fruit_type', 'inflorescence', 'root_type', 'special_features', 'surface_hair']);
+  const STRONG_TRAIT_KEYS = new Set(['fruit_type', 'inflorescence', 'flower_shape', 'root_type', 'special_features', 'surface_hair']);
   const WEAK_MIN = 0.35;
   const STRONG_MIN = 0.55;
+  // 部分 key 需要稍微放寬門檻（例如 flower_shape：LM 常給 0.45–0.5，但對風鈴草非常關鍵）
+  const PER_KEY_MIN_CONF = {
+    // 直接放寬到 0.30，只要不是 unknown 就盡量保留
+    flower_shape: 0.30,
+  };
 
   for (const [key, trait] of Object.entries(traits)) {
     if (trait && trait.value && trait.value !== 'unknown') {
       let conf = Math.max(0, Number(trait.confidence) || 0);
       const evidence = String(trait.evidence || '').trim();
       if (evidence.length > 0 && evidence.length < 6) conf *= 0.8;
-      const minConf = STRONG_TRAIT_KEYS.has(key) ? STRONG_MIN : WEAK_MIN;
+      const baseMinConf = STRONG_TRAIT_KEYS.has(key) ? STRONG_MIN : WEAK_MIN;
+      const minConf = PER_KEY_MIN_CONF[key] != null ? PER_KEY_MIN_CONF[key] : baseMinConf;
       if (conf < minConf) continue;
 
       let traitValue = trait.value;
@@ -703,7 +719,7 @@ function extractFeaturesFromDescriptionKeywords(description) {
   if (/扇形葉|扇狀葉|扇形裂片/.test(text) && !features.includes('棕櫚')) features.push('棕櫚');
 
   // A2 果實（fruit_color 需搭配 果/果實/結實/成熟）
-  const hasFruitContext = /果實|結實|成熟|紅果|橙紅.*果/.test(text);
+  const hasFruitContext = /果實|結實|成熟|紅果|橙紅.*果|小果實/.test(text);
   if (/漿果|多漿果/.test(text)) features.push('漿果');
   else if (/核果/.test(text)) features.push('核果');
   else if (/蒴果|朔果/.test(text)) features.push('蒴果'); // 朔果=錯字
@@ -713,6 +729,14 @@ function extractFeaturesFromDescriptionKeywords(description) {
     if (/(?:紅色|鮮紅|紫黑|深紅|橙紅)[色的]*(?:果實|果)|紅果|橙紅色的果實|橙紅.*果實/.test(text)) features.push('漿果');
     else if (/(?:果實|果).*(?:紅色|鮮紅|橙紅|紫黑|鮮豔)/.test(text)) features.push('漿果');
     else if (/成熟.*(?:紅色|鮮紅|橙紅|紫黑)|變成.*(?:紅色|鮮紅).*果/.test(text)) features.push('漿果');
+    // LM 常寫「綠色的小果實」「小果實」「葉腋處綠色果實」→ 多為漿果型，補進 Query 以提升鑑別
+    else if (/(?:綠色[的]?小?果實|小果實|果實.*綠色|綠色的?[小]?果實)/.test(text)) features.push('漿果');
+  }
+
+  // A2.5 花型（鐘形花：風鈴草等，LM 常寫鐘形/吊鐘/鈴鐺狀/風鈴狀）
+  // 注意：TLPG / LM 描述裡常出現「風鈴狀花」「風鈴形花」，這裡一律視為鐘形花處理
+  if (/鐘形|吊鐘|鈴鐺狀|鐘狀|鐘形花|闊鐘形|筒狀鐘形|風鈴狀|風鈴形|風鈴/.test(text)) {
+    features.push('鐘形花');
   }
 
   // A3 花序：D1 只保留 1 個，優先序 繖房>聚繖>穗狀>繖形>頭狀>總狀>圓錐
@@ -805,6 +829,7 @@ const FEATURE_CATEGORY = {
   leaf_type: ['單葉', '複葉', '羽狀複葉', '掌狀複葉', '二回羽狀', '三出複葉'],
   leaf_margin: ['全緣', '鋸齒', '波狀'],
   flower_inflo: ['總狀花序', '圓錐花序', '聚繖花序', '繖房花序', '頭狀花序', '繖形花序', '穗狀花序', '佛焰花序'],
+  flower_shape: ['鐘形花'],
   fruit_type: ['莢果', '漿果', '核果', '蒴果', '翅果', '瘦果', '堅果', '梨果'],
   flower_color: ['白花', '黃花', '紅花', '紫花', '粉紅花', '橙花'],
   trunk_root: ['板根', '氣生根'],
