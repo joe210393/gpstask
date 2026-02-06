@@ -805,9 +805,12 @@ function extractFeaturesFromDescriptionKeywords(description) {
   else if (/成對|兩朵|對生花/.test(text)) features.push('成對花');
   else if (/簇生|多朵|密集|叢生花/.test(text)) features.push('簇生花');
   
-  // A2.7 花序方向（直立/下垂）
-  if (/下垂|垂吊|下彎|向下|低垂|懸垂|垂掛/.test(text)) features.push('下垂花序');
-  else if (/直立|向上|挺立/.test(text)) features.push('直立花序');
+  // A2.7 花序方向（直立/下垂）- 強化提取，特別是長穗木等植物
+  if (/下垂|垂吊|下彎|向下|低垂|懸垂|垂掛|向下垂掛|花序向下|向下排列/.test(text)) {
+    features.push('下垂花序');
+  } else if (/直立|向上|挺立|向上排列/.test(text)) {
+    features.push('直立花序');
+  }
   
   // A2.8 花色強化提取（特別是紫花、粉紅花對野牡丹等植物鑑別力高）
   if (/深紫|濃紫|紫紅色|紫紅|深紫色|濃紫色/.test(text)) features.push('紫花');
@@ -824,13 +827,14 @@ function extractFeaturesFromDescriptionKeywords(description) {
   }
 
   // A3 花序：D1 只保留 1 個，優先序 繖房>聚繖>穗狀>繖形>頭狀>總狀>圓錐
-  if (/繖房花序|繖房/.test(text)) features.push('繖房花序');
-  else if (/聚繖花序|聚繖/.test(text)) features.push('聚繖花序');
-  else if (/穗狀花序|穗狀/.test(text)) features.push('穗狀花序');
-  else if (/繖形花序|傘形花序|繖狀/.test(text)) features.push('繖形花序');
-  else if (/頭狀花序|頭狀/.test(text)) features.push('頭狀花序');
-  else if (/總狀花序|總狀/.test(text)) features.push('總狀花序');
-  else if (/圓錐花序|圓錐/.test(text)) features.push('圓錐花序');
+  // 強化提取：繖房花序（火筒樹等）和下垂花序（長穗木等）的關鍵字
+  if (/繖房花序|繖房|花朵排列在一個平面上|外圍先開|平面排列/.test(text)) features.push('繖房花序');
+  else if (/聚繖花序|聚繖|中央先開/.test(text)) features.push('聚繖花序');
+  else if (/穗狀花序|穗狀|無花梗|直接著生/.test(text)) features.push('穗狀花序');
+  else if (/繖形花序|傘形花序|繖狀|同一點發出|雨傘骨架/.test(text)) features.push('繖形花序');
+  else if (/頭狀花序|頭狀|密集排列成頭狀/.test(text)) features.push('頭狀花序');
+  else if (/總狀花序|總狀|沿主軸排列|下部先開/.test(text)) features.push('總狀花序');
+  else if (/圓錐花序|圓錐|總狀.*分枝/.test(text)) features.push('圓錐花序');
 
   // B1 葉序（最多 1 個）
   if (/輪生/.test(text)) features.push('輪生');

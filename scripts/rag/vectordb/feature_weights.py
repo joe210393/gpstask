@@ -749,7 +749,17 @@ VISION_ROUTER_PROMPT = """你是一位專業的植物形態學家與生態研究
 
 第二步：詳細描述圖片細節（必須完成）
 - 如果是植物，必須使用專業形態學術語描述（生活型、葉序、葉形、葉緣、花序、果實等）
-- 花序請盡量判斷（總狀 / 圓錐 / 繖形 / 頭狀 / 單生花...）
+- **花序類型必須仔細判斷**：請觀察花朵的排列方式，並在描述中明確說明
+  * **總狀花序**：花朵沿主軸排列，下部的花先開，花梗長度相近。描述時請寫「總狀花序」或「沿主軸排列」
+  * **繖房花序**：花朵排列在一個平面上，外圍的花先開，花梗長度不等（外長內短）。描述時請寫「繖房花序」或「花朵排列在一個平面上，外圍先開」
+  * **聚繖花序**：中央的花先開，外圍的花後開。描述時請寫「聚繖花序」或「中央先開」
+  * **圓錐花序**：總狀花序的分枝再形成總狀花序。描述時請寫「圓錐花序」或「總狀花序的分枝」
+  * **繖形花序**：所有花梗從同一點發出，像雨傘骨架。描述時請寫「繖形花序」或「從同一點發出」
+  * **頭狀花序**：花朵密集排列成頭狀，無明顯花梗。描述時請寫「頭狀花序」或「密集排列成頭狀」
+  * **穗狀花序**：花朵無花梗，直接著生在主軸上。描述時請寫「穗狀花序」或「無花梗，直接著生」
+  * **下垂花序**：花序向下垂掛（如長穗木）。描述時請寫「下垂花序」或「向下垂掛」或「花序向下」
+- **重要**：在描述中必須明確寫出你觀察到的花序排列方式，不要只寫「花序」兩個字
+- 如果花序類型不明確，請描述你看到的排列方式，不要隨便猜測
 
 第三步：判斷類別（必須完成）
 明確指出：植物 / 動物 / 人造物 / 其他
@@ -759,7 +769,12 @@ VISION_ROUTER_PROMPT = """你是一位專業的植物形態學家與生態研究
 - 葉序（互生/對生/輪生）
 - 葉形（披針/卵形/橢圓/心形/線形/圓形...）
 - 葉緣（全緣/鋸齒/波狀/裂緣...）
-- 花序（總狀/圓錐/繖形/頭狀/聚繖/單生花...）
+- **花序類型（必須仔細判斷，這是關鍵鑑別特徵）**：
+  * 觀察花朵排列：是沿主軸排列（總狀/穗狀）？還是從同一點發出（繖形）？
+  * 觀察開花順序：外圍先開（繖房）？中央先開（聚繖）？下部先開（總狀）？
+  * 觀察花序方向：是向上（直立）？還是向下（下垂）？
+  * 如果花序向下垂掛，必須標註 inflorescence_orientation=drooping
+  * 如果花朵排列在一個平面上且外圍先開，必須標註 inflorescence=corymb（繖房花序）
 - 花色（只描述花朵顏色；沒有花就 unknown）
 - 葉色（leaf_color）與花色（flower_color）是不同特徵
 
@@ -790,7 +805,50 @@ VISION_ROUTER_PROMPT = """你是一位專業的植物形態學家與生態研究
 第五步：尺寸驗證（僅限植物）
 檢查生活型與尺寸是否一致，若不一致請修正。
 
-第六步：初步猜測（僅限植物）
+第六步：特徵驗證與交叉檢查（僅限植物，新增步驟）
+在輸出 JSON 之前，請**逐項檢查**以下項目，這是確保準確性的關鍵步驟：
+
+- **花序類型驗證（最重要）**：
+  * 如果你標註 inflorescence=raceme（總狀花序），請確認：
+    - 花朵是否沿主軸排列？
+    - 下部是否先開？
+    - 花梗長度是否相近？
+    - 如果不符合，請改為正確的類型（可能是 corymb 或 cyme）
+  * 如果你標註 inflorescence=corymb（繖房花序），請確認：
+    - 花朵是否排列在一個平面上？
+    - 外圍是否先開？
+    - 花梗長度是否不等（外長內短）？
+    - 如果符合，confidence 應該 ≥ 0.7
+  * 如果你標註 inflorescence=cyme（聚繖花序），請確認：
+    - 中央是否先開？
+    - 外圍是否後開？
+  * **如果花序向下垂掛**，必須標註 inflorescence_orientation=drooping，confidence ≥ 0.7
+  * 如果不確定花序類型，請標註 unknown，不要隨便猜測
+
+- **花色驗證**：
+  * 如果你看到紫色或粉紅色花朵，請確認：
+    - 深紫/濃紫 → flower_color=purple
+    - 粉紅/淡粉 → flower_color=pink
+    - 不要標註為 red 或 unknown
+  * 如果花朵很大或很顯眼（如野牡丹），請確認是否標註了 flower_shape 或 flower_position
+
+- **葉序驗證**：
+  * 互生：葉片交替排列在莖的兩側（每節只有一片葉）
+  * 對生：葉片成對排列在莖的兩側（每節有兩片葉相對）
+  * 輪生：三片或以上葉片排列在同一節上
+  * 如果不確定，請標註 unknown，不要隨便猜測
+
+- **葉緣驗證**：
+  * 全緣：葉緣平滑，無鋸齒或波狀
+  * 鋸齒：葉緣有明顯的鋸齒狀
+  * 波狀：葉緣有波浪狀起伏
+
+- **交叉檢查**：
+  * 檢查所有特徵的 evidence 是否包含足夠的描述
+  * 檢查 confidence 是否與觀察的清晰度一致
+  * 如果發現不一致，請修正後再輸出 JSON
+
+第七步：初步猜測（僅限植物）
 可提出 1–3 個候選名稱（中文為主），但要標註為「猜測」。
 </analysis>
 
@@ -799,7 +857,7 @@ VISION_ROUTER_PROMPT = """你是一位專業的植物形態學家與生態研究
 重要：在 <reply> 中只能根據 <analysis> 的細節來介紹，不要把「猜測」當成定論。
 </reply>
 
-第七步：輸出結構化特徵（僅限植物，必須輸出 JSON）
+第八步：輸出結構化特徵（僅限植物，必須輸出 JSON）
 如果第三步判斷為「植物」，請在最後輸出。**果實必須遵守兩段式 Gate：**
 
 ### 果實 Gate（必做，禁止跳過）
@@ -830,11 +888,11 @@ fruit_arrangement（可選）：solitary/cluster/raceme/unknown，描述果實�
   "leaf_margin": {"value":"entire","confidence":0.85,"evidence":"..."},
   "leaf_texture": {"value":"glabrous","confidence":0.6,"evidence":"..."},
   "leaf_color": {"value":"green","confidence":0.7,"evidence":"..."},
-  "inflorescence": {"value":"panicle","confidence":0.7,"evidence":"..."},
+  "inflorescence": {"value":"corymb","confidence":0.8,"evidence":"花朵排列在一個平面上，外圍先開"},
   "flower_color": {"value":"purple","confidence":0.8,"evidence":"..."},
   "flower_shape": {"value":"unknown","confidence":0.1,"evidence":"照片未見花朵或無法判斷花形"},
   "flower_position": {"value":"unknown","confidence":0.1,"evidence":"照片未見花朵或無法判斷位置"},
-  "inflorescence_orientation": {"value":"unknown","confidence":0.1,"evidence":"照片未見花序或無法判斷方向"},
+  "inflorescence_orientation": {"value":"drooping","confidence":0.8,"evidence":"花序向下垂掛"},
   "fruit_type": {"value":"unknown","confidence":0.1,"evidence":"照片未見果實"},
   "fruit_color": {"value":"unknown","confidence":0.1,"evidence":"照片未見果實"},
   "fruit_arrangement": {"value":"unknown","confidence":0.1,"evidence":"照片未見果實"},
@@ -854,9 +912,14 @@ fruit_arrangement（可選）：solitary/cluster/raceme/unknown，描述果實�
 2) 看不到/無法判斷請用 value=unknown 並給低 confidence（0.1–0.3）
 3) 只填能清楚觀察到的特徵，不確定就 unknown；禁止猜測補齊
 4) 寧可輸出 2–4 個有證據的強特徵，不要湊滿 5 個通用特徵（灌木/單葉/全緣/圓錐）
-5) 強特徵優先：複葉類型、果實、花序型、葉緣鋸齒等比生活型更具鑑別力
-6) 若第三步判斷為「動物/人造物/其他」，請輸出空 JSON：{}
-7) fruit_visible=false 時，fruit_type 與 fruit_color 必須為 unknown
+5) 強特徵優先：複葉類型、果實、花序型（特別是繖房花序、下垂花序）、葉緣鋸齒等比生活型更具鑑別力
+6) **花序類型特別重要**：
+   * 如果看到花朵排列在一個平面上且外圍先開 → 必須標註 inflorescence=corymb（繖房花序）
+   * 如果看到花序向下垂掛 → 必須標註 inflorescence_orientation=drooping（下垂花序）
+   * 如果看到中央先開 → 必須標註 inflorescence=cyme（聚繖花序）
+   * 不要隨便標註 inflorescence=raceme（總狀花序），除非你真的看到沿主軸排列且下部先開
+7) 若第三步判斷為「動物/人造物/其他」，請輸出空 JSON：{}
+8) fruit_visible=false 時，fruit_type 與 fruit_color 必須為 unknown
 
 ### 果實輸出範例（照做可避免亂猜）
 
