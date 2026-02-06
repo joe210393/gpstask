@@ -58,6 +58,10 @@ FEATURE_VOCAB = {
         "紅花": {"en": "red flower", "base_w": 0.05, "max_cap": 0.07},
         "紫花": {"en": "purple flower", "base_w": 0.05, "max_cap": 0.07},
     },
+    # 花型（強特徵，用於風鈴草等鐘形花植物鑑別）
+    "flower_shape": {
+        "鐘形花": {"en": "campanulate", "base_w": 0.08, "max_cap": 0.12},
+    },
     # 花序（工項 C：頭狀/繖形/穗狀較稀有；繖房用於火筒樹等）
     "flower_inflo": {
         "總狀花序": {"en": "raceme", "base_w": 0.06, "max_cap": 0.09},

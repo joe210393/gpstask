@@ -976,9 +976,8 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         query_vector = query_vector.tolist()
 
     # 取更多候選再重新排序
-    # 🔥 關鍵修復：大幅增加候選數量，避免過早被過濾
-    # 使用 max(60, top_k * 10) 確保至少有 60 個候選
-    candidate_limit = max(60, top_k * 10)
+    # 擴大候選池至 100，讓 embedding 排名較後的物種（如風鈴草）也能進入 hybrid 重排
+    candidate_limit = max(100, top_k * 10)
     
     try:
         candidates = qdrant_client.query_points(
@@ -1010,15 +1009,20 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         if query_total_weight > 0:
             print(f"[API] feature_score 標準化: query_total_weight={query_total_weight:.4f}")
 
-    # A. 強特徵 Gate：Query 若沒有任何「強特徵」（果實/花序/特殊/根型），不讓 feature 壓過 embedding
-    STRONG_SCORE_CATEGORIES = frozenset({"fruit_type", "flower_inflo", "trunk_root", "special"})
+    # A. 強特徵 Gate：Query 若沒有任何「強特徵」（果實/花序/花型/特殊/根型），不讓 feature 壓過 embedding
+    STRONG_SCORE_CATEGORIES = frozenset({"fruit_type", "flower_inflo", "flower_shape", "trunk_root", "special"})
     has_strong_in_query = bool(
         features and FEATURE_INDEX and
         any((FEATURE_INDEX.get(f) or {}).get("category") in STRONG_SCORE_CATEGORIES for f in features)
     )
-    effective_feature_weight = feature_weight if has_strong_in_query else min(feature_weight, 0.25)
-    if not has_strong_in_query and features:
-        print(f"[API] 強特徵 Gate: Query 無強特徵（果實/花序/特殊/根型），feature 權重壓低為 {effective_feature_weight:.2f}")
+    if has_strong_in_query:
+        # Query 有強特徵時略提高 feature 權重，讓「有匹配強特徵」的候選更容易脫穎而出（通用規則，不針對特定物種）
+        effective_feature_weight = min(0.55, feature_weight + 0.1)
+        print(f"[API] 強特徵加成: Query 含強特徵，feature 權重提升為 {effective_feature_weight:.2f}")
+    else:
+        effective_feature_weight = min(feature_weight, 0.25)
+        if features:
+            print(f"[API] 強特徵 Gate: Query 無強特徵（果實/花序/特殊/根型），feature 權重壓低為 {effective_feature_weight:.2f}")
 
     # 2. 計算每個候選的混合分數（先在物種層級去重，再排序）
     results = []
@@ -1166,7 +1170,17 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         # 增強分數
         enhancement = embedding_score * feature_score * 0.3
         
-        hybrid_score = base_score + enhancement + keyword_bonus
+        # 強特徵匹配加分（通用）：候選若匹配到至少 1 個強特徵（果實/花序/特殊/根型），加小額分數，讓正確答案脫穎而出
+        strong_match_bonus = 0.0
+        if FEATURE_INDEX and c.get("matched_features"):
+            strong_matches = [
+                m for m in c["matched_features"]
+                if (FEATURE_INDEX.get(m) or {}).get("category") in STRONG_SCORE_CATEGORIES
+            ]
+            if strong_matches:
+                strong_match_bonus = min(0.10, 0.05 + 0.025 * len(strong_matches))  # 1 個約 +0.075，2 個 +0.10
+        
+        hybrid_score = base_score + enhancement + keyword_bonus + strong_match_bonus
         
         # 應用 Must Gate 懲罰（軟性降權，而非過濾）
         # 如果關鍵特徵不匹配，分數打折，但仍然保留在列表中
