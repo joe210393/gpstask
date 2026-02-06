@@ -597,9 +597,14 @@ function traitsToFeatureList(traits) {
   const WEAK_MIN = 0.35;
   const STRONG_MIN = 0.55;
   // 部分 key 需要稍微放寬門檻（例如 flower_shape：LM 常給 0.45–0.5，但對風鈴草非常關鍵）
+  // inflorescence 和 inflorescence_orientation 對火筒樹（繖房花序）、長穗木（下垂花序）等非常關鍵
   const PER_KEY_MIN_CONF = {
     // 直接放寬到 0.30，只要不是 unknown 就盡量保留
     flower_shape: 0.30,
+    // inflorescence 放寬到 0.40，讓繖房花序、聚繖花序等關鍵特徵更容易被保留
+    inflorescence: 0.40,
+    // inflorescence_orientation 放寬到 0.35，讓下垂花序更容易被保留
+    inflorescence_orientation: 0.35,
   };
 
   for (const [key, trait] of Object.entries(traits)) {
@@ -609,7 +614,27 @@ function traitsToFeatureList(traits) {
       if (evidence.length > 0 && evidence.length < 6) conf *= 0.8;
       const baseMinConf = STRONG_TRAIT_KEYS.has(key) ? STRONG_MIN : WEAK_MIN;
       const minConf = PER_KEY_MIN_CONF[key] != null ? PER_KEY_MIN_CONF[key] : baseMinConf;
-      if (conf < minConf) continue;
+      
+      // 特殊處理：對於關鍵鑑別特徵（繖房花序、下垂花序），即使 confidence 稍低也盡量保留
+      const isCriticalTrait = (
+        (key === 'inflorescence' && (trait.value === 'corymb' || trait.value === 'cyme')) ||
+        (key === 'inflorescence_orientation' && trait.value === 'drooping')
+      );
+      if (isCriticalTrait && conf >= 0.30 && conf < minConf) {
+        // 如果 evidence 包含關鍵字，即使 confidence 稍低也保留
+        const hasKeyword = (
+          (key === 'inflorescence' && /平面|外圍|外長內短/.test(evidence)) ||
+          (key === 'inflorescence_orientation' && /下垂|垂掛|向下/.test(evidence))
+        );
+        if (hasKeyword) {
+          console.log(`[TraitsParser] 保留關鍵特徵 ${key}=${trait.value}（confidence=${conf.toFixed(2)}，evidence 含關鍵字）`);
+        } else {
+          // 如果沒有關鍵字，仍然需要達到最低門檻
+          if (conf < minConf) continue;
+        }
+      } else if (conf < minConf) {
+        continue;
+      }
 
       let traitValue = trait.value;
       
@@ -635,8 +660,30 @@ function traitsToFeatureList(traits) {
       const chineseKeyword = traitValueMap[traitValue];
       if (chineseKeyword) {
         const STRONG_OUTPUTS = new Set(['有刺', '乳汁', '棕櫚', '胎生苗', '氣生根', '板根']);
-        const reqMin = STRONG_OUTPUTS.has(chineseKeyword) ? STRONG_MIN : minConf;
-        if (conf < reqMin) continue;
+        // 關鍵鑑別特徵（繖房花序、下垂花序）使用較低的門檻
+        const isCriticalKeyword = (
+          chineseKeyword === '繖房花序' ||
+          chineseKeyword === '下垂花序' ||
+          chineseKeyword === '聚繖花序'
+        );
+        const reqMin = STRONG_OUTPUTS.has(chineseKeyword) ? STRONG_MIN : (isCriticalKeyword ? Math.min(minConf, 0.35) : minConf);
+        if (conf < reqMin) {
+          // 對於關鍵特徵，如果 evidence 包含關鍵字，即使 confidence 稍低也保留
+          if (isCriticalKeyword && conf >= 0.30) {
+            const hasKeyword = (
+              (chineseKeyword === '繖房花序' && /平面|外圍|外長內短/.test(evidence)) ||
+              (chineseKeyword === '下垂花序' && /下垂|垂掛|向下/.test(evidence)) ||
+              (chineseKeyword === '聚繖花序' && /中央|先開/.test(evidence))
+            );
+            if (hasKeyword) {
+              console.log(`[TraitsParser] 保留關鍵特徵 ${chineseKeyword}（confidence=${conf.toFixed(2)}，evidence 含關鍵字）`);
+            } else {
+              continue;
+            }
+          } else {
+            continue;
+          }
+        }
         // flower_color 誤塞種子顏色時丟棄（紅種子、白種子、黃種子等會干擾搜尋）
         if (key === 'flower_color' && /種子/.test(chineseKeyword)) {
           console.warn(`[TraitsParser] flower_color 含種子顏色 (${chineseKeyword})，已忽略`);
@@ -806,7 +853,8 @@ function extractFeaturesFromDescriptionKeywords(description) {
   else if (/簇生|多朵|密集|叢生花/.test(text)) features.push('簇生花');
   
   // A2.7 花序方向（直立/下垂）- 強化提取，特別是長穗木等植物
-  if (/下垂|垂吊|下彎|向下|低垂|懸垂|垂掛|向下垂掛|花序向下|向下排列/.test(text)) {
+  // 注意：下垂花序的判斷標準是「花序向下垂掛」，這是長穗木的關鍵特徵
+  if (/下垂|垂吊|下彎|向下|低垂|懸垂|垂掛|向下垂掛|花序向下|向下排列|花序.*下垂|花序.*垂掛|垂掛.*花序/.test(text)) {
     features.push('下垂花序');
   } else if (/直立|向上|挺立|向上排列/.test(text)) {
     features.push('直立花序');
@@ -828,13 +876,22 @@ function extractFeaturesFromDescriptionKeywords(description) {
 
   // A3 花序：D1 只保留 1 個，優先序 繖房>聚繖>穗狀>繖形>頭狀>總狀>圓錐
   // 強化提取：繖房花序（火筒樹等）和下垂花序（長穗木等）的關鍵字
-  if (/繖房花序|繖房|花朵排列在一個平面上|外圍先開|平面排列/.test(text)) features.push('繖房花序');
-  else if (/聚繖花序|聚繖|中央先開/.test(text)) features.push('聚繖花序');
-  else if (/穗狀花序|穗狀|無花梗|直接著生/.test(text)) features.push('穗狀花序');
-  else if (/繖形花序|傘形花序|繖狀|同一點發出|雨傘骨架/.test(text)) features.push('繖形花序');
-  else if (/頭狀花序|頭狀|密集排列成頭狀/.test(text)) features.push('頭狀花序');
-  else if (/總狀花序|總狀|沿主軸排列|下部先開/.test(text)) features.push('總狀花序');
-  else if (/圓錐花序|圓錐|總狀.*分枝/.test(text)) features.push('圓錐花序');
+  // 注意：繖房花序的判斷標準是「花朵排列在一個平面上，外圍先開，花梗長度不等」
+  if (/繖房花序|繖房|花朵排列在一個平面上|外圍先開|平面排列|外圍.*先開|花梗.*不等|外長內短/.test(text)) {
+    features.push('繖房花序');
+  } else if (/聚繖花序|聚繖|中央先開|中央.*先開/.test(text)) {
+    features.push('聚繖花序');
+  } else if (/穗狀花序|穗狀|無花梗|直接著生/.test(text)) {
+    features.push('穗狀花序');
+  } else if (/繖形花序|傘形花序|繖狀|同一點發出|雨傘骨架/.test(text)) {
+    features.push('繖形花序');
+  } else if (/頭狀花序|頭狀|密集排列成頭狀/.test(text)) {
+    features.push('頭狀花序');
+  } else if (/總狀花序|總狀|沿主軸排列|下部先開/.test(text)) {
+    features.push('總狀花序');
+  } else if (/圓錐花序|圓錐|總狀.*分枝/.test(text)) {
+    features.push('圓錐花序');
+  }
 
   // B1 葉序（最多 1 個）
   if (/輪生/.test(text)) features.push('輪生');
