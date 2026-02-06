@@ -51,12 +51,14 @@ FEATURE_VOCAB = {
         "鋸齒": {"en": "serrated", "base_w": 0.05, "max_cap": 0.07},
         "波狀": {"en": "undulate", "base_w": 0.05, "max_cap": 0.07},
     },
-    # 花色
+    # 花色（提升為強特徵，特別是紫花、粉紅花對野牡丹等植物鑑別力高）
     "flower_color": {
-        "白花": {"en": "white flower", "base_w": 0.05, "max_cap": 0.07},
-        "黃花": {"en": "yellow flower", "base_w": 0.05, "max_cap": 0.07},
-        "紅花": {"en": "red flower", "base_w": 0.05, "max_cap": 0.07},
-        "紫花": {"en": "purple flower", "base_w": 0.05, "max_cap": 0.07},
+        "白花": {"en": "white flower", "base_w": 0.06, "max_cap": 0.09},
+        "黃花": {"en": "yellow flower", "base_w": 0.06, "max_cap": 0.09},
+        "紅花": {"en": "red flower", "base_w": 0.06, "max_cap": 0.09},
+        "紫花": {"en": "purple flower", "base_w": 0.08, "max_cap": 0.12},  # 野牡丹等
+        "粉紅花": {"en": "pink flower", "base_w": 0.08, "max_cap": 0.12},  # 野牡丹等
+        "橙花": {"en": "orange flower", "base_w": 0.06, "max_cap": 0.09},
     },
     # 花型（強特徵，用於風鈴草等鐘形花植物鑑別）
     "flower_shape": {

@@ -1056,9 +1056,10 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             print(f"[API] feature_score 標準化: query_total_weight={query_total_weight:.4f}")
 
     # A. 動態權重：根據 Query 特徵的「鑑別力」調整 feature_weight
-    # 強特徵（高鑑別力）：flower_shape, fruit_cluster, fruit_surface, calyx_persistent, compound_leaf, trichome
+    # 強特徵（高鑑別力）：flower_shape, flower_color（特別是紫花、粉紅花）, fruit_cluster, fruit_surface, calyx_persistent, compound_leaf, trichome
     STRONG_DISCRIMINATIVE_CATEGORIES = frozenset({
         "flower_shape", "flower_position", "inflorescence_orientation",
+        "flower_color",  # 花色（特別是紫花、粉紅花）對野牡丹等植物鑑別力高
         "fruit_type", "fruit_cluster", "fruit_surface", "calyx_persistent",
         "leaf_type",  # 複葉類型（羽狀/掌狀）鑑別力高
         "trunk_root", "special", "surface_hair"
@@ -1239,15 +1240,22 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         # 增強分數
         enhancement = embedding_score * feature_score * 0.3
         
-        # 強特徵匹配加分（通用）：候選若匹配到至少 1 個強特徵（果實/花序/特殊/根型），加小額分數，讓正確答案脫穎而出
+        # 強特徵匹配加分（通用）：候選若匹配到至少 1 個強特徵（果實/花序/花色/特殊/根型），加小額分數，讓正確答案脫穎而出
         strong_match_bonus = 0.0
         if FEATURE_INDEX and c.get("matched_features"):
             strong_matches = [
                 m for m in c["matched_features"]
-                if (FEATURE_INDEX.get(m) or {}).get("category") in STRONG_SCORE_CATEGORIES
+                if (FEATURE_INDEX.get(m) or {}).get("category") in STRONG_DISCRIMINATIVE_CATEGORIES
             ]
             if strong_matches:
-                strong_match_bonus = min(0.10, 0.05 + 0.025 * len(strong_matches))  # 1 個約 +0.075，2 個 +0.10
+                # 花色匹配（特別是紫花、粉紅花）給予額外加分
+                flower_color_matches = [m for m in strong_matches if m in ["紫花", "粉紅花"]]
+                base_bonus = min(0.10, 0.05 + 0.025 * len(strong_matches))
+                if flower_color_matches:
+                    # 花色匹配額外加 0.03，讓野牡丹等植物更容易脫穎而出
+                    strong_match_bonus = min(0.15, base_bonus + 0.03 * len(flower_color_matches))
+                else:
+                    strong_match_bonus = base_bonus
         
         hybrid_score = base_score + enhancement + keyword_bonus + strong_match_bonus
         

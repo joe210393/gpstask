@@ -449,19 +449,29 @@ function traitsToFeatureList(traits) {
     
     // flower_color (支援單一值和複數值)
     'white': '白花',
-    'lavender': '淡紫色',
+    'lavender': '紫花',  // 淡紫色 → 紫花
+    'lilac': '紫花',  // 淡紫色 → 紫花
+    'violet': '紫花',  // 紫羅蘭色 → 紫花
     'yellow': '黃花',
     'red': '紅花',
     'purple': '紫花',
+    'deep_purple': '紫花',  // 深紫色 → 紫花
+    'dark_purple': '紫花',  // 深紫色 → 紫花
     'pink': '粉紅花',
+    'pinkish': '粉紅花',  // 粉紅色 → 粉紅花
+    'rose': '粉紅花',  // 玫瑰色 → 粉紅花
     'orange': '橙花',
     'green': '綠花',
     'blue': '藍花',
+    'blue_purple': '紫花',  // 藍紫色 → 紫花
+    'purple_blue': '紫花',  // 紫藍色 → 紫花
     // 複數值處理（用逗號分隔）
     'yellow, pink, orange': '黃花',  // 取第一個顏色
     'yellow, pink, white': '黃花',
     'pink, white': '粉紅花',
-    'red, pink': '紅花',
+    'red, pink': '粉紅花',  // 紅粉 → 粉紅花（野牡丹常見）
+    'purple, pink': '粉紅花',  // 紫粉 → 粉紅花（野牡丹常見）
+    'deep_purple, pink': '粉紅花',  // 深紫粉 → 粉紅花
     
     // flower_shape（鐘形花：風鈴草等）
     'bell': '鐘形花',
@@ -581,8 +591,9 @@ function traitsToFeatureList(traits) {
     'scaly': '鱗片'
   };
 
-  // B: 強特徵門檻 - fruit/inflo/special/trunk 需 ≥ 0.55，其餘 ≥ 0.35；evidence < 6 字 → ×0.8
-  const STRONG_TRAIT_KEYS = new Set(['fruit_type', 'inflorescence', 'flower_shape', 'root_type', 'special_features', 'surface_hair']);
+  // B: 強特徵門檻 - fruit/inflo/special/trunk/flower_color 需 ≥ 0.55，其餘 ≥ 0.35；evidence < 6 字 → ×0.8
+  // 花色（特別是紫花、粉紅花）對野牡丹等植物鑑別力高，提升為強特徵
+  const STRONG_TRAIT_KEYS = new Set(['fruit_type', 'inflorescence', 'flower_shape', 'flower_color', 'root_type', 'special_features', 'surface_hair']);
   const WEAK_MIN = 0.35;
   const STRONG_MIN = 0.55;
   // 部分 key 需要稍微放寬門檻（例如 flower_shape：LM 常給 0.45–0.5，但對風鈴草非常關鍵）
@@ -795,8 +806,22 @@ function extractFeaturesFromDescriptionKeywords(description) {
   else if (/簇生|多朵|密集|叢生花/.test(text)) features.push('簇生花');
   
   // A2.7 花序方向（直立/下垂）
-  if (/下垂|垂吊|下彎|向下|低垂/.test(text)) features.push('下垂花序');
+  if (/下垂|垂吊|下彎|向下|低垂|懸垂|垂掛/.test(text)) features.push('下垂花序');
   else if (/直立|向上|挺立/.test(text)) features.push('直立花序');
+  
+  // A2.8 花色強化提取（特別是紫花、粉紅花對野牡丹等植物鑑別力高）
+  if (/深紫|濃紫|紫紅色|紫紅|深紫色|濃紫色/.test(text)) features.push('紫花');
+  else if (/粉紅|粉紅色|淡粉|淺粉/.test(text)) features.push('粉紅花');
+  else if (/淡紫|淺紫|淡紫色|淺紫色|紫藍|藍紫/.test(text)) features.push('紫花');
+  else if (/白色|白花|潔白/.test(text)) features.push('白花');
+  else if (/黃色|黃花|金黃/.test(text)) features.push('黃花');
+  else if (/紅色|紅花|鮮紅|深紅/.test(text)) features.push('紅花');
+  
+  // A2.9 花形描述提取（牡丹般、大型花朵等）
+  if (/牡丹般|牡丹狀|牡丹型|大型花朵|大花|花朵大/.test(text)) {
+    // 牡丹般花型通常與紫花/粉紅花搭配，這裡只提取描述，實際花形由 flower_shape 處理
+    // 但可以作為輔助特徵，提升匹配權重
+  }
 
   // A3 花序：D1 只保留 1 個，優先序 繖房>聚繖>穗狀>繖形>頭狀>總狀>圓錐
   if (/繖房花序|繖房/.test(text)) features.push('繖房花序');
@@ -895,7 +920,7 @@ const FEATURE_CATEGORY = {
   fruit_cluster: ['單生果', '成串果', '總狀果', '腋生果'],
   fruit_surface: ['光滑果', '有毛果', '粗糙果', '有棱果'],
   calyx_persistent: ['宿存萼'],
-  flower_color: ['白花', '黃花', '紅花', '紫花', '粉紅花', '橙花'],
+  flower_color: ['白花', '黃花', '紅花', '紫花', '粉紅花', '橙花', '藍花'],
   trunk_root: ['板根', '氣生根'],
   special: ['有刺', '乳汁', '胎生苗', '棕櫚', '紅苞葉'],
 };
