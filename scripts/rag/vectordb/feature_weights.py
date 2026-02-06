@@ -61,6 +61,22 @@ FEATURE_VOCAB = {
     # 花型（強特徵，用於風鈴草等鐘形花植物鑑別）
     "flower_shape": {
         "鐘形花": {"en": "campanulate", "base_w": 0.08, "max_cap": 0.12},
+        "漏斗形花": {"en": "funnel", "base_w": 0.07, "max_cap": 0.11},
+        "唇形花": {"en": "labiate", "base_w": 0.07, "max_cap": 0.11},
+        "蝶形花": {"en": "papilionaceous", "base_w": 0.07, "max_cap": 0.11},
+        "十字形花": {"en": "cruciform", "base_w": 0.07, "max_cap": 0.11},
+        "放射狀花": {"en": "radial", "base_w": 0.06, "max_cap": 0.09},
+    },
+    # 花位置（單生/成對/簇生）
+    "flower_position": {
+        "單生花": {"en": "solitary", "base_w": 0.06, "max_cap": 0.09},
+        "成對花": {"en": "pair", "base_w": 0.06, "max_cap": 0.09},
+        "簇生花": {"en": "cluster", "base_w": 0.05, "max_cap": 0.08},
+    },
+    # 花序方向（直立/下垂）
+    "inflorescence_orientation": {
+        "直立花序": {"en": "erect", "base_w": 0.05, "max_cap": 0.07},
+        "下垂花序": {"en": "drooping", "base_w": 0.07, "max_cap": 0.10},
     },
     # 花序（工項 C：頭狀/繖形/穗狀較稀有；繖房用於火筒樹等）
     "flower_inflo": {
@@ -83,6 +99,24 @@ FEATURE_VOCAB = {
         "瘦果": {"en": "achene", "base_w": 0.07, "max_cap": 0.11},
         "堅果": {"en": "nut", "base_w": 0.07, "max_cap": 0.11},
         "梨果": {"en": "pome", "base_w": 0.07, "max_cap": 0.11},
+    },
+    # 果實排列（單生/成串/總狀/腋生）
+    "fruit_cluster": {
+        "單生果": {"en": "solitary", "base_w": 0.06, "max_cap": 0.09},
+        "成串果": {"en": "cluster", "base_w": 0.07, "max_cap": 0.10},
+        "總狀果": {"en": "raceme", "base_w": 0.07, "max_cap": 0.10},
+        "腋生果": {"en": "axillary", "base_w": 0.06, "max_cap": 0.09},
+    },
+    # 果面（光滑/有毛/粗糙/有棱）
+    "fruit_surface": {
+        "光滑果": {"en": "smooth", "base_w": 0.05, "max_cap": 0.07},
+        "有毛果": {"en": "hairy", "base_w": 0.07, "max_cap": 0.10},
+        "粗糙果": {"en": "rough", "base_w": 0.06, "max_cap": 0.09},
+        "有棱果": {"en": "ridged", "base_w": 0.06, "max_cap": 0.09},
+    },
+    # 萼宿存
+    "calyx_persistent": {
+        "宿存萼": {"en": "persistent calyx", "base_w": 0.07, "max_cap": 0.10},
     },
     # 根/樹幹
     "trunk_root": {
@@ -727,6 +761,30 @@ VISION_ROUTER_PROMPT = """你是一位專業的植物形態學家與生態研究
 - 花色（只描述花朵顏色；沒有花就 unknown）
 - 葉色（leaf_color）與花色（flower_color）是不同特徵
 
+**強制檢查清單（必須逐項檢查，不可跳過）：**
+
+**花（Flower）檢查：**
+- 是否看得到花？看得到就必須填：
+  - flower_color（花色）：white/yellow/red/purple/pink/orange/unknown
+  - flower_shape（花形）：bell/tubular/funnel/flat/labiate/papilionaceous/cruciform/radial/unknown（鐘形/筒狀/漏斗/扁平/唇形/蝶形/十字/放射狀）
+  - flower_position（花位置）：solitary/pair/cluster/unknown（單生/成對/簇生）
+  - inflorescence_orientation（花序方向）：erect/drooping/unknown（直立/下垂）
+- 看不到花 → 以上欄位填 unknown，confidence ≤ 0.3
+
+**果（Fruit）檢查：**
+- 是否看得到果？看得到就必須填：
+  - fruit_type（果型）：berry/drupe/capsule/legume/samara/achene/nut/pome/unknown
+  - fruit_color（果色）：red/orange/yellow/green/purple/black/brown/unknown
+  - fruit_cluster（果實排列）：solitary/cluster/raceme/axillary/unknown（單生/成串/總狀/腋生）
+  - fruit_surface（果面）：smooth/hairy/rough/ridged/unknown（光滑/有毛/粗糙/有棱）
+  - calyx_persistent（萼宿存）：true/false/unknown（萼是否宿存）
+- 看不到果 → 以上欄位填 unknown，confidence ≤ 0.3
+
+**毛被（Trichome）檢查：**
+- 葉/枝/果是否有毛？必須填：
+  - surface_hair（表面毛被）：glabrous/pubescent_soft/tomentose/hirsute/spiny/scaly/unknown（無毛/柔毛/絨毛/粗毛/有刺/鱗片）
+- 無法判斷 → unknown，confidence ≤ 0.3
+
 第五步：尺寸驗證（僅限植物）
 檢查生活型與尺寸是否一致，若不一致請修正。
 
@@ -772,9 +830,15 @@ fruit_arrangement（可選）：solitary/cluster/raceme/unknown，描述果實�
   "leaf_color": {"value":"green","confidence":0.7,"evidence":"..."},
   "inflorescence": {"value":"panicle","confidence":0.7,"evidence":"..."},
   "flower_color": {"value":"purple","confidence":0.8,"evidence":"..."},
+  "flower_shape": {"value":"unknown","confidence":0.1,"evidence":"照片未見花朵或無法判斷花形"},
+  "flower_position": {"value":"unknown","confidence":0.1,"evidence":"照片未見花朵或無法判斷位置"},
+  "inflorescence_orientation": {"value":"unknown","confidence":0.1,"evidence":"照片未見花序或無法判斷方向"},
   "fruit_type": {"value":"unknown","confidence":0.1,"evidence":"照片未見果實"},
   "fruit_color": {"value":"unknown","confidence":0.1,"evidence":"照片未見果實"},
   "fruit_arrangement": {"value":"unknown","confidence":0.1,"evidence":"照片未見果實"},
+  "fruit_cluster": {"value":"unknown","confidence":0.1,"evidence":"照片未見果實"},
+  "fruit_surface": {"value":"unknown","confidence":0.1,"evidence":"照片未見果實"},
+  "calyx_persistent": {"value":"unknown","confidence":0.1,"evidence":"照片未見果實或無法判斷"},
   "root_type": {"value":"unknown","confidence":0.1,"evidence":"照片未見根部"},
   "stem_type": {"value":"unknown","confidence":0.1,"evidence":"..."},
   "seed_type": {"value":"unknown","confidence":0.1,"evidence":"照片未見種子"},

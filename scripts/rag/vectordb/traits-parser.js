@@ -181,8 +181,14 @@ function validateTraits(traits) {
     'inflorescence',
     'flower_color',
     'flower_shape',  // 鐘形花（風鈴草等）
+    'flower_position',  // 單生/成對/簇生
+    'inflorescence_orientation',  // 直立/下垂
     'fruit_type',
     'fruit_color',
+    'fruit_arrangement',  // 果實排列（向後兼容）
+    'fruit_cluster',  // 果實排列（單生/成串/總狀/腋生）
+    'fruit_surface',  // 果面（光滑/有毛/粗糙/有棱）
+    'calyx_persistent',  // 萼宿存
     'root_type',  // 新增：根類型
     'stem_type',  // 新增：莖類型
     'underground_stem',  // 新增：地下莖
@@ -465,6 +471,20 @@ function traitsToFeatureList(traits) {
     'bell shape': '鐘形花',
     'bellshaped': '鐘形花',
     'campanula': '鐘形花',
+    'funnel': '漏斗形花',
+    'labiate': '唇形花',
+    'papilionaceous': '蝶形花',
+    'cruciform': '十字形花',
+    'radial': '放射狀花',
+    
+    // flower_position（花位置）
+    'solitary': '單生花',
+    'pair': '成對花',
+    'cluster': '簇生花',
+    
+    // inflorescence_orientation（花序方向）
+    'erect': '直立花序',
+    'drooping': '下垂花序',
     
     // fruit_type
     'drupe': '核果',
@@ -488,6 +508,22 @@ function traitsToFeatureList(traits) {
     'orange': '橙果',
     'green_brown': '綠棕果',
     'red_brown': '紅棕果',
+    
+    // fruit_cluster（果實排列）
+    'solitary': '單生果',
+    'cluster': '成串果',
+    'raceme': '總狀果',
+    'axillary': '腋生果',
+    
+    // fruit_surface（果面）
+    'smooth': '光滑果',
+    'hairy': '有毛果',
+    'rough': '粗糙果',
+    'ridged': '有棱果',
+    
+    // calyx_persistent（萼宿存）
+    'true': '宿存萼',
+    'false': '非宿存萼',
     
     // leaf_color
     'green': '綠葉',
@@ -732,12 +768,35 @@ function extractFeaturesFromDescriptionKeywords(description) {
     // LM 常寫「綠色的小果實」「小果實」「葉腋處綠色果實」→ 多為漿果型，補進 Query 以提升鑑別
     else if (/(?:綠色[的]?小?果實|小果實|果實.*綠色|綠色的?[小]?果實)/.test(text)) features.push('漿果');
   }
+  
+  // A2.1 果實排列（單生/成串/總狀/腋生）
+  if (/成串|串狀|總狀.*果|果實.*成串|果實.*串生/.test(text)) features.push('成串果');
+  else if (/單生.*果|單果|一個果實/.test(text)) features.push('單生果');
+  else if (/腋生.*果|葉腋.*果|果實.*腋生/.test(text)) features.push('腋生果');
+  
+  // A2.2 果面（光滑/有毛/粗糙/有棱）
+  if (/果實.*有毛|果面.*毛|毛果/.test(text)) features.push('有毛果');
+  else if (/果實.*光滑|光滑.*果|果面.*光滑/.test(text)) features.push('光滑果');
+  else if (/果實.*粗糙|粗糙.*果|果面.*粗糙/.test(text)) features.push('粗糙果');
+  else if (/果實.*棱|有棱.*果|果面.*棱/.test(text)) features.push('有棱果');
+  
+  // A2.3 萼宿存（萼是否宿存）
+  if (/宿存萼|萼.*宿存|果實.*宿存.*萼/.test(text)) features.push('宿存萼');
 
   // A2.5 花型（鐘形花：風鈴草等，LM 常寫鐘形/吊鐘/鈴鐺狀/風鈴狀）
   // 注意：TLPG / LM 描述裡常出現「風鈴狀花」「風鈴形花」，這裡一律視為鐘形花處理
   if (/鐘形|吊鐘|鈴鐺狀|鐘狀|鐘形花|闊鐘形|筒狀鐘形|風鈴狀|風鈴形|風鈴/.test(text)) {
     features.push('鐘形花');
   }
+  
+  // A2.6 花位置（單生/成對/簇生）
+  if (/單生花|單生|一朵花/.test(text)) features.push('單生花');
+  else if (/成對|兩朵|對生花/.test(text)) features.push('成對花');
+  else if (/簇生|多朵|密集|叢生花/.test(text)) features.push('簇生花');
+  
+  // A2.7 花序方向（直立/下垂）
+  if (/下垂|垂吊|下彎|向下|低垂/.test(text)) features.push('下垂花序');
+  else if (/直立|向上|挺立/.test(text)) features.push('直立花序');
 
   // A3 花序：D1 只保留 1 個，優先序 繖房>聚繖>穗狀>繖形>頭狀>總狀>圓錐
   if (/繖房花序|繖房/.test(text)) features.push('繖房花序');
@@ -829,8 +888,13 @@ const FEATURE_CATEGORY = {
   leaf_type: ['單葉', '複葉', '羽狀複葉', '掌狀複葉', '二回羽狀', '三出複葉'],
   leaf_margin: ['全緣', '鋸齒', '波狀'],
   flower_inflo: ['總狀花序', '圓錐花序', '聚繖花序', '繖房花序', '頭狀花序', '繖形花序', '穗狀花序', '佛焰花序'],
-  flower_shape: ['鐘形花'],
+  flower_shape: ['鐘形花', '漏斗形花', '唇形花', '蝶形花', '十字形花', '放射狀花'],
+  flower_position: ['單生花', '成對花', '簇生花'],
+  inflorescence_orientation: ['直立花序', '下垂花序'],
   fruit_type: ['莢果', '漿果', '核果', '蒴果', '翅果', '瘦果', '堅果', '梨果'],
+  fruit_cluster: ['單生果', '成串果', '總狀果', '腋生果'],
+  fruit_surface: ['光滑果', '有毛果', '粗糙果', '有棱果'],
+  calyx_persistent: ['宿存萼'],
   flower_color: ['白花', '黃花', '紅花', '紫花', '粉紅花', '橙花'],
   trunk_root: ['板根', '氣生根'],
   special: ['有刺', '乳汁', '胎生苗', '棕櫚', '紅苞葉'],

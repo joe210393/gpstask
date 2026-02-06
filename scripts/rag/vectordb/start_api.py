@@ -996,6 +996,52 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         print(f"[API] hybrid_search 空候選: Qdrant 回傳 0 筆 (query 前 50 字: {search_query[:50]!r})")
         sys.stdout.flush()
         return []
+    
+    # B. Fruit-only 第二路召回：針對有果實的照片，用果實特徵單獨召回候選
+    fruit_candidates = []
+    if features and FEATURE_INDEX:
+        # 檢查 Query 是否包含果實特徵
+        fruit_features = [
+            f for f in features
+            if (FEATURE_INDEX.get(f) or {}).get("category") in {"fruit_type", "fruit_cluster", "fruit_surface", "calyx_persistent"}
+        ]
+        if fruit_features:
+            print(f"[API] Fruit-only 召回: Query 含果實特徵 {fruit_features}，啟動第二路召回")
+            # 構建果實特徵查詢文字
+            fruit_query_text = " ".join(fruit_features)
+            try:
+                fruit_vector = encode_text(fruit_query_text)
+                if not isinstance(fruit_vector, list):
+                    fruit_vector = fruit_vector.tolist()
+                # 用果實特徵單獨召回（取 top 50）
+                fruit_candidates = qdrant_client.query_points(
+                    collection_name=COLLECTION_NAME,
+                    query=fruit_vector,
+                    limit=50,
+                ).points
+                print(f"[API] Fruit-only 召回找到 {len(fruit_candidates)} 個候選")
+            except Exception as e:
+                print(f"[API] Fruit-only 召回失敗: {e}，繼續使用主路召回")
+                fruit_candidates = []
+    
+    # 合併兩路候選（去重）
+    candidate_dict = {}
+    for c in candidates:
+        key = _canonical_name(c.payload or {}) or str(c.id)
+        candidate_dict[key] = c
+    
+    for c in fruit_candidates:
+        key = _canonical_name(c.payload or {}) or str(c.id)
+        if key not in candidate_dict:
+            candidate_dict[key] = c
+        else:
+            # 如果已存在，保留 embedding 分數較高的（主路優先）
+            existing_score = candidate_dict[key].score
+            if c.score > existing_score:
+                candidate_dict[key] = c
+    
+    candidates = list(candidate_dict.values())
+    print(f"[API] 合併兩路召回: 主路 {len(candidates) - len(fruit_candidates)} + Fruit路 {len(fruit_candidates)} = 總計 {len(candidates)} 個候選")
         
     t2 = time.perf_counter()
     print(f"[API] /hybrid-search encode={(t1 - t0):.3f}s qdrant={(t2 - t1):.3f}s total={(t2 - t0):.3f}s top_k={top_k} limit={candidate_limit} candidates={len(candidates)}")
@@ -1009,20 +1055,43 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         if query_total_weight > 0:
             print(f"[API] feature_score 標準化: query_total_weight={query_total_weight:.4f}")
 
-    # A. 強特徵 Gate：Query 若沒有任何「強特徵」（果實/花序/花型/特殊/根型），不讓 feature 壓過 embedding
-    STRONG_SCORE_CATEGORIES = frozenset({"fruit_type", "flower_inflo", "flower_shape", "trunk_root", "special"})
-    has_strong_in_query = bool(
-        features and FEATURE_INDEX and
-        any((FEATURE_INDEX.get(f) or {}).get("category") in STRONG_SCORE_CATEGORIES for f in features)
-    )
-    if has_strong_in_query:
-        # Query 有強特徵時略提高 feature 權重，讓「有匹配強特徵」的候選更容易脫穎而出（通用規則，不針對特定物種）
-        effective_feature_weight = min(0.55, feature_weight + 0.1)
-        print(f"[API] 強特徵加成: Query 含強特徵，feature 權重提升為 {effective_feature_weight:.2f}")
+    # A. 動態權重：根據 Query 特徵的「鑑別力」調整 feature_weight
+    # 強特徵（高鑑別力）：flower_shape, fruit_cluster, fruit_surface, calyx_persistent, compound_leaf, trichome
+    STRONG_DISCRIMINATIVE_CATEGORIES = frozenset({
+        "flower_shape", "flower_position", "inflorescence_orientation",
+        "fruit_type", "fruit_cluster", "fruit_surface", "calyx_persistent",
+        "leaf_type",  # 複葉類型（羽狀/掌狀）鑑別力高
+        "trunk_root", "special", "surface_hair"
+    })
+    # 弱特徵（通用）：life_form, leaf_arrangement, leaf_margin, flower_inflo（容易誤判）
+    WEAK_GENERIC_CATEGORIES = frozenset({
+        "life_form", "leaf_arrangement", "leaf_margin", "flower_inflo"
+    })
+    
+    # 統計 Query 中強/弱特徵的數量
+    strong_count = 0
+    weak_count = 0
+    if features and FEATURE_INDEX:
+        for f in features:
+            cat = (FEATURE_INDEX.get(f) or {}).get("category")
+            if cat in STRONG_DISCRIMINATIVE_CATEGORIES:
+                strong_count += 1
+            elif cat in WEAK_GENERIC_CATEGORIES:
+                weak_count += 1
+    
+    # 動態調整權重
+    if strong_count > 0:
+        # Query 有強特徵：提高 feature 權重，讓「有匹配強特徵」的候選更容易脫穎而出
+        effective_feature_weight = min(0.60, feature_weight + 0.15)
+        print(f"[API] 強特徵加成: Query 含 {strong_count} 個強特徵，feature 權重提升為 {effective_feature_weight:.2f}")
+    elif weak_count >= 3 and strong_count == 0:
+        # Query 只有通用特徵（例如：灌木+互生+總狀花序）：降低 feature 權重，主要靠 embedding
+        effective_feature_weight = min(feature_weight, 0.20)
+        print(f"[API] 弱特徵 Gate: Query 只有通用特徵（{weak_count} 個），feature 權重壓低為 {effective_feature_weight:.2f}")
     else:
-        effective_feature_weight = min(feature_weight, 0.25)
-        if features:
-            print(f"[API] 強特徵 Gate: Query 無強特徵（果實/花序/特殊/根型），feature 權重壓低為 {effective_feature_weight:.2f}")
+        # 混合情況：保持原權重或略降
+        effective_feature_weight = min(feature_weight, 0.35)
+        print(f"[API] 混合特徵: Query 含 {strong_count} 個強特徵 + {weak_count} 個弱特徵，feature 權重為 {effective_feature_weight:.2f}")
 
     # 2. 計算每個候選的混合分數（先在物種層級去重，再排序）
     results = []
