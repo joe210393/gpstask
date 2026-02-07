@@ -1,6 +1,6 @@
 # RAG 驗證報告（tlpg 網址）
 
-產生時間: 2026-02-07T00:17:49.855Z
+產生時間: 2026-02-07T00:46:40.047Z
 APP_URL: https://gpstask.zeabur.app
 總筆數: 12，通過: 0
 
@@ -68,10 +68,10 @@ APP_URL: https://gpstask.zeabur.app
   17. 老虎竻 (Euphorbia milii) - 分數: 25.9% (embedding: 64.8%, feature: 8.2%)
       匹配特徵: 灌木, 全緣
   18. 滿天星 (無學名) - 分數: 25.6% (embedding: 63.8%, feature: 8.2%)
-      匹配特徵: 灌木, 全緣
+      匹配特徵: ���木, 全緣
   19. 花蓮苧麻 (Boehmeria hwaliensis Liu &amp; Lu) - 分數: 21.9% (embedding: 67.0%, feature: 2.3%)
       匹配特徵: 灌木
-  20. 黃鐘花 (無學名) - 分數: 21.5% (embedding: 65.7%, feature: 2.3%)
+  20. 黃���花 (無學名) - 分數: 21.5% (embedding: 65.7%, feature: 2.3%)
       匹配特徵: 灌木
   21. 三春柳 (Tamarix chinenesis) - 分數: 21.5% (embedding: 65.5%, feature: 2.3%)
       匹配特徵: 灌木
@@ -819,7 +819,7 @@ APP_URL: https://gpstask.zeabur.app
   13. 長梗山礬 (無學名) - 分數: 54.0% (embedding: 62.8%, feature: 35.0%)
       匹配特徵: 灌木, 互生, 總狀果, 總狀花序
   14. 三春柳 (Tamarix chinenesis) - 分數: 53.6% (embedding: 61.9%, feature: 35.0%)
-      匹配特徵: 灌木, 互生, 總狀果, 總狀花序
+      匹配特徵: 灌木, ���生, 總狀果, 總狀花序
   15. 瓜葉馬兜鈴 (Aristolochia cucurbitifolia Hayata) - 分數: 49.4% (embedding: 61.7%, feature: 29.8%)
       匹配特徵: 灌木, 總狀果, 總狀花序
   16. 山毛豆 (無學名) - 分數: 49.4% (embedding: 61.7%, feature: 29.8%)

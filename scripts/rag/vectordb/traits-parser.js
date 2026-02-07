@@ -310,6 +310,43 @@ function isPlantFromTraits(traits) {
  * @param {Object} traits - 驗證後的 traits 物件
  * @returns {Array<string>} 特徵列表
  */
+
+/** V3 正規化：把 LM 錯用詞（鐘形花序→花型）拉回正確類別，避免鐘形花被漏掉 */
+const RE_FLOWER_SHAPE_TYPO = /鐘形花序|鐘狀花序|吊鐘花序|鐘狀花|花冠呈鐘|吊鐘狀|風鈴狀|風鈴形/i;
+function normalizeTraitKeyValueFromEvidence(traits) {
+  if (!traits || typeof traits !== 'object') return traits;
+  const out = {};
+  for (const [k, v] of Object.entries(traits)) {
+    if (!v || typeof v !== 'object') continue;
+    const val = String(v.value || '').trim();
+    const ev = String(v.evidence || '').trim();
+    const hasFlowerShapeTypo = RE_FLOWER_SHAPE_TYPO.test(val) || RE_FLOWER_SHAPE_TYPO.test(ev);
+    if (k === 'inflorescence' && hasFlowerShapeTypo) {
+      // LM 把花型寫成花序：補上 flower_shape，且不保留錯誤的 inflorescence
+      if (!out.flower_shape) {
+        out.flower_shape = { value: 'campanulate', confidence: Math.max(0.4, Number(v.confidence) || 0.3), evidence: ev || '正規化自 inflorescence 錯用鐘形' };
+      }
+      continue;
+    }
+    if (k === 'flower_shape' && val && RE_FLOWER_SHAPE_TYPO.test(val)) {
+      out[k] = { ...v, value: 'campanulate' };
+      continue;
+    }
+    out[k] = v;
+  }
+  // 若任一 trait 的 evidence 含鐘形關鍵字但沒有 flower_shape，補一筆
+  if (!out.flower_shape) {
+    for (const [k, v] of Object.entries(out)) {
+      const ev = String((v && v.evidence) || '').trim();
+      if (RE_FLOWER_SHAPE_TYPO.test(ev)) {
+        out.flower_shape = { value: 'campanulate', confidence: 0.35, evidence: ev };
+        break;
+      }
+    }
+  }
+  return out;
+}
+
 function traitsToFeatureList(traits) {
   if (!traits || Object.keys(traits).length === 0) {
     return [];
@@ -473,7 +510,7 @@ function traitsToFeatureList(traits) {
     'purple, pink': '粉紅花',  // 紫粉 → 粉紅花（野牡丹常見）
     'deep_purple, pink': '粉紅花',  // 深紫粉 → 粉紅花
     
-    // flower_shape（鐘形花：風鈴草等）
+    // flower_shape（鐘形花：風鈴草等）+ V3 錯用詞正規化（LM 常把花型寫成「鐘形花序」）
     'bell': '鐘形花',
     'campanulate': '鐘形花',
     'tubular': '鐘形花',
@@ -481,6 +518,10 @@ function traitsToFeatureList(traits) {
     'bell shape': '鐘形花',
     'bellshaped': '鐘形花',
     'campanula': '鐘形花',
+    '鐘形花序': '鐘形花',
+    '鐘狀花序': '鐘形花',
+    '吊鐘花序': '鐘形花',
+    '鐘狀花': '鐘形花',
     'funnel': '漏斗形花',
     'labiate': '唇形花',
     'papilionaceous': '蝶形花',
@@ -591,58 +632,92 @@ function traitsToFeatureList(traits) {
     'scaly': '鱗片'
   };
 
-  // B: 強特徵門檻 - fruit/inflo/special/trunk/flower_color 需 ≥ 0.55，其餘 ≥ 0.35；evidence < 6 字 → ×0.8
-  // 花色（特別是紫花、粉紅花）對野牡丹等植物鑑別力高，提升為強特徵
+  const DEBUG = process.env.TRAITS_PARSER_DEBUG === '1' || process.env.TRAITS_PARSER_DEBUG === 'true';
+  if (DEBUG) {
+    console.log('[TraitsParser] raw_traits_from_LM:', Object.keys(traits).map((k) => ({ k, v: traits[k]?.value, conf: traits[k]?.confidence })));
+  }
+  // ========== V3：正規化層（先修「鐘形花序」等錯用詞 → flower_shape 鐘形花）==========
+  traits = normalizeTraitKeyValueFromEvidence(traits);
+  if (DEBUG) {
+    console.log('[TraitsParser] normalized_traits:', Object.keys(traits).map((k) => ({ k, v: traits[k]?.value })));
+  }
+
+  // B: 分群 Gate（flower_shape 保底、inflorescence 嚴格化）
   const STRONG_TRAIT_KEYS = new Set(['fruit_type', 'inflorescence', 'flower_shape', 'flower_color', 'root_type', 'special_features', 'surface_hair']);
   const WEAK_MIN = 0.35;
   const STRONG_MIN = 0.55;
-  // 部分 key 需要稍微放寬門檻（例如 flower_shape：LM 常給 0.45–0.5，但對風鈴草非常關鍵）
-  // inflorescence 和 inflorescence_orientation 對火筒樹（繖房花序）、長穗木（下垂花序）等非常關鍵
   const PER_KEY_MIN_CONF = {
-    // 直接放寬到 0.30，只要不是 unknown 就盡量保留
     flower_shape: 0.30,
-    // inflorescence 放寬到 0.40，讓繖房花序、聚繖花序等關鍵特徵更容易被保留
     inflorescence: 0.40,
-    // inflorescence_orientation 放寬到 0.35，讓下垂花序更容易被保留
     inflorescence_orientation: 0.35,
   };
 
+  // V3 分群 Gate 判定（回傳 true = 保留，false = 丟棄，reason 供 debug）
+  function gateByCategory(key, conf, evidence, traitValue, chineseKeyword) {
+    const ev = (evidence || '').trim();
+    // flower_shape：保底規則，有證據就留（≥0.30 才留，與 PER_KEY_MIN_CONF 一致）
+    if (key === 'flower_shape') {
+      if (conf >= 0.45) return { keep: true };
+      if (conf >= 0.30 && /鐘形|吊鐘|鐘狀|bell|campanulate|花冠呈鐘|杯狀|風鈴狀|風鈴形/.test(ev)) return { keep: true };
+      if (conf < 0.30) return { keep: false, reason: 'low_conf' };
+      return { keep: false, reason: 'no_evidence_for_flower_shape' };
+    }
+    // inflorescence_orientation：排除亂猜
+    if (key === 'inflorescence_orientation') {
+      if (/看不清|被遮住|只有單朵|無法判斷/.test(ev)) return { keep: false, reason: 'evidence_uncertain' };
+      if (conf >= 0.55) return { keep: true };
+      if (conf >= 0.35 && /下垂|垂掛|懸垂|drooping|pendant/.test(ev)) return { keep: true };
+      if (chineseKeyword === '下垂花序' && conf >= 0.30) return { keep: true };
+      return { keep: conf >= 0.35, reason: conf >= 0.35 ? 'ok' : 'low_conf' };
+    }
+    // inflorescence（corymb/raceme）：嚴格化，需足夠證據
+    if (key === 'inflorescence') {
+      if (conf >= 0.60) return { keep: true };
+      const corymbCriteria = (ev.match(/平面|平頂|外圍先開|外長內短|花梗不等|flat-topped/g) || []).length;
+      const racemeCriteria = (ev.match(/沿主軸|花梗近等長|下部先開|主軸延伸/g) || []).length;
+      if (conf >= 0.45 && (corymbCriteria >= 2 || racemeCriteria >= 2)) return { keep: true };
+      if ((chineseKeyword === '繖房花序' || chineseKeyword === '下垂花序' || chineseKeyword === '聚繖花序') && conf >= 0.30 && /平面|外圍|下垂|垂掛|中央先開/.test(ev)) return { keep: true };
+      return { keep: conf >= 0.40, reason: conf >= 0.40 ? 'ok' : 'low_conf_or_evidence' };
+    }
+    return { keep: true };
+  }
+
   for (const [key, trait] of Object.entries(traits)) {
-    // 嚴格過濾：unknown 或空值直接跳過，不進入 hybrid traits
+    // 嚴格過濾：unknown 或空值直接跳過
     if (!trait || !trait.value || trait.value === 'unknown' || trait.value === '' || String(trait.value).trim() === '') {
       continue;
     }
-    
-    // 只處理有效的特徵值
-    if (trait && trait.value && trait.value !== 'unknown') {
-      let conf = Math.max(0, Number(trait.confidence) || 0);
-      const evidence = String(trait.evidence || '').trim();
-      if (evidence.length > 0 && evidence.length < 6) conf *= 0.8;
-      const baseMinConf = STRONG_TRAIT_KEYS.has(key) ? STRONG_MIN : WEAK_MIN;
-      const minConf = PER_KEY_MIN_CONF[key] != null ? PER_KEY_MIN_CONF[key] : baseMinConf;
-      
-      // 特殊處理：對於關鍵鑑別特徵（繖房花序、下垂花序），即使 confidence 稍低也盡量保留
-      const isCriticalTrait = (
-        (key === 'inflorescence' && (trait.value === 'corymb' || trait.value === 'cyme')) ||
-        (key === 'inflorescence_orientation' && trait.value === 'drooping')
-      );
-      if (isCriticalTrait && conf >= 0.30 && conf < minConf) {
-        // 如果 evidence 包含關鍵字，即使 confidence 稍低也保留
-        const hasKeyword = (
-          (key === 'inflorescence' && /平面|外圍|外長內短/.test(evidence)) ||
-          (key === 'inflorescence_orientation' && /下垂|垂掛|向下/.test(evidence))
-        );
-        if (hasKeyword) {
-          console.log(`[TraitsParser] 保留關鍵特徵 ${key}=${trait.value}（confidence=${conf.toFixed(2)}，evidence 含關鍵字）`);
-        } else {
-          // 如果沒有關鍵字，仍然需要達到最低門檻
-          if (conf < minConf) continue;
+
+    let traitValue = trait.value;
+    let conf = Math.max(0, Number(trait.confidence) || 0);
+    const evidence = String(trait.evidence || '').trim();
+    if (evidence.length > 0 && evidence.length < 6) conf *= 0.8;
+
+    // V3：inflorescence 若為「鐘形花序」等錯用 → 改為 flower_shape 鐘形花後再處理
+    if (key === 'inflorescence') {
+      const wrongFlowerShape = /鐘形花序|鐘狀花序|吊鐘花序|鐘狀花|鐘形花/i.test(String(traitValue)) || /鐘形花序|鐘狀花序|吊鐘花序|鐘狀花|花冠呈鐘|吊鐘狀/.test(evidence);
+      if (wrongFlowerShape) {
+        features.push('鐘形花');
+        if (process.env.TRAITS_PARSER_DEBUG) {
+          console.log('[TraitsParser] 正規化: inflorescence 錯用「鐘形花序」→ flower_shape 鐘形花');
         }
-      } else if (conf < minConf) {
         continue;
       }
+    }
 
-      let traitValue = trait.value;
+    const baseMinConf = STRONG_TRAIT_KEYS.has(key) ? STRONG_MIN : WEAK_MIN;
+    const minConf = PER_KEY_MIN_CONF[key] != null ? PER_KEY_MIN_CONF[key] : baseMinConf;
+    let chineseKeyword = null;
+    const mapVal = traitValueMap[traitValue];
+    if (mapVal) chineseKeyword = mapVal;
+    const gate = gateByCategory(key, conf, evidence, traitValue, chineseKeyword);
+    if (!gate.keep) continue;
+    if (conf < minConf && !['flower_shape', 'inflorescence', 'inflorescence_orientation'].includes(key)) {
+      continue;
+    }
+
+    // 只處理有效的特徵值
+    if (trait && traitValue && traitValue !== 'unknown') {
       
       // 處理複數值（用逗號分隔的情況）
       if (typeof traitValue === 'string' && traitValue.includes(',')) {
@@ -725,6 +800,9 @@ function traitsToFeatureList(traits) {
     console.log('[TraitsParser] 矛盾處理: 有複葉特徵，已移除「單葉」');
   }
 
+  if (DEBUG) {
+    console.log('[TraitsParser] kept_traits (before cap):', features);
+  }
   return features;
 }
 
@@ -993,6 +1071,8 @@ const FEATURE_CATEGORY = {
 };
 const CATEGORY_CAP = { special: 2 };
 const INFLORESCO_PRIORITY = ['繖房花序', '聚繖花序', '穗狀花序', '繖形花序', '頭狀花序', '佛焰花序', '總狀花序', '圓錐花序'];
+// V3：花型保底，鐘形花優先（風鈴草等）
+const FLOWER_SHAPE_PRIORITY = ['鐘形花', '漏斗形花', '唇形花', '蝶形花', '十字形花', '放射狀花'];
 // 互斥類別內的優先順序（越特殊越前面）
 const LEAF_ARRANGEMENT_PRIORITY = ['輪生', '對生', '叢生', '互生'];
 const LEAF_MARGIN_PRIORITY = ['鋸齒', '波狀', '全緣'];
@@ -1036,6 +1116,9 @@ function capByCategoryAndResolveContradictions(features) {
     let chosen = arr;
     if (cat === 'flower_inflo' && arr.length > 1) {
       const ordered = INFLORESCO_PRIORITY.filter((p) => arr.includes(p));
+      chosen = ordered.length ? [ordered[0]] : [arr[0]];
+    } else if (cat === 'flower_shape' && arr.length > 1) {
+      const ordered = FLOWER_SHAPE_PRIORITY.filter((p) => arr.includes(p));
       chosen = ordered.length ? [ordered[0]] : [arr[0]];
     } else if (cat === 'leaf_arrangement' && arr.length > 1) {
       const ordered = LEAF_ARRANGEMENT_PRIORITY.filter((p) => arr.includes(p));
