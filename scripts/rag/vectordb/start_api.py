@@ -295,7 +295,17 @@ def _init_background_impl():
 
     # 5. 載入特徵資料
     import os.path
-    # P0.6 強化 > P0.5 去重 > P0 clean > final-4302，與 embed 腳本一致
+    # 優先順序：taxonomy-v2（最新，已補齊 taxonomy）> enriched-embed-dedup > enriched > dedup > clean > final-4302
+    taxonomy_v2_paths = [
+        "/app/data/plants-forest-gov-tw-enriched-embed-dedup.taxonomy-v2.jsonl",
+        os.path.join(os.path.dirname(__file__), "..", "data", "plants-forest-gov-tw-enriched-embed-dedup.taxonomy-v2.jsonl"),
+        os.path.join(os.path.dirname(__file__), "data", "plants-forest-gov-tw-enriched-embed-dedup.taxonomy-v2.jsonl"),
+    ]
+    embed_dedup_paths = [
+        "/app/data/plants-forest-gov-tw-enriched-embed-dedup.jsonl",
+        os.path.join(os.path.dirname(__file__), "..", "data", "plants-forest-gov-tw-enriched-embed-dedup.jsonl"),
+        os.path.join(os.path.dirname(__file__), "data", "plants-forest-gov-tw-enriched-embed-dedup.jsonl"),
+    ]
     enriched_paths = [
         "/app/data/plants-forest-gov-tw-enriched.jsonl",
         os.path.join(os.path.dirname(__file__), "..", "data", "plants-forest-gov-tw-enriched.jsonl"),
@@ -344,9 +354,27 @@ def _init_background_impl():
         print(f"  FEATURE_DATA_PATH 指定檔案: {FEATURE_DATA_PATH} -> {'✅ 存在' if exists else '❌ 不存在'}")
         if exists:
             data_path = FEATURE_DATA_PATH
-    # 否則依預設優先順序：P0.6 強化 > P0.5 去重 > P0 clean > final-4302
+    # 否則依預設優先順序：taxonomy-v2 > enriched-embed-dedup > P0.6 強化 > P0.5 去重 > P0 clean > final-4302
     if not data_path:
-        print(f"  搜尋資料檔案（P0.6 強化 > P0.5 去重 > P0 clean > final-4302）...")
+        print(f"  搜尋資料檔案（taxonomy-v2 > enriched-embed-dedup > P0.6 強化 > P0.5 去重 > P0 clean > final-4302）...")
+        # 優先使用 taxonomy-v2（已補齊 taxonomy）
+        for p in taxonomy_v2_paths:
+            exists = os.path.exists(p)
+            print(f"    檢查: {p} -> {'✅ 存在' if exists else '❌ 不存在'}")
+            if exists:
+                data_path = p
+                print(f"    ✅ 找到 Taxonomy V2 資料（已補齊 taxonomy）: {p}")
+                break
+    if not data_path:
+        # 其次使用 enriched-embed-dedup
+        for p in embed_dedup_paths:
+            exists = os.path.exists(p)
+            print(f"    檢查: {p} -> {'✅ 存在' if exists else '❌ 不存在'}")
+            if exists:
+                data_path = p
+                print(f"    ✅ 找到 Enriched-Embed-Dedup 資料: {p}")
+                break
+    if not data_path:
         for p in enriched_paths:
             exists = os.path.exists(p)
             print(f"    檢查: {p} -> {'✅ 存在' if exists else '❌ 不存在'}")

@@ -477,7 +477,10 @@ class FeatureWeightCalculator:
                 query_trait_tokens.append(f)
         
         # 定義 must traits（高信心、硬條件）
-        MUST_KEYS = {"life_form", "leaf_arrangement"}
+        # 🔥 修復：life_form 從 MUST_KEYS 移除，改為 soft penalty
+        # 原因：life_form 最常被照片角度/尺度誤判，v2 補齊後會把正確答案 gate 掉（如風鈴草）
+        # 只保留 leaf_arrangement（葉序較穩定，誤判較少）
+        MUST_KEYS = {"leaf_arrangement"}
         
         # 🔥 關鍵修復：Value Canonicalization（統一值格式）
         def canon_value(key: str, val: str) -> str:
@@ -535,10 +538,9 @@ class FeatureWeightCalculator:
             weight = self.get_weight(f)
             
             # 判斷是否為 must trait（備用方法，用於中文特徵名稱）
+            # 🔥 life_form 已移除：照片角度/尺度易誤判，不再當 must
             is_must = False
-            if "生活型" in std_name or "life_form" in std_name.lower():
-                is_must = True
-            elif "葉序" in std_name or "leaf_arrangement" in std_name.lower():
+            if "葉序" in std_name or "leaf_arrangement" in std_name.lower():
                 is_must = True
             elif "葉形" in std_name or "leaf_shape" in std_name.lower():
                 is_must = True
