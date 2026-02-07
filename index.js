@@ -311,6 +311,10 @@ function isUncertain(plantResults, traits, description) {
   const top5 = plants[4]?.score ?? 0;
   const scoreGap = top1 - top5;
 
+  // 高信心早退：Top1 分數夠高且領先明顯時，直接視為確定，不再要求補拍
+  // 避免「第一/二輪已正確卻仍要第三張，第三張反而稀釋正確答案」的問題
+  if (top1 >= 0.55 && scoreGap >= 0.12) return false;
+
   const features = traits ? traitsToFeatureList(traits) : [];
   const infloTypes = ['總狀花序', '繖房花序', '圓錐花序', '聚繖花序', '穗狀花序', '頭狀花序', '繖形花序'];
   const hasInfloConflict = infloTypes.filter((t) => features.includes(t)).length > 1;
