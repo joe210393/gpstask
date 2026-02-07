@@ -67,14 +67,22 @@ BATCH_SIZE = 16  # 每批處理的資料數量（降低以避免速率限制：�
 # 資料路徑
 SCRIPT_DIR = Path(__file__).parent
 DATA_DIR = SCRIPT_DIR.parent / "data"
-# P0.6 強化 > P0.5 去重 > P0 clean > final-4302
+# 優先順序：taxonomy-v2（最新，已補齊 taxonomy）> enriched-embed-dedup（舊版）> 其他備用檔案
+TAXONOMY_V2_FILE = DATA_DIR / "plants-forest-gov-tw-enriched-embed-dedup.taxonomy-v2.jsonl"
+EMBED_DEDUP_FILE = DATA_DIR / "plants-forest-gov-tw-enriched-embed-dedup.jsonl"
 ENRICHED_FILE = DATA_DIR / "plants-forest-gov-tw-enriched.jsonl"
 DEDUP_FILE = DATA_DIR / "plants-forest-gov-tw-dedup.jsonl"
 CLEAN_FILE = DATA_DIR / "plants-forest-gov-tw-clean.jsonl"
 FINAL_4302_FILE = DATA_DIR / "plants-forest-gov-tw-final-4302.jsonl"
 PROGRESS_FILE = SCRIPT_DIR / "embed_plants_forest_jina_progress.json"
 
-if ENRICHED_FILE.exists():
+if TAXONOMY_V2_FILE.exists():
+    DATA_FILE = TAXONOMY_V2_FILE
+    print(f"✅ 使用 Taxonomy V2 資料（已補齊 taxonomy）: {DATA_FILE}")
+elif EMBED_DEDUP_FILE.exists():
+    DATA_FILE = EMBED_DEDUP_FILE
+    print(f"✅ 使用 Enriched-Embed-Dedup 資料: {DATA_FILE}")
+elif ENRICHED_FILE.exists():
     DATA_FILE = ENRICHED_FILE
     print(f"✅ 使用 P0.6 強化後資料: {DATA_FILE}")
 elif DEDUP_FILE.exists():
@@ -87,8 +95,8 @@ elif FINAL_4302_FILE.exists():
     DATA_FILE = FINAL_4302_FILE
     print(f"✅ 使用 Final-4302 資料檔案: {DATA_FILE}")
 else:
-    DATA_FILE = FINAL_4302_FILE  # 會在下文檢查時失敗
-    print(f"❌ 資料檔案不存在，請先執行 dedup 或 clean 或確認 final-4302: {FINAL_4302_FILE}")
+    DATA_FILE = TAXONOMY_V2_FILE  # 會在下文檢查時失敗
+    print(f"❌ 資料檔案不存在，請先執行 enrich_taxonomy.js 產生 taxonomy-v2.jsonl")
 
 
 def get_qdrant_client():
@@ -246,6 +254,9 @@ def create_plant_text(plant: Dict[str, Any]) -> str:
     1. 優先使用 morphology_summary（如果存在）- 乾淨的摘要
     2. 其次使用 summary 和 key_features
     3. 減少原始 morphology 的權重（避免常見詞淹沒）
+    
+    ⚠️ 重要：taxonomy.genus / taxonomy.family 不要放進 embedding text
+    （會讓語意召回偏到拉丁名/科屬群，與照片萃取的中文形態特徵不一致）
     """
     parts = []
     
@@ -460,6 +471,14 @@ def main():
                 deduplicated_plants.append(plant)
                 canonical_seen[canonical_key] = plant
     print(f"   ✅ 去重完成：原始 {len(plants)} 筆 → 去重後 {len(deduplicated_plants)} 筆（移除 {duplicates_removed} 筆重複）")
+    # 將去重後的資料寫入專用檔案，方便後續特徵權重等模組共用同一批資料（約 2759 筆）
+    try:
+        with open(EMBED_DEDUP_FILE, "w", encoding="utf-8") as f:
+            for plant in deduplicated_plants:
+                f.write(json.dumps(plant, ensure_ascii=False) + "\n")
+        print(f"   💾 已將去重後資料寫入: {EMBED_DEDUP_FILE}（{len(deduplicated_plants)} 筆）")
+    except Exception as e:
+        print(f"   ⚠️ 寫入去重後資料檔失敗（不影響向量化流程）: {e}")
     plants = deduplicated_plants
     
     # 載入進度
