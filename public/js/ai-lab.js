@@ -328,11 +328,13 @@ success 或 fail (只能二選一，小寫)
         const photoSlots = document.querySelectorAll('.photo-slot');
         const photoHint = document.getElementById('photoHint');
 
-        // Multi-photo state
+        // Multi-photo state（兩段式：1 張即可辨識，不清楚再補拍）
         const capturedPhotos = [];
-        const REQUIRED_PHOTOS = 3;
+        const MIN_PHOTOS_TO_ANALYZE = 1;
+        const MAX_PHOTOS = 3;
         const CONFIDENCE_HIGH = 0.85;
         const CONFIDENCE_MEDIUM = 0.40;
+        let needMorePhotosSession = null; // 補拍時儲存 session_data
         
         // Director Panel Elements
         const directorToggle = document.getElementById('directorToggle');
@@ -1047,9 +1049,8 @@ success 或 fail (只能二選一，小寫)
 
         // 添加照片到集合
         function addPhotoToCollection(dataUrl) {
-            if (capturedPhotos.length >= REQUIRED_PHOTOS) {
-                // 已滿，替換最後一張
-                capturedPhotos[REQUIRED_PHOTOS - 1] = dataUrl;
+            if (capturedPhotos.length >= MAX_PHOTOS) {
+                capturedPhotos[MAX_PHOTOS - 1] = dataUrl;
             } else {
                 capturedPhotos.push(dataUrl);
             }
@@ -1075,33 +1076,30 @@ success 或 fail (只能二選一，小寫)
                 }
             });
 
-            // 標記下一個要拍的位置
-            const nextIndex = Math.min(capturedPhotos.length, REQUIRED_PHOTOS - 1);
-            if (capturedPhotos.length < REQUIRED_PHOTOS) {
+            const nextIndex = Math.min(capturedPhotos.length, MAX_PHOTOS - 1);
+            if (capturedPhotos.length < MAX_PHOTOS) {
                 photoSlots[nextIndex]?.classList.add('active');
             }
 
-            // 更新提示文字和按鈕狀態
             const count = capturedPhotos.length;
-            if (count >= REQUIRED_PHOTOS) {
-                if (photoHint) {
-                    photoHint.textContent = '✓ 已拍攝 3 張照片，可以開始辨識';
-                    photoHint.classList.add('complete');
-                }
+            if (count >= MIN_PHOTOS_TO_ANALYZE) {
                 analyzeBtn.disabled = false;
+                if (photoHint) {
+                    photoHint.textContent = count >= MAX_PHOTOS
+                        ? `✓ 已拍攝 ${MAX_PHOTOS} 張，可開始辨識`
+                        : `已拍 ${count} 張，可辨識或繼續補拍 (${count}/${MAX_PHOTOS})`;
+                    photoHint.classList.toggle('complete', count >= MAX_PHOTOS);
+                }
                 if (addPhotoBtn) {
-                    addPhotoBtn.disabled = true;
-                    addPhotoBtn.textContent = '已完成';
+                    addPhotoBtn.disabled = count >= MAX_PHOTOS;
+                    addPhotoBtn.textContent = count >= MAX_PHOTOS ? '已完成' : `拍攝第 ${count + 1} 張`;
                 }
             } else {
-                if (photoHint) {
-                    photoHint.textContent = `請從不同角度拍攝 (${count}/${REQUIRED_PHOTOS})`;
-                    photoHint.classList.remove('complete');
-                }
+                if (photoHint) photoHint.textContent = `請拍攝至少 ${MIN_PHOTOS_TO_ANALYZE} 張照片`;
                 analyzeBtn.disabled = true;
                 if (addPhotoBtn) {
                     addPhotoBtn.disabled = false;
-                    addPhotoBtn.textContent = `拍攝第 ${count + 1} 張`;
+                    addPhotoBtn.textContent = '拍攝第 1 張';
                 }
             }
         }
@@ -1111,11 +1109,11 @@ success 或 fail (只能二選一，小寫)
             resultPanel.classList.add('active');
 
             const count = capturedPhotos.length;
-            if (count < REQUIRED_PHOTOS) {
+            if (count < MIN_PHOTOS_TO_ANALYZE) {
                 aiResult.innerHTML = `<div style="text-align:center; color:#666;">
                     <div style="font-size:24px; margin-bottom:8px;">📷</div>
-                    <div>請繼續拍攝不同角度的照片</div>
-                    <div style="font-size:13px; color:#999; margin-top:4px;">多角度可提高辨識準確度</div>
+                    <div>請拍攝一張照片</div>
+                    <div style="font-size:13px; color:#999; margin-top:4px;">不清楚時可再補拍不同角度</div>
                 </div>`;
             } else {
                 aiResult.innerHTML = '準備就緒，點擊「AI 辨識」開始分析';
@@ -1125,8 +1123,8 @@ success 或 fail (只能二選一，小寫)
         }
 
         function retry() {
-            // 清空所有照片
             capturedPhotos.length = 0;
+            needMorePhotosSession = null;
             updatePhotoStrip();
 
             resultPanel.classList.remove('active');
@@ -1415,18 +1413,21 @@ success 或 fail (只能二選一，小寫)
             });
         }
 
-        // 發送照片進行分析（單次請求）
-        async function analyzePhotos(photoDataUrl, systemPrompt, userPrompt, gpsData) {
+        // 發送照片進行分析（支援補圖 previous_session）
+        async function analyzePhotos(photoDataUrl, systemPrompt, userPrompt, gpsData, opts) {
             const response = await fetch(photoDataUrl);
             const blob = await response.blob();
             const formData = new FormData();
-            formData.append('image', blob, 'capture_grid.jpg');
+            formData.append('image', blob, 'capture.jpg');
             formData.append('systemPrompt', systemPrompt);
             formData.append('userPrompt', userPrompt);
 
             if (gpsData) {
                 formData.append('latitude', gpsData.latitude);
                 formData.append('longitude', gpsData.longitude);
+            }
+            if (opts?.previousSession) {
+                formData.append('previous_session', JSON.stringify(opts.previousSession));
             }
 
             const apiRes = await fetch('/api/vision-test', {
@@ -1501,36 +1502,31 @@ success 或 fail (只能二選一，小寫)
                     console.warn('GPS 略過', gpsErr);
                 }
 
-                // 3. 合併照片並分析（單次 API 請求）
+                // 3. 兩段式多圖：補拍時只送新圖 + previous_session；首次則送單張或格子圖
                 setThinkingStage('upload');
-                updateLoadingMessage('📷 合併照片中...');
+                const isFollowUp = !!needMorePhotosSession;
+                const imageToSend = isFollowUp
+                    ? capturedPhotos[capturedPhotos.length - 1]
+                    : await combinePhotosToGrid(capturedPhotos);
+                if (!imageToSend) throw new Error('無法處理照片');
 
-                // 如果有多張照片，合併成格子圖
-                const gridImage = await combinePhotosToGrid(capturedPhotos);
-                if (!gridImage) {
-                    throw new Error('無法處理照片');
-                }
+                croppedImage.src = imageToSend;
 
-                // 更新預覽圖為合併後的格子圖
-                croppedImage.src = gridImage;
-
-                // 添加多照片提示到 prompt
-                if (capturedPhotos.length > 1) {
+                if (!isFollowUp && capturedPhotos.length > 1) {
                     finalUserPrompt += `\n\n【注意】這是從 ${capturedPhotos.length} 個不同角度拍攝的照片組合，請綜合分析所有角度的特徵。`;
                 }
 
                 setThinkingStage('analyze');
-                updateLoadingMessage('🔍 正在分析圖片細節...');
+                updateLoadingMessage(isFollowUp ? '🔍 正在比對第二張圖...' : '🔍 正在分析圖片細節...');
 
-                // 兩段式辨識：先快速提取特徵並顯示，然後進行完整分析
-                // 第一段：快速特徵提取（顯示給用戶看）
                 let quickFeatures = null;
+                if (!isFollowUp) {
                 try {
                     const quickFeaturePrompt = `你是一位專業的植物形態學家。請快速分析圖片中的植物特徵，只提取關鍵識別特徵（生活型、葉序、葉形、花序、花色等），不要給出植物名稱。用簡短文字描述即可。`;
                     
                     // 快速特徵提取：使用簡化的 prompt，只提取特徵，不給答案
                     const quickFormData = new FormData();
-                    const quickBlob = await (await fetch(gridImage)).blob();
+                    const quickBlob = await (await fetch(imageToSend)).blob();
                     quickFormData.append('image', quickBlob, 'capture_grid.jpg');
                     quickFormData.append('systemPrompt', quickFeaturePrompt);
                     quickFormData.append('userPrompt', '請快速提取這張圖片中植物的關鍵識別特徵（生活型、葉序、葉形、花序、花色等），用簡短文字描述。');
@@ -1560,11 +1556,36 @@ success 或 fail (只能二選一，小寫)
                 } catch (quickErr) {
                     console.warn('⚠️ 快速特徵提取失敗，繼續完整分析:', quickErr);
                 }
+                }
 
-                // 第二段：完整分析（在顯示快速特徵的同時進行）
-                const result = await analyzePhotos(gridImage, finalSystemPrompt, finalUserPrompt, gpsData);
+                const result = await analyzePhotos(imageToSend, finalSystemPrompt, finalUserPrompt, gpsData, needMorePhotosSession ? { previousSession: needMorePhotosSession } : null);
 
                 console.log('🤖 API 回應:', result);
+
+                // 兩段式多圖：需要補拍時儲存 session，顯示提示
+                if (result.need_more_photos && result.session_data) {
+                    needMorePhotosSession = result.session_data;
+                    aiResult.innerHTML = `
+                        <div class="need-more-photos" style="text-align:center; padding:20px;">
+                            <div style="font-size:28px; margin-bottom:12px;">📷</div>
+                            <div style="font-size:16px; font-weight:600; color:#f57c00;">${result.need_more_photos_message || '請從不同角度再拍一張'}</div>
+                            <div style="font-size:13px; color:#666; margin-top:8px;">特別是花朵或花序，可提高辨識準確度</div>
+                            <div style="margin-top:16px;">
+                                <span style="font-size:13px; color:#999;">點「拍攝第 2 張」補拍後，再點「AI 辨識」</span>
+                            </div>
+                        </div>
+                    `;
+                    if (addPhotoBtn) {
+                        addPhotoBtn.disabled = false;
+                        addPhotoBtn.textContent = '拍攝第 2 張';
+                    }
+                    analyzeBtn.textContent = '補拍後再辨識';
+                    stopThinkingAnimation();
+                    aiLoading.classList.add('hidden');
+                    analyzeBtn.disabled = false;
+                    return;
+                }
+                needMorePhotosSession = null;
 
                 // 處理結果
                 const allPlants = [];

@@ -301,7 +301,29 @@ async function embeddingStats() {
     return { ok: false, error: e.message };
   }
 }
-const { parseTraitsFromResponse, isPlantFromTraits, traitsToFeatureList, evaluateTraitQuality, extractFeaturesFromDescriptionKeywords, extractGuessNamesFromDescription, removeCompoundSimpleContradiction, capByCategoryAndResolveContradictions } = require('./scripts/rag/vectordb/traits-parser');
+const { parseTraitsFromResponse, isPlantFromTraits, traitsToFeatureList, evaluateTraitQuality, extractFeaturesFromDescriptionKeywords, extractGuessNamesFromDescription, removeCompoundSimpleContradiction, capByCategoryAndResolveContradictions, aggregateTraitsFromMultipleImages } = require('./scripts/rag/vectordb/traits-parser');
+
+/** 不確定性偵測：符合任一條件即建議補拍（兩段式多圖觸發） */
+function isUncertain(plantResults, traits, description) {
+  if (!plantResults?.plants?.length) return true;
+  const plants = plantResults.plants;
+  const top1 = plants[0]?.score ?? 0;
+  const top5 = plants[4]?.score ?? 0;
+  const scoreGap = top1 - top5;
+
+  const features = traits ? traitsToFeatureList(traits) : [];
+  const infloTypes = ['總狀花序', '繖房花序', '圓錐花序', '聚繖花序', '穗狀花序', '頭狀花序', '繖形花序'];
+  const hasInfloConflict = infloTypes.filter((t) => features.includes(t)).length > 1;
+  const orientBoth = features.includes('直立花序') && features.includes('下垂花序');
+
+  const infloUnknown = !features.some((f) => infloTypes.includes(f));
+  const flowerShapeUnknown = !features.some((f) => ['鐘形花', '漏斗形花', '唇形花', '蝶形花'].includes(f));
+
+  if (infloUnknown && flowerShapeUnknown) return true;
+  if (hasInfloConflict || orientBoth) return true;
+  if (scoreGap < 0.08 && top1 < 0.75) return true;
+  return false;
+}
 
 /** C. 二段式果實補抽：僅用文字描述向 AI 詢問果實類型，回傳 { fruit_type } 或 null */
 async function fetchFruitTypeFromDescription(description, aiUrl, aiKey, model) {
@@ -3527,14 +3549,56 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
     
     // 完整分析模式：繼續進行完整分析（包括 RAG 搜尋）
 
-    // 4. 呼叫 AI（將 RAG 結果加入 prompt，讓 LM 參考）
-    console.log('🤖 正在呼叫 AI:', AI_API_URL);
-    console.log('📝 System Prompt:', systemPrompt.substring(0, 50) + '...');
-    
-    // 將 RAG 上下文加入 system prompt
-    const enhancedSystemPrompt = systemPrompt + ragContextForLM;
+    let description;
+    let detailedDescription;
+    let finishReason = 'stop';
+    let followUpTraits = null; // 補圖時使用投票聚合後的 traits
 
-    const aiResponse = await fetch(`${AI_API_URL}/chat/completions`, {
+    const previousSessionRaw = req.body?.previous_session;
+    if (previousSessionRaw) {
+      try {
+        const session = typeof previousSessionRaw === 'string' ? JSON.parse(previousSessionRaw) : previousSessionRaw;
+        console.log('📷 補圖模式：使用第二張圖 + 投票聚合');
+        const enhancedSystemPrompt = systemPrompt + ragContextForLM;
+        const aiResponse = await fetch(`${AI_API_URL}/chat/completions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${AI_API_KEY}` },
+          body: JSON.stringify({
+            model: AI_MODEL,
+            messages: [
+              { role: 'system', content: enhancedSystemPrompt },
+              { role: 'user', content: [{ type: 'text', text: finalUserPrompt }, { type: 'image_url', image_url: { url: dataUrl } }] }
+            ],
+            max_tokens: 2000,
+            temperature: 0
+          })
+        });
+        if (!aiResponse.ok) throw new Error('補圖 Vision API 失敗');
+        const aiData = await aiResponse.json();
+        description = aiData.choices[0].message.content;
+        finishReason = aiData.choices[0].finish_reason || 'stop';
+        const analysisMatch = description.match(/<analysis>([\s\S]*?)<\/analysis>/i);
+        const part2 = analysisMatch ? analysisMatch[1].trim() : description.substring(0, 800);
+        detailedDescription = (session.detailedDescription || '') + '\n\n[第二角度] ' + part2;
+        const traits2 = parseTraitsFromResponse(description);
+        if (session.traits && traits2) {
+          followUpTraits = aggregateTraitsFromMultipleImages([session.traits, traits2]) || traits2;
+          console.log('📊 投票聚合完成，使用聚合 traits');
+        } else {
+          followUpTraits = traits2 || session.traits;
+        }
+      } catch (e) {
+        console.warn('補圖流程失敗，改用單圖:', e.message);
+      }
+    }
+
+    if (!followUpTraits && !description) {
+      // 4. 呼叫 AI（將 RAG 結果加入 prompt，讓 LM 參考）
+      console.log('🤖 正在呼叫 AI:', AI_API_URL);
+      console.log('📝 System Prompt:', systemPrompt.substring(0, 50) + '...');
+      const enhancedSystemPrompt = systemPrompt + ragContextForLM;
+
+      const aiResponse = await fetch(`${AI_API_URL}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -3572,8 +3636,8 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
     }
 
     const aiData = await aiResponse.json();
-    let description = aiData.choices[0].message.content;
-    const finishReason = aiData.choices[0].finish_reason;
+    description = aiData.choices[0].message.content;
+    finishReason = aiData.choices[0].finish_reason || 'stop';
 
     // 🔥 關鍵修復：清洗模型回應中的重複垃圾文字（如 "modifiable modifiable..."）
     // 這種重複迴圈是 Local LLM 常見的崩潰模式，會導致 JSON 解析失敗
@@ -3605,7 +3669,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
     }
 
     // 5. 從 AI 回應中提取詳細描述（用於後續 RAG 驗證）
-    let detailedDescription = description;
+    detailedDescription = description;
     const analysisMatch = description.match(/<analysis>([\s\S]*?)<\/analysis>/i);
     if (analysisMatch) {
       detailedDescription = analysisMatch[1].trim();
@@ -3631,7 +3695,8 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
         }
       }
     }
-    
+    } // end if (!followUpTraits && !description) — 一般首次辨識流程
+
     // 檢查回應是否被截斷，如果被截斷，發出警告
     const isTruncated = finishReason === 'length' || (description.length > 3000 && !description.includes('</analysis>'));
     if (isTruncated) {
@@ -3660,15 +3725,21 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
           console.warn('[RAG] ⚠️ EMBEDDING_API_URL 可能錯誤，應為 https://gps-task-embedding.zeabur.app');
         }
 
-        // 先用 Vision 的文字結果做一次「粗分類」，如果明確寫出是人造物，就完全跳過 RAG
-        if (description && description.includes('第三步：判斷類別') && description.includes('人造物')) {
-          console.log('⏭️ Vision 判斷為人造物，直接跳過所有植物 RAG 與文字分類');
+        // 人造物跳過條件放寬：補圖時不跳過；僅「明確人造物」且「無植物關鍵字」才跳過
+        const hasPlantKeywords = /葉|花|枝|果|樹皮|脈|鋸齒|莖|根|種子|花序/.test(description || '');
+        const saysArtifact = description && description.includes('第三步：判斷類別') && description.includes('人造物');
+        const skipAsArtifact = !previousSessionRaw && saysArtifact && !hasPlantKeywords;
+        if (skipAsArtifact) {
+          console.log('⏭️ Vision 判斷為人造物且無植物關鍵字，跳過植物 RAG');
           plantResults = {
             is_plant: false,
             category: 'human_made',
             message: 'Vision 分析判斷為人造物，已略過植物搜尋'
           };
         } else {
+          if (saysArtifact && hasPlantKeywords) {
+            console.log('⚠️ Vision 判人造物但描述含植物關鍵字，仍執行植物 RAG');
+          }
           // 重要：先進行傳統搜尋（embedding only）作為基準
           // 這樣可以確保第一階段的結果不會被後續的 traits-based 搜尋覆蓋
           console.log('🔍 第一階段：進行傳統搜尋（embedding only）作為基準...');
@@ -3719,8 +3790,8 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
             }
           }
 
-          // 第二階段：使用 traits-based 判斷（從結構化 JSON 提取）
-          let traits = parseTraitsFromResponse(description);
+          // 第二階段：使用 traits-based 判斷（補圖時用投票聚合結果）
+          let traits = followUpTraits || parseTraitsFromResponse(description);
           // C. 二段式果實補抽：LM 有提到果實但 trait 無 fruit_type 時，再問一次只答果實
           if (traits && AI_API_URL && AI_MODEL) {
             const descMentionsFruit = /果實|漿果|核果|蒴果|莢果|小果實|結實|紅果|綠.*果/.test(description);
@@ -4306,11 +4377,27 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
       }
     }
 
+    // 兩段式多圖：不確定時回傳 need_more_photos 與 session_data 供補拍
+    const traitsForCheck = followUpTraits || parseTraitsFromResponse(description);
+    const uncertain = plantResults?.is_plant && plantResults?.plants?.length > 0 && isUncertain(plantResults, traitsForCheck, description);
+    const needMorePhotos = uncertain && !previousSessionRaw;
+    const sessionData = needMorePhotos ? {
+      description,
+      detailedDescription,
+      traits: traitsForCheck,
+      plants: plantResults?.plants || []
+    } : null;
+
     res.json({
       success: true,
       description: description,
       plant_rag: plantResults,
-      quick_features: quickFeatures  // 快速特徵提取結果，供前端第一階段顯示
+      quick_features: quickFeatures,
+      ...(needMorePhotos && {
+        need_more_photos: true,
+        need_more_photos_message: '請從不同角度再拍一張（特別是花朵或花序），可提高辨識準確度',
+        session_data: sessionData
+      })
     });
 
   } catch (err) {

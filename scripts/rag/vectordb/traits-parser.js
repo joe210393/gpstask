@@ -1188,8 +1188,8 @@ function aggregateTraitsFromMultipleImages(traitsList) {
   }
   
   // 第二輪：決定最終值
-  // 對於關鍵特徵（花序類），需要 ≥2 張一致才輸出
-  const CRITICAL_KEYS = new Set(['inflorescence', 'inflorescence_orientation']);
+  // 關鍵特徵（花序/花型）：需 ≥2 張一致才輸出，避免多圖 union 導致互斥值共存
+  const CRITICAL_KEYS = new Set(['inflorescence', 'inflorescence_orientation', 'flower_shape']);
   const MIN_VOTES_FOR_CRITICAL = 2;
   
   for (const [voteKey, count] of Object.entries(voteCounts)) {
