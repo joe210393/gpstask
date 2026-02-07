@@ -1565,19 +1565,20 @@ success 或 fail (只能二選一，小寫)
                 // 兩段式多圖：需要補拍時儲存 session，顯示提示
                 if (result.need_more_photos && result.session_data) {
                     needMorePhotosSession = result.session_data;
+                    const nextPhotoNum = (result.session_data.photo_count ?? 1) + 1;
                     aiResult.innerHTML = `
                         <div class="need-more-photos" style="text-align:center; padding:20px;">
                             <div style="font-size:28px; margin-bottom:12px;">📷</div>
                             <div style="font-size:16px; font-weight:600; color:#f57c00;">${result.need_more_photos_message || '請從不同角度再拍一張'}</div>
                             <div style="font-size:13px; color:#666; margin-top:8px;">特別是花朵或花序，可提高辨識準確度</div>
                             <div style="margin-top:16px;">
-                                <span style="font-size:13px; color:#999;">點「拍攝第 2 張」補拍後，再點「AI 辨識」</span>
+                                <span style="font-size:13px; color:#999;">點「拍攝第 ${nextPhotoNum} 張」補拍後，再點「AI 辨識」</span>
                             </div>
                         </div>
                     `;
                     if (addPhotoBtn) {
                         addPhotoBtn.disabled = false;
-                        addPhotoBtn.textContent = '拍攝第 2 張';
+                        addPhotoBtn.textContent = `拍攝第 ${nextPhotoNum} 張`;
                     }
                     analyzeBtn.textContent = '補拍後再辨識';
                     stopThinkingAnimation();

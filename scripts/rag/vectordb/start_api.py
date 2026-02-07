@@ -1201,11 +1201,21 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
                 else:
                     key_features_text = str(key_features)
 
+            # 納入 raw_data 的 morphology（苔蘚類等 payload 無 morphology 時，raw 含 全緣/鋸齒 等）
+            raw = r.payload.get("raw_data") or {}
+            raw_morph = _to_str(raw.get("raw_data", {}).get("morphology", ""))
+            ident = raw.get("identification", {})
+            ident_morph = _to_str(ident.get("morphology", []))
+            ident_summary = _to_str(ident.get("summary", ""))
+
             plant_text = " ".join(filter(None, [
                 _to_str(r.payload.get("summary")),
                 _to_str(r.payload.get("life_form")),
                 _to_str(r.payload.get("morphology")),
                 key_features_text,
+                raw_morph,
+                ident_morph,
+                ident_summary,
             ]))
 
             # 計算特徵匹配

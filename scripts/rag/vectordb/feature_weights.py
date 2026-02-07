@@ -527,6 +527,27 @@ class FeatureWeightCalculator:
                         must_traits_in_query.append(normalized)
         
         must_traits_matched = []
+
+        # 🔥 Fallback：苔蘚類等 key_features_norm 常為空，從 plant_text 用 zh_patterns 萃取
+        valid_kfn = [x for x in (plant_key_features_norm or []) if x in FEATURE_INDEX] if plant_key_features_norm else []
+        if plant_text and len(valid_kfn) < 2:
+            zh_patterns_fallback = [
+                "總狀花序", "圓錐花序", "穗狀花序", "聚繖花序", "繖房花序", "繖形花序", "頭狀花序",
+                "漿果", "核果", "蒴果", "莢果", "翅果", "瘦果", "堅果", "梨果",
+                "互生", "對生", "輪生", "叢生",
+                "羽狀複葉", "掌狀複葉", "二回羽狀", "三出複葉", "複葉", "單葉",
+                "全緣", "鋸齒", "波狀", "白花", "黃花", "紅花", "紫花", "粉紅花", "棕櫚", "有刺", "乳汁",
+                "氣生根", "板根", "胎生苗", "紅苞葉", "佛焰花序", "宿存萼",
+                "鐘形花", "鐘形", "鐘形花朵", "漏斗形花", "唇形花", "蝶形花",
+                "成串果", "總狀果",
+            ]
+            fallback = []
+            for zh in zh_patterns_fallback:
+                if zh in plant_text and zh in FEATURE_INDEX:
+                    fallback.append(zh)
+            if ("齒緣" in plant_text or "細齒" in plant_text) and "鋸齒" in FEATURE_INDEX:
+                fallback.append("鋸齒")
+            plant_key_features_norm = list(set((plant_key_features_norm or []) + fallback))
         
         # 🔥 關鍵修復：用「原始」query_features 迭代，避免 normalize 把 總狀花序→總狀、蒴果→蒴 導致 FEATURE_INDEX 查不到
         for f in query_features:

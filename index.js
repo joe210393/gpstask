@@ -3555,10 +3555,13 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
     let followUpTraits = null; // 補圖時使用投票聚合後的 traits
 
     const previousSessionRaw = req.body?.previous_session;
+    let photoCount = 1; // 目前已分析的張數（含本次）
     if (previousSessionRaw) {
       try {
         const session = typeof previousSessionRaw === 'string' ? JSON.parse(previousSessionRaw) : previousSessionRaw;
-        console.log('📷 補圖模式：使用第二張圖 + 投票聚合');
+        photoCount = (session.photo_count ?? 1) + 1;
+        const angleLabel = photoCount === 2 ? '第二' : '第三';
+        console.log(`📷 補圖模式：使用第${angleLabel}張圖 + 投票聚合 (photo_count=${photoCount})`);
         const enhancedSystemPrompt = systemPrompt + ragContextForLM;
         const aiResponse = await fetch(`${AI_API_URL}/chat/completions`, {
           method: 'POST',
@@ -3579,7 +3582,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
         finishReason = aiData.choices[0].finish_reason || 'stop';
         const analysisMatch = description.match(/<analysis>([\s\S]*?)<\/analysis>/i);
         const part2 = analysisMatch ? analysisMatch[1].trim() : description.substring(0, 800);
-        detailedDescription = (session.detailedDescription || '') + '\n\n[第二角度] ' + part2;
+        detailedDescription = (session.detailedDescription || '') + '\n\n[' + angleLabel + '角度] ' + part2;
         const traits2 = parseTraitsFromResponse(description);
         if (session.traits && traits2) {
           followUpTraits = aggregateTraitsFromMultipleImages([session.traits, traits2]) || traits2;
@@ -4380,15 +4383,17 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
     }
 
     // 兩段式多圖：僅在「確定是植物」且「結果不確定」時才建議補拍；非植物（人造物等）絕不要求拍花朵
+    // 支援最多 3 張：第 1 張後可要第 2 張，第 2 張後仍不確定可要第 3 張
     const traitsForCheck = followUpTraits || parseTraitsFromResponse(description);
     const isPlant = plantResults?.is_plant && plantResults?.plants?.length > 0;
     const uncertain = isPlant && isUncertain(plantResults, traitsForCheck, description);
-    const needMorePhotos = uncertain && !previousSessionRaw && plantResults?.category !== 'human_made';
+    const needMorePhotos = uncertain && photoCount < 3 && plantResults?.category !== 'human_made';
     const sessionData = needMorePhotos ? {
       description,
       detailedDescription,
       traits: traitsForCheck,
-      plants: plantResults?.plants || []
+      plants: plantResults?.plants || [],
+      photo_count: photoCount
     } : null;
 
     res.json({
