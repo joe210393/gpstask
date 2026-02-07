@@ -977,6 +977,11 @@ function extractFeaturesFromDescriptionKeywords(description) {
     features.push('圓錐花序');
   }
 
+  // B0 葉型（羽狀/掌狀複葉：火筒樹等，LM 常只描述小葉形狀而漏掉複葉）
+  if (/羽狀複葉|二回羽狀|2回羽狀|3回羽狀|多回羽狀|羽狀复葉|羽狀裂/.test(text)) features.push('羽狀複葉');
+  else if (/掌狀複葉|掌狀裂葉/.test(text)) features.push('掌狀複葉');
+  else if (/三出複葉|三小葉/.test(text)) features.push('三出複葉');
+
   // B1 葉序（最多 1 個）
   if (/輪生/.test(text)) features.push('輪生');
   else if (/對生/.test(text)) features.push('對生');
@@ -993,6 +998,9 @@ function extractFeaturesFromDescriptionKeywords(description) {
   else if (/喬木/.test(text)) features.push('喬木');
   else if (/灌木/.test(text)) features.push('灌木');
   else if (/草本/.test(text)) features.push('草本');
+
+  // C0 棕櫚（棕竹等：掌狀裂、扇形、椰子類）
+  if (/棕櫚|棕樹|掌狀裂|掌狀深裂|扇形葉|椰子類|棕櫚形|扇形/.test(text)) features.push('棕櫚');
 
   // C1 刺/乳汁
   if (/有刺|具刺|刺狀|刺多/.test(text)) features.push('有刺');

@@ -304,7 +304,7 @@ class FeatureWeightCalculator:
                 if "藤本" in lf_str or "vine" in lf_lower or "climber" in lf_lower:
                     found_features.add("藤本")
 
-            # 4. 全文中文關鍵字（補充 key_features 遺漏）
+            # 4. 全文中文關鍵字（補充 key_features 遺漏，含花型讓風鈴草等可被匹配）
             zh_patterns = [
                 "總狀花序", "圓錐花序", "穗狀花序", "聚繖花序", "繖房花序", "繖形花序", "頭狀花序",
                 "漿果", "核果", "蒴果", "莢果", "翅果", "瘦果", "堅果", "梨果",
@@ -312,10 +312,14 @@ class FeatureWeightCalculator:
                 "羽狀複葉", "掌狀複葉", "二回羽狀", "三出複葉", "複葉", "單葉",
                 "全緣", "鋸齒", "波狀", "白花", "黃花", "紅花", "紫花", "棕櫚", "有刺", "乳汁",
                 "氣生根", "板根", "胎生苗", "紅苞葉", "佛焰花序",
+                "鐘形花", "鐘形", "鐘形花朵", "漏斗形花", "唇形花", "蝶形花",  # 花型：風鈴草等
             ]
             for zh in zh_patterns:
                 if zh in text or zh in key_features_text:
                     found_features.add(zh)
+            # 棕櫚科：椰子、掌狀裂、扇形葉 → 棕櫚（讓棕竹等可被匹配）
+            if "棕櫚" not in found_features and ("椰子" in text or "掌狀深裂" in key_features_text or "扇形" in text):
+                found_features.add("棕櫚")
 
             # 更新 df
             for feature in found_features:
