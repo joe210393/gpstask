@@ -2,9 +2,13 @@
 /**
  * 從台灣景觀植物介紹 (tlpg.hsiliu.org.tw) 網址驗證 RAG 辨識
  *
- * 流程：爬取網頁 → 抓圖（最多 3 張合成一大張，不足 3 張用局部放大補滿）→ 呼叫 /api/vision-test → 比對 Top1 與預期物種
+ * 流程（與真實 UX 一致）：爬取網頁 → 抓圖 →
+ *   1. 先送第 1 張圖 → /api/vision-test
+ *   2. 若 need_more_photos 且 session_data，送第 2 張 + previous_session
+ *   3. 若仍 need_more_photos，送第 3 張 + previous_session
+ *   4. 以最終 plant_rag 比對 Top1 與預期物種
  *
- * 依賴：sharp（合成圖片）。未安裝時僅送第一張圖。
+ * 依賴：sharp（可選，用於單圖縮放）。未安裝時用原圖。
  *
  * 使用：
  *   APP_URL=http://localhost:3000 node scripts/rag/verify_from_tlpg_url.js <url1> [url2] ...
@@ -203,6 +207,7 @@ async function compositeThreePanels(panelBuffers) {
 
 /**
  * 從網頁解析的 imageUrls 產出一張「三格合成圖」buffer；若無 sharp 則回傳第一張原圖。
+ * （僅在 --composite 模式下使用）
  */
 async function getImageToSend(imageUrls) {
   if (!sharp || imageUrls.length === 0) {
@@ -211,6 +216,37 @@ async function getImageToSend(imageUrls) {
   }
   const panels = await buildCompositePanelBuffers(imageUrls);
   return compositeThreePanels(panels);
+}
+
+/** 取得單張圖 buffer（兩段式流程用），index 從 0 起算 */
+async function getSingleImageBuffer(imageUrls, index) {
+  const url = imageUrls[index];
+  if (!url) throw new Error(`無圖片 index ${index}`);
+  let buf = await fetchUrl(url);
+  if (sharp) {
+    buf = await sharp(buf).resize(1200, 1200, { fit: 'inside' }).jpeg({ quality: 88 }).toBuffer();
+  }
+  return buf;
+}
+
+/** 呼叫 vision-test API（支援 previous_session 補拍） */
+async function callVisionApi(imageBuffer, previousSession = null) {
+  const apiUrl = `${APP_URL.replace(/\/$/, '')}/api/vision-test`;
+  const form = new FormData();
+  form.append('image', new Blob([imageBuffer], { type: 'image/jpeg' }), 'plant.jpg');
+  if (PLANT_SYSTEM_PROMPT) {
+    form.append('systemPrompt', PLANT_SYSTEM_PROMPT);
+    form.append('userPrompt', '請依照提示詞分析這張植物圖片，並輸出 <analysis> / <reply> 與結構化 traits JSON。');
+  }
+  if (previousSession) {
+    form.append('previous_session', JSON.stringify(previousSession));
+  }
+  const res = await fetch(apiUrl, { method: 'POST', body: form });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`API ${res.status}: ${errText.slice(0, 200)}`);
+  }
+  return res.json();
 }
 
 async function verifyOne(pageUrl, verbose = false) {
@@ -237,47 +273,35 @@ async function verifyOne(pageUrl, verbose = false) {
 
   console.log('  預期物種:', parsed.plantName, parsed.scientificName ? `(${parsed.scientificName})` : '');
   console.log('  圖片數:', parsed.imageUrls.length);
-  const useComposite = sharp && parsed.imageUrls.length > 0;
-  if (useComposite) {
-    const n = Math.min(NUM_PANELS, parsed.imageUrls.length);
-    console.log(`  使用三格合成: ${n} 張原圖${n < 3 ? '（不足處以局部放大補滿）' : ''}`);
-  } else {
-    console.log('  使用第一張圖片:', parsed.imageUrls[0]);
-  }
+  console.log('  流程: 兩段式（1張→若需要補拍→2張→3張）');
 
-  let imageBuffer;
+  let data;
+  let rounds = 0;
+  const maxRounds = Math.min(3, parsed.imageUrls.length);
+
   try {
-    imageBuffer = await getImageToSend(parsed.imageUrls);
-  } catch (e) {
-    console.error('❌ 無法下載/合成圖片:', e.message);
-    return { url: pageUrl, expected: parsed.plantName, ok: false, error: e.message };
-  }
+    // 第 1 輪：送第 1 張
+    let imageBuffer = await getSingleImageBuffer(parsed.imageUrls, 0);
+    data = await callVisionApi(imageBuffer);
+    rounds = 1;
 
-  const apiUrl = `${APP_URL.replace(/\/$/, '')}/api/vision-test`;
-  const form = new FormData();
-  form.append('image', new Blob([imageBuffer], { type: 'image/jpeg' }), 'plant.jpg');
-  if (PLANT_SYSTEM_PROMPT) {
-    form.append('systemPrompt', PLANT_SYSTEM_PROMPT);
-    form.append('userPrompt', '請依照提示詞分析這張植物圖片，並輸出 <analysis> / <reply> 與結構化 traits JSON。');
-  }
+    // 若 need_more_photos 且還有圖可補拍，繼續
+    while (data.need_more_photos && data.session_data && rounds < maxRounds) {
+      rounds++;
+      console.log(`  📷 補拍第 ${rounds} 張（need_more_photos）`);
+      imageBuffer = await getSingleImageBuffer(parsed.imageUrls, rounds - 1);
+      data = await callVisionApi(imageBuffer, data.session_data);
+    }
 
-  let res;
-  try {
-    res = await fetch(apiUrl, { method: 'POST', body: form });
+    if (rounds > 1) {
+      console.log(`  ✅ 兩段式完成，共 ${rounds} 輪`);
+    }
   } catch (e) {
     const cause = e.cause ? ` (${e.cause.code || e.cause.message})` : '';
     console.error('❌ API 請求失敗:', e.message + cause);
     console.error('   💡 請確認：1) 主程式已啟動  2) APP_URL 正確 (目前:', APP_URL, ')');
-    return { url: pageUrl, expected: parsed.plantName, ok: false, error: e.message };
+    return { url: pageUrl, expected: parsed.plantName, ok: false, error: e.message, parsed };
   }
-
-  if (!res.ok) {
-    const errText = await res.text();
-    console.error('❌ API 回傳錯誤:', res.status, errText.slice(0, 200));
-    return { url: pageUrl, expected: parsed.plantName, ok: false, error: `API ${res.status}` };
-  }
-
-  const data = await res.json();
   const plantRag = data?.plant_rag || {};
   const plants = plantRag.plants || [];
   const top1 = plants[0];
@@ -327,7 +351,8 @@ async function verifyOne(pageUrl, verbose = false) {
     parsed,
     apiData: data,
     plants,
-    plantRag
+    plantRag,
+    rounds
   };
 }
 
@@ -342,6 +367,7 @@ function formatCaseReport(result, index) {
   lines.push(`- **網址**: ${result.url}`);
   lines.push(`- **預期物種**: ${parsed?.plantName || result.expected || '-'}${parsed?.scientificName ? ` (${parsed.scientificName})` : ''}`);
   lines.push(`- **圖片數**: ${parsed?.imageUrls?.length ?? 0}`);
+  lines.push(`- **補拍輪數**: ${result.rounds ?? 1}（兩段式流程）`);
   lines.push(`- **使用結構化 Prompt**: ${PLANT_SYSTEM_PROMPT ? '是' : '否'}`);
   lines.push(`- **RAG Top1**: ${result.top1 || '無'}${result.top1Scientific ? ` (${result.top1Scientific})` : ''}`);
   if (result.error) lines.push(`- **錯誤**: ${result.error}`);
