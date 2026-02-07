@@ -3725,20 +3725,22 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
           console.warn('[RAG] ⚠️ EMBEDDING_API_URL 可能錯誤，應為 https://gps-task-embedding.zeabur.app');
         }
 
-        // 人造物跳過條件放寬：補圖時不跳過；僅「明確人造物」且「無植物關鍵字」才跳過
-        const hasPlantKeywords = /葉|花|枝|果|樹皮|脈|鋸齒|莖|根|種子|花序/.test(description || '');
+        // 人造物跳過：第三步說人造物 且 第四步明確寫「不提取生物特徵」→ 一律跳過
+        // 避免「葉片長度：N/A」等模板字被誤判為植物證據，導致仍跑 RAG 並要求補拍花朵
         const saysArtifact = description && description.includes('第三步：判斷類別') && description.includes('人造物');
-        const skipAsArtifact = !previousSessionRaw && saysArtifact && !hasPlantKeywords;
+        const explicitlyNoBioFeatures = /不提取生物特徵|由於判斷為人造物|不進行猜測/.test(description || '');
+        const hasRealPlantEvidence = /葉片[^N]*[形狀狀卵披針]|花朵[^直徑N]*[色紫紅白黃]|花序|枝條|果實|樹皮|脈序|鋸齒緣/.test(description || '');
+        const skipAsArtifact = !previousSessionRaw && saysArtifact && (explicitlyNoBioFeatures || !hasRealPlantEvidence);
         if (skipAsArtifact) {
-          console.log('⏭️ Vision 判斷為人造物且無植物關鍵字，跳過植物 RAG');
+          console.log('⏭️ Vision 判斷為人造物，跳過植物 RAG');
           plantResults = {
             is_plant: false,
             category: 'human_made',
             message: 'Vision 分析判斷為人造物，已略過植物搜尋'
           };
         } else {
-          if (saysArtifact && hasPlantKeywords) {
-            console.log('⚠️ Vision 判人造物但描述含植物關鍵字，仍執行植物 RAG');
+          if (saysArtifact && !skipAsArtifact) {
+            console.log('⚠️ Vision 判人造物但描述含植物特徵，仍執行植物 RAG');
           }
           // 重要：先進行傳統搜尋（embedding only）作為基準
           // 這樣可以確保第一階段的結果不會被後續的 traits-based 搜尋覆蓋
@@ -4377,10 +4379,11 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
       }
     }
 
-    // 兩段式多圖：不確定時回傳 need_more_photos 與 session_data 供補拍
+    // 兩段式多圖：僅在「確定是植物」且「結果不確定」時才建議補拍；非植物（人造物等）絕不要求拍花朵
     const traitsForCheck = followUpTraits || parseTraitsFromResponse(description);
-    const uncertain = plantResults?.is_plant && plantResults?.plants?.length > 0 && isUncertain(plantResults, traitsForCheck, description);
-    const needMorePhotos = uncertain && !previousSessionRaw;
+    const isPlant = plantResults?.is_plant && plantResults?.plants?.length > 0;
+    const uncertain = isPlant && isUncertain(plantResults, traitsForCheck, description);
+    const needMorePhotos = uncertain && !previousSessionRaw && plantResults?.category !== 'human_made';
     const sessionData = needMorePhotos ? {
       description,
       detailedDescription,
