@@ -548,6 +548,73 @@ class FeatureWeightCalculator:
             if ("齒緣" in plant_text or "細齒" in plant_text) and "鋸齒" in FEATURE_INDEX:
                 fallback.append("鋸齒")
             plant_key_features_norm = list(set((plant_key_features_norm or []) + fallback))
+
+        # 🔥 花色統一與補全（FLOWER_COLOR_DESIGN）
+        # 1. 花色變體正規化：白色小花 → 白花、紫白色花朵 → 紫花
+        FLOWER_COLOR_ALIASES = {
+            "白花": ["白色花", "白色小花", "白色花瓣", "花白色", "花色白色", "花色白"],
+            "黃花": ["黃色花", "黃色小花", "黃白色花", "花黃色", "花色黃色", "花色黃"],
+            "紅花": ["紅色花", "紅色小花", "花紅色", "花色紅色", "花色紅", "朱紅色"],
+            "紫花": ["紫色花", "紫色小花", "紫白色花", "紫白色花朵", "花紫色", "花色紫色", "花色紫"],
+            "粉紅花": ["粉紅色花", "粉色花", "小型紅/粉紅色花朵", "紅/粉紅色", "淡粉", "淺粉"],
+            "橙花": ["橙色花", "橘色花", "花橙色", "花色橙色"],
+        }
+        if plant_key_features_norm:
+            normalized = []
+            for x in plant_key_features_norm:
+                replaced = False
+                for std, aliases in FLOWER_COLOR_ALIASES.items():
+                    if x in aliases and std in FEATURE_INDEX:
+                        if std not in normalized:
+                            normalized.append(std)
+                        replaced = True
+                        break
+                if not replaced and x not in normalized:
+                    normalized.append(x)
+            plant_key_features_norm = normalized
+
+        # 2. 從 trait_tokens 補花色（若 key_features_norm 尚無花色）
+        FLOWER_COLOR_FROM_TOKEN = {
+            "white": "白花", "yellow": "黃花", "red": "紅花",
+            "purple": "紫花", "pink": "粉紅花", "orange": "橙花",
+        }
+        _has_fc = lambda kfn: kfn and any(f in kfn for f in ["白花", "黃花", "紅花", "紫花", "粉紅花", "橙花"])
+        has_flower_color = _has_fc(plant_key_features_norm)
+        if not has_flower_color and plant_trait_tokens:
+            for token in plant_trait_tokens:
+                if "=" in str(token) and str(token).strip().lower().startswith("flower_color="):
+                    val = str(token).split("=", 1)[1].strip().lower()
+                    std = FLOWER_COLOR_FROM_TOKEN.get(val)
+                    if std and std in FEATURE_INDEX:
+                        plant_key_features_norm = list(plant_key_features_norm or []) + [std]
+                    break
+
+        # 3. 花色 fallback 萃取：從 plant_text 萃取 花色：白色、花白色 等
+        has_flower_color = _has_fc(plant_key_features_norm)
+        if plant_text and not has_flower_color:
+            flower_from_text = None
+            if re.search(r"花色[：:]\s*白", plant_text):
+                flower_from_text = "白花"
+            elif re.search(r"花色[：:]\s*黃", plant_text):
+                flower_from_text = "黃花"
+            elif re.search(r"花色[：:]\s*紅", plant_text):
+                flower_from_text = "紅花"
+            elif re.search(r"花色[：:]\s*紫", plant_text):
+                flower_from_text = "紫花"
+            elif re.search(r"花色[：:]\s*粉", plant_text):
+                flower_from_text = "粉紅花"
+            elif re.search(r"花色[：:]\s*橙", plant_text):
+                flower_from_text = "橙花"
+            elif re.search(r"花\s*白(?:色|色花)?", plant_text):
+                idx = plant_text.find("花")
+                if idx >= 0 and "種子" not in plant_text[idx:idx + 25]:
+                    flower_from_text = "白花"
+            elif re.search(r"花瓣\s*紫白|紫白色花朵?", plant_text):
+                flower_from_text = "紫花"
+            elif re.search(r"花[^，。]{0,8}(?:淡红|淡紅|淺紅|粉紅)|(?:淡红|淡紅|淺紅|粉紅)[^，。]{0,8}花", plant_text):
+                flower_from_text = "粉紅花"
+            if flower_from_text and flower_from_text in FEATURE_INDEX:
+                plant_key_features_norm = list(plant_key_features_norm or []) + [flower_from_text]
         
         # 🔥 關鍵修復：用「原始」query_features 迭代，避免 normalize 把 總狀花序→總狀、蒴果→蒴 導致 FEATURE_INDEX 查不到
         for f in query_features:
