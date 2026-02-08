@@ -910,6 +910,10 @@ VISION_ROUTER_PROMPT = """你是一位專業的植物形態學家與生態研究
   - surface_hair（表面毛被）：glabrous/pubescent_soft/tomentose/hirsute/spiny/scaly/unknown（無毛/柔毛/絨毛/粗毛/有刺/鱗片）
 - 無法判斷 → unknown，confidence ≤ 0.3
 
+**棕櫚類特化（若判斷為棕櫚科/椰子類）：**
+- trunk_pattern：clumping（叢生莖）/ single_trunk（單幹）/ unknown
+- 葉型若為棕櫚：fan（扇形葉）/ pinnate（羽狀裂）/ unknown。叢生+扇形多為棕竹；單幹+羽狀多為黃椰子、華盛頓椰子。
+
 第五步：尺寸驗證（僅限植物）
 檢查生活型與尺寸是否一致，若不一致請修正。
 
@@ -990,9 +994,13 @@ VISION_ROUTER_PROMPT = """你是一位專業的植物形態學家與生態研究
 3. **如果以上檢查發現問題，請修正後再輸出 JSON**
 
 第九步：輸出結構化特徵（僅限植物，必須輸出 JSON）
-如果第三步判斷為「植物」，請在最後輸出。**果實必須遵守兩段式 Gate：**
+如果第三步判斷為「植物」，請在最後輸出。
 
-### 果實 Gate（必做，禁止跳過）
+**可見部位與禁止猜物種（必讀）：**
+- **visible_parts**：在 JSON 中列出照片中**真正可見**的部位，例如 ["leaf","flower"] 或 ["fruit","stem"]。只列確實看得到的（leaf/flower/fruit/stem/whole_plant），看不到就不要列。
+- **禁止在特徵階段猜測物種名稱**：此步驟只輸出可見的形態特徵，不要輸出或依賴猜測的植物名。confidence < 0.6 的特徵將不會用於辨識，故不確定的請填 unknown 或給低 confidence。
+
+**果實必須遵守兩段式 Gate：**
 
 **必填欄位（不可整段省略）：** fruit_visible、fruit_type、fruit_color 必須永遠出現在 JSON 中；看不到果實則填 value=unknown，不可省略這三個欄位。
 
@@ -1011,6 +1019,7 @@ fruit_arrangement（可選）：solitary/cluster/raceme/unknown，描述果實�
 
 ```json
 {
+  "visible_parts": ["leaf","flower"],
   "fruit_visible": {"value":"false","confidence":0.2,"evidence":"照片未見果實"},
   "life_form": {"value":"shrub","confidence":0.8,"evidence":"..."},
   "phenology": {"value":"unknown","confidence":0.2,"evidence":"..."},
@@ -1061,6 +1070,7 @@ fruit_arrangement（可選）：solitary/cluster/raceme/unknown，描述果實�
    * 不要因為「看起來像」就猜測互生/對生或全緣/鋸齒
 9) 若第三步判斷為「動物/人造物/其他」，請輸出空 JSON：{}
 10) fruit_visible=false 時，fruit_type 與 fruit_color 必須為 unknown
+11) **禁止在特徵階段猜物種名**：只描述可見形態，不輸出猜測的植物名稱作為特徵依據
 
 ### 果實輸出範例（照做可避免亂猜）
 

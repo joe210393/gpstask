@@ -409,6 +409,11 @@ function traitsToFeatureList(traits) {
     'palm': '棕櫚',
     'arecaceae': '棕櫚',
     'palm_like': '棕櫚',
+    // 棕櫚特化：叢生 vs 單幹、扇形 vs 羽狀（棕竹 vs 黃椰子）
+    'clumping': '叢生莖',
+    'single_trunk': '單幹',
+    'fan': '扇形葉',
+    'fan_shaped': '扇形葉',
 
     // leaf_shape
     'ovate': '卵形',
@@ -682,6 +687,9 @@ function traitsToFeatureList(traits) {
     return { keep: true };
   }
 
+  // 全域門檻：conf < 0.6 不入 hybrid，寧可少也不要亂（減少青皮木等萬用命中）
+  const CONF_MIN_HYBRID = 0.6;
+
   for (const [key, trait] of Object.entries(traits)) {
     // 嚴格過濾：unknown 或空值直接跳過
     if (!trait || !trait.value || trait.value === 'unknown' || trait.value === '' || String(trait.value).trim() === '') {
@@ -692,6 +700,8 @@ function traitsToFeatureList(traits) {
     let conf = Math.max(0, Number(trait.confidence) || 0);
     const evidence = String(trait.evidence || '').trim();
     if (evidence.length > 0 && evidence.length < 6) conf *= 0.8;
+
+    if (conf < CONF_MIN_HYBRID) continue;
 
     // V3：inflorescence 若為「鐘形花序」等錯用 → 改為 flower_shape 鐘形花後再處理
     if (key === 'inflorescence') {

@@ -1139,14 +1139,19 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
     seen_canonical = set()
     
     def _is_non_species(payload) -> bool:
-        """排除科名/書名等非物種條目（如 蕁麻科 (施炳霖著)、桑科 (林志忠著)）"""
+        """排除科名/屬名/書名等非物種條目（如 蕁麻科、桑科 (林志忠著)、XX屬）"""
+        import re
         cname = (payload.get("chinese_name") or "").strip()
         if not cname:
             return False
         if "著)" in cname or cname.endswith("著)"):
             return True
-        import re
         if re.search(r"[科屬]\s*\([^)]*著\s*\)\s*$", cname):
+            return True
+        # 科/屬結尾或單獨出現 → 非物種
+        if cname.endswith("科") or cname.endswith("屬"):
+            return True
+        if re.match(r"^[^\s]+\s*科\s*$", cname) or re.match(r"^[^\s]+\s*屬\s*$", cname):
             return True
         return False
 
@@ -1313,6 +1318,10 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         effective_feature_weight = 0.25
         print(f"[API] 高 embedding 調整: max_emb={max_emb:.2f} >= 0.75，權重切換為 E:0.75/F:0.25")
 
+    # 過度通用物種懲罰：匹配特徵數遠高於中位數者（資料寫太雜、百科型）略降權，避免霸榜
+    matched_counts = [len(c.get("matched_features") or []) for c in final_candidates]
+    median_matched = sorted(matched_counts)[len(matched_counts) // 2] if matched_counts else 0
+
     # 計算最終分數並排序
     for c in final_candidates:
         r = c["point"]
@@ -1400,6 +1409,13 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         qs = r.payload.get("quality_score")
         if qs is not None and isinstance(qs, (int, float)) and 0 < qs < 1:
             hybrid_score *= qs
+
+        # 過度通用物種懲罰：匹配數遠高於中位數（百科型條目）略降權，打掉青皮木式霸榜
+        n_matched = len(c.get("matched_features") or [])
+        if median_matched and n_matched > max(median_matched * 2, 6):
+            hybrid_score *= 0.95
+            if hybrid_score > 0.3:
+                print(f"[API] 過度通用懲罰: {c['plant_name']} - 匹配數 {n_matched} > 2*中位數 {median_matched} (x0.95)")
         
         # 確保分數不超過 1.0
         hybrid_score = min(1.0, hybrid_score)

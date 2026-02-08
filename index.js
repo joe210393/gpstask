@@ -4399,6 +4399,26 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
     const isPlant = plantResults?.is_plant && plantResults?.plants?.length > 0;
     const uncertain = isPlant && isUncertain(plantResults, traitsForCheck, description);
     const needMorePhotos = !SINGLE_PHOTO_MODE && uncertain && photoCount < 2 && plantResults?.category !== 'human_made';
+
+    // 三段式補拍指引：依信心與照片內容給不同建議（單張時可一次把補拍方向講對）
+    let needMorePhotosMessage = '請從不同角度再拍一張（特別是花朵或花序），可提高辨識準確度';
+    if (needMorePhotos && traitsForCheck) {
+      const fv = traitsForCheck.fruit_visible?.value ?? traitsForCheck.fruit_type?.value;
+      const fruitVisible = fv === true || fv === 'true' || (traitsForCheck.fruit_type?.value && String(traitsForCheck.fruit_type.value).toLowerCase() !== 'unknown');
+      const leafUnknown = !traitsForCheck.leaf_arrangement?.value || String(traitsForCheck.leaf_arrangement.value).toLowerCase() === 'unknown';
+      const infloUnknown = !traitsForCheck.inflorescence?.value || String(traitsForCheck.inflorescence.value).toLowerCase() === 'unknown';
+      if (fruitVisible && leafUnknown && infloUnknown) {
+        needMorePhotosMessage = '此張主要為果實，請補拍葉片或整株以利辨識';
+      } else if (plantResults?.plants?.length >= 2) {
+        const top1 = plantResults.plants[0]?.score ?? 0;
+        const top2 = plantResults.plants[1]?.score ?? 0;
+        const gap = top1 - top2;
+        if (top1 < 0.5 || gap < 0.05) {
+          needMorePhotosMessage = '建議補拍：葉背、花近照、整株或果實以利辨識';
+        }
+      }
+    }
+
     const sessionData = needMorePhotos ? {
       description,
       detailedDescription,
@@ -4414,7 +4434,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
       quick_features: quickFeatures,
       ...(needMorePhotos && {
         need_more_photos: true,
-        need_more_photos_message: '請從不同角度再拍一張（特別是花朵或花序），可提高辨識準確度',
+        need_more_photos_message: needMorePhotosMessage,
         session_data: sessionData
       })
     });
