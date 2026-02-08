@@ -105,7 +105,7 @@ feature_calculator = None  # 特徵權重計算器
 # 混合評分權重（初始預設：embedding 稍高，特徵為輔）
 EMBEDDING_WEIGHT = 0.55  # embedding 相似度權重（偏重，降低 traits 誤判影響）
 FEATURE_WEIGHT = 0.45    # 特徵匹配權重
-KEYWORD_BONUS_WEIGHT = 0.1  # 關鍵字匹配加分權重（較小，避免過度偏向名稱匹配）
+KEYWORD_BONUS_WEIGHT = 0.18  # 關鍵字匹配加分（Vision 猜的物種名是強訊號，提高以對抗 feature 資料不全）
 
 
 def encode_text(text):
@@ -1311,7 +1311,11 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
                 else:
                     strong_match_bonus = base_bonus
         
-        hybrid_score = base_score + enhancement + keyword_bonus + strong_match_bonus
+        # guess_names 命中且 embedding 高時加成：Vision 猜對時 embedding 通常也高，補償 DB feature 不全
+        guess_embed_boost = 0.0
+        if keyword_bonus > 0 and embedding_score >= 0.65:
+            guess_embed_boost = embedding_score * 0.08  # 高 embedding 的 guess 候選加分
+        hybrid_score = base_score + enhancement + keyword_bonus + strong_match_bonus + guess_embed_boost
         
         # 應用 Must Gate 懲罰（軟性降權，而非過濾）
         # 如果關鍵特徵不匹配，分數打折，但仍然保留在列表中
