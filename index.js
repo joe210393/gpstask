@@ -184,15 +184,18 @@ async function smartSearch(query, topK = RAG_TOP_K) {
 function cleanGuessNames(rawNames = []) {
   if (!Array.isArray(rawNames)) return [];
   const cleaned = [];
+  const badDescriptive = /例如|比如|像是|可能是|可能為|這種植物|這是一株|整體呈現|看起來像|但需要更多|否向下垂掛|無法完全確定|解析度有限|類似/;
+  const badMarkdown = /[*#_`\[\]]/;
+  const badForeign = /[\u0600-\u06FF\u0400-\u04FF]/; // Arabic, Cyrillic
   for (const n of rawNames) {
     if (!n) continue;
     let name = String(n).trim();
     if (!name) continue;
-    // 移除明顯描述性或非名稱片語
-    if (/例如|比如|像是|可能是|可能為|這種植物|這是一株|整體呈現|看起來像/.test(name)) continue;
-    // 移除內含空白/標點過多的長句
+    if (/^unknown$/i.test(name)) continue;
+    if (badDescriptive.test(name)) continue;
+    if (badMarkdown.test(name)) continue;
+    if (badForeign.test(name)) continue;
     if (/[。！？；：,，]/.test(name) && name.length > 8) continue;
-    // 長度過短或過長的略過（例如「植物」「一種植物」等）
     if (name.length < 2 || name.length > 12) continue;
     cleaned.push(name);
   }

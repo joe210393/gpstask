@@ -892,16 +892,24 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
     # 清洗 guess_names（再次保險，Node 端已做初步清洗）
     raw_guess_names = guess_names or []
     guess_names = []
+    bad_descriptive = ("例如", "比如", "像是", "這是一株", "這種植物", "整體呈現", "但需要更多", "否向下垂掛", "無法完全確定", "解析度有限", "類似")
+    bad_markdown = ("*", "#", "_", "`", "[", "]")
     for name in raw_guess_names:
         if not name:
             continue
         n = str(name).strip()
         if not n:
             continue
+        if n.lower() == "unknown":
+            continue
         if len(n) < 2 or len(n) > 12:
             continue
-        # 避免描述性片語再次混入
-        if any(bad in n for bad in ("例如", "比如", "像是", "這是一株", "這種植物", "整體呈現")):
+        if any(bad in n for bad in bad_descriptive):
+            continue
+        if any(bad in n for bad in bad_markdown):
+            continue
+        # 排除阿拉伯文、西里爾文等混合語
+        if any("\u0600" <= c <= "\u06FF" or "\u0400" <= c <= "\u04FF" for c in n):
             continue
         guess_names.append(n)
     guess_names = list(dict.fromkeys(guess_names))  # 去重保序
@@ -1295,6 +1303,14 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
     
     final_candidates = scored_candidates
     print(f"[API] Must Gate 已禁用 (保留所有 {len(final_candidates)} 個候選)")
+
+    # B. 高 embedding 權重調整：當候選池有極高 embedding 時，信任語意相似度，降低 feature 權重
+    # 避免 山茶花（embedding 高、feature 少）被 feature 豐富但語意較遠的物種壓過
+    max_emb = max((c["embedding_score"] for c in final_candidates), default=0)
+    if max_emb >= 0.72:
+        embedding_weight = 0.80
+        effective_feature_weight = 0.20
+        print(f"[API] 高 embedding 調整: max_emb={max_emb:.2f} >= 0.72，權重切換為 E:0.80/F:0.20")
 
     # 計算最終分數並排序
     for c in final_candidates:
