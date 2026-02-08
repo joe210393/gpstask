@@ -955,7 +955,7 @@ function extractFeaturesFromDescriptionKeywords(description) {
   }
   
   // A2.8 花色強化提取（特別是紫花、粉紅花對野牡丹等植物鑑別力高）
-  if (/深紫|濃紫|紫紅色|紫紅|深紫色|濃紫色/.test(text)) features.push('紫花');
+  if (/深紫|濃紫|紫紅色|紫紅|深紫色|濃紫色|紫色的|紫色花|紫花|紫色/.test(text)) features.push('紫花');
   else if (/粉紅|粉紅色|淡粉|淺粉/.test(text)) features.push('粉紅花');
   else if (/淡紫|淺紫|淡紫色|淺紫色|紫藍|藍紫/.test(text)) features.push('紫花');
   else if (/白色|白花|潔白/.test(text)) features.push('白花');
@@ -998,8 +998,11 @@ function extractFeaturesFromDescriptionKeywords(description) {
   else if (/互生/.test(text)) features.push('互生');
   else if (/叢生|葉叢生/.test(text)) features.push('叢生');
 
-  // B2 葉緣
-  if (/鋸齒緣|鋸齒|粗鋸齒/.test(text)) features.push('鋸齒');
+  // B2 葉緣（全緣優先：LM 常寫「邊緣光滑」卻漏標全緣，而 traits 誤給鋸齒→金露花 case）
+  const hasEntireEvidence = /全緣|邊緣光滑|邊緣平滑|葉緣平滑|葉緣光滑|光滑完整|平滑完整|光滑無齒/.test(text);
+  const hasSerrateEvidence = /鋸齒緣|鋸齒|粗鋸齒/.test(text);
+  if (hasEntireEvidence && !hasSerrateEvidence) features.push('全緣');
+  else if (hasSerrateEvidence) features.push('鋸齒');
   else if (/波狀緣|波狀/.test(text)) features.push('波狀');
   else if (/全緣/.test(text)) features.push('全緣');
 
@@ -1169,6 +1172,24 @@ function removeCompoundSimpleContradiction(features) {
 }
 
 /**
+ * 葉緣矛盾：當描述明確說全緣/光滑時，移除鋸齒（金露花 case：LM 說邊緣光滑但 traits 誤給鋸齒）
+ * @param {string[]} features
+ * @param {string} [description] - Vision/LM 描述
+ * @returns {string[]}
+ */
+function removeLeafMarginContradiction(features, description) {
+  if (!Array.isArray(features) || !description || typeof description !== 'string') return features;
+  const hasEntireDesc = /全緣|邊緣光滑|邊緣平滑|葉緣平滑|葉緣光滑|光滑完整|平滑完整|光滑無齒/.test(description);
+  const hasSerrateDesc = /鋸齒緣|鋸齒|粗鋸齒/.test(description);
+  if (hasEntireDesc && !hasSerrateDesc && features.includes('鋸齒')) {
+    const out = features.filter((f) => f !== '鋸齒');
+    if (!out.includes('全緣')) out.push('全緣');
+    return out;
+  }
+  return features;
+}
+
+/**
  * 多圖投票聚合：聚合多張圖片的 traits 結果，提高穩定性
  * 策略：
  * - 花序類：需要 ≥2 張一致才輸出（否則 unknown）
@@ -1275,6 +1296,7 @@ module.exports = {
   extractFeaturesFromDescriptionKeywords,
   extractGuessNamesFromDescription,
   removeCompoundSimpleContradiction,
+  removeLeafMarginContradiction,
   capByCategoryAndResolveContradictions,
   aggregateTraitsFromMultipleImages
 };

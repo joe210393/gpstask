@@ -1191,12 +1191,14 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
     seen_canonical = set()
     
     def _is_non_species(payload) -> bool:
-        """排除科名/屬名/書名等非物種條目（如 蕁麻科、桑科 (林志忠著)、XX屬）"""
+        """排除科名/屬名/書名等非物種條目（如 蕁麻科 (施炳霖著)、桑科 (林志忠著)、XX屬）"""
         import re
         cname = (payload.get("chinese_name") or "").strip()
         if not cname:
             return False
         if "著)" in cname or cname.endswith("著)"):
+            return True
+        if re.search(r"科\s*\([^)]*著", cname) or re.search(r"屬\s*\([^)]*著", cname):
             return True
         if re.search(r"[科屬]\s*\([^)]*著\s*\)\s*$", cname):
             return True

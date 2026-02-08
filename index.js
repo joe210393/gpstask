@@ -306,7 +306,7 @@ async function embeddingStats() {
     return { ok: false, error: e.message };
   }
 }
-const { parseTraitsFromResponse, isPlantFromTraits, traitsToFeatureList, evaluateTraitQuality, extractFeaturesFromDescriptionKeywords, extractGuessNamesFromDescription, removeCompoundSimpleContradiction, capByCategoryAndResolveContradictions, aggregateTraitsFromMultipleImages } = require('./scripts/rag/vectordb/traits-parser');
+const { parseTraitsFromResponse, isPlantFromTraits, traitsToFeatureList, evaluateTraitQuality, extractFeaturesFromDescriptionKeywords, extractGuessNamesFromDescription, removeCompoundSimpleContradiction, removeLeafMarginContradiction, capByCategoryAndResolveContradictions, aggregateTraitsFromMultipleImages } = require('./scripts/rag/vectordb/traits-parser');
 
 /** 不確定性偵測：符合任一條件即建議補拍（兩段式多圖觸發） */
 function isUncertain(plantResults, traits, description) {
@@ -3843,6 +3843,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 }
               }
               features = removeCompoundSimpleContradiction(features);
+              features = removeLeafMarginContradiction(features, description);
               features = capByCategoryAndResolveContradictions(features);
               console.log(`📊 使用 traits 提取的特徵: ${features.join(', ')}`);
 
@@ -3983,6 +3984,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
             let keywordFeatures = extractFeaturesFromDescriptionKeywords(description);
             if (keywordFeatures.length > 0 && preSearchResults?.plants?.length > 0) {
               keywordFeatures = removeCompoundSimpleContradiction(keywordFeatures);
+              keywordFeatures = removeLeafMarginContradiction(keywordFeatures, description);
               keywordFeatures = capByCategoryAndResolveContradictions(keywordFeatures);
               console.log(`[RAG] P0 fallback: 從描述擷取特徵 [${keywordFeatures.join(', ')}]，進入 hybrid`);
               const guessNamesFromFirst = preSearchResults.plants
@@ -4046,6 +4048,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 }
               }
               visionFeatures = removeCompoundSimpleContradiction(visionFeatures);
+              visionFeatures = removeLeafMarginContradiction(visionFeatures, description);
               visionFeatures = capByCategoryAndResolveContradictions(visionFeatures);
 
               if (visionParsed.success && visionParsed.intent === 'plant' && (visionFeatures.length > 0 || visionGuessNames.length > 0)) {
