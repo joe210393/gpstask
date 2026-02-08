@@ -272,13 +272,14 @@ async function verifyOne(pageUrl, verbose = false) {
     return { url: pageUrl, ok: false, error: 'no images' };
   }
 
+  const singlePhotoMode = process.env.SINGLE_PHOTO_MODE === '1';
   console.log('  預期物種:', parsed.plantName, parsed.scientificName ? `(${parsed.scientificName})` : '');
   console.log('  圖片數:', parsed.imageUrls.length);
-  console.log('  流程: 兩段式（1張→若需要補拍→2張→3張）');
+  console.log('  流程:', singlePhotoMode ? '單張模式（僅用第1張）' : '兩段式（1張→若需要補拍→2張）');
 
   let data;
   let rounds = 0;
-  const maxRounds = Math.min(2, parsed.imageUrls.length);
+  const maxRounds = singlePhotoMode ? 1 : Math.min(2, parsed.imageUrls.length);
 
   try {
     // 第 1 輪：送第 1 張

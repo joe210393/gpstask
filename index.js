@@ -154,6 +154,8 @@ const SEARCH_GET_MAX_QUERY_LEN = 500;
 
 // RAG 每階段取回數量（擴大以提升召回，正確答案常落在 4~60 名）
 const RAG_TOP_K = parseInt(process.env.RAG_TOP_K || '30', 10);
+/** 單張照片模式：設為 1 時不要求補拍，只用第一張圖辨識（可減少多圖聚合帶來的雜訊） */
+const SINGLE_PHOTO_MODE = parseInt(process.env.SINGLE_PHOTO_MODE || '0', 10) === 1;
 
 async function smartSearch(query, topK = RAG_TOP_K) {
   try {
@@ -399,6 +401,7 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
 
 const app = express();
 console.log('🚀 GPS Task Server with Plant RAG integration');
+if (SINGLE_PHOTO_MODE) console.log('📷 單張照片模式已啟用（SINGLE_PHOTO_MODE=1）');
 
 // 🔥 關鍵設定：信任反向代理（Zeabur/Cloudflare 等）
 // 設定為 1 表示只信任第一層代理（Zeabur 通常只有一層負載均衡器）
@@ -4388,10 +4391,11 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
 
     // 兩段式多圖：僅在「確定是植物」且「結果不確定」時才建議補拍；非植物（人造物等）絕不要求拍花朵
     // 支援最多 2 張：第 1 張後可要第 2 張（第 3 張常稀釋正確答案，故不要求）
+    // SINGLE_PHOTO_MODE=1 時只用第一張，不要求補拍（可減少多圖聚合雜訊）
     const traitsForCheck = followUpTraits || parseTraitsFromResponse(description);
     const isPlant = plantResults?.is_plant && plantResults?.plants?.length > 0;
     const uncertain = isPlant && isUncertain(plantResults, traitsForCheck, description);
-    const needMorePhotos = uncertain && photoCount < 2 && plantResults?.category !== 'human_made';
+    const needMorePhotos = !SINGLE_PHOTO_MODE && uncertain && photoCount < 2 && plantResults?.category !== 'human_made';
     const sessionData = needMorePhotos ? {
       description,
       detailedDescription,
