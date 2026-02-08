@@ -1306,11 +1306,12 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
 
     # B. 高 embedding 權重調整：當候選池有極高 embedding 時，信任語意相似度，降低 feature 權重
     # 避免 山茶花（embedding 高、feature 少）被 feature 豐富但語意較遠的物種壓過
+    # 門檻 0.75（原 0.72）減少觸發，E:0.75/F:0.25 較溫和，避免 Top1 分數過度下降
     max_emb = max((c["embedding_score"] for c in final_candidates), default=0)
-    if max_emb >= 0.72:
-        embedding_weight = 0.80
-        effective_feature_weight = 0.20
-        print(f"[API] 高 embedding 調整: max_emb={max_emb:.2f} >= 0.72，權重切換為 E:0.80/F:0.20")
+    if max_emb >= 0.75:
+        embedding_weight = 0.75
+        effective_feature_weight = 0.25
+        print(f"[API] 高 embedding 調整: max_emb={max_emb:.2f} >= 0.75，權重切換為 E:0.75/F:0.25")
 
     # 計算最終分數並排序
     for c in final_candidates:

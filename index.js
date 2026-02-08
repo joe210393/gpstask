@@ -4421,10 +4421,12 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
 
   } catch (err) {
     console.error('❌ AI 辨識失敗:', err);
+    if (err.stack) console.error('❌ Stack:', err.stack);
     res.status(500).json({
       success: false,
       message: 'AI 暫時無法連線，請確認後端設定',
-      error: err.message
+      error: err.message,
+      ...(process.env.NODE_ENV !== 'production' && err.stack && { stack: err.stack })
     });
   }
 });
