@@ -656,8 +656,16 @@ SOFT_RULES = [
     {"id": "S1", "trait": "leaf_arrangement", "conf_min": 0.5, "penalty": 0.20},
     {"id": "S2", "trait": "life_form", "conf_min": 0.6, "penalty": 0.12},
     {"id": "S3", "trait": "leaf_type", "conf_min": 0.7, "penalty": 0.25},
+    {"id": "S4", "trait": "flower_color", "conf_min": 0.6, "penalty": 0.18},  # 紫花/粉紅 vs 紅花
 ]
 MAX_SOFT_COUNT = 2
+
+# 花色互斥群組：紫/粉 vs 紅（野牡丹紫花 vs 火筒樹紅花）
+FLOWER_COLOR_GROUPS = {
+    "purple": "gp", "pink": "gp", "purple_pink": "gp",
+    "red": "gr",
+    "white": "gw", "yellow": "gy", "orange": "go",
+}
 
 # 葉序互斥群組：同群組=一致，不同群組=矛盾
 LEAF_ARRANGEMENT_GROUP_IDS = {
@@ -741,19 +749,30 @@ def _get_plant_leaf_type(payload):
 
 # Gate-A：棕櫚/複葉 gate 關鍵字（query 有則候選需有）
 PALM_COMPOUND_QUERY_TOKENS = frozenset({"羽狀複葉", "掌狀複葉", "二回羽狀", "三出複葉", "複葉", "棕櫚"})
-# P1b: 移除單一「掌狀」避免烏桕(掌狀葉)誤判為棕櫚；改用「掌狀複」
-PALM_COMPOUND_PLANT_KEYWORDS = (
-    "羽狀複葉", "掌狀複葉", "棕櫚", "扇形", "複葉", "棕櫚科", "掌狀複", "三出複"
-)
+# 候選「是否為棕櫚類」：僅用棕櫚特有關鍵字，不含羽狀複葉（銀合歡/豆科也有羽狀複葉）
+PALM_SPECIFIC_PLANT_KEYWORDS = ("棕櫚", "棕櫚科", "扇形", "扇形葉", "椰子", "扇葉")
 
 
 def _plant_has_palm_compound(payload) -> bool:
-    """候選植物是否有棕櫚/複葉相關描述。"""
+    """候選植物是否為棕櫚類（棕櫚科/椰子/扇形葉等），非僅有羽狀複葉。"""
     kf = payload.get("key_features") or []
     kf_norm = payload.get("key_features_norm") or []
     summary = _to_str(payload.get("summary", ""))
     text = " ".join(_to_str(x) for x in kf + kf_norm) + " " + summary
-    return any(kw in text for kw in PALM_COMPOUND_PLANT_KEYWORDS)
+    return any(kw in text for kw in PALM_SPECIFIC_PLANT_KEYWORDS)
+
+
+def _is_bryophyte_pteridophyte(payload) -> bool:
+    """候選是否為苔蘚蕨類（鋸齒語意與種子植物不同，易誤匹配）。"""
+    cname = (payload.get("chinese_name") or "").strip()
+    if not cname:
+        return False
+    if cname.endswith("苔") or cname.endswith("蘚") or cname.endswith("蕨"):
+        return True
+    family = _to_str(payload.get("family", "")).strip()
+    if "苔" in family or "蘚" in family or "蕨" in family:
+        return True
+    return False
 
 
 def compute_soft_contradiction_penalty(traits, payload):
@@ -808,7 +827,40 @@ def compute_soft_contradiction_penalty(traits, payload):
             if q_compound == plant_compound:
                 continue
             penalties.append((rule["id"], penalty_val))
+        elif trait_key == "flower_color":
+            plant_fc = _get_plant_flower_color(payload)
+            if plant_fc is None:
+                continue
+            q_gid = FLOWER_COLOR_GROUPS.get(q_val) or FLOWER_COLOR_GROUPS.get(q_val.replace(" ", "_"))
+            plant_gid = FLOWER_COLOR_GROUPS.get(plant_fc) or FLOWER_COLOR_GROUPS.get(plant_fc.replace(" ", "_"))
+            if not q_gid or not plant_gid:
+                continue
+            if q_gid == plant_gid:
+                continue
+            # 僅在 query 紫/粉、plant 紅 時懲罰（野牡丹紫花→火筒樹紅花應降權；反向不懲罰，避免 LM 抽錯紅花時懲到正確紫花物種）
+            if q_gid == "gp" and plant_gid == "gr":
+                penalties.append((rule["id"], penalty_val))
     return sorted(penalties, key=lambda x: -x[1])[:MAX_SOFT_COUNT]
+
+
+def _get_plant_flower_color(payload) -> str | None:
+    """從 payload 推斷花色（英文）。"""
+    kf = payload.get("key_features") or []
+    kf_norm = payload.get("key_features_norm") or []
+    text = " ".join(_to_str(x) for x in kf + kf_norm)
+    if "紫花" in text or "紫色" in text:
+        return "purple"
+    if "粉紅花" in text or "粉紅色" in text:
+        return "pink"
+    if "紅花" in text or "紅色" in text:
+        return "red"
+    if "白花" in text or "白色" in text:
+        return "white"
+    if "黃花" in text or "黃色" in text:
+        return "yellow"
+    if "橙花" in text or "橙色" in text:
+        return "orange"
+    return None
 
 
 def resolve_weights(weights):
@@ -1396,7 +1448,7 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         if gate_triggered and not has_palm and hybrid_score > 0.3:
             print(f"[API] Gate-A 棕櫚/複葉降權: {c['plant_name']} - 無複葉/棕櫚描述 (x{gate_penalty})")
 
-        # SOFT 矛盾重罰：life_form / leaf_arrangement 不一致時扣分（取最嚴重 2 條）
+        # SOFT 矛盾重罰：life_form / leaf_arrangement / flower_color 不一致時扣分（取最嚴重 2 條）
         if traits:
             soft_penalties = compute_soft_contradiction_penalty(traits, r.payload)
             if soft_penalties:
@@ -1404,6 +1456,16 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
                 hybrid_score = max(0.0, hybrid_score - total_penalty)
                 if hybrid_score > 0.2:
                     print(f"[API] SOFT 矛盾懲罰: {c['plant_name']} - {[rid for rid, _ in soft_penalties]}, 共扣 {total_penalty:.2f}")
+
+        # 蕨苔蘚 vs 種子植物 Gate：查詢非苔蘚蕨時，苔蘚蕨類降權（鋸齒語意不同，易誤匹配）
+        query_has_bryo_fern = bool(query and ("苔" in query or "蘚" in query or "蕨" in query))
+        query_features_str = " ".join(features or [])
+        if not query_has_bryo_fern and ("苔" in query_features_str or "蘚" in query_features_str or "蕨" in query_features_str):
+            query_has_bryo_fern = True
+        if not query_has_bryo_fern and _is_bryophyte_pteridophyte(r.payload):
+            hybrid_score *= 0.15
+            if hybrid_score > 0.2:
+                print(f"[API] 蕨苔蘚 Gate: {c['plant_name']} - 查詢為種子植物，苔蘚蕨類降權 (x0.15)")
 
         # 資料品質降權：低品質筆（缺乏描述、推測等）乘 quality_score
         qs = r.payload.get("quality_score")
