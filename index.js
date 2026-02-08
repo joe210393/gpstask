@@ -23,12 +23,12 @@ const { URL } = require('url');
 // 預設 60 秒逾時，避免 Embedding API 連線失敗時無限等待
 const EMBEDDING_REQUEST_TIMEOUT_MS = parseInt(process.env.EMBEDDING_REQUEST_TIMEOUT_MS || '60000', 10);
 
-// 動態權重區間（Q 越低越依賴 embedding，避免爛 traits 亂帶）
+// 動態權重區間（偏重 embedding，避免 traits 誤判拖累；Q 低時更依賴 embedding）
 const DYNAMIC_WEIGHT_SEGMENTS = [
   { threshold: 0.30, embedding: 0.90, feature: 0.10 },
-  { threshold: 0.55, embedding: 0.70, feature: 0.30 },
-  { threshold: 0.75, embedding: 0.50, feature: 0.50 },
-  { threshold: 1.01, embedding: 0.30, feature: 0.70 }
+  { threshold: 0.55, embedding: 0.65, feature: 0.35 },
+  { threshold: 0.75, embedding: 0.55, feature: 0.45 },
+  { threshold: 1.01, embedding: 0.45, feature: 0.55 }
 ];
 
 // Step 9: 學名／中文名對應表（LM 學名可匹配 RAG 中文）
@@ -4387,11 +4387,11 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
     }
 
     // 兩段式多圖：僅在「確定是植物」且「結果不確定」時才建議補拍；非植物（人造物等）絕不要求拍花朵
-    // 支援最多 3 張：第 1 張後可要第 2 張，第 2 張後仍不確定可要第 3 張
+    // 支援最多 2 張：第 1 張後可要第 2 張（第 3 張常稀釋正確答案，故不要求）
     const traitsForCheck = followUpTraits || parseTraitsFromResponse(description);
     const isPlant = plantResults?.is_plant && plantResults?.plants?.length > 0;
     const uncertain = isPlant && isUncertain(plantResults, traitsForCheck, description);
-    const needMorePhotos = uncertain && photoCount < 3 && plantResults?.category !== 'human_made';
+    const needMorePhotos = uncertain && photoCount < 2 && plantResults?.category !== 'human_made';
     const sessionData = needMorePhotos ? {
       description,
       detailedDescription,

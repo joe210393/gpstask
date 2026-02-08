@@ -103,8 +103,8 @@ category_embeddings = None  # 預計算的類別向量
 feature_calculator = None  # 特徵權重計算器
 
 # 混合評分權重（初始預設：embedding 稍高，特徵為輔）
-EMBEDDING_WEIGHT = 0.6  # embedding 相似度權重
-FEATURE_WEIGHT = 0.4    # 特徵匹配權重
+EMBEDDING_WEIGHT = 0.55  # embedding 相似度權重（偏重，降低 traits 誤判影響）
+FEATURE_WEIGHT = 0.45    # 特徵匹配權重
 KEYWORD_BONUS_WEIGHT = 0.1  # 關鍵字匹配加分權重（較小，避免過度偏向名稱匹配）
 
 
@@ -1110,8 +1110,8 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
     
     # 動態調整權重
     if strong_count > 0:
-        # Query 有強特徵：提高 feature 權重，讓「有匹配強特徵」的候選更容易脫穎而出
-        effective_feature_weight = min(0.60, feature_weight + 0.15)
+        # Query 有強特徵：適度提高 feature 權重（上限 0.50，避免 traits 誤判過度影響）
+        effective_feature_weight = min(0.50, feature_weight + 0.10)
         print(f"[API] 強特徵加成: Query 含 {strong_count} 個強特徵，feature 權重提升為 {effective_feature_weight:.2f}")
     elif weak_count >= 3 and strong_count == 0:
         # Query 只有通用特徵（例如：灌木+互生+總狀花序）：降低 feature 權重，主要靠 embedding

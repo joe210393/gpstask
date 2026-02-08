@@ -5,7 +5,7 @@
  * 流程（與真實 UX 一致）：爬取網頁 → 抓圖 →
  *   1. 先送第 1 張圖 → /api/vision-test
  *   2. 若 need_more_photos 且 session_data，送第 2 張 + previous_session
- *   3. 若仍 need_more_photos，送第 3 張 + previous_session
+ *   3. (已停用) 第 3 張常稀釋正確答案，維持最多 2 張
  *   4. 以最終 plant_rag 比對 Top1 與預期物種
  *
  * 依賴：sharp（可選，用於單圖縮放）。未安裝時用原圖。
@@ -278,7 +278,7 @@ async function verifyOne(pageUrl, verbose = false) {
 
   let data;
   let rounds = 0;
-  const maxRounds = Math.min(3, parsed.imageUrls.length);
+  const maxRounds = Math.min(2, parsed.imageUrls.length);
 
   try {
     // 第 1 輪：送第 1 張
