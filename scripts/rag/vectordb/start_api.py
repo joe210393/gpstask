@@ -103,8 +103,8 @@ category_embeddings = None  # 預計算的類別向量
 feature_calculator = None  # 特徵權重計算器
 
 # 混合評分權重（初始預設：embedding 稍高，特徵為輔）
-EMBEDDING_WEIGHT = 0.55  # embedding 相似度權重（偏重，降低 traits 誤判影響）
-FEATURE_WEIGHT = 0.45    # 特徵匹配權重
+EMBEDDING_WEIGHT = 0.70  # embedding 主導，降低共通特徵污染
+FEATURE_WEIGHT = 0.30    # 特徵匹配權重（輔助）
 KEYWORD_BONUS_WEIGHT = 0.18  # 關鍵字匹配加分（Vision 猜的物種名是強訊號，提高以對抗 feature 資料不全）
 
 
@@ -1025,27 +1025,29 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         sys.stdout.flush()
         return []
     
-    # B. Fruit-only 第二路召回：針對有果實的照片，用果實特徵單獨召回候選
+    # B. Fruit-only 第二路召回：延遲+高門檻+少量補召回，避免污染候選池
+    # 可設 DISABLE_FRUIT_ONLY_RECALL=1 關閉，用於 A/B 測試
     fruit_candidates = []
-    if features and FEATURE_INDEX:
-        # 檢查 Query 是否包含果實特徵
+    disable_fruit = os.environ.get("DISABLE_FRUIT_ONLY_RECALL", "").strip().lower() in ("1", "true", "yes")
+    if not disable_fruit and features and FEATURE_INDEX:
         fruit_features = [
             f for f in features
             if (FEATURE_INDEX.get(f) or {}).get("category") in {"fruit_type", "fruit_cluster", "fruit_surface", "calyx_persistent"}
         ]
-        if fruit_features:
+        # 高門檻：至少 2 個果實特徵才觸發（避免單一漿果誤召）
+        if len(fruit_features) >= 2:
             print(f"[API] Fruit-only 召回: Query 含果實特徵 {fruit_features}，啟動第二路召回")
-            # 構建果實特徵查詢文字
             fruit_query_text = " ".join(fruit_features)
             try:
                 fruit_vector = encode_text(fruit_query_text)
                 if not isinstance(fruit_vector, list):
                     fruit_vector = fruit_vector.tolist()
-                # 用果實特徵單獨召回（取 top 50）
+                # 少量補召回：20 筆（原 50 易污染候選池）
+                fruit_limit = int(os.environ.get("FRUIT_ONLY_LIMIT", "20"))
                 fruit_candidates = qdrant_client.query_points(
                     collection_name=COLLECTION_NAME,
                     query=fruit_vector,
-                    limit=50,
+                    limit=fruit_limit,
                 ).points
                 print(f"[API] Fruit-only 召回找到 {len(fruit_candidates)} 個候選")
             except Exception as e:
@@ -1053,6 +1055,7 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
                 fruit_candidates = []
     
     # 合併兩路候選（去重）
+    main_count = len(candidates)
     candidate_dict = {}
     for c in candidates:
         key = _canonical_name(c.payload or {}) or str(c.id)
@@ -1069,7 +1072,7 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
                 candidate_dict[key] = c
     
     candidates = list(candidate_dict.values())
-    print(f"[API] 合併兩路召回: 主路 {len(candidates) - len(fruit_candidates)} + Fruit路 {len(fruit_candidates)} = 總計 {len(candidates)} 個候選")
+    print(f"[API] 合併兩路召回: 主路 {main_count} + Fruit路 {len(fruit_candidates)} = 總計 {len(candidate_dict)} 個候選")
         
     t2 = time.perf_counter()
     print(f"[API] /hybrid-search encode={(t1 - t0):.3f}s qdrant={(t2 - t1):.3f}s total={(t2 - t0):.3f}s top_k={top_k} limit={candidate_limit} candidates={len(candidates)}")
@@ -1110,8 +1113,8 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
     
     # 動態調整權重
     if strong_count > 0:
-        # Query 有強特徵：適度提高 feature 權重（上限 0.50，避免 traits 誤判過度影響）
-        effective_feature_weight = min(0.50, feature_weight + 0.10)
+        # Query 有強特徵：適度提高 feature 權重（上限 0.40，避免共通特徵當主證據）
+        effective_feature_weight = min(0.40, feature_weight + 0.08)
         print(f"[API] 強特徵加成: Query 含 {strong_count} 個強特徵，feature 權重提升為 {effective_feature_weight:.2f}")
     elif weak_count >= 3 and strong_count == 0:
         # Query 只有通用特徵（例如：灌木+互生+總狀花序）：降低 feature 權重，主要靠 embedding
@@ -1127,12 +1130,25 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
     scored_candidates = []
     seen_canonical = set()
     
+    def _is_non_species(payload) -> bool:
+        """排除科名/書名等非物種條目（如 蕁麻科 (施炳霖著)、桑科 (林志忠著)）"""
+        cname = (payload.get("chinese_name") or "").strip()
+        if not cname:
+            return False
+        if "著)" in cname or cname.endswith("著)"):
+            return True
+        import re
+        if re.search(r"[科屬]\s*\([^)]*著\s*\)\s*$", cname):
+            return True
+        return False
+
     for r in candidates:
+        if _is_non_species(r.payload or {}):
+            continue
         key = _canonical_name(r.payload or {})
         if not key:
             key = str(r.id)
         if key in seen_canonical:
-            # 物種層級去重：同一 canonical key 只保留一筆候選
             continue
         seen_canonical.add(key)
         embedding_score = r.score  # 0~1

@@ -23,12 +23,12 @@ const { URL } = require('url');
 // 預設 60 秒逾時，避免 Embedding API 連線失敗時無限等待
 const EMBEDDING_REQUEST_TIMEOUT_MS = parseInt(process.env.EMBEDDING_REQUEST_TIMEOUT_MS || '60000', 10);
 
-// 動態權重區間（偏重 embedding，避免 traits 誤判拖累；Q 低時更依賴 embedding）
+// 動態權重區間（embedding 主導，feature 只在真的有辨識力時才拉高）
 const DYNAMIC_WEIGHT_SEGMENTS = [
   { threshold: 0.30, embedding: 0.90, feature: 0.10 },
-  { threshold: 0.55, embedding: 0.65, feature: 0.35 },
-  { threshold: 0.75, embedding: 0.55, feature: 0.45 },
-  { threshold: 1.01, embedding: 0.45, feature: 0.55 }
+  { threshold: 0.55, embedding: 0.75, feature: 0.25 },
+  { threshold: 0.75, embedding: 0.70, feature: 0.30 },
+  { threshold: 1.01, embedding: 0.70, feature: 0.30 }
 ];
 
 // Step 9: 學名／中文名對應表（LM 學名可匹配 RAG 中文）
