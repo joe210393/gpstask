@@ -240,21 +240,43 @@ def traits_json_to_trait_tokens(traits_json: Dict) -> List[str]:
     """
     trait_tokens = []
     MIN_CONFIDENCE = 0.55
-    
+
+    # 🔒 嚴格可見性規則：
+    # - 若 visible_parts 未包含 "flower"，則一律忽略所有 flower_* 類型特徵
+    # - 若 visible_parts 未包含 "fruit"，則一律忽略所有 fruit_* 類型特徵
+    visible_parts = traits_json.get("visible_parts") or []
+    if isinstance(visible_parts, dict):
+        visible_parts = visible_parts.get("value") or []
+    if not isinstance(visible_parts, list):
+        visible_parts = []
+    visible_set: Set[str] = set(str(x).lower() for x in visible_parts)
+
+    def _is_flower_trait(k: str) -> bool:
+        return k.startswith("flower_") or k in {"inflorescence", "flower_inflo", "flower_position", "inflorescence_orientation"}
+
+    def _is_fruit_trait(k: str) -> bool:
+        return k.startswith("fruit_") or k in {"fruit_type", "fruit_color", "fruit_cluster", "fruit_surface"}
+
     for trait_key, trait_data in traits_json.items():
         if not isinstance(trait_data, dict):
             continue
-        
+
+        # 嚴格可見性：看不到花/果就直接跳過相關特徵（即使 LM 給了高信心值）
+        if _is_flower_trait(trait_key) and "flower" not in visible_set:
+            continue
+        if _is_fruit_trait(trait_key) and "fruit" not in visible_set:
+            continue
+
         value = trait_data.get("value")
         confidence = trait_data.get("confidence", 0.0)
-        
+
         if value in ("unknown", None, "") or confidence < MIN_CONFIDENCE:
             continue
-        
+
         # 直接使用 canonical value（已經是英文標準值）
         token = f"{trait_key}={value}"
         trait_tokens.append(token)
-    
+
     return trait_tokens
 
 
