@@ -763,14 +763,19 @@ def _plant_has_palm_compound(payload) -> bool:
 
 
 def _is_bryophyte_pteridophyte(payload) -> bool:
-    """候選是否為苔蘚蕨類（鋸齒語意與種子植物不同，易誤匹配）。"""
+    """候選是否為苔蘚蕨類（與種子植物分開，查詢為灌木/草本/花時強降權）。"""
     cname = (payload.get("chinese_name") or "").strip()
-    if not cname:
-        return False
-    if cname.endswith("苔") or cname.endswith("蘚") or cname.endswith("蕨"):
-        return True
+    if cname:
+        if cname.endswith("苔") or cname.endswith("蘚") or cname.endswith("蕨"):
+            return True
     family = _to_str(payload.get("family", "")).strip()
-    if "苔" in family or "蘚" in family or "蕨" in family:
+    if family and ("苔" in family or "蘚" in family or "蕨" in family):
+        return True
+    summary = _to_str(payload.get("summary", ""))
+    kf = payload.get("key_features") or []
+    kf_norm = payload.get("key_features_norm") or []
+    text = summary + " " + " ".join(_to_str(x) for x in kf + kf_norm)
+    if any(kw in text for kw in ("苔綱", "蘚綱", "蕨類", "地錢", "角苔", "真蘚", "泥炭蘚", "孔雀苔", "懸苔", "紫萼苔")):
         return True
     return False
 
@@ -1450,6 +1455,12 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         if gate_triggered and not has_palm and hybrid_score > 0.3:
             print(f"[API] Gate-A 棕櫚/複葉降權: {c['plant_name']} - 無複葉/棕櫚描述 (x{gate_penalty})")
 
+        # Gate-A 逆邏輯：query 無棕櫚/複葉證據時，棕櫚候選重罰（避免鳥尾花/九重葛/迷迭香等一直被棕樹霸榜）
+        if not query_has_palm_compound and has_palm:
+            hybrid_score *= 0.18
+            if hybrid_score > 0.2:
+                print(f"[API] Gate-A 逆：{c['plant_name']} - 查詢無棕櫚/複葉，棕櫚候選降權 (x0.18)")
+
         # SOFT 矛盾重罰：life_form / leaf_arrangement / flower_color 不一致時扣分（取最嚴重 2 條）
         if traits:
             soft_penalties = compute_soft_contradiction_penalty(traits, r.payload)
@@ -1459,15 +1470,15 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
                 if hybrid_score > 0.2:
                     print(f"[API] SOFT 矛盾懲罰: {c['plant_name']} - {[rid for rid, _ in soft_penalties]}, 共扣 {total_penalty:.2f}")
 
-        # 蕨苔蘚 vs 種子植物 Gate：查詢非苔蘚蕨時，苔蘚蕨類降權（鋸齒語意不同，易誤匹配）
+        # 蕨苔蘚 vs 種子植物 Gate：查詢為種子植物（灌木/草本/花/喬木）時，苔蘚蕨類強降權，分開大類避免誤匹配
         query_has_bryo_fern = bool(query and ("苔" in query or "蘚" in query or "蕨" in query))
         query_features_str = " ".join(features or [])
         if not query_has_bryo_fern and ("苔" in query_features_str or "蘚" in query_features_str or "蕨" in query_features_str):
             query_has_bryo_fern = True
         if not query_has_bryo_fern and _is_bryophyte_pteridophyte(r.payload):
-            hybrid_score *= 0.15
-            if hybrid_score > 0.2:
-                print(f"[API] 蕨苔蘚 Gate: {c['plant_name']} - 查詢為種子植物，苔蘚蕨類降權 (x0.15)")
+            hybrid_score *= 0.06
+            if hybrid_score > 0.15:
+                print(f"[API] 蕨苔蘚 Gate: {c['plant_name']} - 查詢為種子植物，苔蘚蕨類強降權 (x0.06)")
 
         # 資料品質降權：低品質筆（缺乏描述、推測等）乘 quality_score
         qs = r.payload.get("quality_score")
