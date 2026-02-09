@@ -955,12 +955,33 @@ function extractFeaturesFromDescriptionKeywords(description) {
   }
   
   // A2.8 花色強化提取（特別是紫花、粉紅花對野牡丹等植物鑑別力高）
-  if (/深紫|濃紫|紫紅色|紫紅|深紫色|濃紫色|紫色的|紫色花|紫花|紫色/.test(text)) features.push('紫花');
-  else if (/粉紅|粉紅色|淡粉|淺粉/.test(text)) features.push('粉紅花');
-  else if (/淡紫|淺紫|淡紫色|淺紫色|紫藍|藍紫/.test(text)) features.push('紫花');
-  else if (/白色|白花|潔白/.test(text)) features.push('白花');
-  else if (/黃色|黃花|金黃/.test(text)) features.push('黃花');
-  else if (/紅色|紅花|鮮紅|深紅/.test(text)) features.push('紅花');
+  // 修正：避免「紫色果實 / 紫色漿果」被誤判成紫花（紫珠 case）
+  const hasFruitWord = /果實|果子|漿果|果粒|果串|果/.test(text);
+  const hasFlowerWord = /花朵|花序|花瓣|花色|花形|花冠|花筒|花蕊|花/.test(text);
+
+  const hasStrongPurple =
+    /深紫|濃紫|紫紅色|紫紅|深紫色|濃紫色|紫色的|紫色花|紫花|紫色/.test(text) ||
+    /淡紫|淺紫|淡紫色|淺紫色|紫藍|藍紫/.test(text);
+
+  if (hasStrongPurple && hasFruitWord && !hasFlowerWord) {
+    // 只看到紫色「果實」，沒有任何「花」相關關鍵字：
+    // - 不新增「紫花」，避免像紫珠這類紫色漿果被誤當成紫花植物
+    // - 果色交由結構化 JSON 的 fruit_color 處理（映射為「紫果」）
+  } else {
+    if (/深紫|濃紫|紫紅色|紫紅|深紫色|濃紫色|紫色的|紫色花|紫花|紫色/.test(text)) {
+      features.push('紫花');
+    } else if (/粉紅|粉紅色|淡粉|淺粉/.test(text)) {
+      features.push('粉紅花');
+    } else if (/淡紫|淺紫|淡紫色|淺紫色|紫藍|藍紫/.test(text)) {
+      features.push('紫花');
+    } else if (/白色|白花|潔白/.test(text)) {
+      features.push('白花');
+    } else if (/黃色|黃花|金黃/.test(text)) {
+      features.push('黃花');
+    } else if (/紅色|紅花|鮮紅|深紅/.test(text)) {
+      features.push('紅花');
+    }
+  }
   
   // A2.9 花形描述提取（牡丹般、大型花朵等）
   if (/牡丹般|牡丹狀|牡丹型|大型花朵|大花|花朵大/.test(text)) {
