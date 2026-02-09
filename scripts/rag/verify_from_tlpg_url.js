@@ -13,11 +13,13 @@
  * 使用：
  *   APP_URL=http://localhost:3000 node scripts/rag/verify_from_tlpg_url.js <url1> [url2] ...
  *   或
- *   APP_URL=http://localhost:3000 node scripts/rag/verify_from_tlpg_url.js --urls url1,url2,url3
+ *   APP_URL=... node scripts/rag/verify_from_tlpg_url.js --urls url1,url2,url3
+ *   APP_URL=... node scripts/rag/verify_from_tlpg_url.js --urls-file scripts/rag/tlpg-100-urls.txt
  *
  * 參數：
  *   --verbose, -v    輸出詳細資訊（Top5、LM 猜測、特徵、分數），便於除錯與優化
  *   --report [路徑]  將完整報告寫入 Markdown（格式對齊 test-report.md），未指定路徑則自動檔名
+ *   --urls-file 路徑 從檔案讀取 URL（每行一筆或逗號分隔）
  *
  * 範例：
  *   APP_URL=http://localhost:3000 node scripts/rag/verify_from_tlpg_url.js \
@@ -28,6 +30,7 @@
  * 注意：不改動 gps-task 主程式，此為獨立驗證腳本。
  */
 
+const fs = require('fs');
 const https = require('https');
 const http = require('http');
 let sharp;
@@ -472,6 +475,7 @@ function writeReport(results, reportPath) {
 async function main() {
   const verbose = process.argv.includes('--verbose') || process.argv.includes('-v');
   let reportPath = null;
+  let urlsFilePath = null;
   const rawArgs = process.argv.slice(2).filter((a) => a !== '--verbose' && a !== '-v');
   const args = [];
   for (let i = 0; i < rawArgs.length; i++) {
@@ -486,13 +490,26 @@ async function main() {
       }
       continue;
     }
+    if (rawArgs[i] === '--urls-file' && rawArgs[i + 1]) {
+      urlsFilePath = rawArgs[i + 1];
+      i++;
+      continue;
+    }
     args.push(rawArgs[i]);
   }
   let urls = [];
-  if (args.includes('--urls')) {
+  if (urlsFilePath && fs.existsSync(urlsFilePath)) {
+    const content = fs.readFileSync(urlsFilePath, 'utf8');
+    urls = content
+      .split(/[\n,]/)
+      .map((u) => u.trim())
+      .filter((u) => u && (u.startsWith('http://') || u.startsWith('https://')));
+  }
+  if (urls.length === 0 && args.includes('--urls')) {
     const i = args.indexOf('--urls');
     urls = (args[i + 1] || '').split(',').map((u) => u.trim()).filter(Boolean);
-  } else {
+  }
+  if (urls.length === 0) {
     urls = args.filter((a) => !a.startsWith('-') && (a.startsWith('http') || a.startsWith('https')));
   }
 
