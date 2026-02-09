@@ -1004,6 +1004,14 @@ VISION_ROUTER_PROMPT = """你是一位專業的植物形態學家與生態研究
 
 **必填欄位（不可整段省略）：** fruit_visible、fruit_type、fruit_color 必須永遠出現在 JSON 中；看不到果實則填 value=unknown，不可省略這三個欄位。
 
+**🔒 關鍵區分：果實 vs 花朵**
+- **果實（fruit）特徵**：通常是球形/橢圓形、無花瓣、無花蕊、顏色均勻、成串或單生、位於葉腋或枝條末端
+- **花朵（flower）特徵**：有花瓣、有花蕊/雄蕊/雌蕊、可能有花萼、顏色可能漸變、通常有花序結構
+- **⚠️ 常見誤判**：紫色/紅色/橙色的**球形漿果**常被誤判為「花朵」，請仔細觀察：
+  - 如果看到的是**圓形、無花瓣、無花蕊、顏色均勻的小球** → 這是**果實（berry）**，不是花朵
+  - 如果看到的是**有花瓣、有花蕊、有花萼結構** → 才是**花朵**
+- **嚴格規則**：如果照片中只有果實沒有花朵，visible_parts 必須**只包含 "fruit"**，**絕對不要包含 "flower"**；flower_color、inflorescence 等花相關特徵必須為 unknown
+
 **第一步（可見性判斷）— Fruit Visibility Gate：**
 你先判斷照片中「果實是否清楚可見」。
 - 若看不到果實、果實太小、被遮擋、像素不足、或無法確定是否為果 → 直接輸出 fruit_visible=false，fruit_type 與 fruit_color 必須為 unknown，confidence ≤ 0.3
@@ -1071,6 +1079,11 @@ fruit_arrangement（可選）：solitary/cluster/raceme/unknown，描述果實�
 9) 若第三步判斷為「動物/人造物/其他」，請輸出空 JSON：{}
 10) fruit_visible=false 時，fruit_type 與 fruit_color 必須為 unknown
 11) **禁止在特徵階段猜物種名**：只描述可見形態，不輸出猜測的植物名稱作為特徵依據
+12) **🔒 嚴格區分果實與花朵**：
+    * **如果照片中只有果實（球形/橢圓形、無花瓣、無花蕊）** → visible_parts 必須只包含 "fruit"，絕對不要包含 "flower"；flower_color、inflorescence 等花相關特徵必須為 unknown
+    * **如果照片中只有花朵（有花瓣、有花蕊）** → visible_parts 必須只包含 "flower"，fruit_visible 必須為 false
+    * **如果兩者都有** → visible_parts 可同時包含 "fruit" 和 "flower"
+    * **常見誤判**：紫色/紅色/橙色的球形漿果常被誤判為「花朵」，請仔細觀察是否有花瓣/花蕊結構
 
 ### 果實輸出範例（照做可避免亂猜）
 
