@@ -480,11 +480,19 @@ class FeatureWeightCalculator:
             if "=" in f:
                 query_trait_tokens.append(f)
         
-        # 定義 must traits（高信心、硬條件）
-        # 🔥 修復：life_form 從 MUST_KEYS 移除，改為 soft penalty
-        # 原因：life_form 最常被照片角度/尺度誤判，v2 補齊後會把正確答案 gate 掉（如風鈴草）
-        # 只保留 leaf_arrangement（葉序較穩定，誤判較少）
-        MUST_KEYS = {"leaf_arrangement"}
+        # 動態 must traits：查詢有花/果/花序等強鑑別特徵時列為 must，否則不用葉序當唯一 gate
+        MUST_KEYS = set()
+        STRONG_MUST_CATEGORIES = frozenset({
+            "flower_color", "flower_shape", "flower_position", "inflorescence_orientation",
+            "fruit_type", "fruit_cluster", "fruit_surface", "inflorescence", "calyx_persistent"
+        })
+        if features and FEATURE_INDEX:
+            for f in features:
+                cat = (FEATURE_INDEX.get(f) or {}).get("category")
+                if cat in STRONG_MUST_CATEGORIES:
+                    MUST_KEYS.add(cat)
+        if not MUST_KEYS:
+            MUST_KEYS = {"leaf_arrangement"}
         
         # 🔥 關鍵修復：Value Canonicalization（統一值格式）
         def canon_value(key: str, val: str) -> str:
@@ -799,9 +807,10 @@ class FeatureWeightCalculator:
                     q_trait, q_val = query_token.split("=", 1)
                     q_trait = q_trait.strip()
                     
-                    # 如果植物資料中完全沒有這個類別的特徵（例如缺失 leaf_arrangement），視為 unknown -> pass
+                    # 若 query 將此類別列為 must，但候選完全沒有該類別資料 → 不通過（避免缺漏資料的條目混過）
                     if q_trait not in plant_traits_by_category:
-                        continue
+                        must_matched = False
+                        break
                         
                     # 如果有這個類別的特徵，則必須匹配其中之一
                     # 使用 normalize_token 確保格式一致

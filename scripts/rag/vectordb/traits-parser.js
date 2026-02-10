@@ -352,7 +352,7 @@ function traitsToFeatureList(traits) {
     return [];
   }
 
-  const features = [];
+  let features = [];
   
   // 映射表：將英文 trait value 轉換為中文關鍵字
   const traitValueMap = {

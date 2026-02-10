@@ -1138,7 +1138,19 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
     
     candidates = list(candidate_dict.values())
     print(f"[API] 合併兩路召回: 主路 {main_count} + Fruit路 {len(fruit_candidates)} = 總計 {len(candidate_dict)} 個候選")
-        
+
+    # 候選池過濾：查詢為種子植物時，直接排除苔蘚蕨類（避免污染 Top1）
+    query_has_bryo_fern = bool(search_query and ("苔" in search_query or "蘚" in search_query or "蕨" in search_query))
+    query_features_str = " ".join(features or [])
+    if not query_has_bryo_fern and ("苔" in query_features_str or "蘚" in query_features_str or "蕨" in query_features_str):
+        query_has_bryo_fern = True
+    if not query_has_bryo_fern:
+        before_count = len(candidates)
+        candidates = [c for c in candidates if not _is_bryophyte_pteridophyte(c.payload or {})]
+        removed = before_count - len(candidates)
+        if removed > 0:
+            print(f"[API] 候選池過濾: 查詢為種子植物，排除 {removed} 筆苔蘚蕨類候選，剩 {len(candidates)} 筆")
+
     t2 = time.perf_counter()
     print(f"[API] /hybrid-search encode={(t1 - t0):.3f}s qdrant={(t2 - t1):.3f}s total={(t2 - t0):.3f}s top_k={top_k} limit={candidate_limit} candidates={len(candidates)}")
     sys.stdout.flush()
