@@ -103,8 +103,8 @@ category_embeddings = None  # 預計算的類別向量
 feature_calculator = None  # 特徵權重計算器
 
 # 混合評分權重（初始預設：embedding 稍高，特徵為輔）
-EMBEDDING_WEIGHT = 0.70  # embedding 主導，降低共通特徵污染
-FEATURE_WEIGHT = 0.30    # 特徵匹配權重（輔助）
+EMBEDDING_WEIGHT = 0.78  # embedding 為主，避免特徵主導排序
+FEATURE_WEIGHT = 0.22    # 特徵只做 gate + 有限加分
 KEYWORD_BONUS_WEIGHT = 0.18  # 關鍵字匹配加分（Vision 猜的物種名是強訊號，提高以對抗 feature 資料不全）
 
 
@@ -1188,19 +1188,13 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             elif cat in WEAK_GENERIC_CATEGORIES:
                 weak_count += 1
     
-    # 動態調整權重
-    if strong_count > 0:
-        # Query 有強特徵：適度提高 feature 權重（上限 0.40，避免共通特徵當主證據）
-        effective_feature_weight = min(0.40, feature_weight + 0.08)
-        print(f"[API] 強特徵加成: Query 含 {strong_count} 個強特徵，feature 權重提升為 {effective_feature_weight:.2f}")
-    elif weak_count >= 3 and strong_count == 0:
-        # Query 只有通用特徵（例如：灌木+互生+總狀花序）：降低 feature 權重，主要靠 embedding
-        effective_feature_weight = min(feature_weight, 0.20)
+    # 固定權重：不以強/弱特徵動態提升 feature，避免特徵主導排序（寧可 RAG 少出手）
+    effective_feature_weight = feature_weight
+    if weak_count >= 3 and strong_count == 0:
+        effective_feature_weight = min(feature_weight, 0.18)
         print(f"[API] 弱特徵 Gate: Query 只有通用特徵（{weak_count} 個），feature 權重壓低為 {effective_feature_weight:.2f}")
     else:
-        # 混合情況：保持原權重或略降
-        effective_feature_weight = min(feature_weight, 0.35)
-        print(f"[API] 混合特徵: Query 含 {strong_count} 個強特徵 + {weak_count} 個弱特徵，feature 權重為 {effective_feature_weight:.2f}")
+        print(f"[API] 權重固定 E:{embedding_weight:.2f}/F:{effective_feature_weight:.2f}（強特徵 {strong_count}、弱特徵 {weak_count}）")
 
     # 2. 計算每個候選的混合分數（先在物種層級去重，再排序）
     results = []
@@ -1380,14 +1374,10 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
     final_candidates = scored_candidates
     print(f"[API] Must Gate 已禁用 (保留所有 {len(final_candidates)} 個候選)")
 
-    # B. 高 embedding 權重調整：當候選池有極高 embedding 時，信任語意相似度，降低 feature 權重
-    # 避免 山茶花（embedding 高、feature 少）被 feature 豐富但語意較遠的物種壓過
-    # 門檻 0.75（原 0.72）減少觸發，E:0.75/F:0.25 較溫和，避免 Top1 分數過度下降
+    # B. 高 embedding 時維持固定權重，不再提高 feature 比例（設計：embedding 為主）
     max_emb = max((c["embedding_score"] for c in final_candidates), default=0)
     if max_emb >= 0.75:
-        embedding_weight = 0.75
-        effective_feature_weight = 0.25
-        print(f"[API] 高 embedding 調整: max_emb={max_emb:.2f} >= 0.75，權重切換為 E:0.75/F:0.25")
+        print(f"[API] 高 embedding 候選 max_emb={max_emb:.2f}，維持 E:{embedding_weight:.2f}/F:{effective_feature_weight:.2f}")
 
     # 過度通用物種懲罰：匹配特徵數遠高於中位數者（資料寫太雜、百科型）略降權，避免霸榜
     matched_counts = [len(c.get("matched_features") or []) for c in final_candidates]
@@ -1401,13 +1391,13 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         keyword_bonus = c["keyword_bonus"]
         match_result = c["match_result"]
         
-        # 基礎分數（無強特徵時用壓低後的 feature 權重，避免灌木/互生/總狀灌滿分）
+        # 基礎分數：embedding 為主、特徵輔助
         base_score = (embedding_weight * embedding_score) + (effective_feature_weight * feature_score)
         
-        # 增強分數
-        enhancement = embedding_score * feature_score * 0.3
+        # 增強分數：設上限，避免特徵主導
+        enhancement = min(0.06, embedding_score * feature_score * 0.25)
         
-        # 強特徵匹配加分（通用）：候選若匹配到至少 1 個強特徵（果實/花序/花色/特殊/根型），加小額分數，讓正確答案脫穎而出
+        # 強特徵匹配加分：小額上限，寧可少出手不誤導
         strong_match_bonus = 0.0
         if FEATURE_INDEX and c.get("matched_features"):
             strong_matches = [
@@ -1415,12 +1405,10 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
                 if (FEATURE_INDEX.get(m) or {}).get("category") in STRONG_DISCRIMINATIVE_CATEGORIES
             ]
             if strong_matches:
-                # 花色匹配（特別是紫花、粉紅花）給予額外加分
                 flower_color_matches = [m for m in strong_matches if m in ["紫花", "粉紅花"]]
-                base_bonus = min(0.10, 0.05 + 0.025 * len(strong_matches))
+                base_bonus = min(0.05, 0.02 + 0.015 * len(strong_matches))
                 if flower_color_matches:
-                    # 花色匹配額外加 0.03，讓野牡丹等植物更容易脫穎而出
-                    strong_match_bonus = min(0.15, base_bonus + 0.03 * len(flower_color_matches))
+                    strong_match_bonus = min(0.05, base_bonus + 0.02 * len(flower_color_matches))
                 else:
                     strong_match_bonus = base_bonus
         

@@ -141,6 +141,16 @@ function isMatch(expected, actual, scientificName) {
   return false;
 }
 
+/** 在候選名單中找預期物種的排名（1-based），找不到回傳 999 */
+function findRank(plantList, expectedName, scientificName) {
+  if (!Array.isArray(plantList) || !expectedName) return 999;
+  for (let i = 0; i < plantList.length; i++) {
+    const p = plantList[i];
+    if (isMatch(expectedName, p.chinese_name, p.scientific_name)) return i + 1;
+  }
+  return 999;
+}
+
 /** 將單張圖縮成一個格子的尺寸（統一輸出 jpeg 以利合成） */
 async function resizeToCell(buffer) {
   return sharp(buffer)
@@ -309,7 +319,17 @@ async function verifyOne(pageUrl, verbose = false) {
   }
   const plantRag = data?.plant_rag || {};
   const plants = plantRag.plants || [];
+  const embeddingOnlyPlants = plantRag.embedding_only_plants || [];
   const top1 = plants[0];
+
+  const rankEmbedding = findRank(embeddingOnlyPlants, parsed.plantName, parsed.scientificName);
+  const rankHybrid = findRank(plants, parsed.plantName, parsed.scientificName);
+  let ragEffect = 'n/a';
+  if (embeddingOnlyPlants.length > 0) {
+    if (rankHybrid < rankEmbedding) ragEffect = 'help';
+    else if (rankHybrid > rankEmbedding) ragEffect = 'disturb';
+    else ragEffect = 'neutral';
+  }
 
   const matched = top1 && isMatch(parsed.plantName, top1.chinese_name, top1.scientific_name);
   const top1Name = top1 ? `${top1.chinese_name || ''} (${top1.scientific_name || '無學名'})` : '無結果';
@@ -357,7 +377,10 @@ async function verifyOne(pageUrl, verbose = false) {
     apiData: data,
     plants,
     plantRag,
-    rounds
+    rounds,
+    rank_embedding: rankEmbedding,
+    rank_hybrid: rankHybrid,
+    rag_effect: ragEffect
   };
 }
 
@@ -375,6 +398,12 @@ function formatCaseReport(result, index) {
   lines.push(`- **補拍輪數**: ${result.rounds ?? 1}（兩段式流程）`);
   lines.push(`- **使用結構化 Prompt**: ${PLANT_SYSTEM_PROMPT ? '是' : '否'}`);
   lines.push(`- **RAG Top1**: ${result.top1 || '無'}${result.top1Scientific ? ` (${result.top1Scientific})` : ''}`);
+  if (result.rank_embedding != null || result.rank_hybrid != null) {
+    const re = result.rank_embedding ?? '-';
+    const rh = result.rank_hybrid ?? '-';
+    const effect = result.rag_effect === 'help' ? '幫忙' : result.rag_effect === 'disturb' ? '擾亂' : result.rag_effect === 'neutral' ? '不變' : 'n/a';
+    lines.push(`- **Embedding-only 排名**: ${re} | **Hybrid 排名**: ${rh} | **RAG 效果**: ${effect}`);
+  }
   if (result.error) lines.push(`- **錯誤**: ${result.error}`);
   lines.push('');
 
@@ -453,6 +482,12 @@ function writeReport(results, reportPath) {
     ''
   ].join('\n');
 
+  const withEffect = results.filter((r) => r.rag_effect && r.rag_effect !== 'n/a');
+  const helpCount = withEffect.filter((r) => r.rag_effect === 'help').length;
+  const neutralCount = withEffect.filter((r) => r.rag_effect === 'neutral').length;
+  const disturbCount = withEffect.filter((r) => r.rag_effect === 'disturb').length;
+  const naCount = results.length - withEffect.length;
+
   const summary = [
     '## 結果彙總',
     '',
@@ -460,6 +495,13 @@ function writeReport(results, reportPath) {
       const status = r.ok ? '✅' : '❌';
       return `${i + 1}. ${status} ${r.expected || r.url} → Top1: ${r.top1 || '無'}`;
     }),
+    '',
+    '### Embedding-only vs Hybrid（同一 query）',
+    '',
+    `- **幫忙**（hybrid 排名較前）: ${helpCount}`,
+    `- **不變**: ${neutralCount}`,
+    `- **擾亂**（hybrid 排名較後）: ${disturbCount}`,
+    `- **n/a**（無 embedding_only 資料）: ${naCount}`,
     '',
     '---',
     ''
@@ -560,11 +602,17 @@ async function main() {
   }
 
   const passed = results.filter((r) => r.ok).length;
+  const withEffect = results.filter((r) => r.rag_effect && r.rag_effect !== 'n/a');
+  const helpCount = withEffect.filter((r) => r.rag_effect === 'help').length;
+  const neutralCount = withEffect.filter((r) => r.rag_effect === 'neutral').length;
+  const disturbCount = withEffect.filter((r) => r.rag_effect === 'disturb').length;
   console.log('\n' + '='.repeat(60));
   console.log('📊 結果彙總:', `${passed}/${results.length} 通過`);
+  console.log('📊 Embedding vs Hybrid: 幫忙', helpCount, '| 不變', neutralCount, '| 擾亂', disturbCount, '| n/a', results.length - withEffect.length);
   results.forEach((r, i) => {
     const status = r.ok ? '✅' : '❌';
-    console.log(`  ${i + 1}. ${status} ${r.expected || r.url} → Top1: ${r.top1 || '無'}`);
+    const eff = r.rag_effect ? ` [${r.rag_effect}]` : '';
+    console.log(`  ${i + 1}. ${status} ${r.expected || r.url} → Top1: ${r.top1 || '無'}${eff}`);
   });
 
   if (reportPath) {

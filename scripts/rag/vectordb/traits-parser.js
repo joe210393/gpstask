@@ -347,13 +347,29 @@ function normalizeTraitKeyValueFromEvidence(traits) {
   return out;
 }
 
+/** 花相關 trait key：visible_parts 無 'flower' 時不送 RAG */
+const FLOWER_RELATED_KEYS = new Set([
+  'flower_color', 'flower_shape', 'flower_position', 'inflorescence', 'inflorescence_orientation'
+]);
+/** 果相關 trait key：visible_parts 無 'fruit' 時不送 RAG */
+const FRUIT_RELATED_KEYS = new Set([
+  'fruit_type', 'fruit_color', 'fruit_cluster', 'fruit_surface', 'fruit_arrangement'
+]);
+
 function traitsToFeatureList(traits) {
   if (!traits || Object.keys(traits).length === 0) {
     return [];
   }
 
   let features = [];
-  
+  // visible_parts：支援 array 或 { value: array }，無則不篩選
+  const rawParts = traits.visible_parts;
+  const visibleParts = Array.isArray(rawParts)
+    ? rawParts
+    : (rawParts && Array.isArray(rawParts.value) ? rawParts.value : []);
+  const hasFlower = visibleParts.some(p => String(p).toLowerCase() === 'flower');
+  const hasFruit = visibleParts.some(p => String(p).toLowerCase() === 'fruit');
+
   // 映射表：將英文 trait value 轉換為中文關鍵字
   const traitValueMap = {
     // life_form
@@ -687,10 +703,13 @@ function traitsToFeatureList(traits) {
     return { keep: true };
   }
 
-  // 全域門檻：conf < 0.6 不入 hybrid，寧可少也不要亂（減少青皮木等萬用命中）
-  const CONF_MIN_HYBRID = 0.6;
+  // 全域門檻：conf < 0.65 不入 hybrid，寧可少也不要亂（減少青皮木等萬用命中）
+  const CONF_MIN_HYBRID = 0.65;
 
   for (const [key, trait] of Object.entries(traits)) {
+    // visible_parts 過濾：無花則不送花相關特徵、無果則不送果相關，避免誤導 RAG
+    if (FLOWER_RELATED_KEYS.has(key) && !hasFlower) continue;
+    if (FRUIT_RELATED_KEYS.has(key) && !hasFruit) continue;
     // 嚴格過濾：unknown 或空值直接跳過
     if (!trait || !trait.value || trait.value === 'unknown' || trait.value === '' || String(trait.value).trim() === '') {
       continue;

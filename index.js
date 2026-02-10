@@ -3896,6 +3896,22 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
               }
               console.log(`[RAG] 第二階段請求: query=${queryTextZh.length}字 features=${features.length} guess_names=${guessNames.length} topK=${RAG_TOP_K}`);
 
+              // 同一 query 的 embedding-only 結果，供評測「幫忙/不變/擾亂」
+              let embeddingOnlyPlants = [];
+              try {
+                const embOnly = await smartSearch(queryTextZh, RAG_TOP_K);
+                if (embOnly?.results?.length) {
+                  embeddingOnlyPlants = embOnly.results.map(p => ({
+                    chinese_name: p.chinese_name,
+                    scientific_name: p.scientific_name,
+                    score: p.score
+                  }));
+                  console.log(`[RAG] embedding-only 基準（同 query）: ${embeddingOnlyPlants.length} 筆`);
+                }
+              } catch (e) {
+                console.warn('[RAG] embedding-only 查詢失敗:', e.message);
+              }
+
               const hybridResult = await hybridSearch({
                 query: queryTextZh,
                 features: features,
@@ -3928,6 +3944,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                   traits: traits,
                   traits_decision: traitsBasedDecision,
                   feature_info: hybridResult.feature_info,
+                  embedding_only_plants: embeddingOnlyPlants,
                   plants: hybridResult.results.map(p => ({
                     chinese_name: p.chinese_name,
                     scientific_name: p.scientific_name,
@@ -3945,7 +3962,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 if (preSearchResults && preSearchResults.is_plant && preSearchResults.plants && preSearchResults.plants.length > 0) {
                   const merged = mergePlantResults(preSearchResults.plants, newResults.plants);
                   console.log(`🔄 合併兩階段結果：第一階段 ${preSearchResults.plants.length} 筆 + 第二階段 ${newResults.plants.length} 筆 → 去重後 ${merged.length} 筆`);
-                  plantResults = { ...newResults, plants: merged };
+                  plantResults = { ...newResults, plants: merged, embedding_only_plants: newResults.embedding_only_plants };
                 } else {
                   plantResults = newResults;
                 }
