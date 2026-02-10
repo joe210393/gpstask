@@ -1391,32 +1391,9 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         keyword_bonus = c["keyword_bonus"]
         match_result = c["match_result"]
         
-        # 基礎分數：embedding 為主、特徵輔助
-        base_score = (embedding_weight * embedding_score) + (effective_feature_weight * feature_score)
-        
-        # 增強分數：設上限，避免特徵主導
-        enhancement = min(0.06, embedding_score * feature_score * 0.25)
-        
-        # 強特徵匹配加分：小額上限，寧可少出手不誤導
-        strong_match_bonus = 0.0
-        if FEATURE_INDEX and c.get("matched_features"):
-            strong_matches = [
-                m for m in c["matched_features"]
-                if (FEATURE_INDEX.get(m) or {}).get("category") in STRONG_DISCRIMINATIVE_CATEGORIES
-            ]
-            if strong_matches:
-                flower_color_matches = [m for m in strong_matches if m in ["紫花", "粉紅花"]]
-                base_bonus = min(0.05, 0.02 + 0.015 * len(strong_matches))
-                if flower_color_matches:
-                    strong_match_bonus = min(0.05, base_bonus + 0.02 * len(flower_color_matches))
-                else:
-                    strong_match_bonus = base_bonus
-        
-        # guess_names 命中且 embedding 高時加成：Vision 猜對時 embedding 通常也高，補償 DB feature 不全
-        guess_embed_boost = 0.0
-        if keyword_bonus > 0 and embedding_score >= 0.65:
-            guess_embed_boost = embedding_score * 0.08  # 高 embedding 的 guess 候選加分
-        hybrid_score = base_score + enhancement + keyword_bonus + strong_match_bonus + guess_embed_boost
+        # 純 Gate 模式：以 embedding 為基準，不做任何正向加分
+        # 設計目標：寧可少出手，也不要把錯的物種推到 Top1
+        hybrid_score = embedding_score
         
         # 應用 Must Gate 懲罰（軟性降權，而非過濾）
         # 如果關鍵特徵不匹配，分數打折，但仍然保留在列表中
