@@ -124,7 +124,12 @@ const COMMON_NAME_SYNONYMS = [
   ['長穗木', '紫花長穗木'],
   ['馬纓丹', '五色梅'],  // Lantana camara
   ['西印度櫻桃', '昔來薩樹'],
-  ['西印度櫻桃', '勒李']
+  ['西印度櫻桃', '勒李'],
+  // TLPG ↔ 森林局資料常見對應
+  ['紫珠', '杜虹花'],        // 杜虹花（common_names 含「臺灣紫珠」）
+  ['越橘葉蔓榕', '瓜子蔓榕'],
+  ['蒲葵', '扇葉葵'],
+  ['香椿', '春陽樹']
 ];
 
 function isMatch(expected, actual, scientificName) {

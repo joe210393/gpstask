@@ -67,6 +67,8 @@ BATCH_SIZE = 16  # 每批處理的資料數量（降低以避免速率限制：�
 # 資料路徑
 SCRIPT_DIR = Path(__file__).parent
 DATA_DIR = SCRIPT_DIR.parent / "data"
+# 手動補齊的 TLPG 物種（例如蔓性夏堇、迷迭香等），若存在就一併載入
+SUPPLEMENT_FILE = DATA_DIR / "tlpg-manual-supplement.jsonl"
 # 優先順序：taxonomy-v2（最新，已補齊 taxonomy）> enriched-embed-dedup（舊版）> 其他備用檔案
 TAXONOMY_V2_FILE = DATA_DIR / "plants-forest-gov-tw-enriched-embed-dedup.taxonomy-v2.jsonl"
 EMBED_DEDUP_FILE = DATA_DIR / "plants-forest-gov-tw-enriched-embed-dedup.jsonl"
@@ -368,6 +370,24 @@ def load_plants() -> List[Dict[str, Any]]:
             except json.JSONDecodeError as e:
                 print(f"⚠️  跳過無效的 JSON 行: {e}")
                 continue
+
+    # 若有手動補齊的 TLPG 物種，追加載入
+    if SUPPLEMENT_FILE.exists():
+        added = 0
+        with open(SUPPLEMENT_FILE, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    plant = json.loads(line)
+                    plants.append(plant)
+                    added += 1
+                except json.JSONDecodeError as e:
+                    print(f"⚠️  補充檔跳過無效的 JSON 行: {e}")
+                    continue
+        if added > 0:
+            print(f"   ➕ 從補充檔載入 {added} 筆 TLPG 手動物種資料")
     return plants
 
 
