@@ -108,6 +108,35 @@ EMBEDDING_WEIGHT = 0.78  # embedding 為主，避免特徵主導排序
 FEATURE_WEIGHT = 0.22    # 特徵只做 gate + 有限加分
 KEYWORD_BONUS_WEIGHT = 0.18  # 關鍵字匹配加分（Vision 猜的物種名是強訊號，提高以對抗 feature 資料不全）
 
+# 常錯當 Top1 的「萬用條目」：輕度降權，降低霸榜機率
+# 注意：這是短期止血，不是長期解法（長期應改善資料/特徵/權重）
+GENERIC_TOP1_BLACKLIST = frozenset({"冇拱", "南亞孔雀苔", "鞭枝懸苔", "株苔", "八角蓮", "草海桐", "白檀"})
+GENERIC_TOP1_PENALTY = float(os.environ.get("GENERIC_TOP1_PENALTY", "0.80"))
+
+
+def apply_generic_top1_penalty(rows: list[dict], penalty: float = GENERIC_TOP1_PENALTY) -> list[dict]:
+    """對萬用條目做輕度降權（就地修改 + 回傳，方便 chain）。"""
+    if not rows:
+        return rows
+    try:
+        p = float(penalty)
+    except Exception:
+        p = 0.88
+    # 夾住，避免環境變數設錯造成極端結果
+    if p <= 0:
+        p = 0.01
+    if p > 1:
+        p = 1.0
+
+    for item in rows:
+        try:
+            name = (item.get("chinese_name") or "").strip()
+            if name in GENERIC_TOP1_BLACKLIST:
+                item["score"] = float(item.get("score") or 0.0) * p
+        except Exception:
+            continue
+    return rows
+
 
 def encode_text(text):
     """
@@ -645,10 +674,7 @@ def search_plants(query: str, top_k: int = 5):
             for r in dedup_results
         ]
         # 萬用條目輕度降權（與 hybrid 一致），再依分數排序
-        _blacklist = frozenset({"冇拱", "南亞孔雀苔", "鞭枝懸苔", "株苔", "八角蓮", "草海桐", "白檀"})
-        for item in out:
-            if (item.get("chinese_name") or "").strip() in _blacklist:
-                item["score"] = item["score"] * 0.88
+        apply_generic_top1_penalty(out)
         out.sort(key=lambda x: x["score"], reverse=True)
         return out
     except Exception as e:
@@ -979,8 +1005,21 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         guess_names.append(n)
     guess_names = list(dict.fromkeys(guess_names))  # 去重保序
     weights = weights or {}
-    embedding_weight = weights.get("embedding", EMBEDDING_WEIGHT)
-    feature_weight = weights.get("feature", FEATURE_WEIGHT)
+    embedding_weight = float(weights.get("embedding", EMBEDDING_WEIGHT))
+    feature_weight = float(weights.get("feature", FEATURE_WEIGHT))
+
+    # Phase 2：保護性 clamp + 正規化，避免特徵權重過高造成擾亂
+    if not features:
+        feature_weight = 0.0
+        embedding_weight = 1.0
+    embedding_weight = max(0.65, min(0.95, embedding_weight))
+    feature_weight = max(0.05, min(0.35, feature_weight)) if features else 0.0
+    total_w = embedding_weight + feature_weight
+    if total_w <= 0:
+        embedding_weight, feature_weight = 1.0, 0.0
+    else:
+        embedding_weight = embedding_weight / total_w
+        feature_weight = feature_weight / total_w
     print(f"[API] hybrid_search 入參: query_len={len(query or '')}, features={len(features)}, guess_names={len(guess_names)}, top_k={top_k}, weights=E:{embedding_weight:.2f}/F:{feature_weight:.2f}")
     sys.stdout.flush()
 
@@ -1499,10 +1538,7 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         })
 
     # 萬用條目輕度降權：常錯當 Top1 的物種 ×0.88，減少霸榜、讓正解有機會超前
-    _blacklist_generic = frozenset({"冇拱", "南亞孔雀苔", "鞭枝懸苔", "株苔", "八角蓮", "草海桐", "白檀"})
-    for r in results:
-        if (r.get("chinese_name") or "").strip() in _blacklist_generic:
-            r["score"] = r["score"] * 0.88
+    apply_generic_top1_penalty(results)
 
     # 4. 按混合分數重新排序
     results.sort(key=lambda x: x["score"], reverse=True)

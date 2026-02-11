@@ -202,6 +202,56 @@ function cleanGuessNames(rawNames = []) {
   return Array.from(new Set(cleaned));
 }
 
+/**
+ * 第一階段 embedding 搜尋用的 query：
+ * - 優先用從描述抽出的關鍵特徵（葉序/葉型/花色/果實等）
+ * - 不足時再補上一小段乾淨的文字描述
+ * - 控制長度在 ~200 字內，避免把整段 step-by-step 分析丟進 embedding
+ */
+function buildFirstStageEmbeddingQuery(description, detailedDescription) {
+  let queryTextZh = '';
+  const desc = description || '';
+
+  try {
+    // 從 LM 描述抽取關鍵特徵（與 traits-path 共用邏輯）
+    let features = extractFeaturesFromDescriptionKeywords(desc);
+    if (features.length > 0) {
+      features = removeCompoundSimpleContradiction(features);
+      features = removeLeafMarginContradiction(features, desc);
+      features = capByCategoryAndResolveContradictions(features);
+      queryTextZh = features.slice(0, 15).join('、');
+    }
+  } catch (e) {
+    console.warn('[RAG] buildFirstStageEmbeddingQuery: 特徵抽取失敗:', e.message);
+  }
+
+  // 若僅有少量特徵，補上一小段乾淨描述（去掉步驟標題/不確定語句）
+  const descSource = detailedDescription || desc;
+  if (!queryTextZh || queryTextZh.length < 10) {
+    const cleanDesc = (descSource || '')
+      .replace(/第[一二三四五六七八九十\d]+步[：:]/g, '')
+      .replace(/\*\*[^*]+\*\*/g, '')
+      .replace(/推測|估計|無法判斷|可能/g, '')
+      .trim()
+      .substring(0, 120);
+    if (cleanDesc) {
+      queryTextZh = queryTextZh ? `${queryTextZh}。${cleanDesc}` : cleanDesc;
+    }
+  }
+
+  // 最長 200 字內
+  if (queryTextZh.length > 200) {
+    queryTextZh = queryTextZh.substring(0, 200);
+  }
+
+  // 萬一仍然為空，退回描述的前 200 字
+  if (!queryTextZh) {
+    queryTextZh = (detailedDescription || desc || '').substring(0, 200);
+  }
+
+  return queryTextZh;
+}
+
 async function hybridSearch({ query, features = [], guessNames = [], topK = RAG_TOP_K, weights = null, traits = null }) {
   try {
     const safeGuessNames = cleanGuessNames(guessNames);
@@ -244,6 +294,38 @@ function mergePlantResults(prePlants, newPlants, limit = RAG_TOP_K) {
   return Array.from(byKey.values())
     .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
     .slice(0, limit);
+}
+
+/**
+ * 將任意植物列表正規化為 embedding_only_plants 形狀
+ * [{ chinese_name, scientific_name, score }]
+ */
+function toEmbeddingOnlyPlants(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((p) => {
+      if (!p) return null;
+      const chinese_name = p.chinese_name || p.chineseName || p.name || null;
+      const scientific_name = p.scientific_name || p.scientificName || null;
+      const score = p.score ?? p.embedding_score ?? p.embeddingScore ?? null;
+      if (!chinese_name && !scientific_name) return null;
+      return { chinese_name, scientific_name, score };
+    })
+    .filter(Boolean);
+}
+
+/**
+ * 優先取 preSearchResults.embedding_only_plants，其次退回 preSearchResults.plants，再退回 fallbackList
+ * 用於確保各路徑都能穩定回傳 embedding_only_plants（供驗證報告計算）
+ */
+function getEmbeddingOnlyPlants(preSearchResults, fallbackList = []) {
+  const src =
+    (preSearchResults && Array.isArray(preSearchResults.embedding_only_plants) && preSearchResults.embedding_only_plants.length > 0)
+      ? preSearchResults.embedding_only_plants
+      : (preSearchResults && Array.isArray(preSearchResults.plants) && preSearchResults.plants.length > 0)
+        ? preSearchResults.plants
+        : fallbackList;
+  return toEmbeddingOnlyPlants(src);
 }
 
 /**
@@ -301,14 +383,25 @@ function determineDynamicWeights(traitQuality = {}) {
     embeddingWeight = 1 - featureWeight;
   }
 
+  // 通用特徵過多時，強制降低特徵權重（避免互生/喬木等把結果拉歪）
+  if (typeof genericRatio === 'number' && genericRatio >= 0.75) {
+    featureWeight = Math.min(featureWeight, 0.15);
+    embeddingWeight = 1 - featureWeight;
+  }
+
   const total = embeddingWeight + featureWeight;
   if (total !== 1) {
     embeddingWeight = embeddingWeight / total;
     featureWeight = featureWeight / total;
   }
 
-  embeddingWeight = clamp(Number(embeddingWeight.toFixed(3)), 0.1, 0.9);
-  featureWeight = clamp(Number(featureWeight.toFixed(3)), 0.1, 0.9);
+  // Phase 2：限制 hybrid 權重，避免特徵洗掉 embedding 正解（以 embedding 為主）
+  embeddingWeight = clamp(Number(embeddingWeight.toFixed(3)), 0.65, 0.95);
+  featureWeight = clamp(Number(featureWeight.toFixed(3)), 0.05, 0.35);
+  // 再次正規化（避免 clamp 後總和不為 1）
+  const total2 = embeddingWeight + featureWeight;
+  embeddingWeight = clamp(Number((embeddingWeight / total2).toFixed(3)), 0.65, 0.95);
+  featureWeight = clamp(Number((1 - embeddingWeight).toFixed(3)), 0.05, 0.35);
 
   return { embedding: embeddingWeight, feature: featureWeight };
 }
@@ -537,17 +630,25 @@ app.use((req, res, next) => {
 });
 
 // IMPORTANT: DB config must come from env vars only. No hardcoded defaults.
-const dbConfig = getDbConfig();
+// 開發 / RAG 驗證用：允許 SKIP_DB=1 跳過 DB（不影響 /api/vision-test / 植物 RAG）
+const SKIP_DB = String(process.env.SKIP_DB || '').trim() === '1';
+let dbConfig = null;
+let pool = null;
+if (!SKIP_DB) {
+  dbConfig = getDbConfig();
 
-// 建立連接池
-const pool = mysql.createPool({
-  ...dbConfig,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  enableKeepAlive: true,
-  keepAliveInitialDelay: 0
-});
+  // 建立連接池
+  pool = mysql.createPool({
+    ...dbConfig,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 0
+  });
+} else {
+  console.log('[DB] SKIP_DB=1：跳過資料庫連線與啟動遷移（僅用於本機 RAG/驗證）');
+}
 
 const ALLOWED_TASK_TYPES = ['qa', 'multiple_choice', 'photo', 'number', 'keyword', 'location'];
 
@@ -566,6 +667,7 @@ function generateToken(user) {
 
 // 測試資料庫連接
 async function testDatabaseConnection() {
+  if (SKIP_DB) return false;
   let conn;
   try {
     console.log('🔄 測試資料庫連接...');
@@ -3815,19 +3917,41 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
           const PLANT_SCORE_THRESHOLD = visionSaysPlant ? 0.4 : (finishReason === 'length' ? 0.45 : 0.5);
 
           if (classification.is_plant && classification.plant_score >= PLANT_SCORE_THRESHOLD) {
-            const ragResult = await smartSearch(detailedDescription, RAG_TOP_K);
+            // A 階段：為第一階段構建高訊號 query（特徵 + 精簡描述），並做雙 query 召回後合併
+            const firstStageQuery = buildFirstStageEmbeddingQuery(description, detailedDescription);
+            console.log(`[RAG] 第一階段 query_text_zh (${firstStageQuery.length} 字元): ${firstStageQuery.substring(0, 60)}...`);
 
-            if (ragResult?.error) {
-              console.warn('[RAG] 第一階段失敗:', ragResult.error);
-            }
-            if (ragResult?.results?.length === 0 && !ragResult?.error) {
-              console.log('[RAG] 第一階段 API 回傳 0 筆結果（非連線錯誤）');
+            const ragResultPrimary = await smartSearch(firstStageQuery, RAG_TOP_K);
+            if (ragResultPrimary?.error) {
+              console.warn('[RAG] 第一階段 (primary) 失敗:', ragResultPrimary.error);
             }
 
-            if (ragResult.classification?.is_plant && ragResult.results?.length > 0 && !alreadyNonPlant) {
-              console.log(`✅ 第一階段傳統搜尋找到 ${ragResult.results.length} 個結果`);
-              console.log('📋 第一階段檢測到的植物：');
-              ragResult.results.forEach((p, idx) => {
+            // 補一輪「原始 detailedDescription」召回，避免特徵 query 遮蔽某些語義訊號
+            let ragResultSecondary = null;
+            if (detailedDescription && detailedDescription.length > 0 && detailedDescription !== firstStageQuery) {
+              try {
+                ragResultSecondary = await smartSearch(detailedDescription, RAG_TOP_K);
+                if (ragResultSecondary?.error) {
+                  console.warn('[RAG] 第一階段 (secondary) 失敗:', ragResultSecondary.error);
+                }
+              } catch (e) {
+                console.warn('[RAG] 第一階段 (secondary) 例外:', e.message);
+              }
+            }
+
+            const primaryResults = Array.isArray(ragResultPrimary?.results) ? ragResultPrimary.results : [];
+            const secondaryResults = Array.isArray(ragResultSecondary?.results) ? ragResultSecondary.results : [];
+
+            if (primaryResults.length === 0 && secondaryResults.length === 0) {
+              console.log('[RAG] 第一階段 API 回傳 0 筆結果（primary/secondary 皆為空，非連線錯誤）');
+            }
+
+            const mergedFirstStage = mergePlantResults(primaryResults, secondaryResults, RAG_TOP_K);
+
+            if (mergedFirstStage.length > 0 && !alreadyNonPlant) {
+              console.log(`✅ 第一階段傳統搜尋（雙 query）合併後共 ${mergedFirstStage.length} 個結果`);
+              console.log('📋 第一階段檢測到的植物（合併後 Top10）：');
+              mergedFirstStage.slice(0, 10).forEach((p, idx) => {
                 console.log(`  ${idx + 1}. ${p.chinese_name} (${p.scientific_name || '無學名'}) - 分數: ${(p.score * 100).toFixed(1)}%`);
               });
               
@@ -3835,13 +3959,9 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 is_plant: true,
                 category: 'plant',
                 search_type: 'embedding',
-                message: ragResult.message,
-                embedding_only_plants: ragResult.results.map(p => ({
-                  chinese_name: p.chinese_name,
-                  scientific_name: p.scientific_name,
-                  score: p.score
-                })),
-                plants: ragResult.results.map(p => ({
+                message: ragResultPrimary?.message || ragResultSecondary?.message,
+                embedding_only_plants: toEmbeddingOnlyPlants(mergedFirstStage),
+                plants: mergedFirstStage.map(p => ({
                   chinese_name: p.chinese_name,
                   scientific_name: p.scientific_name,
                   family: p.family,
@@ -4011,12 +4131,26 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                   }))
                 };
 
-                // 擾亂止血：特徵總分或匹配數太低時不合併，沿用第一階段 embedding，避免 hybrid 洗掉正解
+                // 擾亂止血：特徵過弱 / Top1 變動但提升不明顯 → 不合併，沿用第一階段 embedding
                 const featureTotal = hybridResult.feature_info?.total_score ?? 0;
                 const topMatched = Math.max(0, ...(hybridResult.results.slice(0, 5).map(p => (p.matched_features || []).length)));
-                const weakFeature = featureTotal < 0.15 || topMatched < 2;
+                let weakFeature = featureTotal < 0.20 || topMatched < 3;
+
+                // Top1 改變但分數提升不明顯時，視為高風險擾亂：直接沿用第一階段
+                const embTop1 = preSearchResults?.plants?.[0];
+                const hyTop1 = hybridResult.results?.[0];
+                if (!weakFeature && embTop1 && hyTop1) {
+                  const embName = (embTop1.chinese_name || embTop1.scientific_name || '').trim();
+                  const hyName = (hyTop1.chinese_name || hyTop1.scientific_name || '').trim();
+                  const scoreBoost = (hyTop1.score ?? 0) - (embTop1.score ?? 0);
+                  if (embName && hyName && embName !== hyName && scoreBoost < 0.08) {
+                    weakFeature = true;
+                    console.log(`[RAG] Top1 變動但提升不足 (boost=${scoreBoost.toFixed(3)})，沿用第一階段 embedding，避免擾亂`);
+                  }
+                }
+
                 if (weakFeature && preSearchResults?.plants?.length > 0) {
-                  console.log(`[RAG] 特徵過弱 (total=${featureTotal.toFixed(3)}, topMatched=${topMatched})，沿用第一階段 embedding，不合併 hybrid`);
+                  console.log(`[RAG] 特徵/擾亂風險過高 (total=${featureTotal.toFixed(3)}, topMatched=${topMatched})，沿用第一階段 embedding，不合併 hybrid`);
                 }
                 
                 // 合併兩階段候選，依分數排序（移除 +0.15 gate）；防呆：已判非植物則不覆蓋；弱特徵時不合併
@@ -4044,7 +4178,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                   console.log('✅ 回退使用第一階段 embedding 結果');
                   plantResults = {
                     ...preSearchResults,
-                    embedding_only_plants: embeddingOnlyPlants,
+                    embedding_only_plants: getEmbeddingOnlyPlants(preSearchResults),
                     plants: reorderPlantsByLifeFormGate(preSearchResults.plants || [], traits)
                   };
                 } else if (!alreadyNonPlant) {
@@ -4057,6 +4191,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                     traits: traits,
                     traits_decision: traitsBasedDecision,
                     message: '檢測到植物特徵，但資料庫中未找到匹配植物',
+                    embedding_only_plants: getEmbeddingOnlyPlants(preSearchResults),
                     plants: []
                   };
                 }
@@ -4069,11 +4204,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 plantResults = {
                   ...preSearchResults,
                   plants,
-                  embedding_only_plants: (preSearchResults.embedding_only_plants || preSearchResults.plants || []).map(p => ({
-                    chinese_name: p.chinese_name,
-                    scientific_name: p.scientific_name,
-                    score: p.score
-                  }))
+                  embedding_only_plants: getEmbeddingOnlyPlants(preSearchResults)
                 };
               }
             }
@@ -4119,7 +4250,11 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                   }))
                 };
                 const merged = mergePlantResults(preSearchResults.plants, newResults.plants);
-                plantResults = { ...newResults, plants: merged };
+                plantResults = { 
+                  ...newResults, 
+                  plants: merged,
+                  embedding_only_plants: getEmbeddingOnlyPlants(preSearchResults, newResults.embedding_only_plants || [])
+                };
               }
             }
 
@@ -4211,7 +4346,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 if (preSearchResults && !alreadyNonPlant) {
                   plantResults = {
                     ...preSearchResults,
-                    embedding_only_plants: (preSearchResults.embedding_only_plants || preSearchResults.plants || []).map(p => ({ chinese_name: p.chinese_name, scientific_name: p.scientific_name, score: p.score }))
+                    embedding_only_plants: getEmbeddingOnlyPlants(preSearchResults)
                   };
                 }
               }
@@ -4220,7 +4355,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 if (preSearchResults && !alreadyNonPlant) {
                   plantResults = {
                     ...preSearchResults,
-                    embedding_only_plants: (preSearchResults.embedding_only_plants || preSearchResults.plants || []).map(p => ({ chinese_name: p.chinese_name, scientific_name: p.scientific_name, score: p.score }))
+                    embedding_only_plants: getEmbeddingOnlyPlants(preSearchResults)
                   };
                 }
               }
@@ -4284,9 +4419,9 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 if (preSearchResults && preSearchResults.is_plant && preSearchResults.plants && preSearchResults.plants.length > 0) {
                   const merged = mergePlantResults(preSearchResults.plants, newResults.plants);
                   console.log(`🔄 合併兩階段結果（vision 解析）: ${preSearchResults.plants.length} + ${newResults.plants.length} → ${merged.length} 筆`);
-                  plantResults = { ...newResults, plants: merged, embedding_only_plants: (preSearchResults.embedding_only_plants || preSearchResults.plants || []).map(p => ({ chinese_name: p.chinese_name, scientific_name: p.scientific_name, score: p.score })) };
+                  plantResults = { ...newResults, plants: merged, embedding_only_plants: getEmbeddingOnlyPlants(preSearchResults) };
                 } else {
-                  plantResults = { ...newResults, embedding_only_plants: (preSearchResults?.embedding_only_plants || preSearchResults?.plants || newResults.plants || []).map(p => ({ chinese_name: p.chinese_name, scientific_name: p.scientific_name, score: p.score })) };
+                  plantResults = { ...newResults, embedding_only_plants: getEmbeddingOnlyPlants(preSearchResults, newResults.plants || []) };
                 }
               }
             }
@@ -4321,7 +4456,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                   category: 'plant',
                   search_type: 'embedding',
                   message: ragResult.message,
-                  embedding_only_plants: ragResult.results.map(p => ({ chinese_name: p.chinese_name, scientific_name: p.scientific_name, score: p.score })),
+                  embedding_only_plants: toEmbeddingOnlyPlants(ragResult.results),
                   plants: ragResult.results.map(p => ({
                     chinese_name: p.chinese_name,
                     scientific_name: p.scientific_name,
@@ -4340,9 +4475,9 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 if (preSearchResults && preSearchResults.is_plant && preSearchResults.plants && preSearchResults.plants.length > 0) {
                   const merged = mergePlantResults(preSearchResults.plants, newResults.plants);
                   console.log(`🔄 合併搜尋結果: ${preSearchResults.plants.length} + ${newResults.plants.length} → ${merged.length} 筆`);
-                  plantResults = { ...newResults, plants: merged, embedding_only_plants: (preSearchResults.embedding_only_plants || preSearchResults.plants || []).map(p => ({ chinese_name: p.chinese_name, scientific_name: p.scientific_name, score: p.score })) };
+                  plantResults = { ...newResults, plants: merged, embedding_only_plants: getEmbeddingOnlyPlants(preSearchResults) };
                 } else {
-                  plantResults = { ...newResults, embedding_only_plants: newResults.embedding_only_plants || newResults.plants.map(p => ({ chinese_name: p.chinese_name, scientific_name: p.scientific_name, score: p.score })) };
+                  plantResults = { ...newResults, embedding_only_plants: getEmbeddingOnlyPlants(null, newResults.embedding_only_plants || newResults.plants || []) };
                 }
               } else {
                 const cls = ragResult.classification || {};
@@ -4382,7 +4517,9 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
           plantResults = {
             is_plant: true,
             category: 'plant',
-            message: 'Vision AI 判斷為植物，但 RAG 搜尋失敗'
+            message: 'Vision AI 判斷為植物，但 RAG 搜尋失敗',
+            embedding_only_plants: getEmbeddingOnlyPlants(preSearchResults),
+            plants: []
           };
         }
       }
@@ -5040,14 +5177,15 @@ if (process.env.NODE_ENV !== 'production') {
   console.log('✅ 環境變數已載入（生產模式，詳細資訊已隱藏）');
 }
 
-// 啟動時測試資料庫連接
-(async () => {
-  const dbConnected = await testDatabaseConnection();
-  if (!dbConnected) {
-    console.error('⚠️  警告: 資料庫連接失敗，部分功能可能無法正常運作');
-  } else {
-    // 自動執行 AR 系統資料庫遷移
-    try {
+// 啟動時測試資料庫連接（可用 SKIP_DB=1 略過）
+if (!SKIP_DB) {
+  (async () => {
+    const dbConnected = await testDatabaseConnection();
+    if (!dbConnected) {
+      console.error('⚠️  警告: 資料庫連接失敗，部分功能可能無法正常運作');
+    } else {
+      // 自動執行 AR 系統資料庫遷移
+      try {
         const conn = await pool.getConnection();
         
         // 1. 建立 ar_models 表
@@ -5126,11 +5264,12 @@ if (process.env.NODE_ENV !== 'production') {
         
         conn.release();
         console.log('✅ AR 多步驟系統資料庫結構檢查完成');
-    } catch (err) {
+      } catch (err) {
         console.error('❌ AR 系統資料庫遷移失敗:', err);
+      }
     }
-  }
-})();
+  })();
+}
 
 app.listen(PORT, () => {
   console.log('Server running on port ' + PORT);
