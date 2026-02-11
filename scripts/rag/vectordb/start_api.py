@@ -1401,6 +1401,7 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             match_result = {}
 
         # 暫存結果，稍後進行過濾和排序
+        hard_reject = match_result.get("hard_reject", False)
         scored_candidates.append({
             "point": r,
             "embedding_score": embedding_score,
@@ -1408,18 +1409,19 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             "keyword_bonus": keyword_bonus,
             "coverage": coverage,
             "must_matched": must_matched,
+            "hard_reject": hard_reject,
             "match_result": match_result,
             "matched_features": matched_features,
             "plant_name": r.payload.get("chinese_name", "未知"),
             "scientific_name": r.payload.get("scientific_name", "")
         })
 
-    # 🔥 關鍵修復：完全移除 Must Gate 過濾，改為純排序降權
-    # 使用者請求：先把 must Gate 拿掉
-    # 策略：保留所有候選結果，僅對不符合關鍵特徵的結果進行降分
-    
-    final_candidates = scored_candidates
-    print(f"[API] Must Gate 已禁用 (保留所有 {len(final_candidates)} 個候選)")
+    # Must Gate 硬淘汰：排除強區辨特徵完全不匹配的候選
+    before_gate = len(scored_candidates)
+    final_candidates = [c for c in scored_candidates if not c.get("hard_reject")]
+    rejected = before_gate - len(final_candidates)
+    if rejected > 0:
+        print(f"[API] Must Gate 硬淘汰: 排除 {rejected} 個候選（強特徵完全不匹配），剩 {len(final_candidates)} 個")
 
     # B. 高 embedding 時維持固定權重，不再提高 feature 比例（設計：embedding 為主）
     max_emb = max((c["embedding_score"] for c in final_candidates), default=0)

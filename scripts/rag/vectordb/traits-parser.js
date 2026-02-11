@@ -663,14 +663,27 @@ function traitsToFeatureList(traits) {
     console.log('[TraitsParser] normalized_traits:', Object.keys(traits).map((k) => ({ k, v: traits[k]?.value })));
   }
 
-  // B: 分群 Gate（flower_shape 保底、inflorescence 嚴格化）
+  // B: 分群 Gate（Phase 2：強特徵門檻提高，弱特徵維持）
   const STRONG_TRAIT_KEYS = new Set(['fruit_type', 'inflorescence', 'flower_shape', 'flower_color', 'root_type', 'special_features', 'surface_hair']);
-  const WEAK_MIN = 0.35;
-  const STRONG_MIN = 0.55;
+  const WEAK_MIN = 0.40;       // 弱特徵：life_form / leaf_arrangement / leaf_margin
+  const STRONG_MIN = 0.58;     // 強特徵：fruit / inflo / special / trunk_root
   const PER_KEY_MIN_CONF = {
-    flower_shape: 0.30,
-    inflorescence: 0.40,
-    inflorescence_orientation: 0.35,
+    life_form: 0.38,
+    leaf_arrangement: 0.38,
+    leaf_margin: 0.38,
+    flower_color: 0.48,
+    flower_position: 0.45,
+    inflorescence_orientation: 0.40,
+    leaf_type: 0.50,
+    flower_shape: 0.35,        // 鐘形花保底
+    inflorescence: 0.45,
+    fruit_type: 0.58,
+    fruit_cluster: 0.55,
+    fruit_surface: 0.55,
+    calyx_persistent: 0.55,
+    root_type: 0.58,
+    special_features: 0.58,
+    surface_hair: 0.55,
   };
 
   // V3 分群 Gate 判定（回傳 true = 保留，false = 丟棄，reason 供 debug）
@@ -703,8 +716,8 @@ function traitsToFeatureList(traits) {
     return { keep: true };
   }
 
-  // 全域門檻：conf < 0.65 不入 hybrid，寧可少也不要亂（減少青皮木等萬用命中）
-  const CONF_MIN_HYBRID = 0.65;
+  // 全域門檻：conf < 0.62 不入 hybrid，寧可少也不要亂（與強/弱分群一致）
+  const CONF_MIN_HYBRID = 0.62;
 
   for (const [key, trait] of Object.entries(traits)) {
     // visible_parts 過濾：無花則不送花相關特徵、無果則不送果相關，避免誤導 RAG
@@ -1168,6 +1181,10 @@ const FLOWER_SHAPE_PRIORITY = ['鐘形花', '漏斗形花', '唇形花', '蝶形
 // 互斥類別內的優先順序（越特殊越前面）
 const LEAF_ARRANGEMENT_PRIORITY = ['輪生', '對生', '叢生', '互生'];
 const LEAF_MARGIN_PRIORITY = ['鋸齒', '波狀', '全緣'];
+// leaf_type：複葉細類 > 複葉 > 單葉
+const LEAF_TYPE_PRIORITY = ['羽狀複葉', '掌狀複葉', '二回羽狀', '三出複葉', '複葉', '單葉'];
+// flower_color：紫/粉紅等強區辨 > 常見
+const FLOWER_COLOR_PRIORITY = ['紫花', '粉紅花', '橙花', '紅花', '黃花', '白花', '藍花'];
 
 function getCategory(f) {
   for (const [cat, list] of Object.entries(FEATURE_CATEGORY)) {
@@ -1217,6 +1234,12 @@ function capByCategoryAndResolveContradictions(features) {
       chosen = ordered.length ? [ordered[0]] : [arr[0]];
     } else if (cat === 'leaf_margin' && arr.length > 1) {
       const ordered = LEAF_MARGIN_PRIORITY.filter((p) => arr.includes(p));
+      chosen = ordered.length ? [ordered[0]] : [arr[0]];
+    } else if (cat === 'leaf_type' && arr.length > 1) {
+      const ordered = LEAF_TYPE_PRIORITY.filter((p) => arr.includes(p));
+      chosen = ordered.length ? [ordered[0]] : [arr[0]];
+    } else if (cat === 'flower_color' && arr.length > 1) {
+      const ordered = FLOWER_COLOR_PRIORITY.filter((p) => arr.includes(p));
       chosen = ordered.length ? [ordered[0]] : [arr[0]];
     } else if (arr.length > cap) {
       chosen = arr.slice(0, cap);

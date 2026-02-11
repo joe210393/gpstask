@@ -151,6 +151,16 @@ FEATURE_INDEX = build_feature_index()
 # 僅作為 Gate 使用的類別：這些特徵主要用於 MUST / 矛盾排除，不參與正向加分
 GATE_ONLY_CATEGORIES = {"life_form"}
 
+# Must Gate 硬淘汰：query 有這些強區辨特徵、候選端完全找不到同義詞時 → hard_reject
+# （traits-parser 已過濾 conf，進入 hybrid 的特徵視為高置信）
+HARD_GATE_TRAITS = frozenset({
+    "羽狀複葉", "掌狀複葉", "二回羽狀", "三出複葉",
+    "棕櫚", "乳汁", "有刺",
+    "氣生根", "板根",
+    "蒴果", "漿果", "核果", "翅果", "莢果",
+    "佛焰花序", "頭狀花序",
+})
+
 
 class FeatureWeightCalculator:
     """特徵權重計算器"""
@@ -828,6 +838,10 @@ class FeatureWeightCalculator:
                         must_matched = False
                         break
 
+        # Must Gate 硬淘汰：query 有強區辨特徵、候選完全無描述 → hard_reject
+        missing_names = {m["name"] for m in missing}
+        hard_reject = bool(missing_names & HARD_GATE_TRAITS)
+
         return {
             "match_score": match_score,
             "matched_features": matched,
@@ -836,6 +850,7 @@ class FeatureWeightCalculator:
             "must_matched": must_matched,
             "must_traits_in_query": must_traits_in_query,
             "must_traits_matched": must_traits_matched,
+            "hard_reject": hard_reject,
         }
 
 
