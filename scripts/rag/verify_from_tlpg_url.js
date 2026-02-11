@@ -41,6 +41,8 @@ try {
 }
 
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
+// 選擇性：直接打 embedding API 做「名稱直查」實驗；未設定時跳過此步驟
+const EMBEDDING_API_URL = process.env.EMBEDDING_API_URL || null;
 const CELL_SIZE = 400;
 const NUM_PANELS = 3;
 
@@ -154,6 +156,33 @@ function findRank(plantList, expectedName, scientificName) {
     if (isMatch(expectedName, p.chinese_name, p.scientific_name)) return i + 1;
   }
   return 999;
+}
+
+/** 直接用植物名稱打 embedding API，測試「名稱直查」的排名（1-based，999=沒找到） */
+async function findNameOnlyRank(expectedName, scientificName) {
+  if (!EMBEDDING_API_URL || !expectedName) return 999;
+  try {
+    const url = `${EMBEDDING_API_URL.replace(/\/$/, '')}/search`;
+    const body = { query: expectedName, top_k: 50, smart: true };
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15000)
+    });
+    if (!res.ok) {
+      console.error('  ❌ 名稱直查 search 失敗:', res.status, await res.text());
+      return 999;
+    }
+    const json = await res.json();
+    const list = json?.results || [];
+    const rank = findRank(list, expectedName, scientificName);
+    console.log(`  🔎 名稱直查 Embedding 排名: ${rank}`);
+    return rank;
+  } catch (e) {
+    console.error('  ❌ 名稱直查例外:', e.message);
+    return 999;
+  }
 }
 
 /** 將單張圖縮成一個格子的尺寸（統一輸出 jpeg 以利合成） */
@@ -329,6 +358,7 @@ async function verifyOne(pageUrl, verbose = false) {
 
   const rankEmbedding = findRank(embeddingOnlyPlants, parsed.plantName, parsed.scientificName);
   const rankHybrid = findRank(plants, parsed.plantName, parsed.scientificName);
+  const rankNameOnly = await findNameOnlyRank(parsed.plantName, parsed.scientificName);
   let ragEffect = 'n/a';
   if (embeddingOnlyPlants.length > 0) {
     if (rankHybrid < rankEmbedding) ragEffect = 'help';
@@ -385,6 +415,7 @@ async function verifyOne(pageUrl, verbose = false) {
     rounds,
     rank_embedding: rankEmbedding,
     rank_hybrid: rankHybrid,
+    rank_name_only: rankNameOnly,
     rag_effect: ragEffect
   };
 }
@@ -406,8 +437,9 @@ function formatCaseReport(result, index) {
   if (result.rank_embedding != null || result.rank_hybrid != null) {
     const re = result.rank_embedding ?? '-';
     const rh = result.rank_hybrid ?? '-';
+    const rn = result.rank_name_only ?? '-';
     const effect = result.rag_effect === 'help' ? '幫忙' : result.rag_effect === 'disturb' ? '擾亂' : result.rag_effect === 'neutral' ? '不變' : 'n/a';
-    lines.push(`- **Embedding-only 排名**: ${re} | **Hybrid 排名**: ${rh} | **RAG 效果**: ${effect}`);
+    lines.push(`- **Embedding-only 排名**: ${re} | **Hybrid 排名**: ${rh} | **Name-only 排名**: ${rn} | **RAG 效果**: ${effect}`);
   }
   if (result.error) lines.push(`- **錯誤**: ${result.error}`);
   lines.push('');

@@ -14,7 +14,12 @@ PYTHON="${PROJECT_ROOT}/.venv-rag/bin/python3"
 # 預設本機 Qdrant
 export QDRANT_URL="${QDRANT_URL:-http://localhost:6333}"
 export PORT="${PORT:-8100}"
-export USE_JINA_API="${USE_JINA_API:-true}"
+# 預設改為本機模型（你也可以在外面 export USE_JINA_API=true 改回走 Jina API）
+export USE_JINA_API="${USE_JINA_API:-false}"
+# 使用你指定的本機 embedding 模型（若外面已 export EMBEDDING_MODEL，就用外面的）
+export EMBEDDING_MODEL="${EMBEDDING_MODEL:-jinaai/jina-embeddings-v3}"
+# 特徵權重計算資料檔（若外面已 export FEATURE_DATA_PATH，就用外面的）
+export FEATURE_DATA_PATH="${FEATURE_DATA_PATH:-${PROJECT_ROOT}/scripts/rag/data/plants-forest-gov-tw-enriched-embed-dedup.taxonomy-v2.jsonl}"
 
 if [ "$USE_JINA_API" = "true" ]; then
   if [ -z "$JINA_API_KEY" ]; then
@@ -38,7 +43,12 @@ fi
 export QDRANT_API_KEY="${QDRANT_API_KEY:-}"
 
 echo "🔗 Qdrant: $QDRANT_URL"
-echo "🔑 Jina API: 已設定"
+if [ "$USE_JINA_API" = "true" ]; then
+  echo "🔑 模式: 使用 Jina API (EMBEDDING_MODEL=${EMBEDDING_MODEL})"
+else
+  echo "🧠 模式: 本機 embedding 模型 (EMBEDDING_MODEL=${EMBEDDING_MODEL})"
+fi
+echo "📄 FEATURE_DATA_PATH: ${FEATURE_DATA_PATH:-[未設定]}"
 echo "🌐 Port: $PORT"
 echo ""
 echo "啟動 embedding-api（Ctrl+C 停止）..."
