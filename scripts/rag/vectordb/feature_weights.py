@@ -486,8 +486,8 @@ class FeatureWeightCalculator:
             "flower_color", "flower_shape", "flower_position", "inflorescence_orientation",
             "fruit_type", "fruit_cluster", "fruit_surface", "inflorescence", "calyx_persistent"
         })
-        if features and FEATURE_INDEX:
-            for f in features:
+        if query_features and FEATURE_INDEX:
+            for f in query_features:
                 cat = (FEATURE_INDEX.get(f) or {}).get("category")
                 if cat in STRONG_MUST_CATEGORIES:
                     MUST_KEYS.add(cat)
