@@ -246,6 +246,42 @@ function mergePlantResults(prePlants, newPlants, limit = RAG_TOP_K) {
     .slice(0, limit);
 }
 
+/**
+ * 辨識導覽原則：不準確可以，錯誤放大不行。
+ * 當 traits 判斷為種子植物（灌木/草本/喬木/藤本）時，不讓苔蘚/蕨類當 Top1。
+ */
+function isBryophyteOrPteridophyte(plant) {
+  if (!plant) return false;
+  const name = (plant.chinese_name || '').trim();
+  if (name && /[苔蘚蕨]$/.test(name)) return true;
+  const lf = (plant.life_form || '').trim();
+  if (lf && /苔|蘚|蕨/.test(lf)) return true;
+  return false;
+}
+
+function traitsIndicateSeedPlant(traits) {
+  if (!traits || typeof traits !== 'object') return false;
+  const lf = (traits.life_form || (traits.visible_parts && traits.visible_parts.life_form) || '').toString();
+  if (/灌木|草本|喬木|藤本|亞灌木/.test(lf)) return true;
+  try {
+    const features = traitsToFeatureList(traits);
+    if (features.some(f => /灌木|草本|喬木|藤本/.test(String(f)))) return true;
+  } catch (e) { /* ignore */ }
+  return false;
+}
+
+function reorderPlantsByLifeFormGate(plants, traits) {
+  if (!Array.isArray(plants) || plants.length === 0) return plants;
+  if (!traitsIndicateSeedPlant(traits)) return plants;
+  const seed = plants.filter(p => !isBryophyteOrPteridophyte(p));
+  const bryo = plants.filter(p => isBryophyteOrPteridophyte(p));
+  if (bryo.length === 0) return plants;
+  const reordered = [...seed, ...bryo];
+  if (reordered.length !== plants.length) return plants;
+  console.log(`[RAG] 大類一致防錯: 種子植物 ${seed.length} 筆優先，苔蘚蕨類 ${bryo.length} 筆置後（避免花草/灌木→苔類）`);
+  return reordered;
+}
+
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
@@ -3730,6 +3766,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
         plantResults = { is_plant: false, message: 'Embedding API 未就緒，暫時跳過植物搜尋' };
       } else {
         console.log('🌿 正在查詢植物 RAG（使用詳細描述）...');
+        let alreadyNonPlant = false; // 防呆：一旦已判為非植物，後續不再用植物結果覆蓋（含 catch 內）
         try {
           const urlHost = new URL(EMBEDDING_API_URL).hostname;
           console.log(`[RAG] Embedding API: ${urlHost} (查詢長度: ${detailedDescription?.length || 0} 字元)`);
@@ -3738,22 +3775,33 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
           console.warn('[RAG] ⚠️ EMBEDDING_API_URL 可能錯誤，應為 https://gps-task-embedding.zeabur.app');
         }
 
-        // 人造物跳過：第三步說人造物 且 第四步明確寫「不提取生物特徵」→ 一律跳過
-        // 避免「葉片長度：N/A」等模板字被誤判為植物證據，導致仍跑 RAG 並要求補拍花朵
-        const saysArtifact = description && description.includes('第三步：判斷類別') && description.includes('人造物');
-        const explicitlyNoBioFeatures = /不提取生物特徵|由於判斷為人造物|不進行猜測/.test(description || '');
+        // 非植物跳過：第三步為人造物/動物/昆蟲/其他 且 非植物特徵明確 → 一律跳過植物 RAG（判斷是什麼就給什麼答案）
+        const hasStep3 = description && description.includes('第三步：判斷類別');
+        const saysNonPlant = hasStep3 && (
+          description.includes('人造物') ||
+          description.includes('動物') ||
+          description.includes('昆蟲') ||
+          description.includes('其他')
+        );
+        const explicitlyNoBioFeatures = /不提取生物特徵|由於判斷為人造物|不進行猜測|主體是動物|主體是昆蟲|植物僅在背景|主要為人造物/.test(description || '');
         const hasRealPlantEvidence = /葉片[^N]*[形狀狀卵披針]|花朵[^直徑N]*[色紫紅白黃]|花序|枝條|果實|樹皮|脈序|鋸齒緣/.test(description || '');
-        const skipAsArtifact = !previousSessionRaw && saysArtifact && (explicitlyNoBioFeatures || !hasRealPlantEvidence);
-        if (skipAsArtifact) {
-          console.log('⏭️ Vision 判斷為人造物，跳過植物 RAG');
+        const skipAsNonPlant = !previousSessionRaw && saysNonPlant && (explicitlyNoBioFeatures || !hasRealPlantEvidence);
+
+        let nonPlantCategory = 'other';
+        if (hasStep3 && description.includes('人造物')) nonPlantCategory = 'human_made';
+        else if (hasStep3 && (description.includes('動物') || description.includes('昆蟲'))) nonPlantCategory = 'animal';
+
+        if (skipAsNonPlant) {
+          console.log(`⏭️ Vision 判斷為非植物（${nonPlantCategory}），跳過植物 RAG`);
           plantResults = {
             is_plant: false,
-            category: 'human_made',
-            message: 'Vision 分析判斷為人造物，已略過植物搜尋'
+            category: nonPlantCategory,
+            message: `Vision 分析判斷為${nonPlantCategory === 'human_made' ? '人造物' : nonPlantCategory === 'animal' ? '動物/昆蟲' : '其他'}，已略過植物搜尋`
           };
+          alreadyNonPlant = true;
         } else {
-          if (saysArtifact && !skipAsArtifact) {
-            console.log('⚠️ Vision 判人造物但描述含植物特徵，仍執行植物 RAG');
+          if (saysNonPlant && !skipAsNonPlant) {
+            console.log('⚠️ Vision 判非植物但描述含植物特徵，仍執行植物 RAG');
           }
           // 重要：先進行傳統搜尋（embedding only）作為基準
           // 這樣可以確保第一階段的結果不會被後續的 traits-based 搜尋覆蓋
@@ -3776,7 +3824,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
               console.log('[RAG] 第一階段 API 回傳 0 筆結果（非連線錯誤）');
             }
 
-            if (ragResult.classification?.is_plant && ragResult.results?.length > 0) {
+            if (ragResult.classification?.is_plant && ragResult.results?.length > 0 && !alreadyNonPlant) {
               console.log(`✅ 第一階段傳統搜尋找到 ${ragResult.results.length} 個結果`);
               console.log('📋 第一階段檢測到的植物：');
               ragResult.results.forEach((p, idx) => {
@@ -3958,25 +4006,30 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                   }))
                 };
                 
-                // 合併兩階段候選，依分數排序（移除 +0.15 gate）
-                if (preSearchResults && preSearchResults.is_plant && preSearchResults.plants && preSearchResults.plants.length > 0) {
-                  const merged = mergePlantResults(preSearchResults.plants, newResults.plants);
-                  console.log(`🔄 合併兩階段結果：第一階段 ${preSearchResults.plants.length} 筆 + 第二階段 ${newResults.plants.length} 筆 → 去重後 ${merged.length} 筆`);
-                  plantResults = { ...newResults, plants: merged, embedding_only_plants: newResults.embedding_only_plants };
-                } else {
-                  plantResults = newResults;
+                // 合併兩階段候選，依分數排序（移除 +0.15 gate）；防呆：已判非植物則不覆蓋
+                if (!alreadyNonPlant) {
+                  if (preSearchResults && preSearchResults.is_plant && preSearchResults.plants && preSearchResults.plants.length > 0) {
+                    const merged = mergePlantResults(preSearchResults.plants, newResults.plants);
+                    console.log(`🔄 合併兩階段結果：第一階段 ${preSearchResults.plants.length} 筆 + 第二階段 ${newResults.plants.length} 筆 → 去重後 ${merged.length} 筆`);
+                    plantResults = { ...newResults, plants: reorderPlantsByLifeFormGate(merged, traits), embedding_only_plants: newResults.embedding_only_plants };
+                  } else {
+                    plantResults = { ...newResults, plants: reorderPlantsByLifeFormGate(newResults.plants || [], traits) };
+                  }
                 }
               } else {
                 const why = hybridResult.error
                   ? `API 錯誤: ${hybridResult.error}`
                   : (Array.isArray(hybridResult.results) ? `results.length=0` : 'results 未定義');
                 console.log(`⚠️ 第二階段搜尋無結果（${why}），檢查是否有第一階段結果`);
-                if (preSearchResults) {
+                if (preSearchResults && !alreadyNonPlant) {
                   console.log('✅ 回退使用第一階段 embedding 結果');
-                  plantResults = preSearchResults;
-                } else {
+                  plantResults = {
+                    ...preSearchResults,
+                    embedding_only_plants: embeddingOnlyPlants,
+                    plants: reorderPlantsByLifeFormGate(preSearchResults.plants || [], traits)
+                  };
+                } else if (!alreadyNonPlant) {
                   // 如果第一階段也沒有結果，但 Traits 判斷是植物，我們應該保留這個判斷
-                  // 這樣前端至少能顯示「植物」類別，而不是「一般物品」
                   console.log('⚠️ 兩階段搜尋都無結果，但 Traits 判斷為植物，設置基本植物屬性');
                   plantResults = {
                     is_plant: true,
@@ -3990,10 +4043,13 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 }
               }
             } else {
-              // Traits 判斷不是植物，但也許第一階段認為是
-              if (preSearchResults) {
+              // Traits 判斷不是植物，但也許第一階段認為是；防呆：已判非植物則不覆蓋
+              if (preSearchResults && !alreadyNonPlant) {
                 console.log('⚠️ Traits 判斷非植物，但第一階段 embedding 認為是，使用第一階段結果');
-                plantResults = preSearchResults;
+                plantResults = {
+                  ...preSearchResults,
+                  plants: reorderPlantsByLifeFormGate(preSearchResults.plants || [], traits)
+                };
               }
             }
           } else {
@@ -4017,7 +4073,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 topK: RAG_TOP_K,
                 weights: determineDynamicWeights({ quality: 0.6, genericRatio: 0.3 })
               });
-              if (hybridResult?.results?.length > 0) {
+              if (hybridResult?.results?.length > 0 && !alreadyNonPlant) {
                 console.log(`✅ 混合搜尋找到 ${hybridResult.results.length} 個結果（keyword fallback）`);
                 const newResults = {
                   is_plant: true,
@@ -4086,7 +4142,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 weights
               });
 
-              if (hybridResult.results?.length > 0) {
+              if (hybridResult.results?.length > 0 && !alreadyNonPlant) {
                 console.log(`✅ 混合搜尋找到 ${hybridResult.results.length} 個結果（structured JSON）`);
 
                 const newResults = {
@@ -4125,39 +4181,38 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
               } else {
                 const why = hybridResult?.error ? `API 錯誤: ${hybridResult.error}` : 'results.length=0';
                 console.log(`⚠️ 混合搜尋無結果（structured JSON, ${why}），回退使用第一階段 embedding`);
-                if (preSearchResults) {
+                if (preSearchResults && !alreadyNonPlant) {
                   plantResults = preSearchResults;
                 }
               }
               } else {
                 console.log('⚠️ 結構化 JSON 不足以混合搜尋（缺少 features/guess_names），回退使用第一階段 embedding');
-                if (preSearchResults) {
+                if (preSearchResults && !alreadyNonPlant) {
                   plantResults = preSearchResults;
                 }
               }
             }
           }
 
-          // 如果 traits-based 判斷失敗，嘗試舊的 parseVisionResponse 方法
-          if (!plantResults) {
+          // 如果 traits-based 判斷失敗，嘗試舊的 parseVisionResponse 方法；防呆：已判非植物則不覆蓋
+          if (!plantResults && !alreadyNonPlant) {
             const visionParsed = parseVisionResponse(description);
 
             if (visionParsed.success && visionParsed.intent === 'plant') {
               // 使用混合搜尋（結合特徵權重）
-              // 重要：使用詳細描述作為 query，而不是 shortCaption 或 guess_names
               console.log(
                 `📊 結構化辨識: intent=${visionParsed.intent}, features=${visionParsed.plant.features.join(',')}`
               );
 
               const hybridResult = await hybridSearch({
-                query: detailedDescription, // 使用詳細描述，而不是猜測的名稱
+                query: detailedDescription,
                 features: visionParsed.plant.features || [],
                 guessNames: visionParsed.plant.guess_names || [],
                 topK: RAG_TOP_K,
                 weights: determineDynamicWeights()
               });
 
-              if (hybridResult.results?.length > 0) {
+              if (hybridResult.results?.length > 0 && !alreadyNonPlant) {
                 console.log(`✅ 混合搜尋找到 ${hybridResult.results.length} 個結果`);
                 // 顯示所有檢測到的植物（用於調試）
                 console.log('📋 所有檢測到的植物：');
@@ -4204,22 +4259,16 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
             }
           }
 
-          // 如果結構化解析失敗或不是植物，先用 classify 判斷，只有植物才搜尋（省 token）
-          if (!plantResults) {
-            // 使用詳細描述進行分類（而不是完整回應）
+          // 如果結構化解析失敗或不是植物，先用 classify 判斷，只有植物才搜尋（省 token）；防呆：已判非植物則不覆蓋
+          if (!plantResults && !alreadyNonPlant) {
             const classification = await classify(detailedDescription);
 
-            // 調整閾值：與 Python API 的 PLANT_THRESHOLD (0.40) 保持一致
-            // 如果 Vision AI 已經明確判斷是植物（從 <analysis> 中看到「第三步：判斷類別」是「植物」），
-            // 則降低閾值以確保能搜尋
             const visionSaysPlant = description && 
               description.includes('第三步：判斷類別') && 
               description.includes('植物');
-            
-            // 如果 Vision AI 明確說是植物，使用較低閾值；否則使用正常閾值
             const PLANT_SCORE_THRESHOLD = visionSaysPlant ? 0.4 : (finishReason === 'length' ? 0.45 : 0.5);
 
-            if (classification.is_plant && classification.plant_score >= PLANT_SCORE_THRESHOLD) {
+            if (classification.is_plant && classification.plant_score >= PLANT_SCORE_THRESHOLD && !alreadyNonPlant) {
               // 確認是植物，使用詳細描述進行完整搜尋
               console.log(
                 `🔍 確認是植物 (plant_score=${classification.plant_score.toFixed(
@@ -4228,10 +4277,8 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
               );
               const ragResult = await smartSearch(detailedDescription, RAG_TOP_K);
 
-              if (ragResult.classification?.is_plant && ragResult.results?.length > 0) {
+              if (ragResult.classification?.is_plant && ragResult.results?.length > 0 && !alreadyNonPlant) {
                 console.log(`✅ 傳統搜尋找到 ${ragResult.results.length} 個結果`);
-                // 顯示所有檢測到的植物（用於調試）
-                console.log('📋 所有檢測到的植物：');
                 ragResult.results.forEach((p, idx) => {
                   console.log(`  ${idx + 1}. ${p.chinese_name} (${p.scientific_name || '無學名'}) - 分數: ${(p.score * 100).toFixed(1)}%`);
                 });
@@ -4251,14 +4298,11 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                   }))
                 };
                 
-                // 重要：第一次搜尋完成後，保存結果作為 preSearchResults
-                // 這樣後續的 traits-based 搜尋可以與第一次搜尋的結果比較
                 if (!preSearchResults) {
                   preSearchResults = newResults;
                   console.log(`💾 保存第一次搜尋結果作為基準（最高分數: ${(newResults.plants[0].score * 100).toFixed(1)}%）`);
                 }
                 
-                // 合併兩階段候選（若 preSearchResults 來自同流程的第一次搜尋）
                 if (preSearchResults && preSearchResults.is_plant && preSearchResults.plants && preSearchResults.plants.length > 0) {
                   const merged = mergePlantResults(preSearchResults.plants, newResults.plants);
                   console.log(`🔄 合併搜尋結果: ${preSearchResults.plants.length} + ${newResults.plants.length} → ${merged.length} 筆`);
@@ -4278,6 +4322,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                   category: ragResult.classification?.category,
                   message: ragResult.message
                 };
+                alreadyNonPlant = true;
               }
             } else {
               // 分類結果顯示非植物，直接跳過搜尋（省 token）
@@ -4291,21 +4336,21 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 category: classification.category,
                 message: `非植物相關查詢（${classification.category}），已跳過 RAG 搜尋以節省 token`
               };
+              alreadyNonPlant = true;
             }
           }
         }
       }
       } catch (ragErr) {
         console.warn('⚠️ 植物 RAG 查詢失敗 (非致命):', ragErr.message);
-        // 如果 Vision AI 明確判斷為植物，即使 RAG 失敗也要設置 category
-        if (!plantResults && description && description.includes('第三步：判斷類別') && description.includes('植物')) {
+        // 若已判非植物則不覆蓋；僅在尚無結果且 Vision 說植物時才設為植物
+        if (!plantResults && !alreadyNonPlant && description && description.includes('第三步：判斷類別') && description.includes('植物')) {
           plantResults = {
             is_plant: true,
             category: 'plant',
             message: 'Vision AI 判斷為植物，但 RAG 搜尋失敗'
           };
         }
-        // RAG 失敗不影響主要回應
       }
     }
 
