@@ -3836,6 +3836,11 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 category: 'plant',
                 search_type: 'embedding',
                 message: ragResult.message,
+                embedding_only_plants: ragResult.results.map(p => ({
+                  chinese_name: p.chinese_name,
+                  scientific_name: p.scientific_name,
+                  score: p.score
+                })),
                 plants: ragResult.results.map(p => ({
                   chinese_name: p.chinese_name,
                   scientific_name: p.scientific_name,
@@ -4005,10 +4010,24 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                     summary: p.summary
                   }))
                 };
+
+                // 擾亂止血：特徵總分或匹配數太低時不合併，沿用第一階段 embedding，避免 hybrid 洗掉正解
+                const featureTotal = hybridResult.feature_info?.total_score ?? 0;
+                const topMatched = Math.max(0, ...(hybridResult.results.slice(0, 5).map(p => (p.matched_features || []).length)));
+                const weakFeature = featureTotal < 0.15 || topMatched < 2;
+                if (weakFeature && preSearchResults?.plants?.length > 0) {
+                  console.log(`[RAG] 特徵過弱 (total=${featureTotal.toFixed(3)}, topMatched=${topMatched})，沿用第一階段 embedding，不合併 hybrid`);
+                }
                 
-                // 合併兩階段候選，依分數排序（移除 +0.15 gate）；防呆：已判非植物則不覆蓋
+                // 合併兩階段候選，依分數排序（移除 +0.15 gate）；防呆：已判非植物則不覆蓋；弱特徵時不合併
                 if (!alreadyNonPlant) {
-                  if (preSearchResults && preSearchResults.is_plant && preSearchResults.plants && preSearchResults.plants.length > 0) {
+                  if (weakFeature && preSearchResults && preSearchResults.is_plant && preSearchResults.plants && preSearchResults.plants.length > 0) {
+                    plantResults = {
+                      ...preSearchResults,
+                      embedding_only_plants: embeddingOnlyPlants,
+                      plants: reorderPlantsByLifeFormGate(preSearchResults.plants, traits)
+                    };
+                  } else if (preSearchResults && preSearchResults.is_plant && preSearchResults.plants && preSearchResults.plants.length > 0) {
                     const merged = mergePlantResults(preSearchResults.plants, newResults.plants);
                     console.log(`🔄 合併兩階段結果：第一階段 ${preSearchResults.plants.length} 筆 + 第二階段 ${newResults.plants.length} 筆 → 去重後 ${merged.length} 筆`);
                     plantResults = { ...newResults, plants: reorderPlantsByLifeFormGate(merged, traits), embedding_only_plants: newResults.embedding_only_plants };
@@ -4043,12 +4062,18 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 }
               }
             } else {
-              // Traits 判斷不是植物，但也許第一階段認為是；防呆：已判非植物則不覆蓋
+              // Traits 判斷不是植物，但也許第一階段認為是；防呆：已判非植物則不覆蓋；補齊 embedding_only_plants 供報告
               if (preSearchResults && !alreadyNonPlant) {
                 console.log('⚠️ Traits 判斷非植物，但第一階段 embedding 認為是，使用第一階段結果');
+                const plants = reorderPlantsByLifeFormGate(preSearchResults.plants || [], traits);
                 plantResults = {
                   ...preSearchResults,
-                  plants: reorderPlantsByLifeFormGate(preSearchResults.plants || [], traits)
+                  plants,
+                  embedding_only_plants: (preSearchResults.embedding_only_plants || preSearchResults.plants || []).map(p => ({
+                    chinese_name: p.chinese_name,
+                    scientific_name: p.scientific_name,
+                    score: p.score
+                  }))
                 };
               }
             }
@@ -4075,10 +4100,12 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
               });
               if (hybridResult?.results?.length > 0 && !alreadyNonPlant) {
                 console.log(`✅ 混合搜尋找到 ${hybridResult.results.length} 個結果（keyword fallback）`);
+                const embOnly = (preSearchResults?.plants || []).map(p => ({ chinese_name: p.chinese_name, scientific_name: p.scientific_name, score: p.score }));
                 const newResults = {
                   is_plant: true,
                   category: 'plant',
                   search_type: 'hybrid_traits',
+                  embedding_only_plants: embOnly.length ? embOnly : undefined,
                   plants: hybridResult.results.map(p => ({
                     chinese_name: p.chinese_name,
                     scientific_name: p.scientific_name,
@@ -4182,13 +4209,19 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 const why = hybridResult?.error ? `API 錯誤: ${hybridResult.error}` : 'results.length=0';
                 console.log(`⚠️ 混合搜尋無結果（structured JSON, ${why}），回退使用第一階段 embedding`);
                 if (preSearchResults && !alreadyNonPlant) {
-                  plantResults = preSearchResults;
+                  plantResults = {
+                    ...preSearchResults,
+                    embedding_only_plants: (preSearchResults.embedding_only_plants || preSearchResults.plants || []).map(p => ({ chinese_name: p.chinese_name, scientific_name: p.scientific_name, score: p.score }))
+                  };
                 }
               }
               } else {
                 console.log('⚠️ 結構化 JSON 不足以混合搜尋（缺少 features/guess_names），回退使用第一階段 embedding');
                 if (preSearchResults && !alreadyNonPlant) {
-                  plantResults = preSearchResults;
+                  plantResults = {
+                    ...preSearchResults,
+                    embedding_only_plants: (preSearchResults.embedding_only_plants || preSearchResults.plants || []).map(p => ({ chinese_name: p.chinese_name, scientific_name: p.scientific_name, score: p.score }))
+                  };
                 }
               }
             }
@@ -4251,9 +4284,9 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 if (preSearchResults && preSearchResults.is_plant && preSearchResults.plants && preSearchResults.plants.length > 0) {
                   const merged = mergePlantResults(preSearchResults.plants, newResults.plants);
                   console.log(`🔄 合併兩階段結果（vision 解析）: ${preSearchResults.plants.length} + ${newResults.plants.length} → ${merged.length} 筆`);
-                  plantResults = { ...newResults, plants: merged };
+                  plantResults = { ...newResults, plants: merged, embedding_only_plants: (preSearchResults.embedding_only_plants || preSearchResults.plants || []).map(p => ({ chinese_name: p.chinese_name, scientific_name: p.scientific_name, score: p.score })) };
                 } else {
-                  plantResults = newResults;
+                  plantResults = { ...newResults, embedding_only_plants: (preSearchResults?.embedding_only_plants || preSearchResults?.plants || newResults.plants || []).map(p => ({ chinese_name: p.chinese_name, scientific_name: p.scientific_name, score: p.score })) };
                 }
               }
             }
@@ -4288,6 +4321,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                   category: 'plant',
                   search_type: 'embedding',
                   message: ragResult.message,
+                  embedding_only_plants: ragResult.results.map(p => ({ chinese_name: p.chinese_name, scientific_name: p.scientific_name, score: p.score })),
                   plants: ragResult.results.map(p => ({
                     chinese_name: p.chinese_name,
                     scientific_name: p.scientific_name,
@@ -4306,9 +4340,9 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
                 if (preSearchResults && preSearchResults.is_plant && preSearchResults.plants && preSearchResults.plants.length > 0) {
                   const merged = mergePlantResults(preSearchResults.plants, newResults.plants);
                   console.log(`🔄 合併搜尋結果: ${preSearchResults.plants.length} + ${newResults.plants.length} → ${merged.length} 筆`);
-                  plantResults = { ...newResults, plants: merged };
+                  plantResults = { ...newResults, plants: merged, embedding_only_plants: (preSearchResults.embedding_only_plants || preSearchResults.plants || []).map(p => ({ chinese_name: p.chinese_name, scientific_name: p.scientific_name, score: p.score })) };
                 } else {
-                  plantResults = newResults;
+                  plantResults = { ...newResults, embedding_only_plants: newResults.embedding_only_plants || newResults.plants.map(p => ({ chinese_name: p.chinese_name, scientific_name: p.scientific_name, score: p.score })) };
                 }
               } else {
                 const cls = ragResult.classification || {};

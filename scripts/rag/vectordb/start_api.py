@@ -630,7 +630,7 @@ def search_plants(query: str, top_k: int = 5):
             if len(dedup_results) >= top_k:
                 break
 
-        return [
+        out = [
             {
                 "code": r.payload.get("code"),
                 "chinese_name": r.payload.get("chinese_name"),
@@ -644,6 +644,13 @@ def search_plants(query: str, top_k: int = 5):
             }
             for r in dedup_results
         ]
+        # 萬用條目輕度降權（與 hybrid 一致），再依分數排序
+        _blacklist = frozenset({"冇拱", "南亞孔雀苔", "鞭枝懸苔", "株苔", "八角蓮", "草海桐", "白檀"})
+        for item in out:
+            if (item.get("chinese_name") or "").strip() in _blacklist:
+                item["score"] = item["score"] * 0.88
+        out.sort(key=lambda x: x["score"], reverse=True)
+        return out
     except Exception as e:
         print(f"[API] ❌ search_plants 錯誤: {e}")
         import traceback
@@ -1491,7 +1498,11 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             "summary": r.payload.get("summary", "")[:300],
         })
 
-    # 4. 按混合分數重新排序
+    # 萬用條目輕度降權：常錯當 Top1 的物種 ×0.88，減少霸榜、讓正解有機會超前
+    _blacklist_generic = frozenset({"冇拱", "南亞孔雀苔", "鞭枝懸苔", "株苔", "八角蓮", "草海桐", "白檀"})
+    for r in results:
+        if (r.get("chinese_name") or "").strip() in _blacklist_generic:
+            r["score"] = r["score"] * 0.88
 
     # 4. 按混合分數重新排序
     results.sort(key=lambda x: x["score"], reverse=True)
