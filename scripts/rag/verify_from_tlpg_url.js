@@ -508,12 +508,21 @@ function formatCaseReport(result, index) {
 /** 寫入完整報告檔（格式對齊 test-report.md，便於決定下一步修改與權重） */
 function writeReport(results, reportPath) {
   const fs = require('fs');
+  // Step 5：將結果分為 valid / no-image / 其他，accuracy 只算 valid
+  const validResults = results.filter((r) => !r.error && r.expected && r.top1 !== undefined);
+  const noImageResults = results.filter((r) => r.error === 'no images');
+  const otherSkipResults = results.filter((r) => r.error && r.error !== 'no images');
+  const validPassed = validResults.filter((r) => r.ok).length;
+  const accuracyStr = validResults.length > 0
+    ? `${validPassed}/${validResults.length} (${(validPassed / validResults.length * 100).toFixed(1)}%)`
+    : 'n/a';
+
   const header = [
     '# RAG 驗證報告（tlpg 網址）',
     '',
     `產生時間: ${new Date().toISOString()}`,
     `APP_URL: ${APP_URL}`,
-    `總筆數: ${results.length}，通過: ${results.filter((r) => r.ok).length}`,
+    `總筆數: ${results.length} | 有效樣本: ${validResults.length} | 通過: ${results.filter((r) => r.ok).length} | Accuracy: ${accuracyStr}`,
     '',
     '---',
     ''
@@ -539,9 +548,15 @@ function writeReport(results, reportPath) {
   const summary = [
     '## 結果彙總',
     '',
+    `- **有效樣本**（有圖+有預期物種）: ${validResults.length} 筆`,
+    `- **Accuracy（僅算有效樣本）**: ${accuracyStr}`,
+    `- **無圖（no-image）**: ${noImageResults.length} 筆（不算 accuracy）`,
+    `- **其他跳過**（parse/API 錯誤）: ${otherSkipResults.length} 筆`,
+    '',
     ...results.map((r, i) => {
       const status = r.ok ? '✅' : '❌';
-      return `${i + 1}. ${status} ${r.expected || r.url} → Top1: ${r.top1 || '無'}`;
+      const tag = r.error === 'no images' ? ' [no-image]' : (r.error ? ' [skip]' : '');
+      return `${i + 1}. ${status} ${r.expected || r.url} → Top1: ${r.top1 || '無'}${tag}`;
     }),
     '',
     '### Embedding-only vs Hybrid（同一 query）',

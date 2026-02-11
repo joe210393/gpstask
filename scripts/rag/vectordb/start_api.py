@@ -106,11 +106,14 @@ feature_calculator = None  # 特徵權重計算器
 # 混合評分權重（初始預設：embedding 稍高，特徵為輔）
 EMBEDDING_WEIGHT = 0.78  # embedding 為主，避免特徵主導排序
 FEATURE_WEIGHT = 0.22    # 特徵只做 gate + 有限加分
-KEYWORD_BONUS_WEIGHT = 0.18  # 關鍵字匹配加分（Vision 猜的物種名是強訊號，提高以對抗 feature 資料不全）
+KEYWORD_BONUS_WEIGHT = 0.08  # 關鍵字匹配加分（降低以減少 guess_names 誤導霸榜）
 
 # 常錯當 Top1 的「萬用條目」：輕度降權，降低霸榜機率
 # 注意：這是短期止血，不是長期解法（長期應改善資料/特徵/權重）
-GENERIC_TOP1_BLACKLIST = frozenset({"冇拱", "南亞孔雀苔", "鞭枝懸苔", "株苔", "八角蓮", "草海桐", "白檀"})
+GENERIC_TOP1_BLACKLIST = frozenset({
+    "冇拱", "南亞孔雀苔", "鞭枝懸苔", "株苔", "八角蓮", "草海桐", "白檀",
+    "水漆", "凹葉柃木", "棕樹",  # 常見霸榜物種
+})
 GENERIC_TOP1_PENALTY = float(os.environ.get("GENERIC_TOP1_PENALTY", "0.80"))
 
 
@@ -734,9 +737,36 @@ def _to_str(v):
     return str(v)
 
 
+def _get_list(x):
+    """統一取得 list 型態（payload 欄位可能是 list 或 None）。"""
+    if x is None:
+        return []
+    return x if isinstance(x, list) else [x]
+
+
+def _get_ident(payload: dict) -> dict:
+    """
+    統一取得 identification 資料：payload 可能是平鋪、或在 identification、或在 raw_data.identification。
+    回傳 trait_tokens, key_features_norm, key_features 的合併來源。
+    """
+    if not payload or not isinstance(payload, dict):
+        return {"trait_tokens": [], "key_features_norm": [], "key_features": []}
+    ident = payload.get("identification")
+    if not isinstance(ident, dict):
+        raw = payload.get("raw_data")
+        ident = raw.get("identification") if isinstance(raw, dict) else {}
+    ident = ident if isinstance(ident, dict) else {}
+    return {
+        "trait_tokens": _get_list(ident.get("trait_tokens") or payload.get("trait_tokens")),
+        "key_features_norm": _get_list(ident.get("key_features_norm") or payload.get("key_features_norm")),
+        "key_features": _get_list(ident.get("key_features") or payload.get("key_features")),
+    }
+
+
 def _get_plant_leaf_arrangement(payload):
-    kf = payload.get("key_features") or []
-    kf_norm = payload.get("key_features_norm") or []
+    ident = _get_ident(payload)
+    kf = ident["key_features"]
+    kf_norm = ident["key_features_norm"]
     text = " ".join(_to_str(x) for x in kf + kf_norm)
     if "對生" in text:
         return "opposite"
@@ -769,10 +799,9 @@ def _get_plant_life_form_group(payload):
 
 def _get_plant_leaf_type(payload):
     """從 payload 推斷葉型：simple(單葉) 或 compound(複葉)。"""
-    raw = payload.get("raw_data") or {}
-    ident = raw.get("identification") or {}
-    kf = ident.get("key_features") or []
-    kf_norm = ident.get("key_features_norm") or []
+    ident = _get_ident(payload)
+    kf = ident["key_features"]
+    kf_norm = ident["key_features_norm"]
     text = " ".join(_to_str(x) for x in kf + kf_norm)
     if any(x in text for x in ["羽狀複葉", "掌狀複葉", "掌狀", "三出複", "複葉"]):
         return "compound"
@@ -789,8 +818,9 @@ PALM_SPECIFIC_PLANT_KEYWORDS = ("棕櫚", "棕櫚科", "扇形", "扇形葉", "�
 
 def _plant_has_palm_compound(payload) -> bool:
     """候選植物是否為棕櫚類（棕櫚科/椰子/扇形葉等），非僅有羽狀複葉。"""
-    kf = payload.get("key_features") or []
-    kf_norm = payload.get("key_features_norm") or []
+    ident = _get_ident(payload)
+    kf = ident["key_features"]
+    kf_norm = ident["key_features_norm"]
     summary = _to_str(payload.get("summary", ""))
     text = " ".join(_to_str(x) for x in kf + kf_norm) + " " + summary
     return any(kw in text for kw in PALM_SPECIFIC_PLANT_KEYWORDS)
@@ -805,9 +835,10 @@ def _is_bryophyte_pteridophyte(payload) -> bool:
     family = _to_str(payload.get("family", "")).strip()
     if family and ("苔" in family or "蘚" in family or "蕨" in family):
         return True
+    ident = _get_ident(payload)
     summary = _to_str(payload.get("summary", ""))
-    kf = payload.get("key_features") or []
-    kf_norm = payload.get("key_features_norm") or []
+    kf = ident["key_features"]
+    kf_norm = ident["key_features_norm"]
     text = summary + " " + " ".join(_to_str(x) for x in kf + kf_norm)
     if any(kw in text for kw in ("苔綱", "蘚綱", "蕨類", "地錢", "角苔", "真蘚", "泥炭蘚", "孔雀苔", "懸苔", "紫萼苔")):
         return True
@@ -828,7 +859,11 @@ def compute_soft_contradiction_penalty(traits, payload):
         conf = t.get("confidence", 0) or 0
         if conf < conf_min:
             continue
-        q_val = (t.get("value") or "").strip().lower()
+        raw_val = t.get("value")
+        if isinstance(raw_val, list):
+            q_val = (raw_val[0] if raw_val else "").strip().lower()
+        else:
+            q_val = (raw_val or "").strip().lower()
         if not q_val:
             continue
         if trait_key == "leaf_arrangement":
@@ -884,8 +919,9 @@ def compute_soft_contradiction_penalty(traits, payload):
 
 def _get_plant_flower_color(payload) -> str | None:
     """從 payload 推斷花色（英文）。"""
-    kf = payload.get("key_features") or []
-    kf_norm = payload.get("key_features_norm") or []
+    ident = _get_ident(payload)
+    kf = ident["key_features"]
+    kf_norm = ident["key_features_norm"]
     text = " ".join(_to_str(x) for x in kf + kf_norm)
     if "紫花" in text or "紫色" in text:
         return "purple"
@@ -1292,23 +1328,22 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         match_result = {}
 
         if features and feature_calculator:
-            # ... (特徵提取代碼省略，保持不變) ...
-            # 取得植物的 trait_tokens（優先使用）
-            plant_trait_tokens = r.payload.get("trait_tokens", [])
+            # 統一從 get_ident 取得植物特徵（支援 payload 平鋪 / identification / raw_data.identification）
+            ident = _get_ident(r.payload or {})
+            plant_trait_tokens = ident["trait_tokens"]
             if not plant_trait_tokens:
                 try:
                     from pathlib import Path
                     tokenizer_path = Path(__file__).parent / "trait_tokenizer.py"
                     if tokenizer_path.exists():
                         from trait_tokenizer import key_features_to_trait_tokens
-                        key_features = r.payload.get("key_features", [])
-                        if key_features and isinstance(key_features, list):
+                        key_features = ident["key_features"]
+                        if key_features:
                             plant_trait_tokens = key_features_to_trait_tokens(key_features)
                 except (ImportError, Exception):
                     plant_trait_tokens = []
             
-            # 取得正規化後的 key_features_norm（D. 只保留合法 FEATURE_VOCAB，避免亂碼導致匹配失真）
-            plant_key_features_norm = r.payload.get("key_features_norm", [])
+            plant_key_features_norm = ident["key_features_norm"]
             if plant_key_features_norm and FEATURE_INDEX:
                 plant_key_features_norm = [
                     x for x in plant_key_features_norm
@@ -1320,8 +1355,8 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
                     normalize_path = Path(__file__).parent / "normalize_features.py"
                     if normalize_path.exists():
                         from normalize_features import normalize_features
-                        key_features = r.payload.get("key_features", [])
-                        if key_features and isinstance(key_features, list):
+                        key_features = ident["key_features"]
+                        if key_features:
                             plant_key_features_norm = normalize_features(key_features)
                 except (ImportError, Exception):
                     plant_key_features_norm = []
@@ -1334,7 +1369,7 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
                     return " ".join(str(x) for x in v if x is not None)
                 return str(v)
 
-            key_features = r.payload.get("key_features", [])
+            key_features = ident["key_features"]
             key_features_text = ""
             if key_features:
                 if isinstance(key_features, list):
@@ -1345,9 +1380,9 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             # 納入 raw_data 的 morphology（苔蘚類等 payload 無 morphology 時，raw 含 全緣/鋸齒 等）
             raw = r.payload.get("raw_data") or {}
             raw_morph = _to_str(raw.get("raw_data", {}).get("morphology", ""))
-            ident = raw.get("identification", {})
-            ident_morph = _to_str(ident.get("morphology", []))
-            ident_summary = _to_str(ident.get("summary", ""))
+            raw_ident = raw.get("identification", {}) if isinstance(raw, dict) else {}
+            ident_morph = _to_str(raw_ident.get("morphology", []))
+            ident_summary = _to_str(raw_ident.get("summary", ""))
 
             plant_text = " ".join(filter(None, [
                 _to_str(r.payload.get("summary")),
@@ -1440,21 +1475,19 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         keyword_bonus = c["keyword_bonus"]
         match_result = c["match_result"]
         
-        # 純 Gate 模式：以 embedding 為基準，不做任何正向加分
-        # 設計目標：寧可少出手，也不要把錯的物種推到 Top1
-        hybrid_score = embedding_score
+        # 統一計分公式：feature 必須是加分項，否則 RAG 只是扣分器
+        hybrid_score = (
+            embedding_weight * embedding_score
+            + effective_feature_weight * feature_score
+            + keyword_bonus
+        )
         
-        # 應用 Must Gate 懲罰（軟性降權，而非過濾）
-        # 如果關鍵特徵不匹配，分數打折，但仍然保留在列表中
-        if not c["must_matched"]:
-            # 🔥 關鍵修復：加重懲罰，從 0.5 (5折) 改為 0.3 (3折)
-            # 這樣可以避免喬木因為 Embedding 相似而排在正確草本（但 Embedding 稍低）的前面
-            # 但仍保留「完全找不到時，至少給個結果」的退路
-            MUST_GATE_PENALTY = 0.3
+        # Must Gate 懲罰（軟性降權）：關鍵特徵不匹配時打折，保守用 0.7
+        if not c["must_matched"] and features and len(features) >= 2:
+            MUST_GATE_PENALTY = 0.7
             hybrid_score *= MUST_GATE_PENALTY
-            # 僅在分數較高時顯示日誌，避免刷屏
             if hybrid_score > 0.4:
-                print(f"[API] ⚠️ Must Gate 懲罰: {c['plant_name']} - 關鍵特徵不匹配，分數大幅降權 (x0.3)")
+                print(f"[API] ⚠️ Must Gate 懲罰: {c['plant_name']} - 關鍵特徵不匹配 (x{MUST_GATE_PENALTY})")
 
         # Gate-A：棕櫚/複葉 gate（query 有複葉/棕櫚則候選需有，否則降權）
         query_has_palm_compound = (
