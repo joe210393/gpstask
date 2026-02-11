@@ -28,6 +28,7 @@ import threading
 import numpy as np
 import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from socketserver import ThreadingMixIn
 from urllib.parse import urlparse, parse_qs
 from qdrant_client.models import Filter, FieldCondition, MatchValue, MatchAny, MatchText
 
@@ -1697,36 +1698,50 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self._send_json({"error": "Missing 'query', 'features', or 'guess_names'"}, 400)
                 return
 
-            # 計算特徵總分（用於信心度）
+            # 計算特徵總分（用於信心度）與混合搜尋；任何例外都回傳 500 避免連線 EOF
             feature_info = None
-            if features and feature_calculator:
-                feature_info = feature_calculator.calculate_feature_score(features)
+            try:
+                if features and feature_calculator:
+                    feature_info = feature_calculator.calculate_feature_score(features)
 
-            # 執行混合搜尋
-            traits = data.get("traits")
-            results = hybrid_search(
-                query=query or " ".join(guess_names),
-                features=features,
-                guess_names=guess_names,
-                top_k=top_k,
-                weights={
-                    "embedding": embedding_weight,
-                    "feature": feature_weight
-                },
-                traits=traits
-            )
+                traits = data.get("traits")
+                results = hybrid_search(
+                    query=query or " ".join(guess_names),
+                    features=features,
+                    guess_names=guess_names,
+                    top_k=top_k,
+                    weights={
+                        "embedding": embedding_weight,
+                        "feature": feature_weight
+                    },
+                    traits=traits
+                )
 
-            self._send_json({
-                "query": query,
-                "features": features,
-                "guess_names": guess_names,
-                "feature_info": feature_info,
-                "results": results,
-                "weights": {
-                    "embedding": embedding_weight,
-                    "feature": feature_weight
-                }
-            })
+                self._send_json({
+                    "query": query,
+                    "features": features,
+                    "guess_names": guess_names,
+                    "feature_info": feature_info,
+                    "results": results,
+                    "weights": {
+                        "embedding": embedding_weight,
+                        "feature": feature_weight
+                    }
+                })
+            except Exception as e:
+                print(f"[API] POST /hybrid-search 500: {e}")
+                import traceback
+                traceback.print_exc()
+                sys.stdout.flush()
+                self._send_json({
+                    "error": str(e),
+                    "query": query,
+                    "features": features,
+                    "guess_names": guess_names,
+                    "feature_info": feature_info,
+                    "results": [],
+                    "weights": {"embedding": embedding_weight, "feature": feature_weight}
+                }, 500)
 
         else:
             self._send_json({"error": "Not found"}, 404)
@@ -1741,11 +1756,16 @@ class RequestHandler(BaseHTTPRequestHandler):
         print(f"[API] {args[0]}")
 
 
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    """多執行緒 HTTP 服務，避免單一請求卡住或崩潰導致其他連線 EOF"""
+    pass
+
+
 def main():
     try:
         init()
 
-        server = HTTPServer(("0.0.0.0", API_PORT), RequestHandler)
+        server = ThreadedHTTPServer(("0.0.0.0", API_PORT), RequestHandler)
         print(f"\n🌿 植物向量搜尋 API 啟動")
         print(f"   http://localhost:{API_PORT}")
         print(f"\n端點：")
