@@ -493,6 +493,17 @@ function writeReport(results, reportPath) {
   const disturbCount = withEffect.filter((r) => r.rag_effect === 'disturb').length;
   const naCount = results.length - withEffect.length;
 
+  // Embedding-only 排名分佈（了解第一階段召回狀況）
+  const embRanksAll = results
+    .map((r) => (typeof r.rank_embedding === 'number' ? r.rank_embedding : 999));
+  const embMiss = embRanksAll.filter((r) => r === 999).length;
+  const embHit = embRanksAll.length - embMiss;
+  const embTop1 = embRanksAll.filter((r) => r === 1).length;
+  const embTop3 = embRanksAll.filter((r) => r > 0 && r <= 3).length;
+  const embTop5 = embRanksAll.filter((r) => r > 0 && r <= 5).length;
+  const embTop10 = embRanksAll.filter((r) => r > 0 && r <= 10).length;
+  const embTop30 = embRanksAll.filter((r) => r > 0 && r <= 30).length;
+
   const summary = [
     '## 結果彙總',
     '',
@@ -507,6 +518,16 @@ function writeReport(results, reportPath) {
     `- **不變**: ${neutralCount}`,
     `- **擾亂**（hybrid 排名較後）: ${disturbCount}`,
     `- **n/a**（無 embedding_only 資料）: ${naCount}`,
+    '',
+    '### Embedding-only 排名分佈（第一階段召回）',
+    '',
+    `- **Top1**: ${embTop1}`,
+    `- **Top3 內**: ${embTop3}`,
+    `- **Top5 內**: ${embTop5}`,
+    `- **Top10 內**: ${embTop10}`,
+    `- **Top30 內**: ${embTop30}`,
+    `- **完全沒抓到（rank=999）**: ${embMiss}`,
+    `- **至少有抓到（rank≠999）**: ${embHit}`,
     '',
     '---',
     ''
