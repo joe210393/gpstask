@@ -3724,6 +3724,32 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
       const reply = simpleData.choices?.[0]?.message?.content || '';
       return res.json({ success: true, description: reply });
     }
+
+    // 3.7. 跳過 RAG 模式：仍用前端傳來的 system/user prompt（自由探索/任務模式），只呼叫 LM，不做植物 RAG
+    const skipRag = req.body && (req.body.skipRag === 'true' || req.body.skip_rag === 'true');
+    if (skipRag) {
+      console.log('📷 跳過 RAG：使用既有 prompt 呼叫 LM，不進行植物資料庫比對');
+      const aiResponse = await fetch(`${AI_API_URL}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${AI_API_KEY}` },
+        body: JSON.stringify({
+          model: AI_MODEL,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: [{ type: 'text', text: finalUserPrompt }, { type: 'image_url', image_url: { url: dataUrl } }] }
+          ],
+          max_tokens: 2000,
+          temperature: 0
+        })
+      });
+      if (!aiResponse.ok) {
+        const errText = await aiResponse.text();
+        throw new Error(`AI 辨識失敗: ${aiResponse.status}`);
+      }
+      const aiData = await aiResponse.json();
+      const description = aiData.choices?.[0]?.message?.content || '';
+      return res.json({ success: true, description, skip_rag: true });
+    }
     
     // 完整分析模式：繼續進行完整分析（包括 RAG 搜尋）
 
