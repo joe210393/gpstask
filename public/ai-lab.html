@@ -3,164 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 視覺實驗室 (Director Mode)</title>
-    <link rel="stylesheet" href="css/ai-lab.css?v=7">
-    <link rel="stylesheet" href="css/mode-switch.css?v=2">
-    <link
-        rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-        crossorigin=""
-    />
-    <!-- 引入 SweetAlert2 -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <title>AI 視覺實驗室</title>
+    <link rel="stylesheet" href="css/ai-lab.css?v=8">
 </head>
 <body>
     <div class="camera-container">
-        <!-- Debug Console (hidden by default) -->
-        <div id="debugConsole" style="display:none; position:fixed; top:20px; left:10px; z-index:9999; color:#0f0; background:rgba(0,0,0,0.5); font-size:12px; pointer-events:none; max-width:200px; word-break:break-all;">Debug Init...</div>
-        
-        <!-- 相機畫面 -->
         <video id="cameraFeed" autoplay playsinline muted></video>
-        
-        <!-- 繪圖畫布 (覆蓋在相機上) -->
         <canvas id="drawingCanvas"></canvas>
 
-        <!-- 透明地圖與位置資訊 -->
-        <div class="mini-map-wrap">
-            <button id="miniMapToggle" class="mini-map-toggle" title="切換地圖">🗺️</button>
-            <button id="miniMapRefresh" class="mini-map-refresh" title="定位更新">📍</button>
-            <div id="miniMap" class="mini-map"></div>
-            <div id="locationInfo" class="location-info">定位中...</div>
-        </div>
-        
-        <!-- UI 介面 -->
         <div class="ui-layer">
             <div class="header">
                 <button id="backBtn" class="icon-btn">✕</button>
                 <div class="status-pill">AI Vision Lab</div>
                 <div class="header-actions">
-                    <button id="micBtn" class="icon-btn" title="語音聊天">🎤</button>
-                    <button id="captureBtn" class="icon-btn" title="拍照">📸</button>
                     <button id="switchCameraBtn" class="icon-btn">↻</button>
                 </div>
             </div>
 
-            <div class="top-controls">
-                <div id="locationBar" class="location-bar">目前位置：定位中...</div>
+            <div class="instruction">請用手指圈選物體</div>
 
-                <!-- 模式切換器 -->
-                <div class="mode-switcher">
-                    <button class="mode-btn active" data-mode="free">🌿 自由探索</button>
-                    <button class="mode-btn" data-mode="mission">🛡️ 任務模式</button>
-                </div>
-
-                <div class="control-row">
-                    <!-- 語言選擇 -->
-                    <div class="lang-selector">
-                        <label for="langSelect">語言</label>
-                        <select id="langSelect">
-                            <option value="zh">繁體中文</option>
-                            <option value="en">English</option>
-                            <option value="ja">日本語</option>
-                            <option value="ko">한국어</option>
-                        </select>
-                    </div>
-
-                    <!-- 縮放控制 -->
-                    <div id="zoomControl" class="zoom-control hidden">
-                        <button class="zoom-btn" data-zoom="1">1x</button>
-                        <button class="zoom-btn" data-zoom="2">2x</button>
-                        <button class="zoom-btn" data-zoom="5">5x</button>
-                        <button class="zoom-btn" data-zoom="10">10x</button>
-                        <span id="zoomValue">1.0x</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 導演模式開關 -->
-            <button id="directorToggle" class="director-toggle hidden">🎬 導演設定</button>
-
-
-            <!-- 導演控制台 -->
-            <div id="directorPanel" class="director-panel hidden">
-                <div class="panel-title">導演控制台 (Prompt Engineering)</div>
-                
-                <div class="input-group">
-                    <label>System Prompt (劇本設定)</label>
-                    <textarea id="systemPrompt" class="director-input"></textarea>
-                </div>
-
-                <div class="input-group">
-                    <label>User Prompt (玩家指令)</label>
-                    <textarea id="userPrompt" class="director-input" style="min-height: 40px;"></textarea>
-                </div>
-                
-                <div style="font-size:10px; color:#aaa; margin-top:5px;">
-                    * 修改後下次辨識生效
-                </div>
-            </div>
-            
-            <div class="instruction">
-                請用手指圈選物體
-            </div>
-
-            <!-- 語音聊天面板 -->
-            <div id="voicePanel" class="voice-panel hidden">
-                <label class="voice-toggle">
-                    <input id="voiceSpeakToggle" type="checkbox" checked>
-                    AI 語音回覆
-                </label>
-                <div class="voice-row">
-                    <div class="voice-label">你說</div>
-                    <div id="voiceUser" class="voice-text">—</div>
-                </div>
-                <div class="voice-row">
-                    <div class="voice-label">AI</div>
-                    <div id="voiceAi" class="voice-text">—</div>
-                </div>
-                <div id="voiceStatus" class="voice-status">語音待命</div>
-            </div>
-
-            <!-- 結果展示區 (隱藏) -->
+            <!-- 結果展示區 -->
             <div id="resultPanel" class="result-panel">
                 <div class="result-content">
-                    <!-- 多照片縮圖區 -->
-                    <div id="photoStrip" class="photo-strip">
-                        <div class="photo-slot" data-index="0">
-                            <div class="slot-placeholder">1</div>
-                        </div>
-                        <div class="photo-slot" data-index="1">
-                            <div class="slot-placeholder">2</div>
-                        </div>
-                        <div class="photo-slot" data-index="2">
-                            <div class="slot-placeholder">3</div>
-                        </div>
-                    </div>
-                    <div id="photoHint" class="photo-hint">請從不同角度拍攝 3 張照片</div>
-
                     <img id="croppedImage" src="" alt="Cropped">
                     <div class="analysis-box">
                         <div id="aiLoading" class="hidden">
                             <div class="spinner"></div>
-                            <span id="loadingText">正在分析...</span>
+                            <span id="loadingText">AI 辨識中...</span>
                         </div>
                         <div id="aiResult" class="ai-text"></div>
-                        <div id="rawOutput" class="raw-output"></div>
                     </div>
                 </div>
                 <div class="action-buttons">
-                    <button id="retryBtn" class="btn secondary">重新拍攝</button>
-                    <button id="addPhotoBtn" class="btn secondary">拍攝下一張</button>
+                    <button id="retryBtn" class="btn secondary">重新圈選</button>
                     <button id="analyzeBtn" class="btn primary" disabled>AI 辨識</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-        crossorigin=""></script>
-    <script src="js/ai-lab.js?v=10"></script>
+    <script src="js/ai-lab.js?v=11"></script>
 </body>
 </html>

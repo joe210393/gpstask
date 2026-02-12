@@ -3694,6 +3694,36 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
         throw new Error('快速特徵提取失敗');
       }
     }
+
+    // 3.6. 簡易模式：只送照片到 LM，LM 回覆答案，不進行 RAG / traits / 植物搜尋
+    const simpleMode = req.body && (req.body.simpleMode === 'true' || req.body.simple_mode === 'true');
+    if (simpleMode) {
+      console.log('📷 簡易模式：只呼叫 LM 辨識，跳過 RAG / 特徵 / 植物搜尋');
+      const simpleSystem = req.body.systemPrompt || '你是一個友善的 AI 助手。請簡潔描述圖片中圈選的物體。';
+      const simpleUser = req.body.userPrompt || '請描述這張圖片中圈選區域的物體是什麼，並用簡短文字介紹。';
+
+      const simpleResponse = await fetch(`${AI_API_URL}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${AI_API_KEY}` },
+        body: JSON.stringify({
+          model: AI_MODEL,
+          messages: [
+            { role: 'system', content: simpleSystem },
+            { role: 'user', content: [{ type: 'text', text: simpleUser }, { type: 'image_url', image_url: { url: dataUrl } }] }
+          ],
+          max_tokens: 1000,
+          temperature: 0.3
+        })
+      });
+
+      if (!simpleResponse.ok) {
+        const errText = await simpleResponse.text();
+        throw new Error(`AI 辨識失敗: ${simpleResponse.status}`);
+      }
+      const simpleData = await simpleResponse.json();
+      const reply = simpleData.choices?.[0]?.message?.content || '';
+      return res.json({ success: true, description: reply });
+    }
     
     // 完整分析模式：繼續進行完整分析（包括 RAG 搜尋）
 
