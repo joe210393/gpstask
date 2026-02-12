@@ -20,6 +20,7 @@
  *   --verbose, -v    輸出詳細資訊（Top5、LM 猜測、特徵、分數），便於除錯與優化
  *   --report [路徑]  將完整報告寫入 Markdown（格式對齊 test-report.md），未指定路徑則自動檔名
  *   --urls-file 路徑 從檔案讀取 URL（每行一筆或逗號分隔）
+ *   --limit N      只跑前 N 筆 URL（與 --urls-file 併用）
  *
  * 範例：
  *   APP_URL=http://localhost:3000 node scripts/rag/verify_from_tlpg_url.js \
@@ -591,6 +592,7 @@ async function main() {
   const verbose = process.argv.includes('--verbose') || process.argv.includes('-v');
   let reportPath = null;
   let urlsFilePath = null;
+  let limitUrls = null; // --limit N：只跑前 N 筆
   const rawArgs = process.argv.slice(2).filter((a) => a !== '--verbose' && a !== '-v');
   const args = [];
   for (let i = 0; i < rawArgs.length; i++) {
@@ -610,6 +612,12 @@ async function main() {
       i++;
       continue;
     }
+    if (rawArgs[i] === '--limit' && rawArgs[i + 1]) {
+      const n = parseInt(rawArgs[i + 1], 10);
+      if (!Number.isNaN(n) && n > 0) limitUrls = n;
+      i++;
+      continue;
+    }
     args.push(rawArgs[i]);
   }
   let urls = [];
@@ -619,6 +627,10 @@ async function main() {
       .split(/[\n,]/)
       .map((u) => u.trim())
       .filter((u) => u && (u.startsWith('http://') || u.startsWith('https://')));
+    if (limitUrls != null && urls.length > limitUrls) {
+      urls = urls.slice(0, limitUrls);
+      console.log(`[限制] 只跑前 ${limitUrls} 筆 URL\n`);
+    }
   }
   if (urls.length === 0 && args.includes('--urls')) {
     const i = args.indexOf('--urls');

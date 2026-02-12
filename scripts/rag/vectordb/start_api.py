@@ -98,7 +98,16 @@ _boot_error = None  # 初始化失敗時的錯誤訊息
 # 混合評分權重（初始預設：embedding 稍高，特徵為輔）
 EMBEDDING_WEIGHT = 0.78  # embedding 為主，避免特徵主導排序
 FEATURE_WEIGHT = 0.22    # 特徵只做 gate + 有限加分
-KEYWORD_BONUS_WEIGHT = 0.08  # 關鍵字匹配加分（降低以減少 guess_names 誤導霸榜）
+KEYWORD_BONUS_WEIGHT = 0.0  # 關閉 guess_names 加分，只作召回提示，避免類別詞誤導霸榜
+
+# 類別詞：非物種名，不得用於加分；過濾後 guess_names 僅作查詢擴充
+GENERIC_GUESSES = frozenset({
+    "喬木", "灌木", "木本", "草本", "針葉樹", "闊葉樹", "小喬木", "藤本", "亞灌木",
+})
+# 弱鑑別力特徵（life_form 類）：有效特徵數排除這些；顯示時也可只顯示「有鑑別力」的匹配
+WEAK_FEATURES = frozenset({
+    "喬木", "灌木", "木本", "草本", "針葉樹", "闊葉樹", "小喬木", "藤本", "亞灌木",
+})
 
 # 常錯當 Top1 的「萬用條目」：輕度降權，降低霸榜機率
 # 注意：這是短期止血，不是長期解法（長期應改善資料/特徵/權重）
@@ -746,9 +755,10 @@ def compute_soft_contradiction_penalty(traits, payload):
             continue
         raw_val = t.get("value")
         if isinstance(raw_val, list):
-            q_val = (raw_val[0] if raw_val else "").strip().lower()
+            first = raw_val[0] if raw_val else None
+            q_val = (first if isinstance(first, str) else str(first or "")).strip().lower()
         else:
-            q_val = (raw_val or "").strip().lower()
+            q_val = (raw_val if isinstance(raw_val, str) else str(raw_val or "")).strip().lower()
         if not q_val:
             continue
         if trait_key == "leaf_arrangement":
@@ -963,6 +973,8 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             continue
         guess_names.append(n)
     guess_names = list(dict.fromkeys(guess_names))  # 去重保序
+    # 刀1：濾掉類別詞，只保留可能為物種名的猜測（不影響總分，僅作查詢擴充）
+    guess_names = [g for g in guess_names if g not in GENERIC_GUESSES]
     weights = weights or {}
     embedding_weight = float(weights.get("embedding", EMBEDDING_WEIGHT))
     feature_weight = float(weights.get("feature", FEATURE_WEIGHT))
@@ -971,8 +983,16 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
     if not features:
         feature_weight = 0.0
         embedding_weight = 1.0
-    embedding_weight = max(0.65, min(0.95, embedding_weight))
-    feature_weight = max(0.05, min(0.35, feature_weight)) if features else 0.0
+    else:
+        # 刀2：有效特徵（排除喬木/灌木等）不足 2 個 → 退化成 embedding-only
+        effective_feats = [f for f in features if f not in WEAK_FEATURES]
+        if len(effective_feats) < 2:
+            feature_weight = 0.0
+            embedding_weight = 1.0
+            print(f"[API] 有效特徵不足 (effective={len(effective_feats)} < 2)，退化成 embedding-only")
+        else:
+            embedding_weight = max(0.65, min(0.95, embedding_weight))
+            feature_weight = max(0.05, min(0.35, feature_weight))
     total_w = embedding_weight + feature_weight
     if total_w <= 0:
         embedding_weight, feature_weight = 1.0, 0.0
@@ -1381,7 +1401,8 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         # 確保分數不超過 1.0
         hybrid_score = min(1.0, hybrid_score)
         
-        # 記錄結果
+        # 刀3：有鑑別力的匹配特徵（排除喬木/灌木等），方便 log/報表一眼看出有效訊號
+        matched_discriminative = [x for x in (c.get("matched_features") or []) if x not in WEAK_FEATURES]
         results.append({
             "code": r.payload.get("code"),
             "chinese_name": r.payload.get("chinese_name"),
@@ -1396,6 +1417,7 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             "coverage": c["coverage"],
             "must_matched": c["must_matched"],
             "matched_features": c["matched_features"],
+            "matched_features_discriminative": matched_discriminative,
             "summary": r.payload.get("summary", "")[:300],
         })
 
@@ -1413,8 +1435,8 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         score = result.get("score", 0.0)
         embedding_score = result.get("embedding_score", 0.0)
         feature_score = result.get("feature_score", 0.0)
-        matched_features = result.get("matched_features", [])
-        print(f"  {i}. {plant_name}" + (f" ({scientific_name})" if scientific_name else "") + f" - 總分={score:.3f} (embedding={embedding_score:.3f}, feature={feature_score:.3f}), 匹配特徵={matched_features}")
+        matched_discriminative = result.get("matched_features_discriminative", [])
+        print(f"  {i}. {plant_name}" + (f" ({scientific_name})" if scientific_name else "") + f" - 總分={score:.3f} (emb={embedding_score:.3f}, feat={feature_score:.3f}), 匹配(鑑別)={matched_discriminative}")
     print()  # 空行分隔
     sys.stdout.flush()
 
