@@ -1,24 +1,15 @@
 #!/usr/bin/env python3
 """
-植物向量搜尋 API 服務
-提供 REST API 給 Node.js server 呼叫
+植物向量搜尋 API 服務（精簡版）
+提供 REST API 給 Node.js server 呼叫。
 
-功能：
-1. 自動判斷查詢類型（植物/動物/人造物/其他）
-2. 只有植物相關查詢才進行 RAG 搜尋
+端點：
+  GET  /health         - 服務與初始化狀態（ready / error）
+  GET  /vision-prompt  - Vision AI 結構化 Prompt
+  POST /search         - 純 embedding 搜尋（baseline）
+  POST /hybrid-search  - embedding + 特徵權重混合搜尋（主流程）
 
-啟動方式：
-  python start_api.py
-  (Trigger redeploy: 2026-02-02)
-
-API 端點：
-  POST /search
-  Body: { "query": "紅色的花", "top_k": 5 }
-
-  POST /classify
-  Body: { "query": "這是什麼" }
-
-  GET /health
+啟動：python start_api.py
 """
 
 import os
@@ -100,8 +91,9 @@ PLANT_THRESHOLD = 0.40  # 與「植物」相似度超過此值才認為是植物
 # 全域變數（啟動時載入）
 model = None
 qdrant_client = None
-category_embeddings = None  # 預計算的類別向量
 feature_calculator = None  # 特徵權重計算器
+_ready = False  # 背景初始化是否完成（未完成時 /search、/hybrid-search 回 503）
+_boot_error = None  # 初始化失敗時的錯誤訊息
 
 # 混合評分權重（初始預設：embedding 稍高，特徵為輔）
 EMBEDDING_WEIGHT = 0.78  # embedding 為主，避免特徵主導排序
@@ -220,15 +212,20 @@ def encode_text(text):
 
 def init_background():
     """背景初始化模型和連接（在獨立線程中執行）"""
-    global model, qdrant_client, category_embeddings, feature_calculator
+    global model, qdrant_client, feature_calculator, _ready, _boot_error
     global SentenceTransformer, QdrantClient, FeatureWeightCalculator, get_vision_prompt, FEATURE_INDEX
 
     try:
         print("🚀 開始背景初始化...")
         sys.stdout.flush()
         _init_background_impl()
+        _ready = True
+        _boot_error = None
+        print("🎉 背景初始化完成！")
+        sys.stdout.flush()
     except Exception as e:
-        print(f"❌ 背景初始化失敗: {e}")
+        _boot_error = f"{type(e).__name__}: {e}"
+        print(f"❌ 背景初始化失敗: {_boot_error}")
         import traceback
         traceback.print_exc()
         sys.stdout.flush()
@@ -236,7 +233,7 @@ def init_background():
 
 def _init_background_impl():
     """實際的背景初始化實作（由 init_background 包裝）"""
-    global model, qdrant_client, category_embeddings, feature_calculator
+    global model, qdrant_client, feature_calculator
     global SentenceTransformer, QdrantClient, FeatureWeightCalculator, get_vision_prompt, FEATURE_INDEX
 
     # 1. 載入 Qdrant 客戶端模組
@@ -494,71 +491,6 @@ def _init_background_impl():
         feature_calculator = None
     sys.stdout.flush()
 
-    # 6. 計算類別向量（如果模型可用或使用 Jina API）
-    # 優化：合併所有關鍵字為一次 batch 調用，減少 Jina API 調用次數（從 5 次降到 1 次）
-    if model or (USE_JINA_API and JINA_API_KEY):
-        try:
-            print("  計算類別向量（優化：單次 batch 調用）...")
-            sys.stdout.flush()
-            categories = {
-                "plant": ["植物", "花", "樹", "草", "葉子", "果實"],
-                "animal": ["動物", "鳥", "魚", "蟲", "獸"],
-                "artifact": ["建築", "房子", "車", "機器", "工具"],
-                "food": ["食物", "料理", "菜", "飲料"],
-                "other": ["風景", "天氣", "地形", "山", "河"]
-            }
-            
-            # 收集所有關鍵字和對應的類別索引
-            all_keywords = []
-            keyword_to_category = {}  # {index: category}
-            category_keyword_indices = {}  # {category: [indices]}
-            
-            idx = 0
-            for cat, keywords in categories.items():
-                category_keyword_indices[cat] = list(range(idx, idx + len(keywords)))
-                for kw in keywords:
-                    all_keywords.append(kw)
-                    keyword_to_category[idx] = cat
-                    idx += 1
-            
-            # 一次性 batch 調用（所有關鍵字一起）
-            print(f"    批次處理 {len(all_keywords)} 個關鍵字（5 個類別）...")
-            sys.stdout.flush()
-            all_embeddings = encode_text(all_keywords)
-            
-            # 處理回傳結果
-            if isinstance(all_embeddings, np.ndarray):
-                embeddings_array = all_embeddings  # (N, D)
-            elif isinstance(all_embeddings, list):
-                embeddings_array = np.array(all_embeddings)  # list[np.ndarray] -> (N, D)
-            else:
-                embeddings_array = np.array([all_embeddings])
-            
-            # 確保是 (N, D)
-            if embeddings_array.ndim == 1:
-                embeddings_array = embeddings_array.reshape(1, -1)
-            
-            # 按類別分組並計算平均向量
-            category_embeddings = {}
-            for cat, indices in category_keyword_indices.items():
-                cat_vectors = embeddings_array[indices]  # (len(keywords), D)
-                category_embeddings[cat] = np.mean(cat_vectors, axis=0)  # (D,)
-                print(f"    ✅ {cat}: {len(indices)} 個關鍵字")
-            
-            print("  ✅ 類別向量計算完成（僅 1 次 API 調用）")
-        except MemoryError as e:
-            print(f"  ❌ 記憶體不足，無法計算類別向量: {e}")
-            import traceback
-            traceback.print_exc()
-            category_embeddings = None
-        except Exception as e:
-            print(f"  ⚠️ 類別向量計算失敗: {e}")
-            import traceback
-            traceback.print_exc()
-            category_embeddings = None
-    sys.stdout.flush()
-
-    print("🎉 背景初始化完成！")
     sys.stdout.flush()
 
 
@@ -576,53 +508,6 @@ def init():
     print("📡 HTTP 服務器正在啟動...")
     print("   初始化將在背景執行")
     sys.stdout.flush()
-
-
-def classify_query(query: str) -> dict:
-    """
-    分類查詢類型
-    返回: { "category": "plant/animal/artifact/food/other", "confidence": 0.xx, "is_plant": true/false }
-    """
-    if category_embeddings is None:
-        return {
-            "category": "unknown",
-            "confidence": 0,
-            "scores": {},
-            "is_plant": False,
-            "plant_score": 0,
-            "error": "模型尚未載入完成"
-        }
-
-    query_vector = encode_text(query)
-    if isinstance(query_vector, list):
-        query_vector = np.array(query_vector)
-    if isinstance(query_vector, np.ndarray) and query_vector.ndim > 1:
-        # 保險：若意外回傳 (N, D)，取平均變成 (D,)
-        query_vector = np.mean(query_vector, axis=0)
-
-    # 計算與各類別的相似度
-    scores = {}
-    for cat, cat_vector in category_embeddings.items():
-        # 餘弦相似度
-        similarity = np.dot(query_vector, cat_vector) / (
-            np.linalg.norm(query_vector) * np.linalg.norm(cat_vector)
-        )
-        scores[cat] = float(similarity)
-
-    # 找出最高分的類別
-    best_category = max(scores, key=scores.get)
-    best_score = scores[best_category]
-
-    # 判斷是否為植物相關
-    is_plant = scores["plant"] >= PLANT_THRESHOLD
-
-    return {
-        "category": best_category,
-        "confidence": best_score,
-        "scores": scores,
-        "is_plant": is_plant,
-        "plant_score": scores["plant"]
-    }
 
 
 def search_plants(query: str, top_k: int = 5):
@@ -1002,6 +887,33 @@ def _canonical_name(payload: dict) -> str:
     return " | ".join(key_parts)
 
 
+def _traits_to_features(traits: dict | None) -> list:
+    """
+    將結構化 traits（Vision 輸出）轉成 feature token 列表，供 feature_calculator 使用。
+    schema: {"leaf_arrangement": {"value": "opposite", "confidence": 0.9}, ...}
+    """
+    if not traits or not isinstance(traits, dict):
+        return []
+    out = []
+    for _k, v in traits.items():
+        if not v or not isinstance(v, dict):
+            continue
+        val = v.get("value")
+        if val is None or str(val).strip().lower() == "unknown":
+            continue
+        s = str(val).strip()
+        if not s or len(s) < 2:
+            continue
+        out.append(s)
+    seen = set()
+    dedup = []
+    for x in out:
+        if x not in seen:
+            seen.add(x)
+            dedup.append(x)
+    return dedup
+
+
 def hybrid_search(query: str, features: list = None, guess_names: list = None, top_k: int = 5, weights: dict | None = None, traits: dict | None = None):
     """
     混合搜尋：結合 embedding 相似度 + 特徵權重 + 關鍵字匹配
@@ -1016,6 +928,17 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         搜尋結果列表，包含混合分數
     """
     features = features or []
+    # 修正 1：traits 轉 features，避免 traits 有資料但 features 為空導致 feature_score 全 0
+    if not features and traits:
+        features = _traits_to_features(traits)
+        if features:
+            print(f"[API] traits→features 補充: {len(features)} 個 ({', '.join(features[:8])}{'...' if len(features) > 8 else ''})")
+
+    # 保命檢查：query 太短且 features 為空時，無法做有意義搜尋（常見導致 0% 辨識率）
+    effective_query = (query or "").strip() or " ".join(guess_names or [])
+    if len(effective_query) < 4 and (not features or len(features) == 0):
+        print(f"[API] hybrid_search 拒絕: query 太短且 features 為空 (query_len={len(effective_query)}, features={len(features)})")
+        return []
     # 清洗 guess_names（再次保險，Node 端已做初步清洗）
     raw_guess_names = guess_names or []
     guess_names = []
@@ -1056,7 +979,9 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
     else:
         embedding_weight = embedding_weight / total_w
         feature_weight = feature_weight / total_w
+    q_preview = (effective_query or query or "")[:50]
     print(f"[API] hybrid_search 入參: query_len={len(query or '')}, features={len(features)}, guess_names={len(guess_names)}, top_k={top_k}, weights=E:{embedding_weight:.2f}/F:{feature_weight:.2f}")
+    print(f"[API] debug: query_preview={q_preview!r} features_count={len(features)}")
     sys.stdout.flush()
 
     if qdrant_client is None:
@@ -1064,39 +989,8 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         sys.stdout.flush()
         return []  # Qdrant 未連線，返回空結果
 
-    # 0. 如果有 guess_names，先進行關鍵字匹配（輔助提高辨識率）
-    # 注意：關鍵字匹配只是輔助，主要還是依賴 embedding 和特徵匹配
+    # 關鍵字匹配已移除：不再 scroll 全庫做名稱比對，只靠向量檢索 + 特徵重排，行為可預期
     keyword_matched_ids = set()
-    if guess_names:
-        try:
-            # 使用 scroll 取得所有資料，然後在記憶體中過濾
-            # 這對於小資料集（<10K）是可行的
-            # 只執行一次 scroll，然後檢查所有 guess_names
-            scroll_result = qdrant_client.scroll(
-                collection_name=COLLECTION_NAME,
-                limit=10000,  # 假設資料不超過 10K
-                with_payload=True,
-                with_vectors=False
-            )
-            
-            # 在記憶體中過濾匹配的植物
-            for point in scroll_result[0]:
-                chinese_name = point.payload.get("chinese_name", "") or ""
-                scientific_name = point.payload.get("scientific_name", "") or ""
-                
-                # 檢查是否匹配任一 guess_name（部分匹配）
-                for name in guess_names:
-                    if name and name.strip():
-                        name_clean = name.strip()
-                        # 檢查是否包含該名稱（部分匹配）
-                        if name_clean in chinese_name or name_clean in scientific_name:
-                            keyword_matched_ids.add(point.id)
-                            break  # 匹配到一個就夠了
-            
-            if keyword_matched_ids:
-                print(f"[API] 關鍵字匹配找到 {len(keyword_matched_ids)} 個候選（guess_names: {guess_names}）")
-        except Exception as e:
-            print(f"[API] 關鍵字匹配失敗: {e}，繼續使用 embedding 搜尋")
 
     # 1. 先用 embedding 取得候選
     # 🔥 關鍵修復：只使用簡短的 query_text_zh，絕對不要用整段分析文字
@@ -1172,55 +1066,6 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         print(f"[API] hybrid_search 空候選: Qdrant 回傳 0 筆 (query 前 50 字: {search_query[:50]!r})")
         sys.stdout.flush()
         return []
-    
-    # B. Fruit-only 第二路召回：延遲+高門檻+少量補召回，避免污染候選池
-    # 可設 DISABLE_FRUIT_ONLY_RECALL=1 關閉，用於 A/B 測試
-    fruit_candidates = []
-    disable_fruit = os.environ.get("DISABLE_FRUIT_ONLY_RECALL", "").strip().lower() in ("1", "true", "yes")
-    if not disable_fruit and features and FEATURE_INDEX:
-        fruit_features = [
-            f for f in features
-            if (FEATURE_INDEX.get(f) or {}).get("category") in {"fruit_type", "fruit_cluster", "fruit_surface", "calyx_persistent"}
-        ]
-        # 高門檻：至少 2 個果實特徵才觸發（避免單一漿果誤召）
-        if len(fruit_features) >= 2:
-            print(f"[API] Fruit-only 召回: Query 含果實特徵 {fruit_features}，啟動第二路召回")
-            fruit_query_text = " ".join(fruit_features)
-            try:
-                fruit_vector = encode_text(fruit_query_text)
-                if not isinstance(fruit_vector, list):
-                    fruit_vector = fruit_vector.tolist()
-                # 少量補召回：20 筆（原 50 易污染候選池）
-                fruit_limit = int(os.environ.get("FRUIT_ONLY_LIMIT", "20"))
-                fruit_candidates = qdrant_client.query_points(
-                    collection_name=COLLECTION_NAME,
-                    query=fruit_vector,
-                    limit=fruit_limit,
-                ).points
-                print(f"[API] Fruit-only 召回找到 {len(fruit_candidates)} 個候選")
-            except Exception as e:
-                print(f"[API] Fruit-only 召回失敗: {e}，繼續使用主路召回")
-                fruit_candidates = []
-    
-    # 合併兩路候選（去重）
-    main_count = len(candidates)
-    candidate_dict = {}
-    for c in candidates:
-        key = _canonical_name(c.payload or {}) or str(c.id)
-        candidate_dict[key] = c
-    
-    for c in fruit_candidates:
-        key = _canonical_name(c.payload or {}) or str(c.id)
-        if key not in candidate_dict:
-            candidate_dict[key] = c
-        else:
-            # 如果已存在，保留 embedding 分數較高的（主路優先）
-            existing_score = candidate_dict[key].score
-            if c.score > existing_score:
-                candidate_dict[key] = c
-    
-    candidates = list(candidate_dict.values())
-    print(f"[API] 合併兩路召回: 主路 {main_count} + Fruit路 {len(fruit_candidates)} = 總計 {len(candidate_dict)} 個候選")
 
     # 候選池過濾：查詢為種子植物時，直接排除苔蘚蕨類（避免污染 Top1）
     query_has_bryo_fern = bool(search_query and ("苔" in search_query or "蘚" in search_query or "蕨" in search_query))
@@ -1361,14 +1206,7 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
                 except (ImportError, Exception):
                     plant_key_features_norm = []
             
-            # 取得植物的描述文字（payload 欄位可能為 str 或 list，統一轉成 str）
-            def _to_str(v):
-                if v is None:
-                    return ""
-                if isinstance(v, list):
-                    return " ".join(str(x) for x in v if x is not None)
-                return str(v)
-
+            # 取得植物的描述文字（payload 欄位可能為 str 或 list，使用模組級 _to_str）
             key_features = ident["key_features"]
             key_features_text = ""
             if key_features:
@@ -1377,19 +1215,29 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
                 else:
                     key_features_text = str(key_features)
 
-            # 納入 raw_data 的 morphology（苔蘚類等 payload 無 morphology 時，raw 含 全緣/鋸齒 等）
+            # 納入 raw_data 的 morphology / ecology（修正 2：raw 內直接取 morphology，不再找 raw_data.raw_data）
             raw = r.payload.get("raw_data") or {}
-            raw_morph = _to_str(raw.get("raw_data", {}).get("morphology", ""))
+            raw = raw if isinstance(raw, dict) else {}
+            raw_morph = _to_str(raw.get("morphology", ""))
+            raw_ecology = _to_str(raw.get("ecology", ""))
             raw_ident = raw.get("identification", {}) if isinstance(raw, dict) else {}
             ident_morph = _to_str(raw_ident.get("morphology", []))
             ident_summary = _to_str(raw_ident.get("summary", ""))
+
+            # 關鍵優化：把 trait_tokens 併入 plant_text，提升 feature match 訊號（ taxonomy-v2 有 identification.trait_tokens）
+            trait_tokens_str = ""
+            tt = ident.get("trait_tokens") or []
+            if tt:
+                trait_tokens_str = " ".join(str(x) for x in tt if x)
 
             plant_text = " ".join(filter(None, [
                 _to_str(r.payload.get("summary")),
                 _to_str(r.payload.get("life_form")),
                 _to_str(r.payload.get("morphology")),
                 key_features_text,
+                trait_tokens_str,
                 raw_morph,
+                raw_ecology,
                 ident_morph,
                 ident_summary,
             ]))
@@ -1435,8 +1283,8 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
             matched_features = []
             match_result = {}
 
-        # 暫存結果，稍後進行過濾和排序
-        hard_reject = match_result.get("hard_reject", False)
+        # 暫存結果，稍後進行過濾和排序（先關閉 hard_reject，讓 Top5 能找回來再談精準）
+        hard_reject = False  # match_result.get("hard_reject", False)  # 暫時停用
         scored_candidates.append({
             "point": r,
             "embedding_score": embedding_score,
@@ -1475,69 +1323,48 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
         keyword_bonus = c["keyword_bonus"]
         match_result = c["match_result"]
         
-        # 統一計分公式：feature 必須是加分項，否則 RAG 只是扣分器
+        # 統一計分公式：先穩住 Top5，keyword_bonus 封頂避免主宰
+        kw_capped = min(keyword_bonus, 0.05)
         hybrid_score = (
             embedding_weight * embedding_score
             + effective_feature_weight * feature_score
-            + keyword_bonus
+            + kw_capped
         )
-        
-        # Must Gate 懲罰（軟性降權）：關鍵特徵不匹配時打折，保守用 0.7
-        if not c["must_matched"] and features and len(features) >= 2:
-            MUST_GATE_PENALTY = 0.7
-            hybrid_score *= MUST_GATE_PENALTY
-            if hybrid_score > 0.4:
-                print(f"[API] ⚠️ Must Gate 懲罰: {c['plant_name']} - 關鍵特徵不匹配 (x{MUST_GATE_PENALTY})")
 
-        # Gate-A：棕櫚/複葉 gate（query 有複葉/棕櫚則候選需有，否則降權）
+        # 溫和 Gate：改用 0.90 級別，避免過度懲罰導致結果被少數類型綁架
+        gate_mult = 1.0
+
+        # Must Gate 懲罰（溫和）
+        if not c["must_matched"] and features and len(features) >= 2:
+            gate_mult *= 0.90
+
+        # Gate-A：棕櫚/複葉（溫和 0.90）
         query_has_palm_compound = (
             (features and any(f in PALM_COMPOUND_QUERY_TOKENS for f in features))
             or ("棕櫚" in (query or ""))
         )
-        gate_triggered = query_has_palm_compound
         has_palm = _plant_has_palm_compound(r.payload)
-        before_score = hybrid_score
-        # P1: 動態強度 - 羽狀複葉+棕櫚 用 0.25，其他強複葉 0.35，泛用 0.6
-        STRONG_PALM_TOKENS = frozenset({"羽狀複葉", "掌狀複葉", "二回羽狀", "三出複葉"})
-        has_strong = bool(features and any(f in STRONG_PALM_TOKENS for f in features))
-        has_palm_in_query = bool(features and "棕櫚" in features)
-        if has_strong and has_palm_in_query:
-            gate_penalty = 0.25  # 黃椰子等：query 明確有羽狀複葉+棕櫚，非棕櫚候選重罰
-        elif has_strong:
-            gate_penalty = 0.35
-        else:
-            gate_penalty = 0.6
-        if gate_triggered and not has_palm:
-            hybrid_score *= gate_penalty
-        if gate_triggered:
-            print(f"[API] Gate-A debug {c['plant_name']}: has_palm={has_palm} penalty={gate_penalty} before={before_score:.4f} after={hybrid_score:.4f}")
-        if gate_triggered and not has_palm and hybrid_score > 0.3:
-            print(f"[API] Gate-A 棕櫚/複葉降權: {c['plant_name']} - 無複葉/棕櫚描述 (x{gate_penalty})")
-
-        # Gate-A 逆邏輯：query 無棕櫚/複葉證據時，棕櫚候選重罰（避免鳥尾花/九重葛/迷迭香等一直被棕樹霸榜）
+        if query_has_palm_compound and not has_palm:
+            gate_mult *= 0.90
         if not query_has_palm_compound and has_palm:
-            hybrid_score *= 0.18
-            if hybrid_score > 0.2:
-                print(f"[API] Gate-A 逆：{c['plant_name']} - 查詢無棕櫚/複葉，棕櫚候選降權 (x0.18)")
+            gate_mult *= 0.90
 
-        # SOFT 矛盾重罰：life_form / leaf_arrangement / flower_color 不一致時扣分（取最嚴重 2 條）
+        # SOFT 矛盾（溫和）
         if traits:
             soft_penalties = compute_soft_contradiction_penalty(traits, r.payload)
             if soft_penalties:
                 total_penalty = sum(p for _, p in soft_penalties)
-                hybrid_score = max(0.0, hybrid_score - total_penalty)
-                if hybrid_score > 0.2:
-                    print(f"[API] SOFT 矛盾懲罰: {c['plant_name']} - {[rid for rid, _ in soft_penalties]}, 共扣 {total_penalty:.2f}")
+                hybrid_score = max(0.0, hybrid_score - total_penalty * 0.3)  # 折減懲罰強度
 
-        # 蕨苔蘚 vs 種子植物 Gate：查詢為種子植物（灌木/草本/花/喬木）時，苔蘚蕨類強降權，分開大類避免誤匹配
+        # 蕨苔蘚 Gate（溫和 0.90）
         query_has_bryo_fern = bool(query and ("苔" in query or "蘚" in query or "蕨" in query))
         query_features_str = " ".join(features or [])
         if not query_has_bryo_fern and ("苔" in query_features_str or "蘚" in query_features_str or "蕨" in query_features_str):
             query_has_bryo_fern = True
         if not query_has_bryo_fern and _is_bryophyte_pteridophyte(r.payload):
-            hybrid_score *= 0.06
-            if hybrid_score > 0.15:
-                print(f"[API] 蕨苔蘚 Gate: {c['plant_name']} - 查詢為種子植物，苔蘚蕨類強降權 (x0.06)")
+            gate_mult *= 0.90
+
+        hybrid_score *= gate_mult
 
         # 資料品質降權：低品質筆（缺乏描述、推測等）乘 quality_score
         qs = r.payload.get("quality_score")
@@ -1594,27 +1421,6 @@ def hybrid_search(query: str, features: list = None, guess_names: list = None, t
     return results[:top_k]
 
 
-def smart_search(query: str, top_k: int = 5):
-    """
-    智慧搜尋：先分類，只有植物相關才搜尋
-    """
-    classification = classify_query(query)
-
-    result = {
-        "query": query,
-        "classification": classification,
-        "results": []
-    }
-
-    if classification["is_plant"]:
-        result["results"] = search_plants(query, top_k)
-        result["message"] = f"識別為植物相關查詢 (信心度: {classification['plant_score']:.2f})"
-    else:
-        result["message"] = f"非植物相關查詢，識別為: {classification['category']} (信心度: {classification['confidence']:.2f})"
-
-    return result
-
-
 class RequestHandler(BaseHTTPRequestHandler):
     def _send_json(self, data, status=200):
         self.send_response(status)
@@ -1636,19 +1442,18 @@ class RequestHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
 
         if parsed.path == "/health":
-            # 檢查 embedding 是否可用（本地模型或 Jina API）
-            embedding_ready = model is not None or (USE_JINA_API and JINA_API_KEY)
-
+            # 搜尋可用 = 背景初始化完成（Qdrant + embedding + feature_calculator）
             self._send_json({
-                "ok": True,
-                "status": "ok",
+                "ok": _ready and _boot_error is None,
+                "status": "ok" if _ready else ("initializing" if _boot_error is None else "error"),
+                "ready": _ready,
+                "error": _boot_error,
                 "model": EMBEDDING_MODEL,
                 "use_jina_api": USE_JINA_API,
                 "jina_api_configured": JINA_API_KEY is not None,
                 "model_loaded": model is not None,
                 "qdrant_connected": qdrant_client is not None,
                 "qdrant_url": QDRANT_URL,
-                "ready": embedding_ready and qdrant_client is not None
             })
 
         elif parsed.path == "/stats":
@@ -1694,32 +1499,18 @@ class RequestHandler(BaseHTTPRequestHandler):
             })
 
         elif parsed.path == "/search":
+            if not _ready:
+                self._send_json({"error": "Service not ready", "detail": _boot_error}, 503)
+                return
             params = parse_qs(parsed.query)
             query = params.get("q", [""])[0]
             top_k = int(params.get("top_k", [5])[0])
-            smart = params.get("smart", ["true"])[0].lower() == "true"
 
             if not query:
                 self._send_json({"error": "Missing query parameter 'q'"}, 400)
                 return
 
-            if smart:
-                result = smart_search(query, top_k)
-            else:
-                result = {"query": query, "results": search_plants(query, top_k)}
-
-            self._send_json(result)
-
-        elif parsed.path == "/classify":
-            params = parse_qs(parsed.query)
-            query = params.get("q", [""])[0]
-
-            if not query:
-                self._send_json({"error": "Missing query parameter 'q'"}, 400)
-                return
-
-            result = classify_query(query)
-            result["query"] = query
+            result = {"query": query, "results": search_plants(query, top_k)}
             self._send_json(result)
 
         else:
@@ -1736,31 +1527,20 @@ class RequestHandler(BaseHTTPRequestHandler):
             self._send_json({"error": "Invalid JSON"}, 400)
             return
 
+        # 搜尋端點需等初始化完成，否則回 503 避免空結果被誤判為 0% 辨識率
+        if parsed.path in ("/search", "/hybrid-search") and not _ready:
+            self._send_json({"error": "Service not ready", "detail": _boot_error}, 503)
+            return
+
         if parsed.path == "/search":
             query = data.get("query", "")
             top_k = data.get("top_k", 5)
-            smart = data.get("smart", True)
 
             if not query:
                 self._send_json({"error": "Missing 'query' field"}, 400)
                 return
 
-            if smart:
-                result = smart_search(query, top_k)
-            else:
-                result = {"query": query, "results": search_plants(query, top_k)}
-
-            self._send_json(result)
-
-        elif parsed.path == "/classify":
-            query = data.get("query", "")
-
-            if not query:
-                self._send_json({"error": "Missing 'query' field"}, 400)
-                return
-
-            result = classify_query(query)
-            result["query"] = query
+            result = {"query": query, "results": search_plants(query, top_k)}
             self._send_json(result)
 
         elif parsed.path == "/hybrid-search":
@@ -1851,16 +1631,12 @@ def main():
         print(f"\n🌿 植物向量搜尋 API 啟動")
         print(f"   http://localhost:{API_PORT}")
         print(f"\n端點：")
-        print(f"   GET  /health")
-        print(f"   GET  /vision-prompt          - 取得 Vision AI 結構化 Prompt")
-        print(f"   GET  /classify?q=紅色的花")
-        print(f"   GET  /search?q=紅色的花&top_k=5&smart=true")
-        print(f"   POST /search       {{\"query\": \"...\", \"top_k\": 5, \"smart\": true}}")
-        print(f"   POST /classify     {{\"query\": \"...\"}}")
-        print(f"   POST /hybrid-search {{\"query\": \"...\", \"features\": [...], \"guess_names\": [...]}}")
-        print(f"\nEmbedding 方式: {'Jina AI API' if USE_JINA_API else '本地模型'}")
-        print(f"混合搜尋權重: embedding={EMBEDDING_WEIGHT}, feature={FEATURE_WEIGHT}")
-        print(f"植物判斷閾值: {PLANT_THRESHOLD}")
+        print(f"   GET  /health             - 檢查服務與初始化狀態（ready/error）")
+        print(f"   GET  /vision-prompt      - 取得 Vision AI 結構化 Prompt")
+        print(f"   GET  /search?q=...&top_k=5")
+        print(f"   POST /search             {{\"query\": \"...\", \"top_k\": 5}}")
+        print(f"   POST /hybrid-search      {{\"query\": \"...\", \"features\": [...], \"guess_names\": [...]}}")
+        print(f"\nEmbedding: {'Jina API' if USE_JINA_API else '本地模型'} | 權重 E:{EMBEDDING_WEIGHT} F:{FEATURE_WEIGHT}")
         print(f"\n按 Ctrl+C 停止...")
         sys.stdout.flush()
 

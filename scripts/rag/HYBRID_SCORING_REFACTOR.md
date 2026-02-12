@@ -1,6 +1,6 @@
 # Hybrid 計分重構紀錄
 
-> 依據建議完成：統一資料欄位、統一計分公式、驗證報告拆分。
+> 依據建議完成：統一資料欄位、統一計分公式、驗證報告拆分、traits→features、morphology bug 修正。
 
 ---
 
@@ -50,9 +50,26 @@ hybrid_score = embedding_weight × embedding_score
 
 ---
 
+---
+
+## 5. traits→features 通路（修正建議）
+
+- **問題**：`traits` (dict) 傳入但未轉成 `features`，若 Node 端只送 traits 或 features 為空，feature_score 全 0
+- **改法**：新增 `_traits_to_features(traits)`，當 `features` 為空且 `traits` 有資料時，從 traits 擷取 value 補成 features
+- **schema**：`{"leaf_arrangement": {"value": "opposite", "confidence": 0.9}, ...}` → 擷取非 unknown 的 value
+
+---
+
+## 6. plant_text morphology bug 修正
+
+- **問題**：`raw.get("raw_data", {}).get("morphology", "")` 多了一層 `raw_data`，morphology 幾乎取不到
+- **改法**：改為 `raw.get("morphology", "")`，並加入 `raw.get("ecology", "")` 提高 plant_text 完整性
+
+---
+
 ## 檔案變更
 
 | 檔案 | 變更 |
 |------|------|
-| `start_api.py` | `_get_ident`、`_get_list`、payload 讀取統一、hybrid_score 公式修正、Must Gate 0.7、黑名單擴充 |
+| `start_api.py` | `_get_ident`、`_get_list`、payload 讀取統一、hybrid_score 公式修正、Must Gate 0.7、黑名單擴充、`_traits_to_features`、morphology/ecology bug 修正 |
 | `verify_from_tlpg_url.js` | 報告拆分 valid / no-image / 其他 |
