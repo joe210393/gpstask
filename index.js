@@ -3140,7 +3140,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
     const AI_API_URL =
       process.env.AI_API_URL || (process.env.NODE_ENV !== 'production' ? 'http://localhost:1234/v1' : null);
     // 生產環境必須設定 AI_MODEL，開發環境使用預設值
-    const AI_MODEL = process.env.AI_MODEL || (process.env.NODE_ENV !== 'production' ? 'google/gemma-3-12b' : null);
+    const AI_MODEL = process.env.AI_MODEL || (process.env.NODE_ENV !== 'production' ? 'qwen/qwen3-vl-30b' : null);
     const AI_API_KEY = process.env.AI_API_KEY || 'lm-studio';
 
     if (!AI_API_URL) {
@@ -3148,7 +3148,7 @@ app.post('/api/vision-test', uploadTemp.single('image'), async (req, res) => {
     }
     
     if (!AI_MODEL) {
-      throw new Error('AI_MODEL 未設定：請在部署環境設定 AI_MODEL（例如：google/gemma-3-12b）');
+      throw new Error('AI_MODEL 未設定：請在部署環境設定 AI_MODEL（例如：qwen/qwen3-vl-30b）');
     }
 
     // 3.5. 檢查是否為快速特徵提取模式（前端已進行快速提取，這裡只返回特徵）
@@ -3291,7 +3291,7 @@ app.post('/api/chat-text', async (req, res) => {
     const AI_API_URL =
       process.env.AI_API_URL || (process.env.NODE_ENV !== 'production' ? 'http://localhost:1234/v1' : null);
     // 生產環境必須設定 AI_MODEL，開發環境使用預設值
-    const AI_MODEL = process.env.AI_MODEL || (process.env.NODE_ENV !== 'production' ? 'google/gemma-3-12b' : null);
+    const AI_MODEL = process.env.AI_MODEL || (process.env.NODE_ENV !== 'production' ? 'qwen/qwen3-vl-30b' : null);
     const AI_API_KEY = process.env.AI_API_KEY || 'lm-studio';
 
     if (!AI_API_URL) {
@@ -3299,7 +3299,7 @@ app.post('/api/chat-text', async (req, res) => {
     }
     
     if (!AI_MODEL) {
-      throw new Error('AI_MODEL 未設定：請在部署環境設定 AI_MODEL（例如：google/gemma-3-12b）');
+      throw new Error('AI_MODEL 未設定：請在部署環境設定 AI_MODEL（例如：qwen/qwen3-vl-30b）');
     }
 
     console.log('🤖 正在呼叫 AI(文字):', AI_API_URL);
