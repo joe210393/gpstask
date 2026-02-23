@@ -2,6 +2,15 @@ import { apiGet, apiPost } from "./api.js";
 
 let points = [];
 let selected = null;
+let plotEl = null;
+
+const BASE_TRACE_INDEX = 0;
+const TARGET_TRACE_INDEX = 1;
+const INITIAL_CAMERA = {
+  eye: { x: 1.6, y: 1.6, z: 1.2 },
+  up: { x: 0, y: 0, z: 1 },
+  center: { x: 0, y: 0, z: 0 },
+};
 
 function renderPlot(inputPoints) {
   const xs = inputPoints.map((p) => p.x);
@@ -17,24 +26,81 @@ function renderPlot(inputPoints) {
     z: zs,
     text,
     hovertemplate: "<b>%{text}</b><br>X:%{x}<br>Y:%{y}<br>Z:%{z}<extra></extra>",
-    marker: { size: 4, opacity: 0.85 },
+    marker: {
+      size: 4,
+      opacity: 0.9,
+      color: "#111111",
+      line: { color: "#000000", width: 1 },
+    },
+  };
+
+  const targetTrace = {
+    type: "scatter3d",
+    mode: "markers+text",
+    x: [],
+    y: [],
+    z: [],
+    text: [],
+    textposition: "top center",
+    hovertemplate: "<b>%{text}</b><br>X:%{x}<br>Y:%{y}<br>Z:%{z}<extra></extra>",
+    marker: {
+      size: 8,
+      opacity: 1,
+      color: "#e10000",
+      line: { color: "#8b0000", width: 1.5 },
+      symbol: "diamond",
+    },
   };
 
   const layout = {
-    paper_bgcolor: "#0b0d12",
-    plot_bgcolor: "#0b0d12",
+    paper_bgcolor: "#ffffff",
+    plot_bgcolor: "#ffffff",
     scene: {
-      xaxis: { title: "X 除臭" },
-      yaxis: { title: "Y 吸水" },
-      zaxis: { title: "Z z_crush（高=不碎）" },
+      dragmode: "turntable",
+      camera: INITIAL_CAMERA,
+      xaxis: {
+        title: { text: "X 除臭", font: { color: "#cc0000" } },
+        tickfont: { color: "#cc0000" },
+        linecolor: "#cc0000",
+        zerolinecolor: "#000000",
+        gridcolor: "#000000",
+        showline: true,
+        showbackground: true,
+        backgroundcolor: "#ffffff",
+      },
+      yaxis: {
+        title: { text: "Y 吸水", font: { color: "#cc0000" } },
+        tickfont: { color: "#cc0000" },
+        linecolor: "#cc0000",
+        zerolinecolor: "#000000",
+        gridcolor: "#000000",
+        showline: true,
+        showbackground: true,
+        backgroundcolor: "#ffffff",
+      },
+      zaxis: {
+        title: { text: "Z z_crush（高=不碎）", font: { color: "#cc0000" } },
+        tickfont: { color: "#cc0000" },
+        linecolor: "#cc0000",
+        zerolinecolor: "#000000",
+        gridcolor: "#000000",
+        showline: true,
+        showbackground: true,
+        backgroundcolor: "#ffffff",
+      },
     },
+    uirevision: "keep-user-camera",
     margin: { l: 0, r: 0, t: 0, b: 0 },
   };
 
-  Plotly.newPlot("plot", [trace], layout, { responsive: true });
+  Plotly.newPlot("plot", [trace, targetTrace], layout, {
+    responsive: true,
+    doubleClick: false,
+  });
 
-  const plot = document.getElementById("plot");
-  plot.on("plotly_click", (data) => {
+  plotEl = document.getElementById("plot");
+  plotEl.on("plotly_click", (data) => {
+    if (data?.points?.[0]?.curveNumber !== BASE_TRACE_INDEX) return;
     const idx = data?.points?.[0]?.pointNumber;
     if (idx == null) return;
     selected = inputPoints[idx];
@@ -44,6 +110,25 @@ function renderPlot(inputPoints) {
        <div>Z 抗粉碎：${selected.z}（低=更碎）</div>
        <div class="small">（BOM 會在 V1.1 加入：點選後拉 /api/boms/by-sample）</div>`;
   });
+}
+
+function showTargetPoint(target) {
+  if (!plotEl) return;
+  Plotly.restyle(
+    plotEl,
+    {
+      x: [[target.x]],
+      y: [[target.y]],
+      z: [[target.z]],
+      text: [[`Target (${target.x}, ${target.y}, ${target.z})`]],
+    },
+    [TARGET_TRACE_INDEX]
+  );
+}
+
+function resetView() {
+  if (!plotEl) return;
+  Plotly.relayout(plotEl, { "scene.camera": INITIAL_CAMERA });
 }
 
 function renderCandidates(out) {
@@ -85,6 +170,7 @@ function renderCandidates(out) {
 async function main() {
   points = await apiGet("/api/map/points");
   renderPlot(points);
+  document.getElementById("btnResetView").addEventListener("click", resetView);
 
   document.getElementById("btnReco").addEventListener("click", async () => {
     const status = document.getElementById("recoStatus");
@@ -95,6 +181,7 @@ async function main() {
         y: Number(document.getElementById("ty").value),
         z: Number(document.getElementById("tz").value),
       };
+      showTargetPoint(target);
       const k = Number(document.getElementById("k").value || 30);
       const maxMix = Number(document.getElementById("maxMix").value || 3);
 
