@@ -14,7 +14,8 @@ export const pool = mysql.createPool({
 
 export async function exec(sql, params = []) {
   const [rows, meta] = await pool.execute(sql, params);
-  return { rows, meta };
+  // mysql2 for INSERT/UPDATE puts insertId/affectedRows on rows (ResultSetHeader).
+  return { rows, meta: meta ?? rows };
 }
 
 export async function query(sql, params = []) {

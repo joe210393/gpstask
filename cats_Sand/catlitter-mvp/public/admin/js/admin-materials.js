@@ -26,15 +26,19 @@ document.getElementById("btnAdd").onclick = async () => {
     .filter(Boolean);
   if (!name) return alert("請輸入材料名稱");
 
-  await apiPost("/api/materials", {
-    name,
-    function_tags: functions,
-    function_notes: functions.length ? `${name}－${functions.join("、")}` : null,
-  });
+  try {
+    await apiPost("/api/materials", {
+      name,
+      function_tags: functions,
+      function_notes: functions.length ? `${name}－${functions.join("、")}` : null,
+    });
 
-  document.getElementById("name").value = "";
-  document.getElementById("functions").value = "";
-  load();
+    document.getElementById("name").value = "";
+    document.getElementById("functions").value = "";
+    load();
+  } catch (e) {
+    alert(`新增失敗：${e.message}`);
+  }
 };
 
 load();

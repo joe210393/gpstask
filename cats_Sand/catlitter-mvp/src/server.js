@@ -22,6 +22,9 @@ app.use("/api/recommendations", recommendationsRouter);
 
 app.use((err, _req, res, _next) => {
   console.error("Unhandled API error:", err);
+  if (err?.code === "ER_DUP_ENTRY") {
+    return res.status(409).json({ ok: false, error: "資料重複，名稱已存在，請換一個名稱。" });
+  }
   res.status(500).json({ ok: false, error: err?.message || "Internal Server Error" });
 });
 
