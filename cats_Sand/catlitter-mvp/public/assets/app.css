@@ -1,0 +1,15 @@
+body { font-family: system-ui, -apple-system, "Noto Sans TC", sans-serif; margin: 0; background:#0b0d12; color:#eaeef7; }
+a { color: #9fd3ff; }
+.container { display:flex; height:100vh; }
+.panel { width: 420px; padding: 14px; border-left: 1px solid #1f2a3a; background:#0f1320; overflow:auto; }
+.main { flex:1; padding: 10px; }
+.card { border: 1px solid #1f2a3a; background:#0b0f1a; border-radius:10px; padding: 10px; margin-bottom: 10px; }
+.row { display:flex; gap:10px; }
+.row > * { flex:1; }
+input, select, textarea, button {
+  width:100%; padding:10px; border-radius:10px; border:1px solid #243247; background:#0b0f1a; color:#eaeef7;
+}
+button { cursor:pointer; }
+.small { font-size:12px; color:#aab6cc; }
+hr { border:0; border-top:1px solid #1f2a3a; margin:10px 0; }
+.badge { display:inline-block; padding:2px 8px; border:1px solid #243247; border-radius:999px; font-size:12px; color:#cfe1ff; }

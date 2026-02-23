@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>後台 - BOM</title>
+  <link rel="stylesheet" href="/assets/app.css" />
+</head>
+<body>
+  <div class="card">
+    <a id="back" href="/admin/samples.html">← 回樣品</a>
+    <h2 id="title">BOM</h2>
+    <div class="row">
+      <select id="bomSelect"></select>
+      <button id="btnNewBom">新增版本</button>
+      <button id="btnSetActive">設為 Active</button>
+    </div>
+    <hr />
+    <div class="row">
+      <select id="materialSelect"></select>
+      <input id="ratio" type="number" placeholder="ratio (%)" />
+      <button id="btnAddItem">新增材料</button>
+    </div>
+    <div class="small">加總需=100 才算有效（MVP先提醒，不強制擋）</div>
+  </div>
+
+  <div class="card" id="items"></div>
+
+  <script type="module" src="/admin/js/admin-bom-edit.js"></script>
+</body>
+</html>

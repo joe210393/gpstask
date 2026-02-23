@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>後台 - 材料</title>
+  <link rel="stylesheet" href="/assets/app.css" />
+</head>
+<body>
+  <div class="card">
+    <a href="/map.html">← 回 3D 地圖</a>
+    <h2>材料庫</h2>
+    <div class="row">
+      <input id="name" placeholder="材料名稱（例：小蘇打）" />
+      <input id="functions" placeholder="功能標籤（逗號分隔：除臭,抑菌）" />
+      <button id="btnAdd">新增</button>
+    </div>
+    <div class="small">例：小蘇打 → 功能填「除臭」</div>
+  </div>
+
+  <div class="card" id="list"></div>
+
+  <script type="module" src="/admin/js/admin-materials.js"></script>
+</body>
+</html>

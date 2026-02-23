@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>3D 配方地圖</title>
+  <link rel="stylesheet" href="/assets/app.css" />
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="main">
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="small">快速入口</div>
+            <a href="/admin/samples.html">後台：樣品</a> ·
+            <a href="/admin/materials.html">後台：材料</a>
+          </div>
+          <div style="text-align:right" class="small">
+            Z = z_crush（越高越不碎；越低越碎）
+          </div>
+        </div>
+      </div>
+      <div id="plot" style="width:100%; height:calc(100vh - 90px);"></div>
+    </div>
+
+    <div class="panel">
+      <div class="card">
+        <div class="small">Target 目標點（手動輸入）</div>
+        <div class="row">
+          <div>
+            <label class="small">X 除臭</label>
+            <input id="tx" type="number" value="80" step="1" />
+          </div>
+          <div>
+            <label class="small">Y 吸水</label>
+            <input id="ty" type="number" value="70" step="1" />
+          </div>
+          <div>
+            <label class="small">Z 抗粉碎/完整度</label>
+            <input id="tz" type="number" value="75" step="1" />
+          </div>
+        </div>
+        <div class="small">提醒：Z 越高越不碎；越低越碎。</div>
+        <hr />
+        <div class="row">
+          <div><input id="k" type="number" value="30" /></div>
+          <div><input id="maxMix" type="number" value="3" /></div>
+        </div>
+        <div class="row small">
+          <div>K（近鄰數）</div><div>最多混合樣品數</div>
+        </div>
+        <button id="btnReco">產生候選配方（LLM）</button>
+        <div id="recoStatus" class="small"></div>
+      </div>
+
+      <div class="card">
+        <div class="small">點選樣品資訊</div>
+        <div id="sampleInfo" class="small">（點圖上的點）</div>
+      </div>
+
+      <div class="card">
+        <div class="small">候選配方方案</div>
+        <div id="candidates"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/map.js"></script>
+</body>
+</html>

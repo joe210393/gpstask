@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>後台 - 編輯樣品</title>
+  <link rel="stylesheet" href="/assets/app.css" />
+</head>
+<body>
+  <div class="card">
+    <a href="/admin/samples.html">← 回樣品列表</a>
+    <h2 id="title">樣品</h2>
+    <div class="row">
+      <div>
+        <label class="small">樣品名</label>
+        <input id="name" />
+      </div>
+      <div>
+        <label class="small">狀態</label>
+        <select id="status">
+          <option value="draft">draft</option>
+          <option value="tested">tested</option>
+          <option value="archived">archived</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label class="small">X 除臭</label>
+        <input id="x" type="number" step="1" />
+      </div>
+      <div>
+        <label class="small">Y 吸水</label>
+        <input id="y" type="number" step="1" />
+      </div>
+      <div>
+        <label class="small">Z 抗粉碎/完整度（高=不碎）</label>
+        <input id="z" type="number" step="1" />
+      </div>
+    </div>
+
+    <label class="small">備註</label>
+    <textarea id="notes" rows="4"></textarea>
+
+    <div class="row">
+      <button id="btnSave">儲存</button>
+      <button id="btnBom">編輯 BOM</button>
+    </div>
+    <div id="msg" class="small"></div>
+  </div>
+
+  <script type="module" src="/admin/js/admin-sample-edit.js"></script>
+</body>
+</html>
