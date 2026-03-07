@@ -968,13 +968,29 @@ canvas#drawingCanvas {
     overflow: hidden;
 }
 
-.query-transit-mail {
+.query-transit-plane-wrap {
     position: absolute;
     left: 16px;
     top: 50%;
+    width: 26px;
+    height: 26px;
     transform: translateY(-50%);
-    font-size: 22px;
-    animation: mailFly 1.15s ease-in-out infinite;
+}
+
+.query-transit-plane {
+    position: absolute;
+    inset: 0;
+    clip-path: polygon(0 50%, 100% 0, 62% 50%, 100% 100%);
+    background: linear-gradient(135deg, #ffffff, #dbeafe);
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.22));
+}
+
+.query-transit.sending .query-transit-plane-wrap {
+    animation: planeSend 1s ease-in-out infinite;
+}
+
+.query-transit.returning .query-transit-plane-wrap {
+    animation: planeReturn 0.85s ease-in-out infinite;
 }
 
 .query-transit-trail {
@@ -985,7 +1001,14 @@ canvas#drawingCanvas {
     height: 2px;
     background: linear-gradient(90deg, rgba(255,255,255,0.5), rgba(255,255,255,0));
     transform: translateY(-50%);
-    animation: mailTrail 1.15s ease-in-out infinite;
+}
+
+.query-transit.sending .query-transit-trail {
+    animation: planeTrailSend 1s ease-in-out infinite;
+}
+
+.query-transit.returning .query-transit-trail {
+    animation: planeTrailReturn 0.85s ease-in-out infinite;
 }
 
 .query-transit-label {
@@ -994,17 +1017,30 @@ canvas#drawingCanvas {
     white-space: nowrap;
 }
 
-@keyframes mailFly {
-    0% { transform: translate(-10px, -50%) rotate(-8deg); opacity: 0; }
-    20% { transform: translate(0, -50%) rotate(0deg); opacity: 1; }
-    70% { transform: translate(14px, -50%) rotate(6deg); opacity: 1; }
-    100% { transform: translate(26px, -50%) rotate(10deg); opacity: 0; }
+@keyframes planeSend {
+    0% { transform: translate(-16px, -50%) rotate(-18deg) scale(0.85); opacity: 0; }
+    20% { transform: translate(-2px, -50%) rotate(-4deg) scale(1); opacity: 1; }
+    70% { transform: translate(20px, -50%) rotate(8deg) scale(1.02); opacity: 1; }
+    100% { transform: translate(38px, -50%) rotate(14deg) scale(0.92); opacity: 0; }
 }
 
-@keyframes mailTrail {
-    0% { opacity: 0; transform: translate(-10px, -50%) scaleX(0.4); }
-    30% { opacity: 0.75; transform: translate(0, -50%) scaleX(1); }
-    100% { opacity: 0; transform: translate(16px, -50%) scaleX(1.2); }
+@keyframes planeReturn {
+    0% { transform: translate(38px, -50%) rotate(14deg) scale(0.9); opacity: 0; }
+    20% { transform: translate(18px, -50%) rotate(4deg) scale(1.02); opacity: 1; }
+    78% { transform: translate(-2px, -50%) rotate(-6deg) scale(1); opacity: 1; }
+    100% { transform: translate(-18px, -50%) rotate(-14deg) scale(0.82); opacity: 0; }
+}
+
+@keyframes planeTrailSend {
+    0% { opacity: 0; transform: translate(-12px, -50%) scaleX(0.35); }
+    25% { opacity: 0.8; transform: translate(-2px, -50%) scaleX(1); }
+    100% { opacity: 0; transform: translate(18px, -50%) scaleX(1.25); }
+}
+
+@keyframes planeTrailReturn {
+    0% { opacity: 0; transform: translate(18px, -50%) scaleX(1.2); }
+    25% { opacity: 0.75; transform: translate(8px, -50%) scaleX(1); }
+    100% { opacity: 0; transform: translate(-14px, -50%) scaleX(0.4); }
 }
 
 .answer-toast {

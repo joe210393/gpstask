@@ -1168,11 +1168,29 @@ document.addEventListener('DOMContentLoaded', () => {
             if (queryTransitLabel && message) {
                 queryTransitLabel.textContent = message;
             }
-            if (queryTransit) queryTransit.classList.remove('hidden');
+            if (queryTransit) {
+                queryTransit.classList.remove('hidden');
+                queryTransit.classList.remove('returning');
+                queryTransit.classList.add('sending');
+            }
         }
 
         function hideQueryTransit() {
-            if (queryTransit) queryTransit.classList.add('hidden');
+            if (queryTransit) {
+                queryTransit.classList.add('hidden');
+                queryTransit.classList.remove('sending', 'returning');
+            }
+        }
+
+        async function playQueryReturnAnimation(message) {
+            if (queryTransitLabel && message) {
+                queryTransitLabel.textContent = message;
+            }
+            if (!queryTransit) return;
+            queryTransit.classList.remove('hidden', 'sending');
+            queryTransit.classList.add('returning');
+            await new Promise((resolve) => setTimeout(resolve, 850));
+            hideQueryTransit();
         }
 
         function showAnswerToast(text) {
@@ -1188,6 +1206,17 @@ document.addEventListener('DOMContentLoaded', () => {
         function hideAnswerToast() {
             if (answerToastTimer) clearTimeout(answerToastTimer);
             if (answerToast) answerToast.classList.add('hidden');
+        }
+
+        function collapseResultPanel() {
+            if (resultPanel) {
+                resultPanel.classList.remove('active');
+                resultPanel.style.display = 'none';
+            }
+            if (selectionInstruction) {
+                selectionInstruction.style.opacity = '1';
+                selectionInstruction.style.display = '';
+            }
         }
 
         async function analyzeVisionQuestion(photoDataUrl, systemPrompt, userPrompt, gpsData) {
@@ -1218,7 +1247,7 @@ document.addEventListener('DOMContentLoaded', () => {
         async function sendVoiceChat(userText) {
             try {
                 hideAnswerToast();
-                showQueryTransit('問題已送出，AI 正在查看畫面...');
+                showQueryTransit('問題已摺成紙飛機送出...');
                 if (voiceSendBtn) voiceSendBtn.disabled = true;
                 const snapshot = captureCurrentReticleDataUrl();
                 if (!snapshot) {
@@ -1259,6 +1288,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!data.success) throw new Error(data.message || 'AI 回覆失敗');
 
                 const replyText = extractReplyText(data.description || '');
+                await playQueryReturnAnimation('AI 紙飛機回來了');
                 showAnswerToast(replyText);
 
                 const shouldSpeak = voiceSpeakToggle ? voiceSpeakToggle.checked : true;
@@ -1270,6 +1300,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } catch (err) {
                 console.error('語音聊天錯誤', err);
+                await playQueryReturnAnimation('紙飛機帶回了錯誤訊息');
                 showAnswerToast(err.message || '語音回覆失敗，請再試一次');
             } finally {
                 hideQueryTransit();
@@ -2398,7 +2429,8 @@ document.addEventListener('DOMContentLoaded', () => {
             analyzeBtn.disabled = true;
             if (addPhotoBtn) addPhotoBtn.disabled = true;
             hideAnswerToast();
-            showQueryTransit('照片已送出，AI 正在回信...');
+            showQueryTransit('照片問題已摺成紙飛機送出...');
+            collapseResultPanel();
 
             // 立即顯示載入動畫（確保在任何 async 之前）
             aiResult.innerHTML = '';
@@ -2478,11 +2510,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     let displayText = result.description || '';
                     const replyMatch = displayText.match(/<reply>([\s\S]*?)<\/reply>/i);
                     if (replyMatch) displayText = replyMatch[1].trim();
-                    aiResult.innerHTML = displayText.replace(/\n/g, '<br>');
+                    await playQueryReturnAnimation('AI 紙飛機帶回了答案');
+                    showAnswerToast(displayText);
                     aiLoading.classList.add('hidden');
                     analyzeBtn.disabled = false;
                     analyzeBtn.textContent = '再次辨識';
                     if (addPhotoBtn) addPhotoBtn.disabled = false;
+                    retry();
                     return;
                 }
 
@@ -2505,6 +2539,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         addPhotoBtn.textContent = `拍攝第 ${nextPhotoNum} 張`;
                     }
                     analyzeBtn.textContent = '補拍後再辨識';
+                    await playQueryReturnAnimation('AI 紙飛機請你再補一張');
+                    showAnswerToast((result.need_more_photos_message || '請從不同角度再拍一張').replace(/\s+/g, ' ').trim());
                     stopThinkingAnimation();
                     aiLoading.classList.add('hidden');
                     analyzeBtn.disabled = false;
@@ -2584,6 +2620,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     showNonPlantResult(allResults);
                 }
 
+                await playQueryReturnAnimation('AI 紙飛機帶回了答案');
+                showAnswerToast((aiResult.textContent || '').replace(/\s+/g, ' ').trim());
+                retry();
+
             } catch (err) {
                 console.error('API 錯誤:', err);
                 stopThinkingAnimation();
@@ -2605,6 +2645,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div style="color: #666; font-size: 13px; margin-top: 8px;">請稍後再試</div>
                     </div>
                 `;
+                await playQueryReturnAnimation('紙飛機帶回了錯誤訊息');
+                showAnswerToast(errorMessage);
             } finally {
                 hideQueryTransit();
                 stopThinkingAnimation();
