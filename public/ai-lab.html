@@ -26,6 +26,9 @@
         <!-- 繪圖畫布 (覆蓋在相機上) -->
         <canvas id="drawingCanvas"></canvas>
 
+        <!-- 單手框選：取景框 (可點擊畫面移動框的位置) -->
+        <div id="reticleOverlay" class="reticle-overlay" aria-hidden="true"></div>
+
         <!-- 透明地圖與位置資訊 -->
         <div class="mini-map-wrap">
             <button id="miniMapToggle" class="mini-map-toggle" title="切換地圖">🗺️</button>
@@ -101,8 +104,13 @@
                 </div>
             </div>
             
-            <div class="instruction">
-                請用手指圈選物體
+            <div id="selectionInstruction" class="selection-instruction">
+                <span class="selection-mode-toggle" role="group" aria-label="選擇圈選方式">
+                    <button type="button" id="btnReticleMode" class="mode-toggle-btn active" data-mode="reticle">框選（單手）</button>
+                    <button type="button" id="btnDrawMode" class="mode-toggle-btn" data-mode="draw">手繪圈選</button>
+                </span>
+                <p id="instructionText" class="instruction-text">將物體置於框內，點擊下方按鈕拍照</p>
+                <button type="button" id="captureReticleBtn" class="capture-reticle-btn">框內拍照</button>
             </div>
 
             <!-- 語音聊天面板 -->

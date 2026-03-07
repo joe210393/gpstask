@@ -46,6 +46,25 @@ canvas#drawingCanvas {
     touch-action: none; /* 防止滑動頁面 */
 }
 
+/* 單手框選：固定取景框 */
+.reticle-overlay {
+    position: absolute;
+    z-index: 2;
+    width: 70vmin;
+    height: 70vmin;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    border: 3px dashed rgba(255, 215, 0, 0.85);
+    border-radius: 50%;
+    pointer-events: none;
+    box-sizing: border-box;
+    transition: left 0.15s ease-out, top 0.15s ease-out;
+}
+.reticle-overlay.hidden {
+    display: none;
+}
+
 .ui-layer {
     position: absolute;
     top: 0;
@@ -291,6 +310,77 @@ canvas#drawingCanvas {
     text-align: center;
     pointer-events: none;
     transition: opacity 0.3s;
+}
+
+/* 單手／手繪切換 + 框內拍照 */
+.selection-instruction {
+    position: absolute;
+    bottom: 88px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(92vw, 320px);
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    transition: opacity 0.3s;
+}
+.selection-mode-toggle {
+    display: flex;
+    border-radius: 20px;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+}
+.mode-toggle-btn {
+    padding: 6px 14px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.85);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+.mode-toggle-btn.active {
+    background: var(--accent-color);
+    color: #1a1a1a;
+    font-weight: 600;
+}
+.mode-toggle-btn:not(.active):hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+.instruction-text {
+    margin: 0;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.95);
+    text-align: center;
+    line-height: 1.35;
+}
+.capture-reticle-btn {
+    padding: 12px 28px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #1a1a1a;
+    background: var(--accent-color);
+    border: none;
+    border-radius: 24px;
+    cursor: pointer;
+    box-shadow: 0 2px 12px rgba(255, 215, 0, 0.4);
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+.capture-reticle-btn:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 16px rgba(255, 215, 0, 0.5);
+}
+.capture-reticle-btn:active {
+    transform: scale(0.98);
+}
+.selection-instruction.hide-for-draw .capture-reticle-btn {
+    display: none;
+}
+.selection-instruction.hide-for-draw .instruction-text {
+    font-size: 15px;
 }
 
 /* 導演控制台樣式 */

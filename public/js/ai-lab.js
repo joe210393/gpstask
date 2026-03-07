@@ -312,6 +312,10 @@ success 或 fail (只能二選一，小寫)
         // ------------------------------------------------
         let isDrawing = false;
         let points = [];
+        let selectionMode = 'reticle';  // 'reticle' = 單手框選, 'draw' = 手繪圈選
+        let reticleCenter = { x: 0, y: 0 };
+        let reticleRadius = 0;
+        let tapStart = null;           // 用於區分「點擊移動框」與「手繪」
         let stream = null;
         let facingMode = 'environment'; // 預設使用後鏡頭
         let currentMode = 'free';       // 預設模式
@@ -329,6 +333,12 @@ success 或 fail (只能二選一，小寫)
         const canvas = document.getElementById('drawingCanvas');
         const ctx = canvas.getContext('2d');
         const instruction = document.querySelector('.instruction');
+        const selectionInstruction = document.getElementById('selectionInstruction');
+        const instructionText = document.getElementById('instructionText');
+        const captureReticleBtn = document.getElementById('captureReticleBtn');
+        const reticleOverlay = document.getElementById('reticleOverlay');
+        const btnReticleMode = document.getElementById('btnReticleMode');
+        const btnDrawMode = document.getElementById('btnDrawMode');
         const resultPanel = document.getElementById('resultPanel');
         const croppedImage = document.getElementById('croppedImage');
         const backBtn = document.getElementById('backBtn');
@@ -388,6 +398,80 @@ success 或 fail (只能二選一，小寫)
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
+            if (reticleRadius === 0) {
+                reticleCenter.x = canvas.width / 2;
+                reticleCenter.y = canvas.height / 2;
+            }
+            reticleRadius = Math.floor(0.35 * Math.min(canvas.width, canvas.height));
+            updateReticlePosition();
+        }
+
+        // 單手框選：更新取景框位置與大小
+        function updateReticlePosition() {
+            if (!reticleOverlay || !reticleRadius) return;
+            const r = reticleRadius;
+            reticleOverlay.style.width = (2 * r) + 'px';
+            reticleOverlay.style.height = (2 * r) + 'px';
+            reticleOverlay.style.left = reticleCenter.x + 'px';
+            reticleOverlay.style.top = reticleCenter.y + 'px';
+            reticleOverlay.style.transform = 'translate(-50%, -50%)';
+        }
+
+        // 取景框的邊界矩形（用於裁切）
+        function getReticleRect() {
+            return {
+                minX: reticleCenter.x - reticleRadius,
+                minY: reticleCenter.y - reticleRadius,
+                maxX: reticleCenter.x + reticleRadius,
+                maxY: reticleCenter.y + reticleRadius
+            };
+        }
+
+        // 依矩形裁切並加入照片（供框選與手繪共用）
+        function processSelectionFromRect(minX, minY, maxX, maxY) {
+            const width = maxX - minX;
+            const height = maxY - minY;
+            if (width < 10 || height < 10) return;
+
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = video.videoWidth;
+            tempCanvas.height = video.videoHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+
+            const screenRatio = canvas.width / canvas.height;
+            const videoRatio = video.videoWidth / video.videoHeight;
+            let renderWidth, renderHeight, offsetX, offsetY;
+            if (screenRatio > videoRatio) {
+                renderWidth = canvas.width;
+                renderHeight = canvas.width / videoRatio;
+                offsetX = 0;
+                offsetY = (canvas.height - renderHeight) / 2;
+            } else {
+                renderHeight = canvas.height;
+                renderWidth = canvas.height * videoRatio;
+                offsetX = (canvas.width - renderWidth) / 2;
+                offsetY = 0;
+            }
+
+            const sourceX = (minX - offsetX) * (video.videoWidth / renderWidth);
+            const sourceY = (minY - offsetY) * (video.videoHeight / renderHeight);
+            const sourceW = width * (video.videoWidth / renderWidth);
+            const sourceH = height * (video.videoHeight / renderHeight);
+
+            const finalCanvas = document.createElement('canvas');
+            finalCanvas.width = width;
+            finalCanvas.height = height;
+            const finalCtx = finalCanvas.getContext('2d');
+            try {
+                finalCtx.drawImage(tempCanvas, sourceX, sourceY, sourceW, sourceH, 0, 0, width, height);
+                const dataUrl = finalCanvas.toDataURL('image/jpeg', 0.95);
+                addPhotoToCollection(dataUrl);
+            } catch (e) {
+                console.error('截圖失敗', e);
+                aiResult.innerHTML = '<span style="color:red">截圖失敗: ' + e.message + '</span>';
+                showResultPanel();
+            }
         }
 
         // 取得當前劇本
@@ -954,8 +1038,11 @@ success 或 fail (只能二選一，小寫)
 
         // 繪圖相關函數
         function getPos(e) {
-            if (e.touches) {
+            if (e.touches && e.touches[0]) {
                 return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            }
+            if (e.changedTouches && e.changedTouches[0]) {
+                return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
             }
             return { x: e.clientX, y: e.clientY };
         }
@@ -963,10 +1050,14 @@ success 或 fail (只能二選一，小寫)
         function startDraw(e) {
             stopVoiceRecognition();
             if (resultPanel.style.display === 'flex') return;
+            const pos = getPos(e);
+            if (selectionMode === 'reticle') {
+                tapStart = { x: pos.x, y: pos.y };
+                return;
+            }
             isDrawing = true;
             points = [];
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const pos = getPos(e);
             points.push(pos);
             ctx.beginPath();
             ctx.moveTo(pos.x, pos.y);
@@ -974,10 +1065,18 @@ success 或 fail (只能二選一，小寫)
             ctx.strokeStyle = '#ffd700';
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
-            instruction.style.opacity = '0';
+            if (selectionInstruction) selectionInstruction.style.opacity = '0';
         }
 
         function moveDraw(e) {
+            if (selectionMode === 'reticle') {
+                if (tapStart) {
+                    const pos = getPos(e);
+                    const dx = pos.x - tapStart.x, dy = pos.y - tapStart.y;
+                    if (Math.sqrt(dx * dx + dy * dy) > 15) tapStart = null;
+                }
+                return;
+            }
             if (!isDrawing) return;
             e.preventDefault();
             const pos = getPos(e);
@@ -986,21 +1085,34 @@ success 或 fail (只能二選一，小寫)
             ctx.stroke();
         }
 
-        function endDraw() {
+        function endDraw(e) {
+            if (selectionMode === 'reticle') {
+                if (tapStart && e) {
+                    const pos = getPos(e);
+                    const dx = pos.x - tapStart.x, dy = pos.y - tapStart.y;
+                    if (Math.sqrt(dx * dx + dy * dy) <= 15) {
+                        const r = reticleRadius;
+                        reticleCenter.x = Math.max(r, Math.min(canvas.width - r, pos.x));
+                        reticleCenter.y = Math.max(r, Math.min(canvas.height - r, pos.y));
+                        updateReticlePosition();
+                    }
+                }
+                tapStart = null;
+                return;
+            }
             if (!isDrawing) return;
             isDrawing = false;
             ctx.closePath();
             if (points.length > 5) {
-                processSelection()
+                processSelection();
             } else {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                instruction.style.opacity = '1';
+                if (selectionInstruction) selectionInstruction.style.opacity = '1';
             }
         }
 
-        // 截圖處理
+        // 截圖處理（手繪圈選：從 points 算邊界後呼叫共用裁切）
         function processSelection() {
-            // 計算邊界
             let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
             points.forEach(p => {
                 if (p.x < minX) minX = p.x;
@@ -1008,61 +1120,12 @@ success 或 fail (只能二選一，小寫)
                 if (p.y < minY) minY = p.y;
                 if (p.y > maxY) maxY = p.y;
             });
-
             const padding = 20;
             minX = Math.max(0, minX - padding);
             minY = Math.max(0, minY - padding);
             maxX = Math.min(canvas.width, maxX + padding);
             maxY = Math.min(canvas.height, maxY + padding);
-            
-            const width = maxX - minX;
-            const height = maxY - minY;
-
-            // 建立暫存 Canvas 處理原始影像
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = video.videoWidth;
-            tempCanvas.height = video.videoHeight;
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-
-            // 計算縮放比例與位移
-            const screenRatio = canvas.width / canvas.height;
-            const videoRatio = video.videoWidth / video.videoHeight;
-            let renderWidth, renderHeight, offsetX, offsetY;
-            
-            if (screenRatio > videoRatio) {
-                renderWidth = canvas.width;
-                renderHeight = canvas.width / videoRatio;
-                offsetX = 0;
-                offsetY = (canvas.height - renderHeight) / 2;
-            } else {
-                renderHeight = canvas.height;
-                renderWidth = canvas.height * videoRatio;
-                offsetX = (canvas.width - renderWidth) / 2;
-                offsetY = 0;
-            }
-
-            // 映射座標
-            const sourceX = (minX - offsetX) * (video.videoWidth / renderWidth);
-            const sourceY = (minY - offsetY) * (video.videoHeight / renderHeight);
-            const sourceW = width * (video.videoWidth / renderWidth);
-            const sourceH = height * (video.videoHeight / renderHeight);
-
-            // 最終截圖
-            const finalCanvas = document.createElement('canvas');
-            finalCanvas.width = width;
-            finalCanvas.height = height;
-            const finalCtx = finalCanvas.getContext('2d');
-
-            try {
-                finalCtx.drawImage(tempCanvas, sourceX, sourceY, sourceW, sourceH, 0, 0, width, height);
-                const dataUrl = finalCanvas.toDataURL('image/jpeg', 0.95); // 高畫質
-                addPhotoToCollection(dataUrl);
-            } catch (e) {
-                console.error('截圖失敗', e);
-                aiResult.innerHTML = '<span style="color:red">截圖失敗: ' + e.message + '</span>';
-                showResultPanel();
-            }
+            processSelectionFromRect(minX, minY, maxX, maxY);
         }
 
         // 添加照片到集合
@@ -1125,6 +1188,7 @@ success 或 fail (只能二選一，小寫)
         function showResultPanel() {
             resultPanel.style.display = 'flex';
             resultPanel.classList.add('active');
+            if (selectionInstruction) selectionInstruction.style.display = 'none';
 
             const count = capturedPhotos.length;
             if (count < MIN_PHOTOS_TO_ANALYZE) {
@@ -1148,7 +1212,8 @@ success 或 fail (只能二選一，小寫)
             resultPanel.classList.remove('active');
             resultPanel.style.display = 'none';
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            instruction.style.opacity = '1';
+            if (selectionInstruction) selectionInstruction.style.opacity = '1';
+            if (selectionInstruction) selectionInstruction.style.display = '';
             aiResult.innerHTML = '';
             points = [];
         }
@@ -1157,8 +1222,9 @@ success 或 fail (只能二選一，小寫)
         // 5. 事件監聽 (Event Listeners)
         // ------------------------------------------------
 
-        // 視窗大小改變
+        // 視窗大小改變與初始尺寸
         window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
 
         // 相機切換
         switchCameraBtn.addEventListener('click', () => {
@@ -1233,7 +1299,7 @@ success 或 fail (只能二選一，小寫)
         canvas.addEventListener('mouseup', endDraw);
         canvas.addEventListener('touchstart', startDraw, { passive: false });
         canvas.addEventListener('touchmove', moveDraw, { passive: false });
-        canvas.addEventListener('touchend', (e) => { e.preventDefault(); endDraw(); }, { passive: false });
+        canvas.addEventListener('touchend', (e) => { e.preventDefault(); endDraw(e); }, { passive: false });
         canvas.addEventListener('touchcancel', endDraw);
 
         // 導演面板開關
@@ -1260,11 +1326,41 @@ success 或 fail (只能二選一，小寫)
                 resultPanel.classList.remove('active');
                 resultPanel.style.display = 'none';
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                instruction.style.opacity = '1';
+                if (selectionInstruction) selectionInstruction.style.opacity = '1';
             });
         }
 
-        // AI 思考動畫系統
+        // 框內拍照（單手模式）
+        if (captureReticleBtn) {
+            captureReticleBtn.addEventListener('click', () => {
+                if (selectionMode !== 'reticle') return;
+                if (!video.videoWidth || !video.videoHeight) {
+                    aiResult.innerHTML = '<span style="color:red">相機尚未就緒</span>';
+                    showResultPanel();
+                    return;
+                }
+                const rect = getReticleRect();
+                processSelectionFromRect(rect.minX, rect.minY, rect.maxX, rect.maxY);
+            });
+        }
+
+        // 切換框選 / 手繪模式
+        function setSelectionMode(mode) {
+            selectionMode = mode;
+            if (btnReticleMode) btnReticleMode.classList.toggle('active', mode === 'reticle');
+            if (btnDrawMode) btnDrawMode.classList.toggle('active', mode === 'draw');
+            if (reticleOverlay) reticleOverlay.classList.toggle('hidden', mode !== 'reticle');
+            if (selectionInstruction) selectionInstruction.classList.toggle('hide-for-draw', mode !== 'reticle');
+            if (instructionText) {
+                instructionText.textContent = mode === 'reticle'
+                    ? '將物體置於框內，點擊下方按鈕拍照'
+                    : '請用手指圈選物體';
+            }
+        }
+        if (btnReticleMode) btnReticleMode.addEventListener('click', () => setSelectionMode('reticle'));
+        if (btnDrawMode) btnDrawMode.addEventListener('click', () => setSelectionMode('draw'));
+        setSelectionMode('reticle');
+
         const AI_THINKING_STAGES = {
             upload: [
                 '📤 正在上傳照片...',
