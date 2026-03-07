@@ -340,7 +340,7 @@ success 或 fail (只能二選一，小寫)
         const btnReticleMode = document.getElementById('btnReticleMode');
         const btnDrawMode = document.getElementById('btnDrawMode');
         const resultPanel = document.getElementById('resultPanel');
-        const croppedImage = document.getElementById('croppedImage');
+        const previewArea = document.getElementById('previewArea');
         const backBtn = document.getElementById('backBtn');
         const switchCameraBtn = document.getElementById('switchCameraBtn');
         const captureBtn = document.getElementById('captureBtn');
@@ -1138,7 +1138,7 @@ success 或 fail (只能二選一，小寫)
 
             // 更新 UI
             updatePhotoStrip();
-            croppedImage.src = dataUrl;
+            updatePreviewArea();
             showResultPanel();
         }
 
@@ -1197,6 +1197,23 @@ success 或 fail (只能二選一，小寫)
             }
         }
 
+        // 預覽區：依 1/2/3 張顯示，不裁切、不空白
+        function updatePreviewArea() {
+            if (!previewArea) return;
+            previewArea.innerHTML = '';
+            previewArea.className = 'preview-area';
+            const count = capturedPhotos.length;
+            if (count === 0) return;
+            previewArea.classList.add('preview-count-' + Math.min(count, 3));
+            for (let i = 0; i < count; i++) {
+                const img = document.createElement('img');
+                img.src = capturedPhotos[i];
+                img.alt = `第 ${i + 1} 張`;
+                img.loading = 'eager';
+                previewArea.appendChild(img);
+            }
+        }
+
         function showResultPanel() {
             resultPanel.style.display = 'flex';
             resultPanel.classList.add('active');
@@ -1214,14 +1231,18 @@ success 或 fail (只能二選一，小寫)
             }
             if(rawOutput) rawOutput.style.display = 'none';
             analyzeBtn.textContent = 'AI 辨識';
-            // 面板顯示後再刷新照片條，確保縮圖在可見時正確繪製
-            requestAnimationFrame(() => updatePhotoStrip());
+            // 面板顯示後再刷新照片條與預覽區，確保縮圖與大圖在可見時正確繪製
+            requestAnimationFrame(() => {
+                updatePhotoStrip();
+                updatePreviewArea();
+            });
         }
 
         function retry() {
             capturedPhotos.length = 0;
             needMorePhotosSession = null;
             updatePhotoStrip();
+            updatePreviewArea();
 
             resultPanel.classList.remove('active');
             resultPanel.style.display = 'none';
@@ -1641,8 +1662,7 @@ success 或 fail (只能二選一，小寫)
                     ? capturedPhotos[capturedPhotos.length - 1]
                     : await combinePhotosToGrid(capturedPhotos);
                 if (!imageToSend) throw new Error('無法處理照片');
-
-                croppedImage.src = imageToSend;
+                updatePreviewArea();
 
                 if (!isFollowUp && capturedPhotos.length > 1) {
                     finalUserPrompt += `\n\n【注意】這是從 ${capturedPhotos.length} 個不同角度拍攝的照片組合，請綜合分析所有角度的特徵。`;

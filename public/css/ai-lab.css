@@ -593,10 +593,8 @@ canvas#drawingCanvas {
         flex-direction: column;
     }
 
-    img#croppedImage {
-        width: 100%;
-        height: auto;
-        max-height: 180px;
+    .preview-area {
+        max-height: 220px;
     }
 
     .analysis-box {
@@ -609,13 +607,54 @@ canvas#drawingCanvas {
     }
 }
 
-img#croppedImage {
-    width: 100px;
-    height: 100px;
-    object-fit: cover;
+/* 預覽區：1 張為單圖、2 張橫排、3 張網格，不裁切、不空白 */
+.preview-area {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    align-items: center;
+    min-height: 100px;
+    max-height: 200px;
+    width: 100%;
+    background: #f5f5f5;
     border-radius: 12px;
-    background: #f0f0f0;
-    border: 2px solid #eee;
+    padding: 8px;
+    box-sizing: border-box;
+}
+
+.preview-area img {
+    display: block;
+    max-height: 180px;
+    width: auto;
+    max-width: 100%;
+    object-fit: contain;
+    border-radius: 8px;
+    background: #fff;
+    border: 1px solid #eee;
+}
+
+/* 1 張：單圖置中 */
+.preview-area.preview-count-1 img {
+    max-width: 100%;
+    max-height: 200px;
+}
+
+/* 2 張：橫排均分 */
+.preview-area.preview-count-2 {
+    flex-direction: row;
+}
+.preview-area.preview-count-2 img {
+    flex: 1;
+    min-width: 0;
+    max-width: 50%;
+}
+
+/* 3 張：三格均分 */
+.preview-area.preview-count-3 img {
+    flex: 1;
+    min-width: 0;
+    max-width: 33.333%;
 }
 
 .analysis-box {
