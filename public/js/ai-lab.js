@@ -239,6 +239,8 @@ document.addEventListener('DOMContentLoaded', () => {
         let mapInstance = null;
         let mapMarker = null;
         let taskMapMarker = null;
+        let nearbyTaskLayer = null;
+        let nearbyVisibleTasks = [];
         let lastLocationText = '';
         let lastLatLng = null;
         let lastTaskDistance = null;
@@ -328,6 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let miniMapWrap = document.querySelector('.mini-map-wrap');
         let miniMapToggle = document.getElementById('miniMapToggle');
         let miniMapRefresh = document.getElementById('miniMapRefresh');
+        let miniMapTaskIndicators = document.getElementById('miniMapTaskIndicators');
         const locationBar = document.getElementById('locationBar');
         const taskBgmBtn = document.getElementById('taskBgmBtn');
         const taskIntroBtn = document.getElementById('taskIntroBtn');
@@ -592,6 +595,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     [lastLatLng.latitude, lastLatLng.longitude],
                     [targetLat, targetLng]
                 );
+                nearbyVisibleTasks.slice(0, 8).forEach((task) => {
+                    bounds.extend([task.lat, task.lng]);
+                });
                 mapInstance.fitBounds(bounds, { padding: [28, 28], maxZoom: 17 });
             } else {
                 mapInstance.setView([targetLat, targetLng], 16);
@@ -767,6 +773,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                             updateTaskMapViewport();
                         }
+                        loadNearbyVisibleTasks();
                         setMode('mission', false);
                         startTaskNavigation();
                     }
@@ -1696,9 +1703,14 @@ document.addEventListener('DOMContentLoaded', () => {
             infoDiv.className = 'location-info';
             infoDiv.textContent = '定位中...';
 
+            const indicatorDiv = document.createElement('div');
+            indicatorDiv.id = 'miniMapTaskIndicators';
+            indicatorDiv.className = 'mini-map-task-indicators';
+
             wrap.appendChild(toggleBtn);
             wrap.appendChild(refreshBtn);
             wrap.appendChild(mapDiv);
+            wrap.appendChild(indicatorDiv);
             wrap.appendChild(infoDiv);
             cameraContainer.appendChild(wrap);
 
@@ -1707,6 +1719,83 @@ document.addEventListener('DOMContentLoaded', () => {
             miniMapWrap = wrap;
             miniMapToggle = toggleBtn;
             miniMapRefresh = refreshBtn;
+            miniMapTaskIndicators = indicatorDiv;
+        }
+
+        function isIndependentVisibleTask(task) {
+            return task
+                && task.lat != null
+                && task.lng != null
+                && !task.quest_chain_id
+                && String(task.id) !== String(currentTaskId);
+        }
+
+        async function loadNearbyVisibleTasks() {
+            try {
+                const res = await fetch('/api/tasks');
+                const data = await res.json();
+                if (!data.success || !Array.isArray(data.tasks)) return;
+                const reference = lastLatLng || (targetLat && targetLng ? { latitude: targetLat, longitude: targetLng } : null);
+                nearbyVisibleTasks = data.tasks
+                    .filter(isIndependentVisibleTask)
+                    .map((task) => ({
+                        ...task,
+                        lat: Number(task.lat),
+                        lng: Number(task.lng)
+                    }))
+                    .filter((task) => Number.isFinite(task.lat) && Number.isFinite(task.lng))
+                    .filter((task) => {
+                        if (!reference) return true;
+                        return haversineDistance(reference.latitude, reference.longitude, task.lat, task.lng) <= 1000;
+                    });
+                renderNearbyTaskMarkers();
+                updateMiniMapTaskIndicators();
+            } catch (err) {
+                console.warn('載入附近任務失敗', err);
+            }
+        }
+
+        function renderNearbyTaskMarkers() {
+            if (!mapInstance || !window.L) return;
+            if (!nearbyTaskLayer) {
+                nearbyTaskLayer = L.layerGroup().addTo(mapInstance);
+            }
+            nearbyTaskLayer.clearLayers();
+            nearbyVisibleTasks.forEach((task) => {
+                const marker = L.circleMarker([task.lat, task.lng], {
+                    radius: 6,
+                    color: '#38bdf8',
+                    weight: 2,
+                    fillColor: '#0ea5e9',
+                    fillOpacity: 0.92
+                }).addTo(nearbyTaskLayer);
+                marker.bindTooltip(task.name || '任務地點', { permanent: false, direction: 'top' });
+            });
+        }
+
+        function updateMiniMapTaskIndicators() {
+            if (!miniMapTaskIndicators) return;
+            miniMapTaskIndicators.innerHTML = '';
+            if (!mapInstance || !nearbyVisibleTasks.length) return;
+            const bounds = mapInstance.getBounds();
+            const center = mapInstance.getCenter();
+            const indicators = nearbyVisibleTasks
+                .filter((task) => !bounds.contains([task.lat, task.lng]))
+                .slice(0, 3);
+
+            indicators.forEach((task) => {
+                const bearing = calculateBearing(center.lat, center.lng, task.lat, task.lng);
+                const distance = lastLatLng
+                    ? haversineDistance(lastLatLng.latitude, lastLatLng.longitude, task.lat, task.lng)
+                    : haversineDistance(center.lat, center.lng, task.lat, task.lng);
+                const item = document.createElement('div');
+                item.className = 'mini-map-task-indicator';
+                item.innerHTML = `
+                    <span class="mini-map-task-arrow" style="transform: rotate(${bearing}deg)">➤</span>
+                    <span>${task.name || '附近任務'} · ${Math.round(distance)}m</span>
+                `;
+                miniMapTaskIndicators.appendChild(item);
+            });
         }
 
         function initMiniMap() {
@@ -1728,13 +1817,13 @@ document.addEventListener('DOMContentLoaded', () => {
             mapInstance = L.map(miniMapEl, {
                 zoomControl: false,
                 attributionControl: false,
-                dragging: false,
+                dragging: true,
                 scrollWheelZoom: false,
-                doubleClickZoom: false,
+                doubleClickZoom: true,
                 boxZoom: false,
                 keyboard: false,
-                tap: false,
-                touchZoom: false
+                tap: true,
+                touchZoom: true
             }).setView([25.0330, 121.5654], 13);
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -1752,6 +1841,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }).addTo(mapInstance);
                 taskMapMarker.bindTooltip('任務地點', { permanent: false, direction: 'top' });
             }
+            mapInstance.on('moveend zoomend', updateMiniMapTaskIndicators);
+            loadNearbyVisibleTasks();
             updateLocationText('定位中...');
             requestLocation();
         }
@@ -1802,6 +1893,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     mapMarker.setLatLng([latitude, longitude]);
                     updateTaskMapViewport();
                 }
+                loadNearbyVisibleTasks();
                 const display = await reverseGeocode(latitude, longitude);
                 updateLocationText(display || `緯度 ${latitude.toFixed(5)}，經度 ${longitude.toFixed(5)}`);
             } catch (err) {

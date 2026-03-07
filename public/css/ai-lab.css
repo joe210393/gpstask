@@ -408,18 +408,53 @@ canvas#drawingCanvas {
 }
 
 .mini-map {
-    width: 96px;
-    height: 96px;
+    width: 220px;
+    height: 220px;
     border-radius: 12px;
     overflow: hidden;
     background: rgba(0, 0, 0, 0.35);
     border: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
     opacity: 0.9;
+    pointer-events: auto;
+}
+
+.mini-map-task-indicators {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-end;
+    pointer-events: none;
+}
+
+.mini-map-task-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 220px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(7, 12, 20, 0.82);
+    color: #fff;
+    font-size: 11px;
+    line-height: 1.3;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(10px);
+}
+
+.mini-map-task-arrow {
+    display: inline-flex;
+    width: 18px;
+    height: 18px;
+    align-items: center;
+    justify-content: center;
+    color: #f97316;
+    font-size: 16px;
+    transform-origin: center;
 }
 
 .location-info {
-    max-width: 140px;
+    max-width: 220px;
     font-size: 10px;
     color: #fff;
     background: rgba(0, 0, 0, 0.45);
@@ -430,6 +465,7 @@ canvas#drawingCanvas {
 }
 
 .mini-map-wrap.collapsed .mini-map,
+.mini-map-wrap.collapsed .mini-map-task-indicators,
 .mini-map-wrap.collapsed .location-info {
     display: none;
 }
@@ -608,6 +644,17 @@ canvas#drawingCanvas {
     .mini-map-wrap {
         right: 8px;
         bottom: 140px;
+    }
+
+    .mini-map {
+        width: 180px;
+        height: 180px;
+    }
+
+    .mini-map-task-indicator {
+        max-width: 180px;
+        font-size: 10px;
+        padding: 5px 8px;
     }
 }
 
