@@ -387,6 +387,17 @@ success 或 fail (只能二選一，小寫)
         let miniMapToggle = document.getElementById('miniMapToggle');
         let miniMapRefresh = document.getElementById('miniMapRefresh');
         const locationBar = document.getElementById('locationBar');
+        const taskBgmBtn = document.getElementById('taskBgmBtn');
+        const taskIntroBtn = document.getElementById('taskIntroBtn');
+        const taskIntroPanel = document.getElementById('taskIntroPanel');
+        const taskIntroTitle = document.getElementById('taskIntroTitle');
+        const taskIntroCover = document.getElementById('taskIntroCover');
+        const taskIntroDescription = document.getElementById('taskIntroDescription');
+        const taskIntroClose = document.getElementById('taskIntroClose');
+        const taskBgm = document.getElementById('taskBgm');
+
+        // 任務情境（來自 AR-VIEW：由 URL taskId 載入，景點介紹＋背景音樂）
+        let currentTask = null;
 
         if (!video || !canvas) throw new Error('關鍵 DOM 元素遺失');
 
@@ -425,6 +436,53 @@ success 或 fail (只能二選一，小寫)
                 maxX: reticleCenter.x + reticleRadius,
                 maxY: reticleCenter.y + reticleRadius
             };
+        }
+
+        // ---------- 任務情境（AR-VIEW 整合：任務封面＋景點說明＋背景音樂）----------
+        function loadTaskBGM(task) {
+            if (!taskBgm) return;
+            const musicUrl = task?.bgm_url || task?.audio_url || null;
+            if (musicUrl) {
+                taskBgm.src = musicUrl;
+                taskBgm.load();
+                taskBgm.volume = 0.5;
+                if (taskBgmBtn) {
+                    taskBgmBtn.classList.remove('hidden');
+                    taskBgmBtn.title = '任務背景音樂';
+                }
+            } else {
+                taskBgm.src = '';
+                if (taskBgmBtn) taskBgmBtn.classList.add('hidden');
+            }
+        }
+
+        function showTaskContext(task) {
+            currentTask = task;
+            if (taskIntroTitle) taskIntroTitle.textContent = task.name || '任務';
+            if (taskIntroCover) {
+                taskIntroCover.src = task.photoUrl || task.photo_url || '';
+                taskIntroCover.style.display = task.photoUrl || task.photo_url ? 'block' : 'none';
+            }
+            if (taskIntroDescription) {
+                taskIntroDescription.textContent = task.description || '';
+            }
+            if (taskIntroBtn) taskIntroBtn.classList.remove('hidden');
+        }
+
+        function loadTaskFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            const taskId = params.get('taskId');
+            if (!taskId) return;
+            fetch(`/api/tasks/${taskId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.task) {
+                        const task = data.task;
+                        loadTaskBGM(task);
+                        showTaskContext(task);
+                    }
+                })
+                .catch(err => console.error('載入任務失敗:', err));
         }
 
         // 依矩形裁切並加入照片（供框選與手繪共用）
@@ -1323,9 +1381,11 @@ success 或 fail (只能二選一，小寫)
             }
         });
 
-        // 返回
+        // 返回（有 taskId 時回任務詳情，與 AR-VIEW 一致）
         backBtn.addEventListener('click', () => {
-            window.location.href = '/'; 
+            const taskId = new URLSearchParams(window.location.search).get('taskId');
+            if (taskId) window.location.href = `/task-detail.html?id=${taskId}`;
+            else window.location.href = '/';
         });
 
         // 繪圖事件
@@ -1398,6 +1458,29 @@ success 或 fail (只能二選一，小寫)
         if (btnReticleMode) btnReticleMode.addEventListener('click', () => setSelectionMode('reticle'));
         if (btnDrawMode) btnDrawMode.addEventListener('click', () => setSelectionMode('draw'));
         setSelectionMode('reticle');
+        loadTaskFromUrl();
+
+        if (taskBgmBtn && taskBgm) {
+            taskBgmBtn.addEventListener('click', () => {
+                if (taskBgm.paused) {
+                    taskBgm.play().catch(() => {});
+                    taskBgmBtn.textContent = '🔊';
+                } else {
+                    taskBgm.pause();
+                    taskBgmBtn.textContent = '🎵';
+                }
+            });
+        }
+        if (taskIntroBtn && taskIntroPanel) {
+            taskIntroBtn.addEventListener('click', () => {
+                taskIntroPanel.classList.remove('hidden');
+            });
+        }
+        if (taskIntroClose && taskIntroPanel) {
+            taskIntroClose.addEventListener('click', () => {
+                taskIntroPanel.classList.add('hidden');
+            });
+        }
 
         const AI_THINKING_STAGES = {
             upload: [

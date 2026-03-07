@@ -137,6 +137,62 @@ canvas#drawingCanvas {
     display: none;
 }
 
+/* 任務景點介紹面板（AR-VIEW 風格：任務封面＋說明） */
+.task-intro-panel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 70vh;
+    background: rgba(20, 20, 20, 0.97);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.5);
+    z-index: 5000;
+    display: flex;
+    flex-direction: column;
+    pointer-events: auto;
+    animation: slideUpPanel 0.3s ease-out;
+}
+.task-intro-panel.hidden {
+    display: none !important;
+}
+@keyframes slideUpPanel {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+.task-intro-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.task-intro-title {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #fff;
+}
+.task-intro-body {
+    padding: 16px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.task-intro-cover {
+    width: 100%;
+    max-height: 240px;
+    object-fit: contain;
+    border-radius: 12px;
+    background: #111;
+    margin-bottom: 14px;
+}
+.task-intro-description {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.9);
+    white-space: pre-wrap;
+}
+
 .location-bar {
     position: static;
     max-width: 100%;
