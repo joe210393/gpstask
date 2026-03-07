@@ -1142,9 +1142,11 @@ success 或 fail (只能二選一，小寫)
             showResultPanel();
         }
 
-        // 更新照片條
+        // 更新照片條（每次從 DOM 取得 slot，確保顯示在結果面板內的縮圖正確）
         function updatePhotoStrip() {
-            photoSlots.forEach((slot, index) => {
+            const strip = document.getElementById('photoStrip');
+            const slots = strip ? strip.querySelectorAll('.photo-slot') : [];
+            slots.forEach((slot, index) => {
                 slot.classList.remove('filled', 'active');
                 const existingImg = slot.querySelector('img');
                 if (existingImg) existingImg.remove();
@@ -1153,22 +1155,32 @@ success 或 fail (只能二選一，小寫)
                     slot.classList.add('filled');
                     const img = document.createElement('img');
                     img.src = capturedPhotos[index];
+                    img.alt = `第 ${index + 1} 張`;
+                    img.setAttribute('loading', 'eager');
                     slot.appendChild(img);
                 }
             });
 
             const nextIndex = Math.min(capturedPhotos.length, MAX_PHOTOS - 1);
-            if (capturedPhotos.length < MAX_PHOTOS) {
-                photoSlots[nextIndex]?.classList.add('active');
+            if (capturedPhotos.length < MAX_PHOTOS && slots[nextIndex]) {
+                slots[nextIndex].classList.add('active');
             }
 
             const count = capturedPhotos.length;
             if (count >= MIN_PHOTOS_TO_ANALYZE) {
                 analyzeBtn.disabled = false;
                 if (photoHint) {
-                    photoHint.textContent = count >= MAX_PHOTOS
-                        ? `✓ 已拍攝 ${MAX_PHOTOS} 張，可開始辨識`
-                        : `已拍 ${count} 張，可辨識或繼續補拍 (${count}/${MAX_PHOTOS})`;
+                    if (count >= MAX_PHOTOS) {
+                        photoHint.innerHTML = `✓ 已拍攝 ${MAX_PHOTOS} 張，可開始辨識`;
+                    } else if (count === 1) {
+                        photoHint.innerHTML = [
+                            '若此物品並非「生物」請直接辨識。',
+                            '若是生物類（例如植物）建議補上第二、三張：',
+                            '請拍攝特寫花朵、果實、葉片等位置，越多細節推測出的結論越準確。'
+                        ].join('<br>');
+                    } else {
+                        photoHint.innerHTML = `已拍 ${count} 張，可辨識或再補 1 張（建議：花朵／果實／葉片特寫）。`;
+                    }
                     photoHint.classList.toggle('complete', count >= MAX_PHOTOS);
                 }
                 if (addPhotoBtn) {
@@ -1202,6 +1214,8 @@ success 或 fail (只能二選一，小寫)
             }
             if(rawOutput) rawOutput.style.display = 'none';
             analyzeBtn.textContent = 'AI 辨識';
+            // 面板顯示後再刷新照片條，確保縮圖在可見時正確繪製
+            requestAnimationFrame(() => updatePhotoStrip());
         }
 
         function retry() {
