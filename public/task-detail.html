@@ -489,6 +489,22 @@
             };
             container.appendChild(arBtn);
 
+            const aiLabBtn = document.createElement('button');
+            aiLabBtn.className = 'btn';
+            aiLabBtn.style.width = '100%';
+            aiLabBtn.style.marginBottom = '15px';
+            aiLabBtn.style.background = '#0ea5e9';
+            aiLabBtn.style.color = 'white';
+            aiLabBtn.style.fontWeight = 'bold';
+            aiLabBtn.style.border = 'none';
+            aiLabBtn.style.borderRadius = '6px';
+            aiLabBtn.style.padding = '10px';
+            aiLabBtn.innerHTML = '🤖 AI 視覺探索（景點介紹＋辨識）';
+            aiLabBtn.onclick = () => {
+              window.location.href = `/ai-lab.html?taskId=${t.id}&lat=${t.lat}&lng=${t.lng}`;
+            };
+            container.appendChild(aiLabBtn);
+
             const title = document.createElement('div');
             title.style.fontWeight = 'bold';
             title.style.marginBottom = '10px';
