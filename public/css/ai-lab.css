@@ -113,15 +113,15 @@ canvas#drawingCanvas {
 
 .task-target-obj {
     position: absolute;
-    top: 50%;
+    top: 54%;
     left: 50%;
     width: 260px;
-    margin-left: -130px;
-    margin-top: -110px;
     z-index: 17;
     text-align: center;
     cursor: pointer;
     pointer-events: auto;
+    transform: translate(-50%, -50%);
+    transition: left 0.18s ease-out, top 0.18s ease-out, transform 0.18s ease-out, opacity 0.18s ease-out;
 }
 
 .task-target-obj img {
@@ -453,8 +453,6 @@ canvas#drawingCanvas {
 
     .task-target-obj {
         width: 220px;
-        margin-left: -110px;
-        margin-top: -95px;
     }
 
     .task-target-obj img {

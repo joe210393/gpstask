@@ -470,20 +470,47 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function updateTaskNavigationUI(distanceMeters, bearing) {
+            const diff = ((bearing - deviceHeading + 540) % 360) - 180;
             if (taskStatusBox) taskStatusBox.classList.remove('hidden');
             if (taskStatusText) taskStatusText.textContent = `距離目標: ${Math.max(0, Math.round(distanceMeters))}m`;
             if (taskDebugText) {
-                const diff = ((bearing - deviceHeading + 540) % 360) - 180;
                 taskDebugText.textContent = `方位:${Math.round(bearing)}° 手機:${Math.round(deviceHeading)}° 差:${Math.round(diff)}°`;
             }
+
+            const revealDistance = Math.max(8, currentTask?.radius || 30);
+            const interactionDistance = Math.max(6, (currentTask?.radius || 30) / 2);
+            const fieldOfViewDeg = 90; // 進入大約正前方 90 度範圍才看得到物件
+            const halfFov = fieldOfViewDeg / 2;
+            const isInView = Math.abs(diff) <= halfFov;
+            const canRevealObject = distanceMeters <= revealDistance;
+            const shouldShowObject = canRevealObject && isInView;
+
             if (taskGuideArrow) {
-                const relative = bearing - deviceHeading;
-                taskGuideArrow.style.transform = `rotate(${relative}deg)`;
-                taskGuideArrow.classList.toggle('hidden', distanceMeters <= Math.max(6, (currentTask?.radius || 30) / 2));
+                taskGuideArrow.style.transform = `rotate(${diff}deg)`;
+                taskGuideArrow.classList.toggle('hidden', shouldShowObject && distanceMeters <= revealDistance);
             }
             if (taskTargetObj) {
-                const revealDistance = Math.max(8, currentTask?.radius || 30);
-                taskTargetObj.classList.toggle('hidden', distanceMeters > revealDistance);
+                taskTargetObj.classList.toggle('hidden', !shouldShowObject);
+                if (shouldShowObject) {
+                    const normalized = Math.max(-1, Math.min(1, diff / halfFov));
+                    const leftPercent = 50 + normalized * 34; // 左右搜尋感
+                    const topPercent = distanceMeters <= interactionDistance ? 52 : 56;
+                    const scale = distanceMeters <= interactionDistance ? 1.02 : 0.9;
+                    taskTargetObj.style.left = `${leftPercent}%`;
+                    taskTargetObj.style.top = `${topPercent}%`;
+                    taskTargetObj.style.transform = `translate(-50%, -50%) scale(${scale})`;
+                    taskTargetObj.style.opacity = '1';
+                }
+            }
+
+            if (taskStatusText) {
+                if (shouldShowObject) {
+                    taskStatusText.textContent = distanceMeters <= interactionDistance
+                        ? `已找到目標：${Math.round(distanceMeters)}m`
+                        : `目標進入視野：${Math.round(distanceMeters)}m`;
+                } else {
+                    taskStatusText.textContent = `距離目標: ${Math.max(0, Math.round(distanceMeters))}m`;
+                }
             }
         }
 
