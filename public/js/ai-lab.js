@@ -589,19 +589,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function updateTaskMapViewport() {
-            if (!mapInstance || !targetLat || !targetLng) return;
-            if (lastLatLng) {
-                const bounds = L.latLngBounds(
-                    [lastLatLng.latitude, lastLatLng.longitude],
-                    [targetLat, targetLng]
-                );
-                nearbyVisibleTasks.slice(0, 8).forEach((task) => {
-                    bounds.extend([task.lat, task.lng]);
-                });
-                mapInstance.fitBounds(bounds, { padding: [28, 28], maxZoom: 17 });
-            } else {
-                mapInstance.setView([targetLat, targetLng], 16);
+            if (!mapInstance) return;
+            const points = [];
+            if (lastLatLng && Number.isFinite(lastLatLng.latitude) && Number.isFinite(lastLatLng.longitude)) {
+                points.push([lastLatLng.latitude, lastLatLng.longitude]);
             }
+            if (targetLat && targetLng) {
+                points.push([targetLat, targetLng]);
+            }
+            nearbyVisibleTasks.slice(0, 8).forEach((task) => {
+                if (Number.isFinite(task.lat) && Number.isFinite(task.lng)) {
+                    points.push([task.lat, task.lng]);
+                }
+            });
+            if (!points.length) return;
+            const bounds = L.latLngBounds(points[0], points[0]);
+            for (let i = 1; i < points.length; i += 1) {
+                bounds.extend(points[i]);
+            }
+            mapInstance.fitBounds(bounds, { padding: [28, 28], maxZoom: points.length === 1 ? 17 : 16 });
         }
 
         function refreshTaskNavigationFromCache() {
@@ -743,7 +749,10 @@ document.addEventListener('DOMContentLoaded', () => {
         function loadTaskFromUrl() {
             const params = new URLSearchParams(window.location.search);
             const taskId = params.get('taskId');
-            if (!taskId) return;
+            if (!taskId) {
+                loadDefaultVisibleTaskForUser();
+                return;
+            }
             currentTaskId = taskId;
             targetLat = parseFloat(params.get('lat'));
             targetLng = parseFloat(params.get('lng'));
@@ -751,31 +760,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 .then(res => res.json())
                 .then(data => {
                     if (data.success && data.task) {
-                        const task = data.task;
-                        if (task.lat && task.lng) {
-                            targetLat = Number(task.lat);
-                            targetLng = Number(task.lng);
-                        }
-                        loadTaskBGM(task);
-                        showTaskContext(task);
-                        if (mapInstance && targetLat && targetLng) {
-                            if (!taskMapMarker) {
-                                taskMapMarker = L.circleMarker([targetLat, targetLng], {
-                                    radius: 8,
-                                    color: '#ef4444',
-                                    weight: 3,
-                                    fillColor: '#f97316',
-                                    fillOpacity: 0.95
-                                }).addTo(mapInstance);
-                                taskMapMarker.bindTooltip('任務地點', { permanent: false, direction: 'top' });
-                            } else {
-                                taskMapMarker.setLatLng([targetLat, targetLng]);
-                            }
-                            updateTaskMapViewport();
-                        }
-                        loadNearbyVisibleTasks();
-                        setMode('mission', false);
-                        startTaskNavigation();
+                        applyTaskSelection(data.task, { updateUrl: false });
                     }
                 })
                 .catch(err => console.error('載入任務失敗:', err));
@@ -1730,6 +1715,54 @@ document.addEventListener('DOMContentLoaded', () => {
                 && String(task.id) !== String(currentTaskId);
         }
 
+        function normalizeVisibleTasks(tasks, progressMap) {
+            return [
+                ...tasks
+                    .filter(isIndependentVisibleTask)
+                    .map((task) => ({
+                        ...task,
+                        _visibleTaskType: 'single',
+                        lat: Number(task.lat),
+                        lng: Number(task.lng)
+                    })),
+                ...getVisibleQuestTasks(tasks, progressMap)
+            ].filter((task) => Number.isFinite(task.lat) && Number.isFinite(task.lng));
+        }
+
+        async function fetchInProgressTasks() {
+            try {
+                const res = await fetch('/api/user-tasks', { credentials: 'include' });
+                if (!res.ok) return [];
+                const data = await res.json();
+                return data.success && Array.isArray(data.tasks) ? data.tasks : [];
+            } catch (err) {
+                console.warn('取得進行中任務失敗', err);
+                return [];
+            }
+        }
+
+        async function getQuickCurrentPosition() {
+            if (!navigator.geolocation) return null;
+            try {
+                const pos = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 2500, enableHighAccuracy: false });
+                });
+                return { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+            } catch (err) {
+                return null;
+            }
+        }
+
+        function pickNearestTask(tasks, reference) {
+            if (!reference || !tasks.length) return tasks[0] || null;
+            return tasks
+                .map((task) => ({
+                    task,
+                    distance: haversineDistance(reference.latitude, reference.longitude, task.lat, task.lng)
+                }))
+                .sort((a, b) => a.distance - b.distance)[0]?.task || null;
+        }
+
         async function fetchQuestProgressMap() {
             try {
                 const res = await fetch('/api/user/quest-progress', { credentials: 'include' });
@@ -1791,19 +1824,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await taskRes.json();
                 if (!data.success || !Array.isArray(data.tasks)) return;
                 const reference = lastLatLng || (targetLat && targetLng ? { latitude: targetLat, longitude: targetLng } : null);
-                const visibleTasks = [
-                    ...data.tasks
-                    .filter(isIndependentVisibleTask)
-                    .map((task) => ({
-                        ...task,
-                        _visibleTaskType: 'single',
-                        lat: Number(task.lat),
-                        lng: Number(task.lng)
-                    })),
-                    ...getVisibleQuestTasks(data.tasks, questProgress)
-                ];
-                nearbyVisibleTasks = visibleTasks
-                    .filter((task) => Number.isFinite(task.lat) && Number.isFinite(task.lng))
+                nearbyVisibleTasks = normalizeVisibleTasks(data.tasks, questProgress)
                     .filter((task) => {
                         if (!reference) return true;
                         return haversineDistance(reference.latitude, reference.longitude, task.lat, task.lng) <= 1000;
@@ -1833,7 +1854,81 @@ document.addEventListener('DOMContentLoaded', () => {
                     `${task._visibleTaskType === 'quest' ? '劇情任務' : '單題任務'}：${task.name || '任務地點'}`,
                     { permanent: false, direction: 'top' }
                 );
+                marker.on('click', () => {
+                    selectTaskForAiLab(task);
+                });
             });
+        }
+
+        function applyTaskSelection(task, options = {}) {
+            if (!task) return;
+            currentTaskId = task.id;
+            targetLat = Number(task.lat);
+            targetLng = Number(task.lng);
+            loadTaskBGM(task);
+            showTaskContext(task);
+            if (mapInstance && targetLat && targetLng) {
+                if (!taskMapMarker) {
+                    taskMapMarker = L.circleMarker([targetLat, targetLng], {
+                        radius: 8,
+                        color: '#ef4444',
+                        weight: 3,
+                        fillColor: '#f97316',
+                        fillOpacity: 0.95
+                    }).addTo(mapInstance);
+                    taskMapMarker.bindTooltip('任務地點', { permanent: false, direction: 'top' });
+                } else {
+                    taskMapMarker.setLatLng([targetLat, targetLng]);
+                }
+                updateTaskMapViewport();
+            }
+            if (options.updateUrl !== false) {
+                const newUrl = new URL(window.location.href);
+                newUrl.searchParams.set('taskId', task.id);
+                newUrl.searchParams.set('lat', targetLat);
+                newUrl.searchParams.set('lng', targetLng);
+                window.history.replaceState({}, '', newUrl);
+            }
+            loadNearbyVisibleTasks();
+            setMode('mission', false);
+            startTaskNavigation();
+        }
+
+        async function selectTaskForAiLab(taskLike) {
+            try {
+                const res = await fetch(`/api/tasks/${taskLike.id}`);
+                const data = await res.json();
+                if (!data.success || !data.task) return;
+                applyTaskSelection(data.task);
+            } catch (err) {
+                console.error('切換 AI-LAB 任務失敗', err);
+            }
+        }
+
+        async function loadDefaultVisibleTaskForUser() {
+            try {
+                if (!getLoginUser()) return;
+                const [taskRes, questProgress, inProgressTasks, quickPos] = await Promise.all([
+                    fetch('/api/tasks'),
+                    fetchQuestProgressMap(),
+                    fetchInProgressTasks(),
+                    getQuickCurrentPosition()
+                ]);
+                const data = await taskRes.json();
+                if (!data.success || !Array.isArray(data.tasks)) return;
+                const visibleTasks = normalizeVisibleTasks(data.tasks, questProgress);
+                if (!visibleTasks.length) return;
+                const activeIds = new Set(inProgressTasks.map((task) => String(task.id)));
+                const activeVisibleTasks = visibleTasks.filter((task) => activeIds.has(String(task.id)));
+                const selectedTask = activeVisibleTasks.length
+                    ? pickNearestTask(activeVisibleTasks, quickPos || lastLatLng)
+                    : pickNearestTask(visibleTasks, quickPos || lastLatLng);
+                if (selectedTask) {
+                    applyTaskSelection(selectedTask);
+                }
+            } catch (err) {
+                console.error('載入預設任務失敗', err);
+            }
         }
 
         function updateMiniMapTaskIndicators() {
