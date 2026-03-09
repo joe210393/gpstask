@@ -706,8 +706,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 lastLatLng = { latitude, longitude };
                 lastGpsUpdateAt = Date.now();
                 renderTaskMetrics();
-                if (mapInstance && mapMarker) {
-                    mapMarker.setLatLng([latitude, longitude]);
+                if (mapInstance) {
+                    if (!mapMarker) {
+                        mapMarker = L.marker([latitude, longitude]).addTo(mapInstance);
+                    } else {
+                        mapMarker.setLatLng([latitude, longitude]);
+                    }
                     updateTaskMapViewport();
                 }
                 const distanceMeters = haversineDistance(latitude, longitude, targetLat, targetLng);
@@ -732,8 +736,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     lastLatLng = { latitude, longitude };
                     lastGpsUpdateAt = Date.now();
                     renderTaskMetrics();
-                    if (mapInstance && mapMarker) {
-                        mapMarker.setLatLng([latitude, longitude]);
+                    if (mapInstance) {
+                        if (!mapMarker) {
+                            mapMarker = L.marker([latitude, longitude]).addTo(mapInstance);
+                        } else {
+                            mapMarker.setLatLng([latitude, longitude]);
+                        }
                         updateTaskMapViewport();
                     }
                     const distanceMeters = haversineDistance(latitude, longitude, targetLat, targetLng);
@@ -1972,6 +1980,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            // 先用較合理的預設中心：玩家位置 > 任務位置 > 台北市
+            let initialCenter = [25.0330, 121.5654];
+            let initialZoom = 13;
+            if (lastLatLng && Number.isFinite(lastLatLng.latitude) && Number.isFinite(lastLatLng.longitude)) {
+                initialCenter = [lastLatLng.latitude, lastLatLng.longitude];
+                initialZoom = 15;
+            } else if (targetLat && targetLng) {
+                initialCenter = [targetLat, targetLng];
+                initialZoom = 15;
+            }
+
             mapInstance = L.map(miniMapEl, {
                 zoomControl: false,
                 attributionControl: false,
@@ -1982,13 +2001,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 keyboard: false,
                 tap: true,
                 touchZoom: true
-            }).setView([25.0330, 121.5654], 13);
+            }).setView(initialCenter, initialZoom);
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 18
             }).addTo(mapInstance);
 
-            mapMarker = L.marker([25.0330, 121.5654]).addTo(mapInstance);
+            // 玩家定位 marker 僅在取得真實 GPS 後才建立，避免誤導顯示在台北市
+            if (lastLatLng && Number.isFinite(lastLatLng.latitude) && Number.isFinite(lastLatLng.longitude)) {
+                mapMarker = L.marker([lastLatLng.latitude, lastLatLng.longitude]).addTo(mapInstance);
+            } else {
+                mapMarker = null;
+            }
             if (targetLat && targetLng) {
                 taskMapMarker = L.circleMarker([targetLat, targetLng], {
                     radius: 8,
@@ -2047,8 +2071,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 const { latitude, longitude } = pos.coords;
                 lastLatLng = { latitude, longitude };
-                if (mapInstance && mapMarker) {
-                    mapMarker.setLatLng([latitude, longitude]);
+                if (mapInstance) {
+                    if (!mapMarker) {
+                        mapMarker = L.marker([latitude, longitude]).addTo(mapInstance);
+                    } else {
+                        mapMarker.setLatLng([latitude, longitude]);
+                    }
                     updateTaskMapViewport();
                 }
                 loadNearbyVisibleTasks();
