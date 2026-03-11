@@ -286,28 +286,15 @@
 
             <div id="queryTransit" class="query-transit hidden" aria-live="polite">
                 <div class="query-transit-card">
-                    <div class="query-transit-visual" aria-hidden="true">
-                        <svg class="query-transit-svg" viewBox="0 0 160 92">
-                            <g class="qt-send-bubble">
-                                <rect x="14" y="22" width="72" height="42" rx="18" fill="rgba(255,255,255,0.14)" stroke="rgba(255,255,255,0.92)" stroke-width="2"></rect>
-                                <path d="M34 64 L28 78 L48 67" fill="rgba(255,255,255,0.14)" stroke="rgba(255,255,255,0.92)" stroke-width="2" stroke-linejoin="round"></path>
-                                <line x1="28" y1="36" x2="70" y2="36" stroke="rgba(255,255,255,0.92)" stroke-width="3" stroke-linecap="round"></line>
-                                <line x1="28" y1="48" x2="60" y2="48" stroke="rgba(255,255,255,0.72)" stroke-width="3" stroke-linecap="round"></line>
-                            </g>
-                            <g class="qt-plane-group">
-                                <path class="qt-plane-shape" d="M12 44 L108 12 L66 46 L108 80 Z" fill="#ffffff"></path>
-                                <path d="M12 44 L108 12 L66 46" fill="none" stroke="#dbeafe" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>
-                                <path d="M66 46 L108 80" fill="none" stroke="#dbeafe" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>
-                            </g>
-                            <g class="qt-return-bubble">
-                                <rect x="76" y="18" width="70" height="44" rx="18" fill="rgba(255,255,255,0.14)" stroke="rgba(255,255,255,0.92)" stroke-width="2"></rect>
-                                <path d="M130 62 L138 76 L118 66" fill="rgba(255,255,255,0.14)" stroke="rgba(255,255,255,0.92)" stroke-width="2" stroke-linejoin="round"></path>
-                                <line x1="92" y1="34" x2="130" y2="34" stroke="rgba(255,255,255,0.92)" stroke-width="3" stroke-linecap="round"></line>
-                                <line x1="92" y1="46" x2="122" y2="46" stroke="rgba(255,255,255,0.72)" stroke-width="3" stroke-linecap="round"></line>
-                            </g>
+                    <div class="qp-container">
+                        <div class="qp-paper" id="qpPaper">
+                            <div class="qp-paper-text" id="queryTransitLabel">問題已摺成紙飛機送出...</div>
+                        </div>
+                        <svg class="qp-plane" id="qpPlane" viewBox="0 0 24 24" fill="none" stroke="#e5f3ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M22 2L11 13"></path>
+                            <path d="M22 2l-7 20-4-9-9-4 20-7z"></path>
                         </svg>
                     </div>
-                    <div class="query-transit-label" id="queryTransitLabel">問題已摺成紙飛機送出...</div>
                 </div>
             </div>
 

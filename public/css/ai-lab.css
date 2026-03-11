@@ -1103,68 +1103,75 @@ canvas#drawingCanvas {
     overflow: hidden;
     display: flex;
     align-items: center;
-    gap: 12px;
+    justify-content: center;
 }
 
-.query-transit-visual {
-    width: 76px;
-    height: 42px;
-    flex: 0 0 76px;
+.qp-container {
+    position: relative;
+    width: 200px;
+    height: 120px;
 }
 
-.query-transit-svg {
-    width: 100%;
-    height: 100%;
-    overflow: visible;
-}
-
-.qt-send-bubble,
-.qt-plane-group,
-.qt-return-bubble {
-    transform-box: fill-box;
+.qp-paper {
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    background: rgba(15, 23, 42, 0.96);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    padding: 12px 14px;
+    box-sizing: border-box;
     transform-origin: center;
+    transition: transform 0.6s ease-in-out, opacity 0.6s ease-in-out;
 }
 
-.qt-plane-group {
-    opacity: 0;
-}
-
-.qt-return-bubble {
-    opacity: 0;
-}
-
-.query-transit.sending .qt-send-bubble {
-    animation: sendBubbleFold 0.95s ease-in-out infinite;
-}
-
-.query-transit.sending .qt-plane-group {
-    animation: sendPlaneLaunch 0.95s ease-in-out infinite;
-}
-
-.query-transit.returning .qt-plane-group {
-    animation: returnPlaneFly 0.85s ease-in-out forwards;
-}
-
-.query-transit.returning .qt-return-bubble {
-    animation: returnBubbleOpen 0.85s ease-in-out forwards;
-}
-
-.query-transit-label {
+.qp-paper-text {
     font-size: 13px;
-    font-weight: 600;
-    line-height: 1.35;
+    line-height: 1.5;
+    color: rgba(248, 250, 252, 0.96);
 }
 
-@keyframes sendBubbleFold {
-    0% { opacity: 1; transform: translateX(0) scale(1); }
-    45% { opacity: 1; transform: translateX(8px) scale(0.82) rotate(6deg); }
-    100% { opacity: 0; transform: translateX(24px) scale(0.35) rotate(16deg); }
+.qp-plane {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 64px;
+    height: 64px;
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0;
 }
 
-@keyframes sendPlaneLaunch {
-    0% { opacity: 0; transform: translate(-14px, 10px) rotate(-10deg) scale(0.65); }
-    25% { opacity: 1; transform: translate(8px, 0) rotate(0deg) scale(1); }
-    100% { opacity: 0; transform: translate(62px, -20px) rotate(14deg) scale(0.82); }
+/* 折紙階段 */
+.query-transit.sending .qp-paper {
+    transform: scale(0.15) rotate(18deg);
+    opacity: 0;
+}
+
+/* 飛出 */
+.query-transit.sending .qp-plane {
+    animation: qpFlyOut 1.5s ease-in forwards;
+}
+
+/* 回程：先讓紙飛機從遠方飛回來 */
+.query-transit.returning .qp-plane {
+    animation: qpFlyIn 1.5s ease-out forwards;
+}
+
+/* 飛回來後展開紙張 */
+.query-transit.returning .qp-paper {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+}
+
+@keyframes qpFlyOut {
+    0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    50% { transform: translate(40%, -150%) scale(0.7); opacity: 1; }
+    100% { transform: translate(220%, -320%) scale(0.1); opacity: 0; }
+}
+
+@keyframes qpFlyIn {
+    0% { transform: translate(-220%, -320%) scale(0.1) rotate(-35deg); opacity: 0; }
+    50% { transform: translate(-50%, -140%) scale(0.7) rotate(-12deg); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
 }
 
 @keyframes returnPlaneFly {
