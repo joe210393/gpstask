@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">稻米生長階段觀察圖</title>
+  <desc id="desc">幼苗期、生長期、抽穗期與成熟期的比較教學圖</desc>
+  <rect width="1200" height="720" fill="#fffdf1"/>
+  <rect width="1200" height="116" fill="#244f35"/>
+  <text x="60" y="58" fill="#fffbe5" font-size="39" font-family="sans-serif" font-weight="700">稻穗成熟判斷員</text>
+  <text x="60" y="91" fill="#dceab9" font-size="18" font-family="sans-serif">觀察顏色、穀粒飽滿度與稻穗姿態，找出現場稻子的階段</text>
+  <g transform="translate(40 150)">
+    <rect width="260" height="490" rx="22" fill="#eef6dd" stroke="#c3d894" stroke-width="3"/>
+    <rect y="396" width="260" height="94" rx="0" fill="#896a3c"/>
+    <path d="M132 398V289M132 331L84 277M132 354L182 295" fill="none" stroke="#6eae44" stroke-width="13" stroke-linecap="round"/>
+    <path d="M84 277q34 1 48 42M182 295q-37 2-50 40" fill="#76c94b"/>
+    <text x="130" y="54" text-anchor="middle" fill="#244f35" font-size="28" font-family="sans-serif" font-weight="700">幼苗期</text>
+    <text x="130" y="454" text-anchor="middle" fill="#fff7dd" font-size="18" font-family="sans-serif">嫩綠、株型矮小</text>
+  </g>
+  <g transform="translate(326 150)">
+    <rect width="260" height="490" rx="22" fill="#eef6dd" stroke="#c3d894" stroke-width="3"/>
+    <rect y="396" width="260" height="94" fill="#896a3c"/>
+    <g fill="none" stroke="#45943d" stroke-width="12" stroke-linecap="round">
+      <path d="M92 398V186M126 398V160M160 398V201"/>
+      <path d="M92 270L48 213M92 310L135 245M126 250L81 192M126 292L179 217M160 284L213 231"/>
+    </g>
+    <text x="130" y="54" text-anchor="middle" fill="#244f35" font-size="28" font-family="sans-serif" font-weight="700">生長期</text>
+    <text x="130" y="454" text-anchor="middle" fill="#fff7dd" font-size="18" font-family="sans-serif">葉片旺盛、尚無稻穗</text>
+  </g>
+  <g transform="translate(612 150)">
+    <rect width="260" height="490" rx="22" fill="#f3f6d9" stroke="#d6d28e" stroke-width="3"/>
+    <rect y="396" width="260" height="94" fill="#896a3c"/>
+    <g fill="none" stroke="#58923b" stroke-width="11" stroke-linecap="round">
+      <path d="M105 399V165M154 399V156"/>
+      <path d="M105 273L55 218M154 294L211 231"/>
+    </g>
+    <g fill="none" stroke="#83aa43" stroke-width="8" stroke-linecap="round">
+      <path d="M104 165q4-50 36-75"/>
+      <path d="M153 156q10-47 44-67"/>
+    </g>
+    <g fill="#91b94a">
+      <ellipse cx="119" cy="126" rx="9" ry="16"/><ellipse cx="128" cy="109" rx="9" ry="16"/><ellipse cx="142" cy="94" rx="9" ry="16"/>
+      <ellipse cx="169" cy="121" rx="9" ry="16"/><ellipse cx="180" cy="104" rx="9" ry="16"/><ellipse cx="197" cy="91" rx="9" ry="16"/>
+    </g>
+    <text x="130" y="54" text-anchor="middle" fill="#244f35" font-size="28" font-family="sans-serif" font-weight="700">抽穗期</text>
+    <text x="130" y="454" text-anchor="middle" fill="#fff7dd" font-size="18" font-family="sans-serif">稻穗出現、仍偏綠</text>
+  </g>
+  <g transform="translate(898 150)">
+    <rect width="260" height="490" rx="22" fill="#fff2c9" stroke="#e2bc54" stroke-width="5"/>
+    <rect y="396" width="260" height="94" fill="#896a3c"/>
+    <g fill="none" stroke="#a2822c" stroke-width="11" stroke-linecap="round">
+      <path d="M86 399V170M132 399V148"/>
+      <path d="M86 286L43 235M132 293L184 237"/>
+    </g>
+    <g fill="none" stroke="#bf8f25" stroke-width="8" stroke-linecap="round">
+      <path d="M86 170q46 24 69 83"/>
+      <path d="M132 148q48 26 65 90"/>
+    </g>
+    <g fill="#e5b63b">
+      <ellipse cx="116" cy="190" rx="10" ry="17"/><ellipse cx="132" cy="204" rx="10" ry="17"/><ellipse cx="144" cy="222" rx="10" ry="17"/><ellipse cx="154" cy="243" rx="10" ry="17"/>
+      <ellipse cx="160" cy="174" rx="10" ry="17"/><ellipse cx="178" cy="192" rx="10" ry="17"/><ellipse cx="190" cy="217" rx="10" ry="17"/><ellipse cx="197" cy="239" rx="10" ry="17"/>
+    </g>
+    <text x="130" y="54" text-anchor="middle" fill="#815a12" font-size="28" font-family="sans-serif" font-weight="700">成熟期</text>
+    <text x="130" y="454" text-anchor="middle" fill="#fff7dd" font-size="18" font-family="sans-serif">金黃、飽滿、稻穗低垂</text>
+  </g>
+  <rect x="40" y="663" width="1118" height="38" rx="19" fill="#f4ebc6"/>
+  <text x="599" y="689" text-anchor="middle" fill="#4b633e" font-size="19" font-family="sans-serif">提示：稻穗轉為金黃色，且因穀粒重量而低垂，通常代表已進入成熟期。</text>
+</svg>

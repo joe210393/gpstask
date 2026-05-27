@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">樂水有機米小達人徽章</title>
+  <desc id="desc">完成樂水部落有機米食農體驗的紀念徽章</desc>
+  <defs>
+    <radialGradient id="medal">
+      <stop stop-color="#fff4a8"/>
+      <stop offset=".7" stop-color="#eabd48"/>
+      <stop offset="1" stop-color="#ae7625"/>
+    </radialGradient>
+  </defs>
+  <path d="M153 324L119 493 256 425 393 493 359 324Z" fill="#28724b"/>
+  <path d="M171 334L150 456 256 404 362 456 341 334Z" fill="#f2e2a2"/>
+  <circle cx="256" cy="230" r="185" fill="#184b35"/>
+  <circle cx="256" cy="230" r="168" fill="url(#medal)"/>
+  <circle cx="256" cy="230" r="147" fill="#fff9dc" stroke="#bd8f2c" stroke-width="5"/>
+  <g fill="none" stroke="#a4771e" stroke-width="8" stroke-linecap="round">
+    <path d="M187 298V176"/>
+    <path d="M324 298V176"/>
+    <path d="M187 202q-38-26-45-56M187 230q40-30 48-61M187 257q-37-24-46-53"/>
+    <path d="M324 202q38-26 45-56M324 230q-40-30-48-61M324 257q37-24 46-53"/>
+  </g>
+  <text x="256" y="158" text-anchor="middle" fill="#21523a" font-size="22" font-family="sans-serif" font-weight="700">樂水有機米</text>
+  <text x="256" y="240" text-anchor="middle" fill="#163e2c" font-size="42" font-family="sans-serif" font-weight="700">小達人</text>
+  <text x="256" y="278" text-anchor="middle" fill="#55704f" font-size="18" font-family="sans-serif">任務完成</text>
+</svg>

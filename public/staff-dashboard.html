@@ -25,6 +25,41 @@
         order: 2;
       }
     }
+    .leshui-template-content {
+      max-width: 920px;
+    }
+    .leshui-template-settings {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(120px, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .leshui-location-grid {
+      display: grid;
+      gap: 10px;
+      margin: 14px 0;
+    }
+    .leshui-location-row {
+      display: grid;
+      grid-template-columns: minmax(230px, 1.5fr) repeat(2, minmax(125px, 1fr));
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid #dbeafe;
+      border-radius: 8px;
+      background: #f8fbff;
+    }
+    .leshui-location-row small {
+      display: block;
+      color: #64748b;
+      margin-top: 3px;
+    }
+    @media (max-width: 700px) {
+      .leshui-template-settings,
+      .leshui-location-row {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 <body>
@@ -311,9 +346,12 @@
 
         <!-- 劇情任務管理區塊 -->
         <div class="form-container" style="background: #fdfdfd; border: 1px solid #e0e0e0;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap:8px; flex-wrap:wrap; margin-bottom: 1rem;">
             <h2 style="margin: 0;">劇情任務線管理</h2>
-            <button id="btnCreateQuest" class="btn btn-secondary" style="font-size: 0.9rem;">+ 新增劇情</button>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button id="btnCreateLeShuiTemplate" class="btn btn-secondary" style="font-size: 0.9rem; background:#166534; border-color:#166534; color:white;">建立樂水 10 關範本</button>
+              <button id="btnCreateQuest" class="btn btn-secondary" style="font-size: 0.9rem;">+ 新增劇情</button>
+            </div>
           </div>
           <div id="questChainList" style="display: grid; grid-template-columns: 1fr; gap: 1rem;">
             <!-- 劇情列表動態載入 -->
@@ -570,6 +608,44 @@
         </div>
       </div>
     </div>
+    <div class="task-modal" id="leshuiTemplateModal">
+      <div class="task-modal-overlay"></div>
+      <div class="task-modal-content leshui-template-content">
+        <div class="task-modal-header">
+          <h3>建立樂水部落有機米食農體驗</h3>
+          <button class="close-btn" id="closeLeShuiTemplateModal">&times;</button>
+        </div>
+        <div class="task-modal-body">
+          <p style="color:#475569; line-height:1.6; margin-top:0;">
+            系統將建立完整 10 關劇情、每關學習卡、選擇題答案與第 6 關 AR 教學圖。
+            請只填入各據點 GPS 座標；封面與教學圖可在建立後再替換。
+          </p>
+          <form id="leshuiTemplateForm">
+            <div class="leshui-template-settings">
+              <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">每關積分</label>
+                <input class="form-input" id="leshuiPoints" type="number" min="0" value="10" required />
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">全破額外積分</label>
+                <input class="form-input" id="leshuiChainPoints" type="number" min="0" value="50" required />
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">觸發半徑（公尺）</label>
+                <input class="form-input" id="leshuiRadius" type="number" min="5" value="40" required />
+              </div>
+            </div>
+            <div style="font-weight:bold; color:#0f172a;">任務位置</div>
+            <div id="leshuiLocationRows" class="leshui-location-grid"></div>
+            <p style="font-size:0.88rem; line-height:1.55; color:#64748b;">
+              第 10 關通關語預設為「支持樂水有機米」。若同名活動已存在，工具會補建缺少的關卡，不會重複建立既有關卡。
+            </p>
+            <div id="leshuiTemplateMsg" class="mt-2 text-center" style="min-height:24px; margin-bottom:10px;"></div>
+            <button type="submit" id="leshuiTemplateSubmit" class="btn btn-primary w-100">建立完整活動任務</button>
+          </form>
+        </div>
+      </div>
+    </div>
     <div class="task-modal" id="questModal">
       <div class="task-modal-overlay"></div>
       <div class="task-modal-content">
@@ -751,6 +827,7 @@
     &copy; 2025 GPS 任務系統 - 地方開箱任務遊戲
   </footer>
   <script src="/js/staff-dashboard.js?v=2"></script>
+  <script src="/js/leshui-template.js?v=1"></script>
   <script>
     // Header功能
     window.loginUser = JSON.parse(localStorage.getItem('loginUser') || 'null');

@@ -161,6 +161,21 @@ if (!SKIP_DB) {
 }
 
 const ALLOWED_TASK_TYPES = ['qa', 'multiple_choice', 'photo', 'number', 'keyword', 'location'];
+const DATABASE_UNAVAILABLE_ERROR_CODES = new Set([
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ETIMEDOUT',
+  'EAI_AGAIN',
+  'ENOTFOUND',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+  'PROTOCOL_CONNECTION_LOST',
+  'ER_CON_COUNT_ERROR'
+]);
+
+function isDatabaseUnavailableError(error) {
+  return Boolean(error && DATABASE_UNAVAILABLE_ERROR_CODES.has(error.code));
+}
 
 // JWT 工具函數
 function generateToken(user) {
@@ -455,6 +470,13 @@ app.post('/api/login', async (req, res) => {
     }
   } catch (err) {
     console.error('登入 API 錯誤:', err);
+    if (isDatabaseUnavailableError(err)) {
+      console.error(`資料庫暫時無法連線 (${err.code})`);
+      return res.status(503).json({
+        success: false,
+        message: '資料庫暫時無法連線，請稍後再試'
+      });
+    }
     // 如果是資料庫連接錯誤，返回更清楚的錯誤訊息
     if (err.code === 'ER_ACCESS_DENIED_ERROR') {
       console.error('資料庫連接失敗 - 請檢查環境變數設定');
@@ -3729,19 +3751,38 @@ const PORT = process.env.PORT || 3001;
 
 // catch-all route for static html (avoid 404 on /), 只針對非 /api/ 路徑
 // 健康檢查端點
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'OK',
+app.get('/api/health', async (req, res) => {
+  const health = {
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
-    database: {
-      host: process.env.MYSQL_HOST ? '[已設定]' : '[未設定]',
-      port: process.env.MYSQL_PORT ? '[已設定]' : '[未設定]',
-      database: process.env.MYSQL_DATABASE ? '[已設定]' : '[未設定]',
-      username: process.env.MYSQL_USERNAME ? '[已設定]' : '[未設定]',
-      password: process.env.MYSQL_ROOT_PASSWORD ? '[已設定]' : '[未設定]'
-    }
-  });
+    environment: process.env.NODE_ENV || 'development'
+  };
+
+  if (SKIP_DB || !pool) {
+    return res.status(503).json({
+      ...health,
+      status: 'DEGRADED',
+      database: { status: 'disabled' }
+    });
+  }
+
+  try {
+    await pool.query('SELECT 1');
+    return res.json({
+      ...health,
+      status: 'OK',
+      database: { status: 'connected' }
+    });
+  } catch (err) {
+    console.error('健康檢查資料庫連線失敗:', err.code || err.message);
+    return res.status(503).json({
+      ...health,
+      status: 'DEGRADED',
+      database: {
+        status: 'unavailable',
+        code: err.code || 'UNKNOWN'
+      }
+    });
+  }
 });
 
 // Embedding API health (for Zeabur debugging from phone)

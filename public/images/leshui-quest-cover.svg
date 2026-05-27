@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" role="img" aria-labelledby="title desc">
+  <title id="title">樂水部落有機米食農體驗</title>
+  <desc id="desc">山林、水圳與稻田構成的活動任務封面</desc>
+  <defs>
+    <linearGradient id="sky" x2="0" y2="1">
+      <stop stop-color="#dff5ff"/>
+      <stop offset="1" stop-color="#fff3c4"/>
+    </linearGradient>
+    <linearGradient id="field" x2="0" y2="1">
+      <stop stop-color="#cfe887"/>
+      <stop offset="1" stop-color="#7da53c"/>
+    </linearGradient>
+    <linearGradient id="card" x2="0" y2="1">
+      <stop stop-color="#fffdf4"/>
+      <stop offset="1" stop-color="#fff4ce"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="675" fill="url(#sky)"/>
+  <circle cx="983" cy="114" r="54" fill="#ffd25b" opacity=".92"/>
+  <path d="M0 304L160 190 275 280 429 151 606 291 766 183 940 299 1078 205 1200 286V418H0Z" fill="#306846"/>
+  <path d="M0 349L149 263 294 335 420 240 583 344 725 263 911 340 1085 281 1200 328V437H0Z" fill="#4d8950"/>
+  <path d="M0 385H1200V675H0Z" fill="url(#field)"/>
+  <path d="M0 473C238 428 383 434 570 480S903 525 1200 456V515C937 579 757 558 553 517S202 478 0 531Z" fill="#eef2bb"/>
+  <path d="M0 535C186 492 378 508 537 551S883 604 1200 536V575C897 641 704 622 523 581S191 537 0 584Z" fill="#5e9337"/>
+  <path d="M736 450C817 425 901 425 1018 449L1034 481C908 456 822 457 751 478Z" fill="#58b8d4"/>
+  <path d="M745 458C828 439 912 439 1014 458" fill="none" stroke="#dcf8ff" stroke-width="5"/>
+  <g fill="#d3ac34" stroke="#8b6b1e" stroke-width="3">
+    <path d="M100 589V464"/>
+    <path d="M130 593V442"/>
+    <path d="M164 592V455"/>
+    <path d="M101 478q-39-22-48-52 41 8 48 52M101 505q42-23 49-53-39 8-49 53"/>
+    <path d="M130 460q-41-22-48-51 40 7 48 51M130 488q44-22 51-54-43 10-51 54"/>
+    <path d="M164 473q-42-20-47-48 38 6 47 48M164 501q40-20 48-50-40 8-48 50"/>
+  </g>
+  <rect x="58" y="53" width="600" height="259" rx="24" fill="url(#card)" opacity=".97"/>
+  <rect x="80" y="77" width="96" height="8" rx="4" fill="#5f8732"/>
+  <text x="80" y="130" fill="#225438" font-size="26" font-family="sans-serif" font-weight="700">部落農趣任務</text>
+  <text x="80" y="190" fill="#173d2a" font-size="47" font-family="sans-serif" font-weight="700">樂水部落有機米</text>
+  <text x="80" y="247" fill="#173d2a" font-size="47" font-family="sans-serif" font-weight="700">食農體驗</text>
+  <text x="83" y="286" fill="#5b684f" font-size="18" font-family="sans-serif">從一粒米的起點，走到一桌在地滋味</text>
+  <rect x="963" y="594" width="188" height="43" rx="21" fill="#234e32" opacity=".94"/>
+  <text x="1057" y="622" fill="#fffce9" text-anchor="middle" font-size="18" font-family="sans-serif">10 站劇情任務</text>
+</svg>
