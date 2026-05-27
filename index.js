@@ -1339,6 +1339,33 @@ app.get('/api/user-tasks', authenticateToken, async (req, res) => {
   }
 });
 
+async function getNextRequiredQuestOrder(conn, userId, questChainId) {
+  const [steps] = await conn.execute(
+    `SELECT t.quest_order,
+            EXISTS (
+              SELECT 1
+              FROM user_tasks ut
+              WHERE ut.user_id = ? AND ut.task_id = t.id AND ut.status = '完成'
+            ) AS is_completed
+     FROM tasks t
+     WHERE t.quest_chain_id = ?
+     ORDER BY t.quest_order ASC`,
+    [userId, questChainId]
+  );
+
+  if (steps.length === 0) return null;
+  const nextStep = steps.find(step => !Number(step.is_completed));
+  return nextStep
+    ? Number(nextStep.quest_order)
+    : Number(steps[steps.length - 1].quest_order) + 1;
+}
+
+async function isCurrentQuestStep(conn, userId, questChainId, questOrder) {
+  if (!questChainId || !questOrder) return true;
+  const expectedOrder = await getNextRequiredQuestOrder(conn, userId, questChainId);
+  return expectedOrder === Number(questOrder);
+}
+
 // 加入任務（需傳 username, task_id）
 app.post('/api/user-tasks', authenticateToken, async (req, res) => {
   // 強制使用 JWT 認證
@@ -1370,6 +1397,18 @@ app.post('/api/user-tasks', authenticateToken, async (req, res) => {
     // 檢查是否已經完成過
     const [completed] = await conn.execute('SELECT id FROM user_tasks WHERE user_id = ? AND task_id = ? AND status = "完成"', [userId, task_id]);
     if (completed.length > 0) return res.json({ success: false, message: '此任務已完成過，無法再次接取' });
+
+    const [requestedTasks] = await conn.execute(
+      'SELECT quest_chain_id, quest_order FROM tasks WHERE id = ?',
+      [task_id]
+    );
+    if (requestedTasks.length === 0) {
+      return res.status(404).json({ success: false, message: '找不到任務' });
+    }
+    const requestedTask = requestedTasks[0];
+    if (!(await isCurrentQuestStep(conn, userId, requestedTask.quest_chain_id, requestedTask.quest_order))) {
+      return res.status(409).json({ success: false, message: '請依序完成目前劇情任務後再接取此關' });
+    }
 
     await conn.execute('INSERT INTO user_tasks (user_id, task_id, status) VALUES (?, ?, "進行中")', [userId, task_id]);
     res.json({ success: true, message: '已加入任務' });
@@ -1418,6 +1457,10 @@ app.post('/api/user-tasks/finish', reviewerAuth, async (req, res) => {
     const [tasks] = await conn.execute('SELECT name, points, created_by, quest_chain_id, quest_order FROM tasks WHERE id = ?', [task_id]);
     if (tasks.length === 0) return res.status(400).json({ success: false, message: '找不到任務' });
     const task = tasks[0];
+
+    if (!(await isCurrentQuestStep(conn, userId, task.quest_chain_id, task.quest_order))) {
+      return res.status(409).json({ success: false, message: '前一關尚未完成，無法審核此任務' });
+    }
 
     // 權限範圍判斷（admin 全部；shop 僅自己；staff 僅所屬 shop/admin）
     // 新規則：shop 也可審核全部任務（不限制 created_by）
@@ -1768,50 +1811,39 @@ app.get('/api/user/quest-progress', authenticateToken, async (req, res) => {
       currentProgress[chainId] = row.current_step_order;
     });
 
-    // 2. 自我修復邏輯：檢查 user_tasks 中實際完成的任務
-    // 找出每個劇情線中，使用者已完成的最大 quest_order
-    const [completedRows] = await conn.execute(`
-      SELECT t.quest_chain_id, MAX(t.quest_order) as max_completed_order
+    // 2. 自我修復邏輯：只推進到連續完成後的第一個未完成關卡。
+    // 使用 MAX(quest_order) 會讓直接開網址完成後段關卡的玩家跳過前段任務。
+    const [startedChains] = await conn.execute(`
+      SELECT DISTINCT t.quest_chain_id
       FROM user_tasks ut
       JOIN tasks t ON ut.task_id = t.id
-      WHERE ut.user_id = ? AND ut.status = '完成' AND t.quest_chain_id IS NOT NULL
-      GROUP BY t.quest_chain_id
+      WHERE ut.user_id = ? AND t.quest_chain_id IS NOT NULL
     `, [userId]);
 
-    const updates = [];
-
-    // 比對並修復
-    for (const row of completedRows) {
-      // 確保 chainId 作為字串，與 currentProgress 的 key 類型一致
+    let updateCount = 0;
+    for (const row of startedChains) {
       const chainId = String(row.quest_chain_id);
-      const maxCompleted = row.max_completed_order;
-      // 理論上，如果完成了第 N 關，當前進度應該是 N + 1
-      const correctNextStep = maxCompleted + 1;
+      const correctNextStep = await getNextRequiredQuestOrder(conn, userId, row.quest_chain_id);
+      if (correctNextStep === null) continue;
 
       if (!currentProgress[chainId]) {
-        // 情況 A: user_quests 沒記錄，但有完成的任務 -> 補插入
-        updates.push(
-          conn.execute(
-            'INSERT INTO user_quests (user_id, quest_chain_id, current_step_order) VALUES (?, ?, ?)',
-            [userId, row.quest_chain_id, correctNextStep] // 資料庫插入時使用原始數字類型
-          )
+        await conn.execute(
+          'INSERT INTO user_quests (user_id, quest_chain_id, current_step_order) VALUES (?, ?, ?)',
+          [userId, row.quest_chain_id, correctNextStep]
         );
-        currentProgress[chainId] = correctNextStep;
-      } else if (currentProgress[chainId] < correctNextStep) {
-        // 情況 B: 記錄落後 (例如記錄是 1，但已經完成了第 1 關，應該要是 2) -> 更新
-        updates.push(
-          conn.execute(
-            'UPDATE user_quests SET current_step_order = ? WHERE user_id = ? AND quest_chain_id = ?',
-            [correctNextStep, userId, row.quest_chain_id] // 資料庫更新時使用原始數字類型
-          )
+        updateCount += 1;
+      } else if (Number(currentProgress[chainId]) !== correctNextStep) {
+        await conn.execute(
+          'UPDATE user_quests SET current_step_order = ? WHERE user_id = ? AND quest_chain_id = ?',
+          [correctNextStep, userId, row.quest_chain_id]
         );
-        currentProgress[chainId] = correctNextStep;
+        updateCount += 1;
       }
+      currentProgress[chainId] = correctNextStep;
     }
 
-    if (updates.length > 0) {
-      await Promise.all(updates);
-      console.log(`[quest-progress] 已自動修復使用者 ${username} 的 ${updates.length} 條劇情進度`);
+    if (updateCount > 0) {
+      console.log(`[quest-progress] 已自動修復使用者 ${username} 的 ${updateCount} 條劇情進度`);
     }
 
     console.log(`[quest-progress] 使用者 ${username} 的劇情進度:`, currentProgress);
@@ -2058,6 +2090,10 @@ app.patch('/api/user-tasks/:id/answer', authenticateToken, async (req, res) => {
        });
     }
 
+    if (!(await isCurrentQuestStep(conn, userId, userTask.quest_chain_id, userTask.quest_order))) {
+      return res.status(409).json({ success: false, message: '請依序完成目前劇情任務後再作答' });
+    }
+
     let isCompleted = false;
     let message = '答案已儲存';
     let earnedItemName = null; // 移到外層宣告
@@ -2141,7 +2177,11 @@ app.patch('/api/user-tasks/:id/answer', authenticateToken, async (req, res) => {
              [userTask.quest_chain_id]
            );
            
-           if (maxOrder.length > 0 && maxOrder[0].max_order === userTask.quest_order) {
+           const isFinalStep = maxOrder.length > 0 && Number(maxOrder[0].max_order) === Number(userTask.quest_order);
+           const nextRequiredOrder = isFinalStep
+             ? await getNextRequiredQuestOrder(conn, userTask.user_id, userTask.quest_chain_id)
+             : null;
+           if (isFinalStep && nextRequiredOrder === Number(maxOrder[0].max_order) + 1) {
              // 完成了最後一關！
              questChainCompleted = true;
              
