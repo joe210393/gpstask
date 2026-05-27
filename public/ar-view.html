@@ -1032,6 +1032,13 @@
             const chestObj = document.getElementById('chest-obj');
             const chestImg = document.getElementById('chest-img');
             const videoFrame = document.getElementById('video-frame');
+            const ytPlayer = document.getElementById('yt-player');
+
+            chestObj.className = '';
+            chestImg.style.display = 'none';
+            chestImg.removeAttribute('src');
+            videoFrame.style.display = 'none';
+            ytPlayer.removeAttribute('src');
             
             // 只顯示第一步（如果第一步不是 3D 模型）
             const firstStep = arSteps.length > 0 ? arSteps[0] : null;
@@ -1046,7 +1053,7 @@
                     const ytId = extractYouTubeId(firstStep.url);
                     if (ytId) {
                         videoFrame.style.display = 'block';
-                        document.getElementById('yt-player').src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0&controls=1&playsinline=1`;
+                        ytPlayer.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0&controls=1&playsinline=1`;
                         hasVideo = true;
                     }
                 }
@@ -1057,7 +1064,7 @@
                     const ytId = extractYouTubeId(task.youtubeUrl);
                     if (ytId) {
                         videoFrame.style.display = 'block';
-                        document.getElementById('yt-player').src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0&controls=1&playsinline=1`;
+                        ytPlayer.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=0&controls=1&playsinline=1`;
                         hasVideo = true;
                     }
                 }
@@ -2134,8 +2141,7 @@
                         });
                     }
                     
-                    if (isLocationTask) { locationObj.style.display = 'block'; chest.style.display = 'none'; lockedObj.style.display = 'none'; itemUseObj.style.display = 'none'; }
-                    else if (requiredItem) {
+                    if (requiredItem) {
                         if (hasRequiredItem) { 
                             itemUseObj.style.display = 'block'; 
                             lockedObj.style.display = 'none'; 
@@ -2158,7 +2164,11 @@
                             }
                         }
                         else { lockedObj.style.display = 'block'; itemUseObj.style.display = 'none'; chest.style.display = 'none'; locationObj.style.display = 'none'; }
-                    } else { lockedObj.style.display = 'none'; itemUseObj.style.display = 'none'; locationObj.style.display = 'none'; chest.style.display = 'block'; }
+                    } else if (isLocationTask && arSteps.length === 0) {
+                        locationObj.style.display = 'block'; chest.style.display = 'none'; lockedObj.style.display = 'none'; itemUseObj.style.display = 'none';
+                    } else {
+                        lockedObj.style.display = 'none'; itemUseObj.style.display = 'none'; locationObj.style.display = 'none'; chest.style.display = 'block';
+                    }
                 }
                 const screenWidth = window.innerWidth;
                 const xOffset = (delta / 40) * (screenWidth / 2);

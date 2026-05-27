@@ -53,7 +53,8 @@ app.set('trust proxy', 1);
 // 安全性設定
 app.use(helmet({
   contentSecurityPolicy: false, // AR.js 需要較寬鬆的 CSP
-  crossOriginEmbedderPolicy: false
+  crossOriginEmbedderPolicy: false,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
 }));
 
 // 全局限流
