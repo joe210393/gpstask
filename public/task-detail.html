@@ -547,7 +547,9 @@
               hint.style.color = '#666';
               hint.style.display = 'block';
               hint.style.marginTop = '5px';
-              hint.textContent = '💡 提示：請輸入標準名稱 (例如 "白鷺")';
+              hint.textContent = t.is_final_step
+                ? '💡 提示：完成現場互動後，請輸入取得的通關密語'
+                : '💡 提示：請輸入現場找到的關鍵字';
               container.appendChild(hint);
 
               const submitBtn = document.createElement('button');

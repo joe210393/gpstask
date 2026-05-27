@@ -437,6 +437,7 @@
         window.rotationMode = false; // 旋轉模式開關（全局變量，供組件使用）
         
         // === 背景音樂控制 ===
+        const bgmControls = document.getElementById('bgm-controls');
         const bgmAudio = document.getElementById('bgm-audio');
         const bgmToggleBtn = document.getElementById('bgm-toggle-btn');
         const bgmVolumeControl = document.getElementById('bgm-volume-control');
@@ -513,13 +514,14 @@
             const musicUrl = task?.bgm_url || task?.audio_url || null;
             
             if (musicUrl) {
+                bgmControls.style.display = 'flex';
                 bgmAudio.src = musicUrl;
                 bgmAudio.load();
                 console.log('✅ 已載入任務背景音樂:', musicUrl);
             } else {
-                // 如果沒有配置音樂，可以設置默認音樂或保持靜音
-                // 這裡先清空，用戶可以手動添加音樂
-                bgmAudio.src = '';
+                bgmControls.style.display = 'none';
+                bgmAudio.removeAttribute('src');
+                bgmAudio.load();
                 console.log('ℹ️ 此任務沒有配置背景音樂');
             }
         }
