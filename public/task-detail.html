@@ -347,15 +347,16 @@
               credentials: 'include',
               body: JSON.stringify({ username: loginUser.username, task_id: t.id })
             })
-            .then(res => {
+            .then(async res => {
               if (res.status === 401) {
                 handleAuthExpired();
                 throw new Error('unauthorized');
               }
+              const resp = await res.json().catch(() => null);
               if (!res.ok) {
-                throw new Error(`HTTP ${res.status}`);
+                throw new Error((resp && resp.message) || `HTTP ${res.status}`);
               }
-              return res.json();
+              return resp || { success: false, message: '伺服器回應格式錯誤' };
             })
             .then(resp => {
               if (resp.success) {
