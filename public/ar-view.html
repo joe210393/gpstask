@@ -1401,7 +1401,11 @@
                 wheel.querySelector('.btn-up').onclick = () => setVal(Number(wheel.dataset.value) + 1);
                 wheel.querySelector('.btn-down').onclick = () => setVal(Number(wheel.dataset.value) - 1);
                 let startY = null;
-                wheel.addEventListener('pointerdown', (ev) => { startY = ev.clientY; wheel.setPointerCapture(ev.pointerId); });
+                wheel.addEventListener('pointerdown', (ev) => {
+                    if (ev.target.closest('button')) return;
+                    startY = ev.clientY;
+                    wheel.setPointerCapture(ev.pointerId);
+                });
                 wheel.addEventListener('pointermove', (ev) => { if (startY == null) return; const dy = ev.clientY - startY; if (Math.abs(dy) > 18) { setVal(Number(wheel.dataset.value) + (dy < 0 ? 1 : -1)); startY = ev.clientY; } });
                 wheel.addEventListener('pointerup', () => { startY = null; }); wheel.addEventListener('pointercancel', () => { startY = null; });
                 lockWheels.appendChild(wheel);
