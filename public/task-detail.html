@@ -71,6 +71,35 @@
     .answer-container {
       margin-top: 2rem;
     }
+    .task-flow-note {
+      margin-top: 0.75rem;
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+    .gps-soft-status {
+      margin-bottom: 15px;
+      border: 1px solid #bfdbfe;
+      border-left: 5px solid #2563eb;
+      border-radius: 8px;
+      background: #eff6ff;
+      color: #1e3a8a;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      padding: 10px 12px;
+    }
+    .gps-soft-status.warning {
+      border-color: #fde68a;
+      border-left-color: #d97706;
+      background: #fffbeb;
+      color: #92400e;
+    }
+    .gps-soft-status.ok {
+      border-color: #bbf7d0;
+      border-left-color: #16a34a;
+      background: #f0fdf4;
+      color: #166534;
+    }
   </style>
 </head>
 <body>
@@ -160,6 +189,10 @@
     const id = urlParams.get('id');
     const API_BASE = '';
     const taskDetailEl = document.getElementById('taskDetail');
+
+    function goToArPage(task) {
+      window.location.href = `/ar-view.html?taskId=${task.id}&lat=${task.lat}&lng=${task.lng}`;
+    }
     
     function handleAuthExpired() {
       alert('登入狀態已過期，請重新登入');
@@ -217,6 +250,7 @@
             <div class="detail-actions">
               <button id="startTaskBtn" class="btn btn-primary">開始任務</button>
               <div id="taskMsg" style="margin-top:15px; font-weight:600;"></div>
+              <div id="taskHint" class="task-flow-note">按下開始任務後，作答區會在這裡展開；不用回地圖等待自動彈窗。</div>
             </div>
             <div id="answerSection" class="answer-container"></div>
           `;
@@ -326,9 +360,14 @@
                   // 進行中
                   const inProgressTask = udata.tasks.find(x => x.id == t.id && x.status === '進行中');
                   if (inProgressTask) {
-                    showAnswerSection(inProgressTask.user_task_id, inProgressTask.answer || '');
-                    startTaskBtn.disabled = true;
-                    taskMsgEl.textContent = '任務進行中！';
+                    startTaskBtn.textContent = '繼續 AR 任務';
+                    startTaskBtn.disabled = false;
+                    taskMsgEl.textContent = '任務進行中，點擊按鈕回到 AR 遊戲。';
+                    taskMsgEl.style.color = 'var(--primary-color)';
+                    const taskHint = document.getElementById('taskHint');
+                    if (taskHint) {
+                      taskHint.textContent = '進入 AR 後，未到範圍會顯示距離與方向；到達任務半徑才會解鎖內容與題目。';
+                    }
                   }
                 }
               })
@@ -360,36 +399,10 @@
             })
             .then(resp => {
               if (resp.success) {
-                taskMsgEl.textContent = '任務進行中！';
+                taskMsgEl.textContent = '正在進入 AR 遊戲...';
                 taskMsgEl.style.color = 'var(--primary-color)';
                 startTaskBtn.disabled = true;
-                fetch(`${API_BASE}/api/user-tasks/all?username=${encodeURIComponent(loginUser.username)}`, {
-                  credentials: 'include'
-                })
-                  .then(res => {
-                    if (!res.ok) {
-                      throw new Error(`HTTP ${res.status}`);
-                    }
-                    return res.json();
-                  })
-                  .then(udata => {
-                    if (udata.success && Array.isArray(udata.tasks)) {
-                      const ut = udata.tasks.find(x => x.id == t.id && x.status === '進行中');
-                      if (ut) {
-                        showAnswerSection(ut.user_task_id, ut.answer || '');
-                      } else {
-                        // 如果找不到任務，嘗試使用 resp 中的 user_task_id（如果有）
-                        console.warn('找不到進行中的任務，嘗試直接顯示答題區');
-                        // 至少顯示 AR 按鈕
-                        showAnswerSection(null, '');
-                      }
-                    }
-                  })
-                  .catch(err => {
-                    console.error('獲取任務狀態失敗:', err);
-                    // 即使獲取失敗，也顯示答題區（使用臨時 ID）
-                    showAnswerSection(null, '');
-                  });
+                goToArPage(t);
               } else {
                 taskMsgEl.textContent = resp.message || '加入失敗';
                 taskMsgEl.style.color = '#dc3545';
@@ -423,47 +436,54 @@
             const answerDiv = document.getElementById('answerSection');
             answerDiv.innerHTML = '';
 
-            // --- GPS 圍欄監控 (防止作弊) ---
+            const taskHint = document.getElementById('taskHint');
+            if (taskHint) {
+              taskHint.textContent = '作答區已開啟。若 GPS 訊號不穩，系統會提示，但不會遮住非打卡題。';
+            }
+
+            // --- GPS 背景提醒 ---
             if (window.gpsWatchId) navigator.geolocation.clearWatch(window.gpsWatchId);
             const existingWarning = document.getElementById('gpsWarning');
             if (existingWarning) existingWarning.remove();
+            const existingSoftStatus = document.getElementById('gpsSoftStatus');
+            if (existingSoftStatus) existingSoftStatus.remove();
 
-            // 對於非 location 類型的任務，也需要持續監控
+            let gpsSoftStatus = null;
             if (t.task_type !== 'location') {
                 const limit = (t.radius || 50) + 50; // 寬容 50 公尺
-                const warningEl = document.createElement('div');
-                warningEl.id = 'gpsWarning';
-                warningEl.style.cssText = 'display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); color:white; z-index:9999; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:20px;';
-                warningEl.innerHTML = `
-                    <div style="font-size:4rem; margin-bottom:20px;">📡</div>
-                    <h2 style="color:#ffc107; margin-bottom:10px;">訊號中斷</h2>
-                    <p style="font-size:1.1rem; line-height:1.6;">您已離開任務有效範圍<br>請回到任務地點以繼續作答</p>
-                    <div id="distDisplay" style="margin-top:20px; font-weight:bold; font-size:1.2rem;"></div>
-                `;
-                document.body.appendChild(warningEl);
+                gpsSoftStatus = document.createElement('div');
+                gpsSoftStatus.id = 'gpsSoftStatus';
+                gpsSoftStatus.className = 'gps-soft-status';
+                gpsSoftStatus.textContent = 'GPS 正在背景確認位置；即使訊號不穩，也可以先閱讀題目與作答。';
 
                 if (navigator.geolocation) {
                     window.gpsWatchId = navigator.geolocation.watchPosition(
                         (pos) => {
                             const distKm = haversineDistance(pos.coords.latitude, pos.coords.longitude, t.lat, t.lng);
                             const distM = distKm * 1000;
+                            const accuracy = pos.coords.accuracy || 0;
                             
-                            // 檢查距離
-                            if (distM > limit) {
-                                warningEl.style.display = 'flex';
-                                document.getElementById('distDisplay').textContent = `目前距離：${Math.round(distM)} 公尺`;
-                                // 模糊化答題區
-                                answerDiv.style.filter = 'blur(5px)';
-                                answerDiv.style.pointerEvents = 'none';
+                            if (accuracy > Math.max(limit, 80)) {
+                                gpsSoftStatus.className = 'gps-soft-status warning';
+                                gpsSoftStatus.textContent = `GPS 訊號偏弱，誤差約 ${Math.round(accuracy)} 公尺；作答區保持開放，請以現場線索為準。`;
+                            } else if (distM > limit) {
+                                gpsSoftStatus.className = 'gps-soft-status warning';
+                                gpsSoftStatus.textContent = `系統偵測您可能離任務點較遠（約 ${Math.round(distM)} 公尺），仍可先作答；請回到現場確認線索。`;
                             } else {
-                                warningEl.style.display = 'none';
-                                answerDiv.style.filter = 'none';
-                                answerDiv.style.pointerEvents = 'auto';
+                                gpsSoftStatus.className = 'gps-soft-status ok';
+                                gpsSoftStatus.textContent = `位置已確認，距離任務點約 ${Math.round(distM)} 公尺。`;
                             }
                         },
-                        (err) => console.error('GPS 監控失敗:', err),
+                        (err) => {
+                          gpsSoftStatus.className = 'gps-soft-status warning';
+                          gpsSoftStatus.textContent = 'GPS 暫時無法確認位置；作答區保持開放，請依現場線索完成任務。';
+                          console.warn('GPS 監控失敗:', err);
+                        },
                         { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
                     );
+                } else {
+                  gpsSoftStatus.className = 'gps-soft-status warning';
+                  gpsSoftStatus.textContent = '此裝置不支援 GPS；作答區保持開放，請依現場線索完成任務。';
                 }
             }
             // ---------------------------
@@ -472,6 +492,10 @@
             container.style.padding = '15px';
             container.style.background = '#f8f9fa';
             container.style.borderRadius = '8px';
+
+            if (gpsSoftStatus) {
+              container.appendChild(gpsSoftStatus);
+            }
 
             // AR 按鈕
             const arBtn = document.createElement('button');
@@ -795,6 +819,15 @@
                    const startBtn = document.getElementById('startTaskBtn');
                    startBtn.textContent = '任務已完成';
                    startBtn.style.backgroundColor = '#28a745';
+                   const taskMsg = document.getElementById('taskMsg');
+                   if (taskMsg) {
+                     taskMsg.textContent = '任務已完成！';
+                     taskMsg.style.color = '#28a745';
+                   }
+                   const taskHint = document.getElementById('taskHint');
+                   if (taskHint) {
+                     taskHint.textContent = '完成結果已送出，您可以回到地圖查看下一個任務。';
+                   }
                 }
               } else {
                 msg.textContent = data.message || '儲存失敗';

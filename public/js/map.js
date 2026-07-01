@@ -1,11 +1,22 @@
 let map;
 let userMarker;
+let userAccuracyCircle;
+let taskMarkersLayer;
 let tasksList = [];
 let triggeredTasks = new Set();
 let completedTaskIds = new Set();
+let taskStatusById = {};
+let geoWatchId = null;
+let firstLocationFix = false;
+let initialTaskViewApplied = false;
+let taskNavigatorCollapsed = false;
+let lastGeoErrorAt = 0;
+let lastGeoWarningAt = 0;
 
 // const API_BASE = 'http://localhost:3001'; // 本地開發環境 - 生產環境使用相對路徑
 const API_BASE = '';
+const DEFAULT_MAP_CENTER = { lat: 24.757, lng: 121.753 };
+const DEFAULT_MAP_ZOOM = 16;
 
 // 地理位置權限狀態
 let locationPermissionGranted = false;
@@ -16,6 +27,27 @@ let lastUserLat = 0;
 let lastUserLng = 0;
 const MIN_UPDATE_DISTANCE = 0.003; // 最小更新距離 (約 3 公尺)，小於此距離不更新地圖，防止閃爍
 
+function getStoredLoginUser() {
+  try {
+    return JSON.parse(localStorage.getItem('loginUser') || 'null');
+  } catch (err) {
+    return null;
+  }
+}
+
+function isStaffOrAdminUser(user) {
+  return user && (user.role === 'admin' || user.role === 'shop' || user.role === 'staff');
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // 地理位置權限處理
 function requestLocationPermission() {
   return new Promise((resolve, reject) => {
@@ -24,141 +56,81 @@ function requestLocationPermission() {
       return;
     }
 
-    // 檢查權限狀態
-    if (navigator.permissions) {
-      navigator.permissions.query({ name: 'geolocation' }).then(permission => {
-        if (permission.state === 'granted') {
-          locationPermissionGranted = true;
-          resolve();
-        } else if (permission.state === 'denied') {
-          locationPermissionDenied = true;
-          reject(new Error('地理位置權限已被拒絕'));
-        } else {
-          // 請求權限
-          navigator.geolocation.getCurrentPosition(
-            () => {
-              locationPermissionGranted = true;
-              resolve();
-            },
-            (err) => {
-              locationPermissionDenied = true;
-              reject(err);
-            },
-            { enableHighAccuracy: true, timeout: 20000 }
-          );
-        }
-      });
-    } else {
-      // 舊版瀏覽器直接請求
-      navigator.geolocation.getCurrentPosition(
-        () => {
-          locationPermissionGranted = true;
-          resolve();
-        },
-        (err) => {
-          locationPermissionDenied = true;
-          reject(err);
-        },
-        { enableHighAccuracy: true, timeout: 20000 }
-      );
-    }
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        locationPermissionGranted = true;
+        locationPermissionDenied = false;
+        resolve(pos);
+      },
+      err => {
+        locationPermissionDenied = err.code === 1;
+        reject(err);
+      },
+      { enableHighAccuracy: false, maximumAge: 60000, timeout: 5000 }
+    );
   });
 }
 
 // 初始化地圖
 function initMapWithUserLocation() {
-  // 顯示載入狀態
-  showLocationStatus('正在初始化地圖...', 'loading');
-
-  requestLocationPermission()
-    .then(() => {
-      // 權限已授權，獲取位置
-      navigator.geolocation.getCurrentPosition(
-        pos => {
-          const { latitude, longitude } = pos.coords;
-          initMap(latitude, longitude, 18);
-          showLocationStatus('定位成功！', 'success');
-          startGeolocation();
-        },
-        err => handleLocationError(err),
-        { enableHighAccuracy: true, timeout: 15000 }
-      );
-    })
-    .catch(err => {
-      handleLocationError(err);
-    });
+  initMap(DEFAULT_MAP_CENTER.lat, DEFAULT_MAP_CENTER.lng, DEFAULT_MAP_ZOOM);
+  showLocationStatus('正在尋找 GPS；任務已先載入，可以直接點任務開始。', 'loading');
+  startGeolocation({ recenterOnFirstFix: true });
 }
 
 // 處理定位錯誤
 function handleLocationError(error) {
-  console.warn('定位錯誤:', error.message);
+  console.warn('定位錯誤:', error && (error.message || error.code));
 
-  let errorMessage = '';
-  let showManualLocation = false;
+  let errorMessage = '定位暫時失敗，但地圖與任務仍可使用。';
 
   switch (error.code || error.message) {
     case 1: // PERMISSION_DENIED
-      errorMessage = '地理位置權限被拒絕。請在瀏覽器設定中允許網站存取您的位置。';
-      showManualLocation = true;
+      errorMessage = '地理位置權限被拒絕。您仍可從任務導覽開始，或在瀏覽器設定允許定位後重試。';
       break;
     case 2: // POSITION_UNAVAILABLE
-      errorMessage = '無法取得您的位置資訊。';
-      showManualLocation = true;
+      errorMessage = '目前抓不到 GPS 位置。請先用任務導覽查看任務，定位恢復後會自動更新距離。';
       break;
     case 3: // TIMEOUT
-      errorMessage = '取得位置資訊逾時，將嘗試重新定位...';
-      // 不直接顯示手動定位，而是嘗試使用較低的精度重新定位
-      initMapWithLowAccuracy();
-      return;
+      errorMessage = '定位逾時。任務已顯示在地圖上，可以先開始瀏覽或再試一次定位。';
+      break;
     default:
       if (error.message && error.message.includes('不支援')) {
-        errorMessage = '您的瀏覽器不支援地理位置功能。';
-        showManualLocation = true;
-      } else {
-        errorMessage = '定位失敗，使用預設位置。';
-        showManualLocation = true;
+        errorMessage = '您的瀏覽器不支援地理位置功能，請使用任務導覽或任務列表查看內容。';
       }
   }
 
-  // 使用預設位置初始化地圖
-  initMap(24.757, 121.753, 16);
-
-  if (showManualLocation) {
-    showManualLocationOption(errorMessage);
-  } else {
-    showLocationStatus(errorMessage, 'warning');
-  }
+  showManualLocationOption(errorMessage);
 }
 
 // 使用較低精度嘗試重新定位
 function initMapWithLowAccuracy() {
-  showLocationStatus('正在嘗試以較低精度重新定位...', 'loading');
-  navigator.geolocation.getCurrentPosition(
-    pos => {
-      const { latitude, longitude } = pos.coords;
-      initMap(latitude, longitude, 18);
-      showLocationStatus('定位成功！(低精度模式)', 'success');
-      startGeolocation();
-    },
-    err => {
-       console.warn('低精度定位也失敗:', err.message);
-       // 如果還是失敗，回退到預設處理
-       initMap(24.757, 121.753, 16);
-       showManualLocationOption('無法取得您的位置資訊 (定位逾時)');
-    },
-    { enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 }
-  );
+  showLocationStatus('正在嘗試快速定位；任務仍可先操作。', 'loading');
+  startGeolocation({ recenterOnFirstFix: true });
 }
 
 // 初始化地圖
 function initMap(lat, lng, zoom) {
-  map = L.map('map').setView([lat, lng], zoom);
+  if (map) {
+    map.setView([lat, lng], zoom);
+    return;
+  }
+
+  map = L.map('map', {
+    zoomControl: true
+  }).setView([lat, lng], zoom);
+
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
 
+  taskMarkersLayer = L.layerGroup().addTo(map);
+  createTaskNavigator();
+
   // 強制刷新進度後載入任務（確保顯示最新進度的任務）
   loadTasks(true);
+
+  setTimeout(() => map.invalidateSize(), 50);
 }
 
 // 顯示手動定位選項
@@ -168,11 +140,11 @@ function showManualLocationOption(message) {
   statusDiv.innerHTML = `
     <div class="location-error">
       <div class="error-icon">📍</div>
-      <div class="error-message">${message}</div>
+      <div class="error-message">${escapeHtml(message)}</div>
       <div class="location-options">
-        <button onclick="requestLocationAgain()" class="btn-primary">重新請求權限</button>
-        <button onclick="useManualLocation()" class="btn-secondary">手動輸入位置</button>
-        <button onclick="useDefaultLocation()" class="btn-secondary">使用預設位置</button>
+        <button onclick="requestLocationAgain()" class="btn-primary">再次定位</button>
+        <button onclick="useManualLocation()" class="btn-secondary">用地圖中心當位置</button>
+        <a href="/tasks-list.html" class="btn-secondary">任務列表</a>
       </div>
     </div>
   `;
@@ -182,51 +154,42 @@ function showManualLocationOption(message) {
 // 重新請求地理位置權限
 function requestLocationAgain() {
   locationPermissionDenied = false;
-  showLocationStatus('正在請求權限...', 'loading');
-  initMapWithUserLocation();
+  showLocationStatus('正在重新定位；您仍可先操作任務。', 'loading');
+  startGeolocation({ recenterOnFirstFix: true });
 }
 
 // 手動輸入位置
 function useManualLocation() {
-  const address = prompt('請輸入您的所在地址（例如：台北市中正區）：');
-  if (address) {
-    // 使用地址搜尋服務（這裡可以整合 Google Maps 或其他地圖服務）
-    searchAddress(address);
+  const center = map ? map.getCenter() : DEFAULT_MAP_CENTER;
+  const input = prompt('可輸入「緯度,經度」，或直接按確定使用目前地圖中心作為位置。', `${center.lat.toFixed(6)},${center.lng.toFixed(6)}`);
+  if (input === null) return;
+
+  const parts = input.split(',').map(part => Number(part.trim()));
+  const lat = Number.isFinite(parts[0]) ? parts[0] : center.lat;
+  const lng = Number.isFinite(parts[1]) ? parts[1] : center.lng;
+
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    showLocationStatus('座標格式不正確，請輸入像 24.757000,121.753000 這樣的緯度與經度。', 'warning');
+    return;
   }
+
+  setUserPosition(lat, lng, 30, { recenter: true, manual: true });
+  showLocationStatus('已用指定位置更新距離與任務排序。', 'success');
 }
 
 // 使用地址搜尋（模擬實現）
 function searchAddress(address) {
-  showLocationStatus(`正在搜尋「${address}」...`, 'loading');
-
-  // 模擬地址搜尋（實際實現需要整合地圖服務API）
-  setTimeout(() => {
-    // 模擬找到位置
-    const mockLat = 25.0330 + (Math.random() - 0.5) * 0.01;
-    const mockLng = 121.5654 + (Math.random() - 0.5) * 0.01;
-
-    if (map) {
-      map.setView([mockLat, mockLng], 17);
-    }
-
-    showLocationStatus(`已定位到「${address}」附近`, 'success');
-
-    // 重新開始地理位置監控
-    startGeolocation();
-  }, 2000);
+  showLocationStatus(`目前未串接地址搜尋，請改用座標或地圖中心定位。`, 'warning');
 }
 
 // 使用預設位置
 function useDefaultLocation() {
-  if (map) {
-    map.setView([24.757, 121.753], 16);
-  }
-  showLocationStatus('使用預設位置（宜蘭）', 'info');
-  startGeolocation();
+  setUserPosition(DEFAULT_MAP_CENTER.lat, DEFAULT_MAP_CENTER.lng, 50, { recenter: true, manual: true });
+  showLocationStatus('已使用預設位置更新任務距離。', 'info');
 }
 
 // 顯示定位狀態
-function showLocationStatus(message, type = 'info') {
+function showLocationStatus(message, type = 'info', options = {}) {
   const statusDiv = document.getElementById('locationStatus') || createLocationStatusDiv();
 
   const typeClasses = {
@@ -237,11 +200,11 @@ function showLocationStatus(message, type = 'info') {
     info: 'status-info'
   };
 
-  statusDiv.innerHTML = `<div class="location-status ${typeClasses[type] || 'status-info'}">${message}</div>`;
+  statusDiv.innerHTML = `<div class="location-status ${typeClasses[type] || 'status-info'}">${escapeHtml(message)}</div>`;
   statusDiv.style.display = 'block';
 
   // 自動隱藏成功訊息
-  if (type === 'success') {
+  if (type === 'success' && !options.persist) {
     setTimeout(() => {
       statusDiv.style.display = 'none';
     }, 3000);
@@ -253,91 +216,6 @@ function createLocationStatusDiv() {
   const statusDiv = document.createElement('div');
   statusDiv.id = 'locationStatus';
   statusDiv.className = 'location-status-container';
-
-  // 添加樣式
-  const style = document.createElement('style');
-  style.textContent = `
-    .location-status-container {
-      position: fixed;
-      top: 80px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 1000;
-      min-width: 300px;
-      max-width: 500px;
-    }
-
-    .location-status {
-      background: white;
-      border-radius: 8px;
-      padding: 12px 16px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      font-size: 14px;
-      text-align: center;
-      border-left: 4px solid #007bff;
-    }
-
-    .location-error {
-      background: white;
-      border-radius: 8px;
-      padding: 16px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      text-align: center;
-    }
-
-    .error-icon {
-      font-size: 24px;
-      margin-bottom: 8px;
-    }
-
-    .error-message {
-      color: #666;
-      margin-bottom: 16px;
-      font-size: 14px;
-    }
-
-    .location-options {
-      display: flex;
-      gap: 8px;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-
-    .location-options button {
-      padding: 8px 16px;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 14px;
-      transition: all 0.2s;
-    }
-
-    .btn-primary {
-      background: #007bff;
-      color: white;
-    }
-
-    .btn-primary:hover {
-      background: #0056b3;
-    }
-
-    .btn-secondary {
-      background: #6c757d;
-      color: white;
-    }
-
-    .btn-secondary:hover {
-      background: #545b62;
-    }
-
-    .status-loading { border-left-color: #ffc107; }
-    .status-success { border-left-color: #28a745; }
-    .status-warning { border-left-color: #ffc107; }
-    .status-error { border-left-color: #dc3545; }
-    .status-info { border-left-color: #17a2b8; }
-  `;
-  document.head.appendChild(style);
-
   document.body.appendChild(statusDiv);
   return statusDiv;
 }
@@ -430,6 +308,26 @@ function fetchQuestProgress(forceRefresh = false) {
   }
 }
 
+function normalizeTaskCoordinates(task) {
+  const lat = Number(task.lat);
+  const lng = Number(task.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+  return {
+    ...task,
+    lat,
+    lng,
+    radius: Number(task.radius) || 50,
+    points: Number(task.points) || 0
+  };
+}
+
+function resetTaskMarkers() {
+  if (taskMarkersLayer) {
+    taskMarkersLayer.clearLayers();
+  }
+}
+
 // 載入任務並顯示在地圖上
 async function loadTasks(forceRefreshProgress = false) {
   try {
@@ -441,7 +339,9 @@ async function loadTasks(forceRefreshProgress = false) {
 
     if (!tasksRes.success) return;
 
-    const allTasks = tasksRes.tasks;
+    const allTasks = (tasksRes.tasks || [])
+      .map(normalizeTaskCoordinates)
+      .filter(Boolean);
     console.log('[loadTasks] 獲取的進度:', progress);
     console.log('[loadTasks] 所有任務數量:', allTasks.length);
 
@@ -453,6 +353,8 @@ async function loadTasks(forceRefreshProgress = false) {
     console.log('[loadTasks] 劇情線 ID 列表:', Array.from(questChains));
 
     // 過濾邏輯：劇情任務只顯示目前進度的關卡
+    resetTaskMarkers();
+
     tasksList = allTasks.filter(task => {
       // 1. 如果不是劇情任務，直接顯示
       if (task.type !== 'quest') return true;
@@ -502,9 +404,15 @@ async function loadTasks(forceRefreshProgress = false) {
       }
     });
 
-    focusFromUrl();
+    renderTaskNavigator();
+
+    if (!focusFromUrl()) {
+      fitInitialTaskView();
+    }
   } catch (err) {
     console.error('載入任務失敗:', err);
+    showLocationStatus('任務載入失敗，請檢查網路後重新整理。', 'error', { persist: true });
+    renderTaskNavigator();
   }
 }
 
@@ -667,7 +575,7 @@ function bindPopupAndEvents(marker, task) {
     className: 'task-popup'
   });
 
-  marker.addTo(map);
+  marker.addTo(taskMarkersLayer || map);
 
   // 添加點擊事件
   marker.on('click', () => {
@@ -692,9 +600,8 @@ function createTaskPopup(task) {
     : '';
 
   // 檢查使用者權限
-  const userJson = localStorage.getItem('user');
-  const loginUser = userJson ? JSON.parse(userJson) : null;
-  const isStaffOrAdmin = loginUser && (loginUser.role === 'admin' || loginUser.role === 'shop' || loginUser.role === 'staff');
+  const loginUser = getStoredLoginUser();
+  const isStaffOrAdmin = isStaffOrAdminUser(loginUser);
 
   // 限時任務資訊
   let timedInfo = '';
@@ -760,15 +667,180 @@ function createTaskPopup(task) {
   `;
 }
 
+function createTaskNavigator() {
+  if (document.getElementById('taskNavigator')) return;
+
+  const panel = document.createElement('aside');
+  panel.id = 'taskNavigator';
+  panel.className = 'task-navigator';
+  panel.innerHTML = `
+    <div class="task-navigator-header">
+      <div>
+        <div class="task-navigator-title">任務導覽</div>
+        <div id="taskNavigatorSummary" class="task-navigator-summary">正在載入任務...</div>
+      </div>
+      <button id="taskNavigatorToggle" class="task-navigator-toggle" type="button" aria-label="收合任務導覽">收合</button>
+    </div>
+    <div id="taskNavigatorList" class="task-navigator-list"></div>
+  `;
+
+  document.body.appendChild(panel);
+  document.getElementById('taskNavigatorToggle').addEventListener('click', () => {
+    setTaskNavigatorCollapsed(!taskNavigatorCollapsed);
+  });
+}
+
+function setTaskNavigatorCollapsed(isCollapsed) {
+  taskNavigatorCollapsed = isCollapsed;
+  const panel = document.getElementById('taskNavigator');
+  const toggle = document.getElementById('taskNavigatorToggle');
+  if (!panel || !toggle) return;
+
+  panel.classList.toggle('is-collapsed', isCollapsed);
+  toggle.textContent = isCollapsed ? '展開' : '收合';
+  toggle.setAttribute('aria-label', isCollapsed ? '展開任務導覽' : '收合任務導覽');
+}
+
+function getTaskKindLabel(task) {
+  if (task.type === 'quest') return `劇情第 ${task.quest_order || 1} 關`;
+  if (task.type === 'timed') return '限時任務';
+  return '一般任務';
+}
+
+function getAnswerKindLabel(task) {
+  const labels = {
+    multiple_choice: '選擇題',
+    photo: '拍照',
+    number: '數字解謎',
+    keyword: '關鍵字',
+    location: '打卡',
+    qa: '問答'
+  };
+  return labels[task.task_type] || '問答';
+}
+
+function getTaskStatusLabel(task) {
+  if (completedTaskIds.has(task.id) || taskStatusById[task.id] === '完成') return '已完成';
+  if (taskStatusById[task.id] === '進行中') return '進行中';
+  return '可接取';
+}
+
+function getTaskDistanceText(task) {
+  if (!userLatLng) return '等待定位';
+  return formatDistance(haversineDistance(userLatLng.lat, userLatLng.lng, task.lat, task.lng));
+}
+
+function sortTasksForNavigator(tasks) {
+  return tasks.slice().sort((a, b) => {
+    const aDone = getTaskStatusLabel(a) === '已完成' ? 1 : 0;
+    const bDone = getTaskStatusLabel(b) === '已完成' ? 1 : 0;
+    if (aDone !== bDone) return aDone - bDone;
+
+    if (userLatLng) {
+      const aDist = haversineDistance(userLatLng.lat, userLatLng.lng, a.lat, a.lng);
+      const bDist = haversineDistance(userLatLng.lat, userLatLng.lng, b.lat, b.lng);
+      if (aDist !== bDist) return aDist - bDist;
+    }
+
+    if (a.type === 'quest' && b.type === 'quest' && a.quest_chain_id === b.quest_chain_id) {
+      return Number(a.quest_order || 0) - Number(b.quest_order || 0);
+    }
+
+    return Number(b.id || 0) - Number(a.id || 0);
+  });
+}
+
+function renderTaskNavigator() {
+  const list = document.getElementById('taskNavigatorList');
+  const summary = document.getElementById('taskNavigatorSummary');
+  if (!list || !summary) return;
+
+  if (!tasksList.length) {
+    summary.textContent = '目前沒有可顯示任務';
+    list.innerHTML = `
+      <div class="task-navigator-empty">
+        <div>目前地圖上沒有可顯示的任務。</div>
+        <a href="/tasks-list.html">前往任務列表</a>
+      </div>
+    `;
+    return;
+  }
+
+  summary.textContent = userLatLng
+    ? `共 ${tasksList.length} 個任務，已依距離排序`
+    : `共 ${tasksList.length} 個任務，GPS 還在定位中`;
+
+  const sortedTasks = sortTasksForNavigator(tasksList).slice(0, 8);
+  list.innerHTML = sortedTasks.map(task => {
+    const status = getTaskStatusLabel(task);
+    const statusClass = status === '已完成' ? 'is-complete' : (status === '進行中' ? 'is-active' : '');
+    const description = escapeHtml(task.description || '').slice(0, 42);
+    return `
+      <article class="task-navigator-item ${statusClass}">
+        <div class="task-navigator-item-main">
+          <div class="task-navigator-name">${escapeHtml(task.name)}</div>
+          <div class="task-navigator-meta">
+            <span>${escapeHtml(getTaskKindLabel(task))}</span>
+            <span>${escapeHtml(getAnswerKindLabel(task))}</span>
+            <span>${escapeHtml(getTaskDistanceText(task))}</span>
+          </div>
+          ${description ? `<div class="task-navigator-desc">${description}${description.length >= 42 ? '...' : ''}</div>` : ''}
+        </div>
+        <div class="task-navigator-actions">
+          <span class="task-navigator-status">${status}</span>
+          <button type="button" data-focus-task="${task.id}">定位圖釘</button>
+          <a href="/task-detail.html?id=${task.id}">${status === '已完成' ? '查看' : '開始'}</a>
+        </div>
+      </article>
+    `;
+  }).join('');
+
+  list.querySelectorAll('[data-focus-task]').forEach(button => {
+    button.addEventListener('click', () => {
+      focusTaskFromNavigator(Number(button.dataset.focusTask));
+    });
+  });
+}
+
+function focusTaskFromNavigator(taskId) {
+  const task = tasksList.find(item => Number(item.id) === Number(taskId));
+  if (!task || !map) return;
+
+  map.setView([task.lat, task.lng], Math.max(map.getZoom(), 18));
+  if (task._marker) task._marker.openPopup();
+
+  if (window.innerWidth <= 700) {
+    setTaskNavigatorCollapsed(true);
+  }
+}
+
+function fitInitialTaskView() {
+  if (initialTaskViewApplied || !map || userLatLng || !tasksList.length) return;
+  initialTaskViewApplied = true;
+
+  if (tasksList.length === 1) {
+    map.setView([tasksList[0].lat, tasksList[0].lng], 17);
+    return;
+  }
+
+  const bounds = L.latLngBounds(tasksList.map(task => [task.lat, task.lng]));
+  if (bounds.isValid()) {
+    map.fitBounds(bounds, {
+      paddingTopLeft: [24, 110],
+      paddingBottomRight: [360, 120],
+      maxZoom: 17
+    });
+  }
+}
+
 // 顯示任務卡片（模態框）
 function showTaskCard(taskId) {
   const task = tasksList.find(t => t.id === taskId);
   if (!task) return;
 
   // 檢查使用者權限
-  const userJson = localStorage.getItem('user');
-  const loginUser = userJson ? JSON.parse(userJson) : null;
-  const isStaffOrAdmin = loginUser && (loginUser.role === 'admin' || loginUser.role === 'shop' || loginUser.role === 'staff');
+  const loginUser = getStoredLoginUser();
+  const isStaffOrAdmin = isStaffOrAdminUser(loginUser);
 
   // 限時任務資訊 (重複利用邏輯)
   let timedInfo = '';
@@ -941,35 +1013,37 @@ function extractYouTubeId(url) {
 
 // 添加距離顯示控制按鈕
 function addDistanceControls() {
+  if (document.getElementById('distanceBtn')) return;
+
   const controlsDiv = document.createElement('div');
   controlsDiv.className = 'distance-controls';
   controlsDiv.innerHTML = `
-    <button onclick="toggleDistanceDisplay()" class="active" id="distanceBtn">
-      📍 顯示距離
-    </button>
+    <button onclick="toggleDistanceDisplay()" class="active" id="distanceBtn" type="button">隱藏距離</button>
   `;
 
-  // 將控制按鈕添加到地圖容器
-  const mapContainer = document.getElementById('map');
-  if (mapContainer) {
-    mapContainer.style.position = 'relative';
-    mapContainer.appendChild(controlsDiv);
-  }
+  document.body.appendChild(controlsDiv);
+}
+
+function updateDistanceButton() {
+  const btn = document.getElementById('distanceBtn');
+  if (!btn) return;
+  btn.classList.toggle('active', distanceDisplayEnabled);
+  btn.textContent = distanceDisplayEnabled ? '隱藏距離' : '顯示距離';
 }
 
 // 切換距離顯示
 function toggleDistanceDisplay() {
+  if (!userLatLng) {
+    showLocationStatus('尚未取得定位；任務可以先開始，距離會在 GPS 恢復後顯示。', 'warning');
+    return;
+  }
+
   distanceDisplayEnabled = !distanceDisplayEnabled;
-  const btn = document.getElementById('distanceBtn');
+  updateDistanceButton();
 
   if (distanceDisplayEnabled) {
-    btn.classList.add('active');
-    btn.textContent = '📍 顯示距離';
-    // 重新載入任務以顯示距離
-    loadTasks();
+    tasksList.forEach(task => updateTaskDistance(task));
   } else {
-    btn.classList.remove('active');
-    btn.textContent = '📍 隱藏距離';
     // 隱藏所有距離顯示
     tasksList.forEach(task => {
       if (task._marker) {
@@ -978,6 +1052,8 @@ function toggleDistanceDisplay() {
       }
     });
   }
+
+  renderTaskNavigator();
 }
 
 // 檢查任務是否已完成
@@ -986,6 +1062,8 @@ function isTaskCompleted(taskId) {
 }
 
 function focusFromUrl() {
+  if (!map) return false;
+
   const urlParams = new URLSearchParams(window.location.search);
   const lat = parseFloat(urlParams.get('focusLat'));
   const lng = parseFloat(urlParams.get('focusLng'));
@@ -998,124 +1076,136 @@ function focusFromUrl() {
       if (d < minDist) { minDist = d; minMarker = task._marker; }
     });
     if (minMarker) minMarker.openPopup();
+    return true;
   }
+  return false;
 }
 
-function startGeolocation() {
+function startGeolocation(options = {}) {
   if (!('geolocation' in navigator)) {
-    alert('您的裝置不支援定位功能。');
+    handleLocationError(new Error('瀏覽器不支援地理位置功能'));
     return;
   }
-  navigator.geolocation.getCurrentPosition(
-    pos => watchPosition(),
+
+  if (geoWatchId !== null) {
+    navigator.geolocation.clearWatch(geoWatchId);
+    geoWatchId = null;
+  }
+
+  requestLocationPermission()
+    .then(pos => {
+      setUserPosition(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, {
+        recenter: options.recenterOnFirstFix !== false
+      });
+      showLocationStatus(`定位成功，精度約 ${Math.round(pos.coords.accuracy || 0)} 公尺。`, 'success');
+    })
+    .catch(err => handleLocationError(err));
+
+  geoWatchId = navigator.geolocation.watchPosition(
+    pos => {
+      setUserPosition(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, {
+        recenter: !firstLocationFix && options.recenterOnFirstFix !== false
+      });
+    },
     err => handleGeoError(err),
-    { enableHighAccuracy: true, timeout: 10000 }
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
   );
 }
 
-let userAccuracyCircle; // GPS 精度圓圈
-
 function watchPosition() {
-  navigator.geolocation.watchPosition(
-    pos => {
-      const { latitude, longitude, accuracy } = pos.coords;
-      
-      // === GPS 精度過濾 ===
-      // 如果精度太差 (> 60m)，忽略這次更新 (除非是第一次定位)
-      if (accuracy > 60 && lastUserLat !== 0) {
-        // 更新一下精度圈，讓使用者知道目前訊號不穩
-        if (userAccuracyCircle) {
-          userAccuracyCircle.setRadius(accuracy);
-          userAccuracyCircle.setStyle({ color: '#ffc107', fillColor: '#ffc107' }); // 黃色警告
-        }
-        return; 
-      }
+  startGeolocation({ recenterOnFirstFix: false });
+}
 
-      // 如果精度回來了，改回藍色
-      if (userAccuracyCircle) {
-        userAccuracyCircle.setStyle({ color: '#007bff', fillColor: '#007bff' });
-      }
-      
-      // === 防抖動處理 ===
-      // 計算與上一次位置的距離
-      const moveDist = haversineDistance(lastUserLat, lastUserLng, latitude, longitude);
-      
-      // 🔥 優化：每次 GPS 更新都檢查任務觸發，確保邊緣判定的即時性
-      checkProximity(latitude, longitude);
-      
-      // 只有當移動距離超過 MIN_UPDATE_DISTANCE (3公尺) 時才更新地圖上的 Marker (節省渲染資源)
-      if (moveDist > MIN_UPDATE_DISTANCE) {
-          lastUserLat = latitude;
-          lastUserLng = longitude;
-          
-          userLatLng = { lat: latitude, lng: longitude };
+function setUserPosition(latitude, longitude, accuracy = 20, options = {}) {
+  if (!map) return;
 
-          // 更新用戶位置標記
-          if (!userMarker) {
-            userMarker = L.marker([latitude, longitude], {
-              icon: L.icon({
-                iconUrl: '/images/red-arrow.svg',
-                iconSize: [64, 64],
-                iconAnchor: [32, 32]
-              })
-            }).addTo(map);
+  const wasFirstFix = !firstLocationFix;
+  const normalizedAccuracy = Number(accuracy) || 20;
 
-            // 添加精度圓圈
-            userAccuracyCircle = L.circle([latitude, longitude], {
-              radius: accuracy || 10, // 精度半徑 (公尺)
-              color: '#007bff',
-              weight: 1,
-              opacity: 0.5,
-              fillColor: '#007bff',
-              fillOpacity: 0.1
-            }).addTo(map);
+  checkProximity(latitude, longitude);
 
-            // 首次設置用戶位置時，將地圖中心點設置為用戶位置
-            map.setView([latitude, longitude], map.getZoom());
-          } else {
-            userMarker.setLatLng([latitude, longitude]);
-            
-            // 更新精度圓圈
-            if (userAccuracyCircle) {
-              userAccuracyCircle.setLatLng([latitude, longitude]);
-              userAccuracyCircle.setRadius(accuracy || 10);
-            }
+  const moveDist = firstLocationFix
+    ? haversineDistance(lastUserLat, lastUserLng, latitude, longitude)
+    : Infinity;
 
-            // 強制拉回視角：如果使用者跑出畫面太遠 (>300m)，自動拉回來
-            const mapCenter = map.getCenter();
-            const distFromCenter = haversineDistance(mapCenter.lat, mapCenter.lng, latitude, longitude);
-            if (distFromCenter > 0.3) { // 300公尺
-                map.setView([latitude, longitude], map.getZoom());
-            }
-          }
+  if (moveDist <= MIN_UPDATE_DISTANCE && !options.manual) {
+    return;
+  }
 
-          // 啟用距離顯示並更新所有任務距離
-          if (!distanceDisplayEnabled) {
-            distanceDisplayEnabled = true;
-            addDistanceControls();
-          }
+  lastUserLat = latitude;
+  lastUserLng = longitude;
+  userLatLng = { lat: latitude, lng: longitude };
+  firstLocationFix = true;
+  locationPermissionGranted = true;
+  locationPermissionDenied = false;
 
-          // 更新所有任務的距離顯示
-          tasksList.forEach(task => {
-            updateTaskDistance(task);
-          });
-      }
-    },
-    err => handleGeoError(err),
-    { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 }
-  );
+  const accuracyColor = normalizedAccuracy > 80 ? '#f59e0b' : '#007bff';
+  if (normalizedAccuracy > 80 && Date.now() - lastGeoWarningAt > 10000) {
+    lastGeoWarningAt = Date.now();
+    showLocationStatus(`GPS 訊號偏弱，誤差約 ${Math.round(normalizedAccuracy)} 公尺；任務仍可操作。`, 'warning');
+  }
+
+  if (!userMarker) {
+    userMarker = L.marker([latitude, longitude], {
+      icon: L.icon({
+        iconUrl: '/images/red-arrow.svg',
+        iconSize: [64, 64],
+        iconAnchor: [32, 32]
+      })
+    }).addTo(map);
+
+    userAccuracyCircle = L.circle([latitude, longitude], {
+      radius: normalizedAccuracy,
+      color: accuracyColor,
+      weight: 1,
+      opacity: 0.5,
+      fillColor: accuracyColor,
+      fillOpacity: 0.1
+    }).addTo(map);
+  } else {
+    userMarker.setLatLng([latitude, longitude]);
+    if (userAccuracyCircle) {
+      userAccuracyCircle.setLatLng([latitude, longitude]);
+      userAccuracyCircle.setRadius(normalizedAccuracy);
+      userAccuracyCircle.setStyle({ color: accuracyColor, fillColor: accuracyColor });
+    }
+  }
+
+  if (!distanceDisplayEnabled) {
+    distanceDisplayEnabled = true;
+  }
+  addDistanceControls();
+  updateDistanceButton();
+
+  tasksList.forEach(task => updateTaskDistance(task));
+  renderTaskNavigator();
+
+  if (options.recenter || (wasFirstFix && options.recenter !== false)) {
+    map.setView([latitude, longitude], Math.max(map.getZoom(), 17));
+    return;
+  }
+
+  const mapCenter = map.getCenter();
+  const distFromCenter = haversineDistance(mapCenter.lat, mapCenter.lng, latitude, longitude);
+  if (distFromCenter > 0.3) {
+    map.setView([latitude, longitude], map.getZoom());
+  }
 }
 
 function handleGeoError(err) {
   let msg = '';
   switch (err.code) {
-    case 1: msg = '請允許存取位置才能體驗任務功能'; break;
-    case 2: msg = '無法取得您的定位資訊，請確認網路或 GPS 設定'; break;
-    case 3: msg = '定位超時，請重新整理'; break;
+    case 1: msg = '定位權限被拒絕。任務仍可查看，允許權限後可顯示距離與自動觸發。'; break;
+    case 2: msg = '暫時無法取得定位。請先查看任務導覽，GPS 恢復後會自動更新。'; break;
+    case 3: msg = '定位逾時。任務已可操作，您也可以稍後再試一次定位。'; break;
     default: msg = '定位發生未知錯誤';
   }
-  // alert(msg); // 減少干擾，只在控制台輸出
   console.warn(msg);
+
+  if (Date.now() - lastGeoErrorAt > 8000) {
+    lastGeoErrorAt = Date.now();
+    showManualLocationOption(msg);
+  }
 }
 
 function checkProximity(userLat, userLng) {
@@ -1155,36 +1245,43 @@ function showTaskModal(task, onGo, onClose) {
   };
 }
 
-function isTaskCompleted(taskId) {
-  return completedTaskIds.has(taskId);
-}
-
 let globalLoginUser = null;
+
+async function refreshUserTaskStatus() {
+  const loginUser = getStoredLoginUser();
+  if (!loginUser || !loginUser.username) {
+    completedTaskIds = new Set();
+    taskStatusById = {};
+    renderTaskNavigator();
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/user-tasks/all?username=${encodeURIComponent(loginUser.username)}`, {
+      credentials: 'include'
+    });
+    const data = await res.json();
+    if (data.success && Array.isArray(data.tasks)) {
+      taskStatusById = {};
+      data.tasks.forEach(task => {
+        taskStatusById[task.id] = task.status;
+      });
+      completedTaskIds = new Set(data.tasks.filter(task => task.status === '完成').map(task => task.id));
+      renderTaskNavigator();
+    }
+  } catch (err) {
+    console.warn('載入使用者任務狀態失敗:', err);
+  }
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   // 初始化方向感測
   initOrientationTracking();
 
-  globalLoginUser = JSON.parse(localStorage.getItem('loginUser') || 'null');
-  const loginUser = globalLoginUser;
-  
-  // 優先強制刷新劇情進度，確保獲取最新狀態
-  if (loginUser && loginUser.username) {
-    // 先強制刷新進度，然後載入已完成任務列表，最後初始化地圖
-    Promise.all([
-      fetchQuestProgress(true), // 強制刷新進度
-      fetch(`${API_BASE}/api/user-tasks/all?username=${encodeURIComponent(loginUser.username)}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            completedTaskIds = new Set(data.tasks.filter(t => t.status === '完成').map(t => t.id));
-          }
-          return data;
-        })
-    ]).then(() => {
-      initMapWithUserLocation();
-    });
-  } else {
-    initMapWithUserLocation();
-  }
+  globalLoginUser = getStoredLoginUser();
+  initMapWithUserLocation();
+
+  refreshUserTaskStatus().then(() => {
+    if (map) loadTasks(true);
+  });
 });

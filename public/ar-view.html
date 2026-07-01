@@ -252,10 +252,74 @@
             background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.3);
         }
         
-        /* 寶箱/道具等 3D Transform 相關 */
+        /* 導航與寶箱/道具等 3D Transform 相關 */
         @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
-        #guide-arrow { position: absolute; top: 50%; left: 50%; width: 60px; height: 60px; margin-left: -30px; margin-top: -30px; display: none; }
-        #guide-arrow::after { content: ''; display: block; width: 100%; height: 100%; border-top: 10px solid #ff3b30; border-right: 10px solid #ff3b30; transform: rotate(45deg); box-shadow: 2px -2px 2px rgba(0,0,0,0.2); }
+        #guide-arrow {
+            position: absolute;
+            top: 52%;
+            left: 50%;
+            width: min(58vw, 260px);
+            aspect-ratio: 16 / 9;
+            margin-left: min(-29vw, -130px);
+            margin-top: -70px;
+            display: none;
+            background: url('/images/ar-direction-arrow.png') center / contain no-repeat;
+            filter: drop-shadow(0 12px 18px rgba(0,0,0,0.55));
+            transform-origin: center center;
+            transition: transform 0.18s ease-out;
+        }
+        #navigation-panel {
+            position: fixed;
+            left: 50%;
+            bottom: 92px;
+            transform: translateX(-50%);
+            width: min(430px, calc(100vw - 32px));
+            background: rgba(8, 13, 24, 0.82);
+            border: 1px solid rgba(255,255,255,0.16);
+            border-radius: 16px;
+            box-shadow: 0 18px 46px rgba(0,0,0,0.42);
+            color: white;
+            padding: 14px 16px;
+            pointer-events: auto;
+            backdrop-filter: blur(12px);
+        }
+        #navigation-panel.in-range {
+            border-color: rgba(34, 197, 94, 0.68);
+            background: rgba(6, 43, 28, 0.86);
+        }
+        .nav-panel-title {
+            font-size: 0.86rem;
+            color: rgba(255,255,255,0.72);
+            margin-bottom: 6px;
+        }
+        .nav-panel-distance {
+            font-size: clamp(2rem, 12vw, 4rem);
+            font-weight: 900;
+            line-height: 1;
+        }
+        .nav-panel-distance small {
+            font-size: 0.38em;
+            margin-left: 4px;
+        }
+        .nav-panel-subtitle {
+            margin-top: 8px;
+            font-size: 0.95rem;
+            color: rgba(255,255,255,0.82);
+            line-height: 1.45;
+        }
+        .nav-panel-meta {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .nav-panel-meta span {
+            background: rgba(255,255,255,0.12);
+            border-radius: 999px;
+            padding: 6px 9px;
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.9);
+        }
         
         /* 背景音樂控制 */
         #bgm-controls {
@@ -366,7 +430,6 @@
             </div>
             <div id="tap-hint" style="color:white; text-align:center; text-shadow:0 2px 2px black; font-weight:bold; margin-top:10px;">點擊查看詳情</div>
         </div>
-        <div id="guide-arrow"></div>
     </div>
     <div id="ar-modal"><div class="modal-content"><div id="modal-body" style="display:flex; flex-direction:column; gap:10px; align-items:center; width:100%;"></div><div class="modal-actions"><button class="btn-close" id="modal-close">關閉</button><button class="btn-reply" id="modal-submit">✍️ 點擊回覆問題</button></div></div></div>
     <div id="lock-overlay"><div class="lock-card"><div class="lock-title">🔒 旋轉密碼鎖</div><div class="lock-subtitle">轉動數字輪盤後按「確定解鎖」。<br>提醒：需要完全正確，才能通關。</div><div class="wheels" id="lock-wheels"></div><div class="lock-actions"><button id="btn-lock-cancel" type="button">關閉</button><button id="btn-lock-submit" type="button">確定解鎖</button></div><div id="lock-msg"></div></div></div>
@@ -419,8 +482,19 @@
             <div style="margin-bottom:30px; color:#ccc; text-align:center; max-width:80%;">需要您的相機與方向感測器權限<br>以進行 AR 導航</div>
             <button id="start-btn" style="padding:15px 40px; font-size:1.2rem; background:#007bff; color:white; border:none; border-radius:50px; font-weight:bold; box-shadow:0 0 20px rgba(0,123,255,0.5);">🚀 開始搜尋</button>
         </div>
+        <div id="guide-arrow"></div>
+        <div id="navigation-panel">
+            <div class="nav-panel-title">前往任務範圍</div>
+            <div class="nav-panel-distance"><span id="nav-distance">定位中</span><small id="nav-distance-unit"></small></div>
+            <div class="nav-panel-subtitle" id="nav-instruction">啟動後會顯示距離與箭頭方向。</div>
+            <div class="nav-panel-meta">
+                <span id="nav-radius">範圍：--</span>
+                <span id="nav-bearing">方向：--</span>
+                <span id="nav-accuracy">GPS：--</span>
+            </div>
+        </div>
         <div class="info-box"><div id="status">等待啟動...</div><div id="debug-info" style="font-size:0.8em; color:#ffeb3b; margin-top:5px;"></div></div>
-        <button id="btn-back" class="btn-back">🔙 返回填寫答案</button>
+        <button id="btn-back" class="btn-back">🔙 返回任務頁</button>
         <button id="btn-open-lock" type="button">🔒 輸入密碼</button>
         <button id="btn-rotation-mode" type="button" style="position:fixed; bottom:90px; right:20px; background:#28a745; color:white; padding:12px 20px; border:none; border-radius:50px; font-size:14px; font-weight:bold; box-shadow:0 4px 10px rgba(0,0,0,0.3); pointer-events:auto; cursor:pointer; z-index:20; display:none;">🔄 旋轉模式</button>
     </div>
@@ -722,18 +796,30 @@
                 
                 // 綁定 GPS 鎖定事件
                 window.addEventListener('gps-camera-update-position', (e) => {
-                    // 持續更新距離與方位資訊 (無論是否鎖定)
                     userLat = e.detail.position.latitude;
                     userLng = e.detail.position.longitude;
                     
                     if (targetLat && targetLng) {
                         const dist = haversineDistance(userLat, userLng, targetLat, targetLng);
                         const bearing = calculateBearing(userLat, userLng, targetLat, targetLng);
+                        let delta = bearing - deviceHeading;
+                        while (delta < -180) delta += 360;
+                        while (delta > 180) delta -= 360;
+
                         document.getElementById('status').innerText = `距離目標: ${dist.toFixed(0)}m (GPS精度: ${e.detail.position.accuracy?.toFixed(0)}m)`;
                         document.getElementById('debug-info').innerText = `目標方位: ${bearing.toFixed(0)}°`;
+
+                        updateNavigationPanel(dist, bearing, delta, e.detail.position.accuracy);
+
+                        if (dist > activationRadius) {
+                            setOutOfRangeState(delta);
+                            return;
+                        }
+
+                        setInRangeState();
                     }
 
-                    if (!gpsLocked && !window.rotationMode) {
+                    if (!gpsLocked && !window.rotationMode && arContentUnlocked) {
                         if(modelEntity && targetLat && targetLng) {
                             modelEntity.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
                             modelEntity.setAttribute('visible', 'true');
@@ -924,6 +1010,68 @@
         let hasRequiredItem = false;
         let arSteps = []; // 多步驟 AR 提示陣列
         let currentArStep = 0; // 當前步驟索引
+        let activationRadius = 15;
+        let arContentUnlocked = false;
+        let arContentAutoOpened = false;
+        let lastDistanceToTarget = null;
+        let lastGpsAccuracy = null;
+
+        function getTaskRadius(task = window.currentTask) {
+            const value = Number(task?.radius);
+            return Number.isFinite(value) && value > 0 ? value : 15;
+        }
+
+        function parseTaskOptions(options) {
+            if (Array.isArray(options)) return options;
+            if (!options) return [];
+            try {
+                const parsed = JSON.parse(options);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (e) {
+                return String(options).split('\n').map(item => item.trim()).filter(Boolean);
+            }
+        }
+
+        function buildArSteps(task) {
+            const steps = [];
+            if (task.ar_model_url) {
+                steps.push({
+                    type: '3d',
+                    order: task.ar_order_model || 1,
+                    url: task.ar_model_url,
+                    scale: task.ar_model_scale || 3.0
+                });
+            }
+            if (task.ar_image_url) {
+                steps.push({
+                    type: 'image',
+                    order: task.ar_order_image || (task.ar_model_url ? 2 : 1),
+                    url: task.ar_image_url
+                });
+            }
+            if (task.youtubeUrl) {
+                steps.push({
+                    type: 'youtube',
+                    order: task.ar_order_youtube || (steps.length + 1),
+                    url: task.youtubeUrl
+                });
+            }
+            if (steps.length > 0 && steps.every(step => !step.order)) {
+                steps.forEach((step, index) => { step.order = index + 1; });
+            }
+            return steps.sort((a, b) => (a.order || 99) - (b.order || 99));
+        }
+
+        function resetJourneyState(task) {
+            activationRadius = getTaskRadius(task);
+            arContentUnlocked = false;
+            arContentAutoOpened = false;
+            currentArStep = 0;
+            isObjectVisible = false;
+            gpsLocked = false;
+            const navRadius = document.getElementById('nav-radius');
+            if (navRadius) navRadius.textContent = `範圍：${Math.round(activationRadius)}m`;
+        }
         if (taskId) {
             fetch(`${API_BASE}/api/tasks/${taskId}`)
                 .then(res => res.json())
@@ -935,45 +1083,8 @@
                         // 載入任務背景音樂
                         loadTaskBGM(task);
                         
-                        // 解析 AR 多步驟順序
-                        arSteps = [];
-                        const steps = [];
-                        
-                        // 3D 模型 (兼容舊數據：如果有 URL 但沒順序，默認為步驟 1)
-                        if (task.ar_model_url) {
-                            steps.push({ 
-                                type: '3d', 
-                                order: task.ar_order_model || 1, 
-                                url: task.ar_model_url, 
-                                scale: task.ar_model_scale || 3.0 
-                            });
-                        }
-                        
-                        // 圖片
-                        if (task.ar_image_url) {
-                            steps.push({ 
-                                type: 'image', 
-                                order: task.ar_order_image || (task.ar_model_url ? 2 : 1), 
-                                url: task.ar_image_url 
-                            });
-                        }
-                        
-                        // YouTube (兼容舊數據：如果有 URL 但沒順序，自動排在後面)
-                        if (task.youtubeUrl) {
-                            steps.push({ 
-                                type: 'youtube', 
-                                order: task.ar_order_youtube || (steps.length + 1), 
-                                url: task.youtubeUrl 
-                            });
-                        }
-                        
-                        // 如果步驟都被設為 0 或 null，重新分配順序
-                        if (steps.length > 0 && steps.every(s => !s.order)) {
-                            steps.forEach((s, i) => s.order = i + 1);
-                        }
-                        
-                        arSteps = steps.sort((a, b) => (a.order || 99) - (b.order || 99));
-                        currentArStep = 0;
+                        arSteps = buildArSteps(task);
+                        resetJourneyState(task);
                         console.log('📋 AR 步驟:', arSteps);
                         
                         // 判斷是否使用 3D 模式（第一步是 3D 模型）
@@ -1000,7 +1111,10 @@
                             const loginUser = getLoginUser();
                             if (loginUser) {
                                 try {
-                                    const invRes = await fetch(`${API_BASE}/api/user/inventory`, { headers: { 'x-username': loginUser.username } });
+                                    const invRes = await fetch(`${API_BASE}/api/user/inventory`, {
+                                        headers: { 'x-username': loginUser.username },
+                                        credentials: 'include'
+                                    });
                                     const invData = await invRes.json();
                                     if (invData.success) hasRequiredItem = invData.inventory.some(i => i.item_id === task.required_item_id);
                                 } catch (e) { console.error(e); }
@@ -1008,19 +1122,18 @@
                         }
                         isNumberTask = (task.task_type === 'number');
                         isLocationTask = (task.task_type === 'location');
-                        if (isLocationTask) fetchCurrentUserTaskId();
                         if (typeof task.correct_answer === 'string') {
                             const len = task.correct_answer.trim().length;
                             if (len >= 2 && len <= 8) lockDigits = len;
                         }
                         
-                        if (task.lat && task.lng) { targetLat = task.lat; targetLng = task.lng; }
+                        if (task.lat && task.lng) { targetLat = Number(task.lat); targetLng = Number(task.lng); }
+                        currentUserTaskId = await ensureTaskStarted();
                         
                         const btnOpenLock = document.getElementById('btn-open-lock');
                         if (isNumberTask) {
                             btnOpenLock.style.display = 'block';
                             initLockWheels(lockDigits);
-                            fetchCurrentUserTaskId();
                         } else {
                             btnOpenLock.style.display = 'none';
                         }
@@ -1212,7 +1325,7 @@
                     modalSubmitBtn.disabled = true;
                     modalSubmitBtn.textContent = '打卡中...';
                     
-                    if (!currentUserTaskId) currentUserTaskId = await fetchCurrentUserTaskId();
+                    if (!currentUserTaskId) currentUserTaskId = await ensureTaskStarted();
                     if (!currentUserTaskId) { 
                         alert('找不到進行中的任務紀錄'); 
                         modalSubmitBtn.disabled = false;
@@ -1224,6 +1337,7 @@
                         const res = await fetch(`${API_BASE}/api/user-tasks/${currentUserTaskId}/answer`, { 
                             method: 'PATCH', 
                             headers: { 'Content-Type': 'application/json' }, 
+                            credentials: 'include',
                             body: JSON.stringify({ answer: 'checked_in' }) 
                         });
                         const data = await res.json();
@@ -1354,6 +1468,13 @@
         const lockMsg = document.getElementById('lock-msg');
         const btnLockCancel = document.getElementById('btn-lock-cancel');
         const btnLockSubmit = document.getElementById('btn-lock-submit');
+        const navigationPanel = document.getElementById('navigation-panel');
+        const navDistance = document.getElementById('nav-distance');
+        const navDistanceUnit = document.getElementById('nav-distance-unit');
+        const navInstruction = document.getElementById('nav-instruction');
+        const navRadius = document.getElementById('nav-radius');
+        const navBearing = document.getElementById('nav-bearing');
+        const navAccuracy = document.getElementById('nav-accuracy');
         
         let userLat = null, userLng = null, deviceHeading = 0, lastHeading = 0, isObjectVisible = false;
         function showToast(message, duration = 2000) {
@@ -1361,12 +1482,143 @@
             toast.textContent = message; toast.style.display = 'block';
             setTimeout(() => { toast.style.display = 'none'; }, duration);
         }
+
+        function formatDistanceForNav(distanceMeters) {
+            if (!Number.isFinite(distanceMeters)) return { value: '定位中', unit: '' };
+            if (distanceMeters >= 1000) return { value: (distanceMeters / 1000).toFixed(1), unit: 'km' };
+            return { value: String(Math.max(0, Math.round(distanceMeters))), unit: 'm' };
+        }
+
+        function setGuideArrow(delta) {
+            if (!arrow) return;
+            arrow.style.display = 'block';
+            arrow.style.transform = `rotate(${delta - 90}deg)`;
+        }
+
+        function hideArObjects() {
+            chest.style.display = 'none';
+            lockedObj.style.display = 'none';
+            itemUseObj.style.display = 'none';
+            locationObj.style.display = 'none';
+            isObjectVisible = false;
+        }
+
+        function showUnlockedObject() {
+            if (requiredItem) {
+                if (hasRequiredItem) {
+                    itemUseObj.style.display = 'block';
+                    lockedObj.style.display = 'none';
+                    chest.style.display = 'none';
+                    locationObj.style.display = 'none';
+
+                    const itemImg = document.getElementById('item-use-image');
+                    const itemModel = document.getElementById('item-use-model');
+                    document.getElementById('item-use-name').textContent = requiredItem.name;
+
+                    if (requiredItem.model) {
+                        itemImg.style.display = 'none';
+                        itemModel.style.display = 'block';
+                        itemModel.src = requiredItem.model;
+                    } else {
+                        itemModel.style.display = 'none';
+                        itemImg.style.display = 'block';
+                        itemImg.src = requiredItem.image || '/images/mascot.png';
+                    }
+                } else {
+                    lockedObj.style.display = 'block';
+                    itemUseObj.style.display = 'none';
+                    chest.style.display = 'none';
+                    locationObj.style.display = 'none';
+                }
+            } else if (isLocationTask && arSteps.length === 0) {
+                locationObj.style.display = 'block';
+                chest.style.display = 'none';
+                lockedObj.style.display = 'none';
+                itemUseObj.style.display = 'none';
+            } else {
+                lockedObj.style.display = 'none';
+                itemUseObj.style.display = 'none';
+                locationObj.style.display = 'none';
+                chest.style.display = 'block';
+            }
+            isObjectVisible = true;
+        }
+
+        function updateNavigationPanel(distanceMeters, bearing, delta, accuracy) {
+            lastDistanceToTarget = distanceMeters;
+            lastGpsAccuracy = accuracy;
+
+            const distanceText = formatDistanceForNav(distanceMeters);
+            navDistance.textContent = distanceText.value;
+            navDistanceUnit.textContent = distanceText.unit;
+            navRadius.textContent = `範圍：${Math.round(activationRadius)}m`;
+            navBearing.textContent = Number.isFinite(bearing) ? `方向：${Math.round(bearing)}°` : '方向：--';
+            navAccuracy.textContent = Number.isFinite(accuracy) ? `GPS：±${Math.round(accuracy)}m` : 'GPS：--';
+
+            const inRange = Number.isFinite(distanceMeters) && distanceMeters <= activationRadius;
+            navigationPanel.classList.toggle('in-range', inRange);
+            if (inRange) {
+                navInstruction.textContent = '已進入任務範圍，正在解鎖內容。';
+            } else {
+                const remaining = Number.isFinite(distanceMeters) ? Math.max(0, Math.ceil(distanceMeters - activationRadius)) : null;
+                navInstruction.textContent = remaining === null
+                    ? '請允許 GPS 定位，系統會引導你走到任務範圍。'
+                    : `再前進約 ${remaining} 公尺；跟著紅色箭頭方向走。`;
+            }
+        }
+
+        function setOutOfRangeState(delta) {
+            arContentUnlocked = false;
+            hideArObjects();
+            setGuideArrow(delta);
+            if (is3DMode) {
+                const modelEntity = document.querySelector('#ar-model-entity');
+                const clickZone = document.querySelector('#ar-model-click-zone');
+                if (modelEntity && !window.rotationMode) modelEntity.setAttribute('visible', 'false');
+                if (clickZone && !window.rotationMode) clickZone.setAttribute('visible', 'false');
+            }
+        }
+
+        function setInRangeState() {
+            if (!arContentUnlocked) {
+                arContentUnlocked = true;
+                showToast(`已進入 ${Math.round(activationRadius)} 公尺任務範圍`, 2200);
+            }
+
+            arrow.style.display = 'none';
+            showUnlockedObject();
+
+            if (is3DMode) {
+                const modelEntity = document.querySelector('#ar-model-entity');
+                const clickZone = document.querySelector('#ar-model-click-zone');
+                if (modelEntity && targetLat && targetLng && !window.rotationMode) {
+                    modelEntity.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
+                    modelEntity.setAttribute('visible', 'true');
+                }
+                if (clickZone && targetLat && targetLng && !window.rotationMode) {
+                    clickZone.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLng};`);
+                    clickZone.setAttribute('visible', 'true');
+                }
+            }
+
+            if (!arContentAutoOpened) {
+                arContentAutoOpened = true;
+                setTimeout(() => {
+                    if (window.currentTask) showArModal(window.currentTask);
+                }, 500);
+            }
+        }
         locationObj.onclick = async () => {
-            if (!currentUserTaskId) currentUserTaskId = await fetchCurrentUserTaskId();
+            if (!currentUserTaskId) currentUserTaskId = await ensureTaskStarted();
             if (!currentUserTaskId) { alert('找不到進行中的任務紀錄'); return; }
             if (confirm('📍 確定要在此處打卡嗎？')) {
                 try {
-                    const res = await fetch(`${API_BASE}/api/user-tasks/${currentUserTaskId}/answer`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answer: 'checked_in' }) });
+                    const res = await fetch(`${API_BASE}/api/user-tasks/${currentUserTaskId}/answer`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ answer: 'checked_in' })
+                    });
                     const data = await res.json();
                     if (data.success && data.isCompleted) {
                         showCompletionModal(data.earnedItemName, data.questChainCompleted, data.questChainReward);
@@ -1390,12 +1642,41 @@
             if (!taskId) return null;
             const loginUser = getLoginUser(); if (!loginUser || !loginUser.username) return null;
             try {
-                const res = await fetch(`${API_BASE}/api/user-tasks?username=${encodeURIComponent(loginUser.username)}`);
+                const res = await fetch(`${API_BASE}/api/user-tasks?username=${encodeURIComponent(loginUser.username)}`, {
+                    credentials: 'include'
+                });
                 const data = await res.json();
                 if (!data.success || !Array.isArray(data.tasks)) return null;
                 const t = data.tasks.find(x => String(x.id) === String(taskId));
                 if (!t) return null; currentUserTaskId = t.user_task_id; return currentUserTaskId;
             } catch (e) { return null; }
+        }
+
+        async function ensureTaskStarted() {
+            if (!taskId) return null;
+            const existing = await fetchCurrentUserTaskId();
+            if (existing) return existing;
+
+            const loginUser = getLoginUser();
+            if (!loginUser || !loginUser.username) return null;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/user-tasks`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ username: loginUser.username, task_id: taskId })
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    showToast(data.message || '任務尚未接取', 2500);
+                    return null;
+                }
+                return await fetchCurrentUserTaskId();
+            } catch (e) {
+                console.warn('自動接取任務失敗:', e);
+                return null;
+            }
         }
         function initLockWheels(digits = 4) {
             if (!lockWheels) return;
@@ -1423,10 +1704,15 @@
             lockMsg.style.color = 'rgba(255,255,255,0.85)'; lockMsg.textContent = '驗證中...';
             btnLockSubmit.disabled = true; btnLockCancel.disabled = true;
             const code = getLockCode();
-            const userTaskId = currentUserTaskId || await fetchCurrentUserTaskId();
+            const userTaskId = currentUserTaskId || await ensureTaskStarted();
             if (!userTaskId) { lockMsg.style.color = '#fca5a5'; lockMsg.textContent = '找不到任務紀錄'; btnLockSubmit.disabled = false; btnLockCancel.disabled = false; return; }
             try {
-                const res = await fetch(`${API_BASE}/api/user-tasks/${userTaskId}/answer`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answer: code }) });
+                const res = await fetch(`${API_BASE}/api/user-tasks/${userTaskId}/answer`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ answer: code })
+                });
                 const data = await res.json();
                 if (!data.success) { lockMsg.style.color = '#fca5a5'; lockMsg.textContent = data.message || '驗證失敗'; }
                 else if (data.isCompleted) {
@@ -1466,6 +1752,7 @@
                 const startRes = await fetch(`${API_BASE}/api/user-tasks`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify({ username: loginUser.username, task_id: nextTask.id })
                 });
                 const startData = await startRes.json();
@@ -1489,8 +1776,8 @@
                 window.history.pushState({}, '', newUrl);
 
                 // Reset AR State
-                targetLat = nextTask.lat;
-                targetLng = nextTask.lng;
+                targetLat = Number(nextTask.lat);
+                targetLng = Number(nextTask.lng);
                 currentUserTaskId = null; // Will be refetched if needed
                 
                 // Reset variables
@@ -1504,45 +1791,8 @@
                     if (len >= 2 && len <= 8) lockDigits = len;
                 }
 
-                // Reset AR Steps (使用與初始化相同的兼容邏輯)
-                arSteps = [];
-                const steps = [];
-                
-                // 3D 模型
-                if (nextTask.ar_model_url) {
-                    steps.push({ 
-                        type: '3d', 
-                        order: nextTask.ar_order_model || 1, 
-                        url: nextTask.ar_model_url, 
-                        scale: nextTask.ar_model_scale || 3.0 
-                    });
-                }
-                
-                // 圖片
-                if (nextTask.ar_image_url) {
-                    steps.push({ 
-                        type: 'image', 
-                        order: nextTask.ar_order_image || (nextTask.ar_model_url ? 2 : 1), 
-                        url: nextTask.ar_image_url 
-                    });
-                }
-                
-                // YouTube
-                if (nextTask.youtubeUrl) {
-                    steps.push({ 
-                        type: 'youtube', 
-                        order: nextTask.ar_order_youtube || (steps.length + 1), 
-                        url: nextTask.youtubeUrl 
-                    });
-                }
-
-                // 如果步驟都被設為 0 或 null，重新分配順序
-                if (steps.length > 0 && steps.every(s => !s.order)) {
-                    steps.forEach((s, i) => s.order = i + 1);
-                }
-                
-                arSteps = steps.sort((a, b) => (a.order || 99) - (b.order || 99));
-                currentArStep = 0;
+                arSteps = buildArSteps(nextTask);
+                resetJourneyState(nextTask);
 
                 // Check required item
                 if (nextTask.required_item_id) {
@@ -1555,7 +1805,10 @@
                     const loginUser = getLoginUser();
                     if (loginUser) {
                         try {
-                            const invRes = await fetch(`${API_BASE}/api/user/inventory`, { headers: { 'x-username': loginUser.username } });
+                            const invRes = await fetch(`${API_BASE}/api/user/inventory`, {
+                                headers: { 'x-username': loginUser.username },
+                                credentials: 'include'
+                            });
                             const invData = await invRes.json();
                             if (invData.success) hasRequiredItem = invData.inventory.some(i => i.item_id === nextTask.required_item_id);
                         } catch (e) { console.error(e); }
@@ -1632,8 +1885,6 @@
                 }
 
                 // Reset Object Visibility
-                isObjectVisible = false;
-                gpsLocked = false;
                 document.getElementById('guide-arrow').style.display = 'block';
                 document.getElementById('chest-obj').style.display = 'none';
                 document.getElementById('locked-obj').style.display = 'none';
@@ -1675,7 +1926,7 @@
             // 根據任務類型顯示不同的輸入界面
             if (task.task_type === 'multiple_choice') {
                 // 選擇題
-                const choices = task.options || [];
+                const choices = parseTaskOptions(task.options);
                 const choicesDiv = document.createElement('div');
                 choicesDiv.className = 'answer-choices';
                 
@@ -1782,6 +2033,7 @@
                     
                     const uploadRes = await fetch(`${API_BASE}/api/upload`, {
                         method: 'POST',
+                        credentials: 'include',
                         body: formData
                     });
                     const uploadData = await uploadRes.json();
@@ -1810,7 +2062,7 @@
                 answerMessage.style.color = 'rgba(255,255,255,0.8)';
 
                 // 獲取 user_task_id
-                if (!currentUserTaskId) await fetchCurrentUserTaskId();
+                if (!currentUserTaskId) currentUserTaskId = await ensureTaskStarted();
                 if (!currentUserTaskId) {
                     throw new Error('找不到任務記錄');
                 }
@@ -1818,6 +2070,7 @@
                 const res = await fetch(`${API_BASE}/api/user-tasks/${currentUserTaskId}/answer`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify({ answer })
                 });
                 const data = await res.json();
@@ -2092,8 +2345,17 @@
             // 這樣在從 3D 切換回 2D 時，updateAR 才能正常運作
             if ('geolocation' in navigator) {
                 navigator.geolocation.watchPosition(
-                    pos => { userLat = pos.coords.latitude; userLng = pos.coords.longitude; updateAR(); },
-                    err => { console.error("GPS Error:", err); },
+                    pos => {
+                        userLat = pos.coords.latitude;
+                        userLng = pos.coords.longitude;
+                        lastGpsAccuracy = pos.coords.accuracy;
+                        updateAR();
+                    },
+                    err => {
+                        console.warn("GPS Error:", err);
+                        status.innerText = 'GPS 暫時無法定位';
+                        navInstruction.textContent = '請確認定位權限已開啟；取得 GPS 後才會顯示距離與方向。';
+                    },
                     { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 }
                 );
             }
@@ -2118,67 +2380,29 @@
             let delta = bearing - deviceHeading;
             while (delta < -180) delta += 360; while (delta > 180) delta -= 360;
             debug.innerText = `方位:${bearing.toFixed(0)}° 手機:${deviceHeading.toFixed(0)}° 差:${delta.toFixed(0)}°`;
+            updateNavigationPanel(dist, bearing, delta, lastGpsAccuracy);
             
             // 2. 如果是 3D 模式，停止更新 2D DOM 元素（寶箱、箭頭等），避免干擾 A-Frame
             if (is3DMode) return; 
 
-            const VISIBLE_DISTANCE = 15; 
-            if (dist > VISIBLE_DISTANCE) {
-                if (isObjectVisible) { isObjectVisible = false; chest.style.display = 'none'; lockedObj.style.display = 'none'; itemUseObj.style.display = 'none'; locationObj.style.display = 'none'; }
-                arrow.style.display = 'block'; arrow.style.transform = `rotate(${delta}deg) translate(0, -100px)`;
+            if (dist > activationRadius) {
+                setOutOfRangeState(delta);
                 return; 
             }
-            const fov = isObjectVisible ? 50 : 30; 
-            if (Math.abs(delta) < fov) {
-                if (!isObjectVisible) {
-                    isObjectVisible = true; arrow.style.display = 'none';
-                    
-                    // 到達任務地點時，自動播放背景音樂（如果任務有配置）
-                    if (bgmAudio.src && !bgmIsPlaying) {
-                        bgmAudio.play().catch(err => {
-                            // 如果自動播放失敗（需要用戶交互），靜默處理
-                            console.log('音樂自動播放需要用戶交互');
-                        });
-                    }
-                    
-                    if (requiredItem) {
-                        if (hasRequiredItem) { 
-                            itemUseObj.style.display = 'block'; 
-                            lockedObj.style.display = 'none'; 
-                            chest.style.display = 'none'; 
-                            locationObj.style.display = 'none';
-                            
-                            // 更新道具顯示 (2D/3D)
-                            const itemImg = document.getElementById('item-use-image');
-                            const itemModel = document.getElementById('item-use-model');
-                            document.getElementById('item-use-name').textContent = requiredItem.name;
-                            
-                            if (requiredItem.model) {
-                                itemImg.style.display = 'none';
-                                itemModel.style.display = 'block';
-                                itemModel.src = requiredItem.model;
-                            } else {
-                                itemModel.style.display = 'none';
-                                itemImg.style.display = 'block';
-                                itemImg.src = requiredItem.image || '/images/mascot.png';
-                            }
-                        }
-                        else { lockedObj.style.display = 'block'; itemUseObj.style.display = 'none'; chest.style.display = 'none'; locationObj.style.display = 'none'; }
-                    } else if (isLocationTask && arSteps.length === 0) {
-                        locationObj.style.display = 'block'; chest.style.display = 'none'; lockedObj.style.display = 'none'; itemUseObj.style.display = 'none';
-                    } else {
-                        lockedObj.style.display = 'none'; itemUseObj.style.display = 'none'; locationObj.style.display = 'none'; chest.style.display = 'block';
-                    }
-                }
-                const screenWidth = window.innerWidth;
-                const xOffset = (delta / 40) * (screenWidth / 2);
-                let scale = 1.2 - (Math.min(dist, 50) / 60); if (scale < 0.4) scale = 0.4;
-                const transformStyle = `translate(${xOffset}px, 0) scale(${scale})`;
-                chest.style.transform = transformStyle; lockedObj.style.transform = transformStyle; itemUseObj.style.transform = transformStyle; locationObj.style.transform = transformStyle;
-            } else {
-                if (isObjectVisible) { isObjectVisible = false; chest.style.display = 'none'; lockedObj.style.display = 'none'; itemUseObj.style.display = 'none'; locationObj.style.display = 'none'; arrow.style.display = 'block'; }
-                arrow.style.transform = `rotate(${delta}deg) translate(0, -100px)`; 
+
+            setInRangeState();
+
+            if (bgmAudio.src && !bgmIsPlaying) {
+                bgmAudio.play().catch(err => {
+                    console.log('音樂自動播放需要用戶交互');
+                });
             }
+
+            const transformStyle = 'translate(0, 0) scale(1)';
+            chest.style.transform = transformStyle;
+            lockedObj.style.transform = transformStyle;
+            itemUseObj.style.transform = transformStyle;
+            locationObj.style.transform = transformStyle;
         }
         function haversineDistance(lat1, lon1, lat2, lon2) {
             const R = 6371e3; const φ1 = lat1 * Math.PI/180; const φ2 = lat2 * Math.PI/180;
