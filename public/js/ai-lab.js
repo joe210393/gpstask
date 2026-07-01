@@ -14,16 +14,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // 包裹在 try-catch 中以捕獲初始化錯誤
     try {
         log('DOM Ready - 初始化開始');
+        const AI_LAB_STANDALONE = true;
 
         // ------------------------------------------------
         // 1. 設定與劇本 (Configuration & Prompts)
         // ------------------------------------------------
-        // 任務劇本已移除，改為使用「新增任務」API 的任務（承接任務後由 currentTask 提供）
+        // AI 實驗室固定為自由提問工具，不再綁定任務或劇情。
 
         const PROMPTS = {
             free: {
-                title: "🌿 自由探索模式",
-                intro: "這裡沒有任務壓力，你可以隨意拍攝身邊的植物或物品，我會為你介紹它們的小知識。",
+                title: "AI 自由提問",
+                intro: "把想問的東西放進框內拍照，輸入或說出問題，AI 會直接回答你。",
                 system: `你是一位專業的植物形態學家與生態研究員。
 
 **重要：你必須按照以下步驟進行分析，絕對不能跳過任何步驟！**
@@ -372,7 +373,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const completionReward = document.getElementById('completionReward');
         const btnCompletionClose = document.getElementById('btnCompletionClose');
 
-        // 任務情境（來自 AR-VIEW／新增任務 API：由 URL taskId 載入；進入後先見相機，再自行找地點）
+        // AI Lab 只保留自由拍照提問；下列任務狀態僅供舊流程函式安全清空。
         let currentTask = null;
         let currentTaskId = null;
         let currentUserTaskId = null;
@@ -386,6 +387,58 @@ document.addEventListener('DOMContentLoaded', () => {
         let orientationPermissionState = 'idle';
 
         if (!video || !canvas) throw new Error('關鍵 DOM 元素遺失');
+
+        function disableTaskBindingUi() {
+            currentTask = null;
+            currentTaskId = null;
+            currentUserTaskId = null;
+            targetLat = null;
+            targetLng = null;
+            taskReached = false;
+            taskObjectVisible = false;
+
+            if (navigationWatchId !== null && navigator.geolocation) {
+                navigator.geolocation.clearWatch(navigationWatchId);
+                navigationWatchId = null;
+            }
+            if (navigationPollTimer) {
+                clearInterval(navigationPollTimer);
+                navigationPollTimer = null;
+            }
+            if (taskBgm) {
+                taskBgm.pause();
+                taskBgm.removeAttribute('src');
+            }
+            [
+                taskHudDock,
+                taskStatusBox,
+                taskGuideArrow,
+                taskTargetObj,
+                taskEncounterModal,
+                answerModal,
+                lockOverlay,
+                completionModal,
+                taskIntroPanel
+            ].forEach((el) => {
+                if (el) el.classList.add('hidden');
+            });
+            [taskBgmBtn, taskIntroBtn].forEach((el) => {
+                if (el) el.classList.add('hidden');
+            });
+            if (nearbyTaskLayer) nearbyTaskLayer.clearLayers();
+            nearbyVisibleTasks = [];
+            if (miniMapTaskIndicators) miniMapTaskIndicators.innerHTML = '';
+            if (taskMapMarker && mapInstance) {
+                mapInstance.removeLayer(taskMapMarker);
+                taskMapMarker = null;
+            }
+
+            const url = new URL(window.location.href);
+            ['taskId', 'lat', 'lng', 'ar_found'].forEach((key) => url.searchParams.delete(key));
+            if (url.href !== window.location.href) {
+                window.history.replaceState({}, '', url);
+            }
+        }
 
         // ------------------------------------------------
         // 4. 功能函數 (Functions)
@@ -755,23 +808,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function loadTaskFromUrl() {
-            const params = new URLSearchParams(window.location.search);
-            const taskId = params.get('taskId');
-            if (!taskId) {
-                loadDefaultVisibleTaskForUser();
-                return;
-            }
-            currentTaskId = taskId;
-            targetLat = parseFloat(params.get('lat'));
-            targetLng = parseFloat(params.get('lng'));
-            fetch(`/api/tasks/${taskId}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success && data.task) {
-                        applyTaskSelection(data.task, { updateUrl: false });
-                    }
-                })
-                .catch(err => console.error('載入任務失敗:', err));
+            disableTaskBindingUi();
         }
 
         function openTaskEncounter() {
@@ -1074,18 +1111,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // 取得當前劇本（任務模式使用 API 任務 currentTask，否則自由探索）
+        // 取得當前劇本：AI Lab 固定使用自由提問，不套任務劇本。
         function getActiveScript() {
-            if (currentMode === 'mission' && currentTask) {
-                const name = currentTask.name || '任務';
-                const desc = currentTask.description || '';
-                return {
-                    title: name,
-                    intro: desc || '請根據任務說明與景點介紹進行互動。',
-                    system: `你是此景點的導覽者。請根據以下任務說明，用簡潔、友善的方式回答玩家的提問或介紹圈選的內容。\n\n【任務】${name}\n${desc ? '【說明】' + desc : ''}`,
-                    user: '請根據這個任務的景點介紹，說明我圈選的內容。'
-                };
-            }
             return PROMPTS.free;
         }
 
@@ -1516,6 +1543,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 切換模式
         function setMode(mode, showIntro = true) {
+            if (AI_LAB_STANDALONE) {
+                mode = 'free';
+            }
             log(`切換模式: ${mode}`);
             if (mode === 'mission' && !currentTask) {
                 Swal.fire({
@@ -1826,6 +1856,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         async function loadNearbyVisibleTasks() {
+            if (AI_LAB_STANDALONE) {
+                nearbyVisibleTasks = [];
+                if (nearbyTaskLayer) nearbyTaskLayer.clearLayers();
+                if (miniMapTaskIndicators) miniMapTaskIndicators.innerHTML = '';
+                return;
+            }
             try {
                 const [taskRes, questProgress] = await Promise.all([
                     fetch('/api/tasks'),
@@ -1872,6 +1908,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function applyTaskSelection(task, options = {}) {
             if (!task) return;
+            if (AI_LAB_STANDALONE) {
+                disableTaskBindingUi();
+                setMode('free', false);
+                return;
+            }
             currentTaskId = task.id;
             targetLat = Number(task.lat);
             targetLng = Number(task.lng);
@@ -1916,6 +1957,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         async function loadDefaultVisibleTaskForUser() {
+            if (AI_LAB_STANDALONE) {
+                disableTaskBindingUi();
+                return;
+            }
             try {
                 if (!getLoginUser()) return;
                 const [taskRes, questProgress, inProgressTasks, quickPos] = await Promise.all([
@@ -2377,11 +2422,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // 返回（有 taskId 時回任務詳情，與 AR-VIEW 一致）
+        // AI Lab 是獨立工具，離開時回首頁。
         backBtn.addEventListener('click', () => {
-            const taskId = new URLSearchParams(window.location.search).get('taskId');
-            if (taskId) window.location.href = `/task-detail.html?id=${taskId}`;
-            else window.location.href = '/';
+            window.location.href = '/';
         });
 
         // 繪圖事件

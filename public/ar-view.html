@@ -292,6 +292,69 @@
             color: rgba(255,255,255,0.72);
             margin-bottom: 6px;
         }
+        .nav-mode-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .nav-mode-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 32px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: rgba(59, 130, 246, 0.18);
+            border: 1px solid rgba(147, 197, 253, 0.36);
+            color: #dbeafe;
+            font-size: 0.82rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+        .nav-mode-switcher {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 5px;
+            flex: 1;
+            min-width: 0;
+        }
+        .nav-mode-btn {
+            min-height: 32px;
+            border: 1px solid rgba(255,255,255,0.16);
+            border-radius: 999px;
+            background: rgba(255,255,255,0.08);
+            color: rgba(255,255,255,0.82);
+            font-size: 0.78rem;
+            font-weight: 800;
+            cursor: pointer;
+            pointer-events: auto;
+        }
+        .nav-mode-btn.active {
+            background: #2563eb;
+            border-color: rgba(147, 197, 253, 0.8);
+            color: white;
+            box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
+        }
+        .nav-route-instruction {
+            margin-top: 10px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.12);
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 900;
+            line-height: 1.35;
+        }
+        .nav-route-summary {
+            margin-top: 6px;
+            min-height: 18px;
+            color: rgba(255,255,255,0.68);
+            font-size: 0.78rem;
+            line-height: 1.35;
+        }
         .nav-panel-distance {
             font-size: clamp(2rem, 12vw, 4rem);
             font-weight: 900;
@@ -319,6 +382,15 @@
             padding: 6px 9px;
             font-size: 0.8rem;
             color: rgba(255,255,255,0.9);
+        }
+        @media (max-width: 380px) {
+            .nav-mode-row {
+                align-items: stretch;
+                flex-direction: column;
+            }
+            .nav-mode-label {
+                justify-content: center;
+            }
         }
         
         /* 背景音樂控制 */
@@ -485,7 +557,17 @@
         <div id="guide-arrow"></div>
         <div id="navigation-panel">
             <div class="nav-panel-title">前往任務範圍</div>
+            <div class="nav-mode-row" aria-label="導航模式">
+                <div class="nav-mode-label" id="nav-mode-label">步行導航</div>
+                <div class="nav-mode-switcher">
+                    <button type="button" class="nav-mode-btn active" data-route-mode="walking" aria-pressed="true">步行</button>
+                    <button type="button" class="nav-mode-btn" data-route-mode="cycling" aria-pressed="false">單車</button>
+                    <button type="button" class="nav-mode-btn" data-route-mode="driving" aria-pressed="false">汽車</button>
+                </div>
+            </div>
             <div class="nav-panel-distance"><span id="nav-distance">定位中</span><small id="nav-distance-unit"></small></div>
+            <div class="nav-route-instruction" id="nav-route-instruction">步行導航準備中，取得定位後會顯示下一步。</div>
+            <div class="nav-route-summary" id="nav-route-summary">目前模式：步行</div>
             <div class="nav-panel-subtitle" id="nav-instruction">啟動後會顯示距離與箭頭方向。</div>
             <div class="nav-panel-meta">
                 <span id="nav-radius">範圍：--</span>
@@ -1069,6 +1151,7 @@
             currentArStep = 0;
             isObjectVisible = false;
             gpsLocked = false;
+            resetRouteState();
             const navRadius = document.getElementById('nav-radius');
             if (navRadius) navRadius.textContent = `範圍：${Math.round(activationRadius)}m`;
         }
@@ -1475,6 +1558,10 @@
         const navRadius = document.getElementById('nav-radius');
         const navBearing = document.getElementById('nav-bearing');
         const navAccuracy = document.getElementById('nav-accuracy');
+        const navModeLabel = document.getElementById('nav-mode-label');
+        const navRouteInstruction = document.getElementById('nav-route-instruction');
+        const navRouteSummary = document.getElementById('nav-route-summary');
+        const navModeButtons = Array.from(document.querySelectorAll('.nav-mode-btn'));
         
         let userLat = null, userLng = null, deviceHeading = 0, lastHeading = 0, isObjectVisible = false;
         function showToast(message, duration = 2000) {
@@ -1488,6 +1575,292 @@
             if (distanceMeters >= 1000) return { value: (distanceMeters / 1000).toFixed(1), unit: 'km' };
             return { value: String(Math.max(0, Math.round(distanceMeters))), unit: 'm' };
         }
+
+        const ROUTE_MODES = {
+            walking: { label: '步行', icon: '🚶', profile: 'walking' },
+            cycling: { label: '單車', icon: '🚲', profile: 'cycling' },
+            driving: { label: '汽車', icon: '🚗', profile: 'driving' }
+        };
+        const ROUTE_REFRESH_MIN_INTERVAL_MS = 12000;
+        const ROUTE_REFRESH_INTERVAL_MS = 45000;
+        const ROUTE_REFRESH_DISTANCE_METERS = 35;
+        const ROUTE_DESTINATION_CHANGE_METERS = 8;
+        const ROUTE_STEP_ADVANCE_METERS = 22;
+        let routeMode = 'walking';
+        let routeRequestSeq = 0;
+        let routeState = createEmptyRouteState();
+
+        function createEmptyRouteState() {
+            return {
+                profile: null,
+                status: 'idle',
+                loading: false,
+                error: '',
+                route: null,
+                steps: [],
+                activeStepIndex: 0,
+                lastOrigin: null,
+                lastDestination: null,
+                lastRequestAt: 0
+            };
+        }
+
+        function resetRouteState() {
+            routeState = createEmptyRouteState();
+            routeRequestSeq += 1;
+            renderRouteGuidance(lastDistanceToTarget);
+        }
+
+        function getRouteModeConfig(mode = routeMode) {
+            return ROUTE_MODES[mode] || ROUTE_MODES.walking;
+        }
+
+        function updateRouteModeUi() {
+            const modeConfig = getRouteModeConfig();
+            if (navModeLabel) navModeLabel.textContent = `${modeConfig.icon} ${modeConfig.label}導航`;
+            if (navRouteSummary && routeState.status === 'idle') navRouteSummary.textContent = `目前模式：${modeConfig.label}`;
+            navModeButtons.forEach((btn) => {
+                const isActive = btn.dataset.routeMode === routeMode;
+                btn.classList.toggle('active', isActive);
+                btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            });
+        }
+
+        function setRouteMode(mode) {
+            if (!ROUTE_MODES[mode] || mode === routeMode) return;
+            routeMode = mode;
+            resetRouteState();
+            updateRouteModeUi();
+            const modeConfig = getRouteModeConfig();
+            showToast(`已切換為${modeConfig.label}導航`, 1600);
+            refreshRouteIfNeeded(userLat, userLng, true);
+        }
+
+        function formatDistanceForInstruction(distanceMeters) {
+            if (!Number.isFinite(distanceMeters)) return '--';
+            const value = Math.max(0, distanceMeters);
+            if (value >= 1000) {
+                const digits = value >= 10000 ? 0 : 1;
+                return `${(value / 1000).toFixed(digits)} 公里`;
+            }
+            return `${Math.round(value)} 公尺`;
+        }
+
+        function formatRouteDuration(seconds) {
+            if (!Number.isFinite(seconds) || seconds <= 0) return '';
+            const minutes = Math.max(1, Math.round(seconds / 60));
+            if (minutes >= 60) {
+                const hours = Math.floor(minutes / 60);
+                const rest = minutes % 60;
+                return rest ? `${hours} 小時 ${rest} 分` : `${hours} 小時`;
+            }
+            return `${minutes} 分`;
+        }
+
+        function getStepLocation(step) {
+            const loc = step?.maneuver?.location;
+            if (!Array.isArray(loc) || loc.length < 2) return null;
+            return { lng: Number(loc[0]), lat: Number(loc[1]) };
+        }
+
+        function getRoadSuffix(step) {
+            const name = String(step?.name || '').trim();
+            return name ? `，進入 ${name}` : '';
+        }
+
+        function describeManeuver(step) {
+            const type = step?.maneuver?.type || '';
+            const modifier = step?.maneuver?.modifier || '';
+            if (type === 'arrive') return '抵達任務附近';
+            if (type === 'depart') return '出發後直行';
+            if (type === 'roundabout' || type === 'rotary' || type === 'roundabout turn') return '進入圓環';
+            if (type === 'merge') return modifier.includes('left') ? '靠左匯入' : modifier.includes('right') ? '靠右匯入' : '匯入道路';
+            if (type === 'fork') return modifier.includes('left') ? '靠左' : modifier.includes('right') ? '靠右' : '沿分岔路前進';
+            if (type === 'end of road') return modifier.includes('left') ? '道路盡頭左轉' : modifier.includes('right') ? '道路盡頭右轉' : '道路盡頭轉向';
+            if (type === 'on ramp') return modifier.includes('left') ? '靠左上匝道' : modifier.includes('right') ? '靠右上匝道' : '上匝道';
+            if (type === 'off ramp') return modifier.includes('left') ? '靠左下匝道' : modifier.includes('right') ? '靠右下匝道' : '下匝道';
+
+            const modifierMap = {
+                straight: '直行',
+                left: '左轉',
+                right: '右轉',
+                'slight left': '微靠左',
+                'slight right': '微靠右',
+                'sharp left': '大幅左轉',
+                'sharp right': '大幅右轉',
+                uturn: '迴轉'
+            };
+            return modifierMap[modifier] || '直行';
+        }
+
+        function buildRouteUrl(originLat, originLng) {
+            const modeConfig = getRouteModeConfig();
+            const origin = `${Number(originLng).toFixed(6)},${Number(originLat).toFixed(6)}`;
+            const destination = `${Number(targetLng).toFixed(6)},${Number(targetLat).toFixed(6)}`;
+            const params = new URLSearchParams({
+                overview: 'false',
+                steps: 'true',
+                alternatives: 'false',
+                geometries: 'geojson'
+            });
+            return `https://router.project-osrm.org/route/v1/${modeConfig.profile}/${origin};${destination}?${params}`;
+        }
+
+        function shouldRefreshRoute(originLat, originLng, force = false) {
+            if (!Number.isFinite(originLat) || !Number.isFinite(originLng) || !Number.isFinite(targetLat) || !Number.isFinite(targetLng)) return false;
+            if (routeState.loading) return false;
+            const now = Date.now();
+            if (!force && now - routeState.lastRequestAt < ROUTE_REFRESH_MIN_INTERVAL_MS) return false;
+            if (routeState.status === 'error') return now - routeState.lastRequestAt >= ROUTE_REFRESH_INTERVAL_MS;
+            if (force || routeState.profile !== routeMode || !routeState.route) return true;
+
+            const moved = routeState.lastOrigin
+                ? haversineDistance(originLat, originLng, routeState.lastOrigin.lat, routeState.lastOrigin.lng)
+                : Infinity;
+            const destinationChanged = routeState.lastDestination
+                ? haversineDistance(targetLat, targetLng, routeState.lastDestination.lat, routeState.lastDestination.lng)
+                : Infinity;
+            return moved >= ROUTE_REFRESH_DISTANCE_METERS
+                || destinationChanged >= ROUTE_DESTINATION_CHANGE_METERS
+                || now - routeState.lastRequestAt >= ROUTE_REFRESH_INTERVAL_MS;
+        }
+
+        async function refreshRouteIfNeeded(originLat, originLng, force = false) {
+            if (!shouldRefreshRoute(originLat, originLng, force)) return;
+
+            const requestSeq = ++routeRequestSeq;
+            const modeConfig = getRouteModeConfig();
+            routeState.loading = true;
+            routeState.status = 'loading';
+            routeState.error = '';
+            routeState.lastRequestAt = Date.now();
+            renderRouteGuidance(lastDistanceToTarget);
+
+            try {
+                const res = await fetch(buildRouteUrl(originLat, originLng));
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                if (data.code !== 'Ok' || !data.routes?.[0]?.legs?.[0]) {
+                    throw new Error(data.message || '路線服務沒有回傳可用路線');
+                }
+                if (requestSeq !== routeRequestSeq) return;
+
+                const route = data.routes[0];
+                const leg = route.legs[0];
+                routeState.profile = routeMode;
+                routeState.status = 'ok';
+                routeState.loading = false;
+                routeState.route = {
+                    distance: Number(route.distance),
+                    duration: Number(route.duration)
+                };
+                routeState.steps = Array.isArray(leg.steps) ? leg.steps : [];
+                routeState.activeStepIndex = 0;
+                routeState.lastOrigin = { lat: originLat, lng: originLng };
+                routeState.lastDestination = { lat: targetLat, lng: targetLng };
+            } catch (err) {
+                if (requestSeq !== routeRequestSeq) return;
+                console.warn(`${modeConfig.label}導航路線計算失敗`, err);
+                routeState.profile = routeMode;
+                routeState.status = 'error';
+                routeState.loading = false;
+                routeState.error = err?.message || '路線計算失敗';
+                routeState.route = null;
+                routeState.steps = [];
+                routeState.activeStepIndex = 0;
+                routeState.lastOrigin = { lat: originLat, lng: originLng };
+                routeState.lastDestination = { lat: targetLat, lng: targetLng };
+            } finally {
+                if (requestSeq === routeRequestSeq) {
+                    renderRouteGuidance(lastDistanceToTarget);
+                }
+            }
+        }
+
+        function buildStepInstruction(distanceMeters) {
+            const steps = routeState.steps;
+            if (!steps.length) {
+                const remaining = Number.isFinite(distanceMeters) ? Math.max(0, distanceMeters - activationRadius) : null;
+                return remaining === null
+                    ? '取得定位後會顯示下一步導航。'
+                    : `沿路線前進約 ${formatDistanceForInstruction(remaining)}。`;
+            }
+
+            let activeIndex = Math.max(0, Math.min(routeState.activeStepIndex, steps.length - 1));
+            while (activeIndex + 1 < steps.length) {
+                const nextLoc = getStepLocation(steps[activeIndex + 1]);
+                if (!nextLoc) break;
+                const distanceToNext = haversineDistance(userLat, userLng, nextLoc.lat, nextLoc.lng);
+                if (distanceToNext <= ROUTE_STEP_ADVANCE_METERS && activeIndex + 2 < steps.length) {
+                    activeIndex += 1;
+                    continue;
+                }
+                break;
+            }
+            routeState.activeStepIndex = activeIndex;
+
+            const currentStep = steps[activeIndex] || steps[0];
+            const nextStep = steps[activeIndex + 1];
+            if (nextStep) {
+                const nextLoc = getStepLocation(nextStep);
+                const distanceToTurn = nextLoc
+                    ? haversineDistance(userLat, userLng, nextLoc.lat, nextLoc.lng)
+                    : Number(currentStep?.distance);
+                const action = describeManeuver(nextStep);
+                if (nextStep.maneuver?.type === 'arrive') {
+                    return `沿路線前進 ${formatDistanceForInstruction(distanceToTurn)}，即將抵達任務範圍。`;
+                }
+                if (action === '直行') {
+                    return `直行 ${formatDistanceForInstruction(distanceToTurn)}${getRoadSuffix(nextStep)}`;
+                }
+                return `前方 ${formatDistanceForInstruction(distanceToTurn)}${action}${getRoadSuffix(nextStep)}`;
+            }
+
+            const currentAction = describeManeuver(currentStep);
+            const remaining = Number.isFinite(distanceMeters) ? Math.max(0, distanceMeters - activationRadius) : Number(currentStep?.distance);
+            if (currentAction === '抵達任務附近') return '已接近任務範圍，請注意畫面提示。';
+            return `沿目前路線前進約 ${formatDistanceForInstruction(remaining)}，接近任務範圍。`;
+        }
+
+        function renderRouteGuidance(distanceMeters) {
+            if (!navRouteInstruction || !navRouteSummary) return;
+            const modeConfig = getRouteModeConfig();
+            const inRange = Number.isFinite(distanceMeters) && distanceMeters <= activationRadius;
+            if (inRange) {
+                navRouteInstruction.textContent = '已進入任務範圍，任務內容即將出現。';
+                navRouteSummary.textContent = `${modeConfig.label}導航完成`;
+                return;
+            }
+            if (!Number.isFinite(userLat) || !Number.isFinite(userLng) || !Number.isFinite(targetLat) || !Number.isFinite(targetLng)) {
+                navRouteInstruction.textContent = `${modeConfig.label}導航等待 GPS 定位中。`;
+                navRouteSummary.textContent = `目前模式：${modeConfig.label}`;
+                return;
+            }
+            if (routeState.route && routeState.steps.length) {
+                navRouteInstruction.textContent = buildStepInstruction(distanceMeters);
+                const duration = formatRouteDuration(routeState.route.duration);
+                navRouteSummary.textContent = `${modeConfig.label}路線：約 ${formatDistanceForInstruction(routeState.route.distance)}${duration ? ` · ${duration}` : ''}${routeState.loading ? ' · 更新中' : ''}`;
+                return;
+            }
+            if (routeState.status === 'loading') {
+                navRouteInstruction.textContent = `正在計算${modeConfig.label}路線...`;
+                navRouteSummary.textContent = `目前模式：${modeConfig.label}`;
+                return;
+            }
+            if (routeState.status === 'error') {
+                const remaining = Number.isFinite(distanceMeters) ? formatDistanceForInstruction(Math.max(0, distanceMeters - activationRadius)) : '--';
+                navRouteInstruction.textContent = `${modeConfig.label}路線暫時無法計算，先依紅色箭頭前進 ${remaining}。`;
+                navRouteSummary.textContent = '路線服務暫時不可用，仍保留 GPS 距離與方向。';
+                return;
+            }
+            navRouteInstruction.textContent = `${modeConfig.label}導航準備中，取得定位後會顯示下一步。`;
+            navRouteSummary.textContent = `目前模式：${modeConfig.label}`;
+        }
+
+        navModeButtons.forEach((btn) => {
+            btn.addEventListener('click', () => setRouteMode(btn.dataset.routeMode));
+        });
+        updateRouteModeUi();
 
         function setGuideArrow(delta) {
             if (!arrow) return;
@@ -1559,12 +1932,17 @@
             navigationPanel.classList.toggle('in-range', inRange);
             if (inRange) {
                 navInstruction.textContent = '已進入任務範圍，正在解鎖內容。';
+                renderRouteGuidance(distanceMeters);
+                return;
             } else {
                 const remaining = Number.isFinite(distanceMeters) ? Math.max(0, Math.ceil(distanceMeters - activationRadius)) : null;
                 navInstruction.textContent = remaining === null
                     ? '請允許 GPS 定位，系統會引導你走到任務範圍。'
                     : `再前進約 ${remaining} 公尺；跟著紅色箭頭方向走。`;
             }
+
+            refreshRouteIfNeeded(userLat, userLng);
+            renderRouteGuidance(distanceMeters);
         }
 
         function setOutOfRangeState(delta) {
@@ -2355,6 +2733,8 @@
                         console.warn("GPS Error:", err);
                         status.innerText = 'GPS 暫時無法定位';
                         navInstruction.textContent = '請確認定位權限已開啟；取得 GPS 後才會顯示距離與方向。';
+                        if (navRouteInstruction) navRouteInstruction.textContent = 'GPS 暫時無法定位，取得位置後會恢復導航。';
+                        if (navRouteSummary) navRouteSummary.textContent = `目前模式：${getRouteModeConfig().label}`;
                     },
                     { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 }
                 );

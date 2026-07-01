@@ -524,9 +524,9 @@
             aiLabBtn.style.border = 'none';
             aiLabBtn.style.borderRadius = '6px';
             aiLabBtn.style.padding = '10px';
-            aiLabBtn.innerHTML = '🤖 AI 視覺探索（景點介紹＋辨識）';
+            aiLabBtn.innerHTML = '🤖 AI 實驗室（自由拍照提問）';
             aiLabBtn.onclick = () => {
-              window.location.href = `/ai-lab.html?taskId=${t.id}&lat=${t.lat}&lng=${t.lng}`;
+              window.location.href = '/ai-lab.html';
             };
             container.appendChild(aiLabBtn);
 
