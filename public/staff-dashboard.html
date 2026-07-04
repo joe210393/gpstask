@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>新增任務（工作人員）| GPS 觸發任務系統</title>
   <link rel="stylesheet" href="/css/style.css" />
-  <link rel="stylesheet" href="/css/staff-dashboard.css?v=1" />
+  <link rel="stylesheet" href="/css/staff-dashboard.css?v=2" />
   <link rel="icon" type="image/png" href="/images/mascot.png" />
 </head>
 <body class="staff-dashboard-page">
@@ -300,53 +300,41 @@
     <!-- 分頁：資源管理 -->
     <div class="sd-panel" id="panelResources">
       <div class="sd-resource-grid">
-        <section class="sd-card sd-resource-card sd-resource-card--items">
-          <div class="sd-card-header">
-            <div>
-              <h3>🎒 道具管理</h3>
-              <p>解鎖條件與完成獎勵</p>
+        <details class="sd-resource-fold sd-resource-card--items" open>
+          <summary class="sd-resource-summary">
+            <span class="sd-resource-summary-text">
+              <strong>🎒 道具管理</strong>
+              <small>解鎖條件與完成獎勵</small>
+            </span>
+            <span class="sd-resource-chevron" aria-hidden="true"></span>
+          </summary>
+          <div class="sd-resource-body">
+            <div class="sd-resource-toolbar">
+              <button id="btnCreateItem" class="sd-btn-warn" type="button">+ 新增道具</button>
             </div>
-            <button id="btnCreateItem" class="sd-btn-warn" type="button">+ 新增道具</button>
-          </div>
-          <div class="sd-card-body">
             <div id="itemList">
               <div style="color: #888; font-size: 0.9rem;">載入中...</div>
             </div>
           </div>
-        </section>
+        </details>
 
-        <section class="sd-card sd-resource-card sd-resource-card--models">
-          <div class="sd-card-header">
-            <div>
-              <h3>🧊 3D 模型庫</h3>
-              <p>AR 場景使用的模型</p>
+        <details class="sd-resource-fold sd-resource-card--models" open>
+          <summary class="sd-resource-summary">
+            <span class="sd-resource-summary-text">
+              <strong>🧊 3D 模型庫</strong>
+              <small>AR 場景使用的模型</small>
+            </span>
+            <span class="sd-resource-chevron" aria-hidden="true"></span>
+          </summary>
+          <div class="sd-resource-body">
+            <div class="sd-resource-toolbar">
+              <button id="btnUploadModel" class="sd-btn-accent" type="button">+ 上傳模型</button>
             </div>
-            <button id="btnUploadModel" class="sd-btn-accent" type="button">+ 上傳模型</button>
-          </div>
-          <div class="sd-card-body">
             <div id="modelList">
               <div style="color: #888; font-size: 0.9rem;">載入中...</div>
             </div>
           </div>
-        </section>
-
-        <section class="sd-card sd-resource-card sd-resource-card--quests">
-          <div class="sd-card-header">
-            <div>
-              <h3>📚 劇情任務線</h3>
-              <p>連續關卡與全破獎勵</p>
-            </div>
-            <div class="sd-card-actions">
-              <button id="btnCreateLeShuiTemplate" class="sd-btn-success-dark" type="button">樂水 10 關範本</button>
-              <button id="btnCreateQuest" class="btn btn-secondary" type="button" style="font-size:0.88rem;padding:0.45rem 0.85rem;">+ 新增劇情</button>
-            </div>
-          </div>
-          <div class="sd-card-body">
-            <div id="questChainList">
-              <div style="color: #888; font-size: 0.9rem;">載入中...</div>
-            </div>
-          </div>
-        </section>
+        </details>
       </div>
     </div>
 
@@ -602,82 +590,6 @@
         </div>
       </div>
     </div>
-    <div class="task-modal" id="leshuiTemplateModal">
-      <div class="task-modal-overlay"></div>
-      <div class="task-modal-content leshui-template-content">
-        <div class="task-modal-header">
-          <h3>建立樂水部落有機米食農體驗</h3>
-          <button class="close-btn" id="closeLeShuiTemplateModal">&times;</button>
-        </div>
-        <div class="task-modal-body">
-          <p style="color:#475569; line-height:1.6; margin-top:0;">
-            系統將建立完整 10 關劇情、每關學習卡、選擇題答案與第 6 關 AR 教學圖。
-            請只填入各據點 GPS 座標；封面與教學圖可在建立後再替換。
-          </p>
-          <form id="leshuiTemplateForm">
-            <div class="leshui-template-settings">
-              <div class="form-group" style="margin-bottom:0;">
-                <label class="form-label">每關積分</label>
-                <input class="form-input" id="leshuiPoints" type="number" min="0" value="10" required />
-              </div>
-              <div class="form-group" style="margin-bottom:0;">
-                <label class="form-label">全破額外積分</label>
-                <input class="form-input" id="leshuiChainPoints" type="number" min="0" value="50" required />
-              </div>
-              <div class="form-group" style="margin-bottom:0;">
-                <label class="form-label">觸發半徑（公尺）</label>
-                <input class="form-input" id="leshuiRadius" type="number" min="5" value="40" required />
-              </div>
-            </div>
-            <div style="font-weight:bold; color:#0f172a;">任務位置</div>
-            <div id="leshuiLocationRows" class="leshui-location-grid"></div>
-            <p style="font-size:0.88rem; line-height:1.55; color:#64748b;">
-              第 10 關通關語預設為「支持樂水有機米」。若同名活動已存在，工具會補建缺少的關卡，不會重複建立既有關卡。
-            </p>
-            <div id="leshuiTemplateMsg" class="mt-2 text-center" style="min-height:24px; margin-bottom:10px;"></div>
-            <button type="submit" id="leshuiTemplateSubmit" class="btn btn-primary w-100">建立完整活動任務</button>
-          </form>
-        </div>
-      </div>
-    </div>
-    <div class="task-modal" id="questModal">
-      <div class="task-modal-overlay"></div>
-      <div class="task-modal-content">
-        <div class="task-modal-header">
-          <h3>新增劇情任務線</h3>
-          <button class="close-btn" id="closeQuestModal">&times;</button>
-        </div>
-        <div class="task-modal-body">
-          <form id="createQuestForm">
-            <!-- ... existing fields ... -->
-            <div class="form-group">
-              <label class="form-label">劇情標題</label>
-              <input class="form-input" type="text" name="title" required placeholder="例如：樂樂園勇者試煉" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">劇情描述</label>
-              <textarea class="form-textarea" name="description" placeholder="描述這個劇情的背景故事..."></textarea>
-            </div>
-            <div class="form-group">
-              <label class="form-label">全破獎勵積分</label>
-              <input class="form-input" type="number" name="chain_points" min="0" value="100" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">全破獎章名稱</label>
-              <input class="form-input" type="text" name="badge_name" placeholder="例如：樂樂園勇者" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">獎章圖片 (選填)</label>
-              <input class="form-input" type="file" name="badge_image" accept="image/*" id="questBadgeInput" />
-              <div style="margin-top: 10px;">
-                <img id="questBadgePreview" src="" style="max-width: 100px; max-height: 100px; display: none; border-radius: 8px; border: 1px solid #ddd;" />
-              </div>
-            </div>
-            <button type="submit" class="btn btn-primary w-100">建立劇情</button>
-          </form>
-        </div>
-      </div>
-    </div>
 
     <!-- 道具 Modal (新增) -->
     <div class="task-modal" id="itemModal">
@@ -821,7 +733,6 @@
     &copy; 2025 GPS 任務系統 - 地方開箱任務遊戲
   </footer>
   <script src="/js/staff-dashboard.js?v=2"></script>
-  <script src="/js/leshui-template.js?v=1"></script>
   <script>
     (function initStaffDashboardTabs() {
       const tabs = Array.from(document.querySelectorAll('.sd-tab'));
