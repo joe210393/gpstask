@@ -670,6 +670,7 @@ if (createItemForm) {
 // 讀取任務列表
 function loadTasks() {
   fetch(`${API_BASE}/api/tasks/admin`, {
+    credentials: 'include',
     headers: { 'x-username': loginUser.username }
   })
     .then(res => res.json())
@@ -985,6 +986,7 @@ function loadTasks() {
     });
 }
 
+window.loadTasks = loadTasks;
 loadTasks();
 
 document.getElementById('addTaskForm').addEventListener('submit', async function(e) {

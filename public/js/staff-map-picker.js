@@ -112,7 +112,20 @@
     let syncing = false;
     let initialized = false;
     let questStatusTimer = null;
+    let questUpdateSeq = 0;
+    let siblingDragActive = false;
     const defaultIcon = typeof L !== 'undefined' ? new L.Icon.Default() : null;
+
+    function clearQuestLayer() {
+      if (!map || !questLayer) return;
+      try {
+        questLayer.clearLayers();
+        map.removeLayer(questLayer);
+      } catch (_) {
+        // layer may already be removed
+      }
+      questLayer = null;
+    }
 
     function setToolbarHint(text) {
       if (toolbarHintEl) toolbarHintEl.textContent = text;
@@ -167,7 +180,7 @@
 
     function setMarkerPosition(lat, lng, opts = {}) {
       if (!map || !marker) return;
-      const { updateFields = true, pan = true, refreshQuest = true } = opts;
+      const { updateFields = true, pan = true, refreshQuest = true, fitView = false } = opts;
       marker.setLatLng([lat, lng]);
       if (updateFields) {
         syncing = true;
@@ -177,7 +190,7 @@
       }
       updateCircle(lat, lng);
       if (pan) map.panTo([lat, lng], { animate: false });
-      if (refreshQuest) updateQuestMarkers();
+      if (refreshQuest && !siblingDragActive) updateQuestMarkers({ fitView });
     }
 
     function onInputChange() {
@@ -200,6 +213,26 @@
       return false;
     }
 
+    function dedupeChainTasks(chainTasks, ctx) {
+      const byOrder = new Map();
+      chainTasks.forEach((task) => {
+        const order = Number(task.quest_order) || 0;
+        const existing = byOrder.get(order);
+        if (!existing) {
+          byOrder.set(order, task);
+          return;
+        }
+        if (ctx.taskId && Number(task.id) === Number(ctx.taskId)) {
+          byOrder.set(order, task);
+          return;
+        }
+        if (!ctx.taskId && ctx.order && order === Number(ctx.order)) {
+          byOrder.set(order, task);
+        }
+      });
+      return Array.from(byOrder.values()).sort((a, b) => (Number(a.quest_order) || 0) - (Number(b.quest_order) || 0));
+    }
+
     async function saveTaskLocation(task, lat, lng) {
       const payload = buildTaskUpdatePayload(task, { lat, lng });
       const res = await fetch(`/api/tasks/${task.id}`, {
@@ -220,10 +253,28 @@
         const idx = window.staffAdminTasks.findIndex((entry) => Number(entry.id) === Number(task.id));
         if (idx >= 0) window.staffAdminTasks[idx] = { ...window.staffAdminTasks[idx], lat, lng };
       }
+
+      const verifyRes = await fetch(`/api/tasks/${task.id}`);
+      const verifyData = await verifyRes.json();
+      if (verifyData.success && verifyData.task) {
+        const savedLat = Number(verifyData.task.lat);
+        const savedLng = Number(verifyData.task.lng);
+        if (!Number.isFinite(savedLat) || !Number.isFinite(savedLng)
+            || Math.abs(savedLat - lat) > 1e-5 || Math.abs(savedLng - lng) > 1e-5) {
+          throw new Error('儲存後座標不一致，請重新整理頁面後再試');
+        }
+      }
+
+      if (typeof window.loadTasks === 'function') {
+        window.loadTasks();
+      }
     }
 
-    async function updateQuestMarkers() {
+    async function updateQuestMarkers(options = {}) {
       if (!map) return;
+      const seq = ++questUpdateSeq;
+      const fitView = options.fitView !== false;
+
       const ctx = getQuestContext();
       const questMode = ctx.type === 'quest' && ctx.chainId;
       const currentOrder = ctx.order || null;
@@ -235,10 +286,7 @@
           : '拖曳標記或點擊地圖設定 GPS'
       );
 
-      if (questLayer) {
-        map.removeLayer(questLayer);
-        questLayer = null;
-      }
+      clearQuestLayer();
 
       if (!questMode) {
         setLegend('', false);
@@ -246,7 +294,9 @@
       }
 
       await ensureAdminTasks();
-      const chainTasks = getChainTasks(ctx.chainId);
+      if (seq !== questUpdateSeq) return;
+
+      const chainTasks = dedupeChainTasks(getChainTasks(ctx.chainId), ctx);
 
       const currentLat = parseCoord(latInput.value);
       const currentLng = parseCoord(lngInput.value);
@@ -280,6 +330,8 @@
         return;
       }
 
+      if (seq !== questUpdateSeq) return;
+
       questLayer = L.layerGroup().addTo(map);
       const routePoints = routeEntries.map((entry) => [entry.lat, entry.lng]);
       const bounds = [];
@@ -297,25 +349,33 @@
 
         stepMarker.bindTooltip(`第 ${order} 關：${task.name}`, { direction: 'top', offset: [0, -16] });
         stepMarker.on('dragend', async () => {
+          if (seq !== questUpdateSeq) return;
           const pos = stepMarker.getLatLng();
+          siblingDragActive = true;
           stepMarker.dragging?.disable();
           setQuestStatus(`正在儲存第 ${order} 關位置...`);
           try {
             await saveTaskLocation(task, pos.lat, pos.lng);
             setQuestStatus(`第 ${order} 關位置已更新`);
-            updateQuestMarkers();
+            await updateQuestMarkers({ fitView: false });
           } catch (err) {
             console.warn(err);
             stepMarker.setLatLng([lat, lng]);
             setQuestStatus(err.message || '儲存失敗', true);
           } finally {
-            stepMarker.dragging?.enable();
+            siblingDragActive = false;
+            if (seq === questUpdateSeq) stepMarker.dragging?.enable();
           }
         });
       });
 
       if (currentLat !== null && currentLng !== null) {
         bounds.push([currentLat, currentLng]);
+      }
+
+      if (seq !== questUpdateSeq) {
+        clearQuestLayer();
+        return;
       }
 
       if (routePoints.length >= 2) {
@@ -341,9 +401,9 @@
         true
       );
 
-      if (bounds.length >= 2) {
+      if (fitView && seq === questUpdateSeq && bounds.length >= 2) {
         map.fitBounds(bounds, { padding: [36, 36], maxZoom: 17 });
-      } else if (bounds.length === 1) {
+      } else if (fitView && seq === questUpdateSeq && bounds.length === 1) {
         map.setView(bounds[0], Math.max(map.getZoom(), 16));
       }
     }
@@ -365,11 +425,11 @@
       marker = L.marker(center, { draggable: true }).addTo(map);
       marker.on('dragend', () => {
         const pos = marker.getLatLng();
-        setMarkerPosition(pos.lat, pos.lng);
+        setMarkerPosition(pos.lat, pos.lng, { fitView: false });
       });
 
       map.on('click', (event) => {
-        setMarkerPosition(event.latlng.lat, event.latlng.lng);
+        setMarkerPosition(event.latlng.lat, event.latlng.lng, { fitView: false });
       });
 
       latInput.addEventListener('input', onInputChange);
