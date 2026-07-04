@@ -5,64 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>新增任務（工作人員）| GPS 觸發任務系統</title>
   <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="/css/staff-dashboard.css?v=1" />
   <link rel="icon" type="image/png" href="/images/mascot.png" />
-  <style>
-    .dashboard-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      align-items: start;
-    }
-    @media (max-width: 900px) {
-      .dashboard-grid {
-        grid-template-columns: 1fr;
-      }
-      /* 手機版讓新增任務排在最上面 */
-      .dashboard-grid > .left-col {
-        order: 1;
-      }
-      .dashboard-grid > .right-col {
-        order: 2;
-      }
-    }
-    .leshui-template-content {
-      max-width: 920px;
-    }
-    .leshui-template-settings {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(120px, 1fr));
-      gap: 12px;
-      margin-bottom: 18px;
-    }
-    .leshui-location-grid {
-      display: grid;
-      gap: 10px;
-      margin: 14px 0;
-    }
-    .leshui-location-row {
-      display: grid;
-      grid-template-columns: minmax(230px, 1.5fr) repeat(2, minmax(125px, 1fr));
-      gap: 10px;
-      align-items: center;
-      padding: 10px;
-      border: 1px solid #dbeafe;
-      border-radius: 8px;
-      background: #f8fbff;
-    }
-    .leshui-location-row small {
-      display: block;
-      color: #64748b;
-      margin-top: 3px;
-    }
-    @media (max-width: 700px) {
-      .leshui-template-settings,
-      .leshui-location-row {
-        grid-template-columns: 1fr;
-      }
-    }
-  </style>
 </head>
-<body>
+<body class="staff-dashboard-page">
   <header id="mainHeader">
     <div class="header-content" id="headerContent">
       <h1 id="pageTitle">新增任務</h1>
@@ -86,286 +32,334 @@
   </header>
 
   <main>
-    <div class="dashboard-grid mb-4">
-      <!-- 左欄：新增任務 -->
-      <div class="left-col">
-        <div class="form-container" style="height: 100%;">
-          <h2 class="text-center mb-4">新增任務點</h2>
-          <form id="addTaskForm" enctype="multipart/form-data">
-            <!-- 任務分類選擇 -->
-            <div class="form-group" style="background: #eef2f7; padding: 10px; border-radius: 6px;">
-              <label class="form-label" style="color: #2c3e50; font-weight: bold;">任務分類</label>
-              <select name="type" id="taskCategorySelect" class="form-select">
-                <option value="single">一般單題任務 (Single)</option>
-                <option value="timed">限時/限量任務 (Timed)</option>
-                <option value="quest">劇情連續任務 (Quest)</option>
-              </select>
-            </div>
+    <header class="sd-page-header">
+      <h2>任務管理工作台</h2>
+      <p>分頁整理新增任務、資源庫與任務列表。所有表單欄位與流程維持不變，僅優化版面。</p>
+    </header>
 
-            <!-- 劇情任務專用欄位 -->
-            <div id="questFields" style="display:none; background:#f0f8ff; padding:15px; border-radius:6px; margin-bottom:15px; border:1px solid #bee5eb;">
-              <div class="form-group">
-                <label class="form-label">選擇所屬劇情</label>
-                <select name="quest_chain_id" id="questChainSelect" class="form-select">
-                  <option value="">-- 請先建立劇情 --</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label class="form-label">劇情順序 (Step Order)</label>
-                <input class="form-input" type="number" name="quest_order" min="1" placeholder="例如：1 代表第一關" />
-                <small style="color: #666;">必須完成第 1 關才能解鎖第 2 關</small>
-              </div>
-              <div class="form-group">
-                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-                  <input type="checkbox" name="is_final_step" value="1" style="width:18px; height:18px; cursor:pointer;" />
-                  <span style="font-weight:bold; color:#d97706;">🏆 標記為結局關卡</span>
-                </label>
-                <small style="color: #666; display:block; margin-top:4px;">勾選後，此關卡將被標記為劇情任務的結局，完成後可獲得劇情獎勵</small>
-              </div>
-            </div>
+    <nav class="sd-tabs" aria-label="工作台分頁">
+      <button type="button" class="sd-tab active" data-sd-panel="panelCreate">新增任務</button>
+      <button type="button" class="sd-tab" data-sd-panel="panelResources">資源管理</button>
+      <button type="button" class="sd-tab" data-sd-panel="panelTasks">所有任務</button>
+    </nav>
 
-            <!-- 限時任務專用欄位 -->
-            <div id="timedFields" style="display:none; background:#fff0f5; padding:15px; border-radius:6px; margin-bottom:15px; border:1px solid #f5c6cb;">
-              <div class="form-group">
-                <label class="form-label">開始時間</label>
-                <input class="form-input" type="datetime-local" name="time_limit_start" />
-              </div>
-              <div class="form-group">
-                <label class="form-label">結束時間</label>
-                <input class="form-input" type="datetime-local" name="time_limit_end" />
-              </div>
-              <div class="form-group">
-                <label class="form-label">名額限制 (Max Participants)</label>
-                <input class="form-input" type="number" name="max_participants" min="0" placeholder="0 或空值代表不限" />
-              </div>
-            </div>
+    <!-- 分頁：新增任務 -->
+    <div class="sd-panel active" id="panelCreate">
+      <div class="sd-card">
+        <div class="sd-card-header">
+          <div>
+            <h3>新增任務點</h3>
+            <p>依區塊展開填寫，完成後捲到底部送出</p>
+          </div>
+        </div>
+        <div class="sd-card-body">
+          <form id="addTaskForm" enctype="multipart/form-data" class="sd-form-shell">
 
-            <div style="margin-bottom:15px;color:var(--text-secondary);font-size:0.9rem;background:#f3f4f6;padding:10px;border-radius:6px;">
-              提示：經緯度請貼入十進位格式（如 24.678222, 121.760361），可用 Google Maps 右鍵複製座標。
-            </div>
-            
-            <div class="form-group">
-              <label class="form-label">任務名稱</label>
-              <input class="form-input" type="text" name="name" required />
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-              <div class="form-group">
-                <label class="form-label">緯度</label>
-                <input class="form-input" type="number" name="lat" step="any" required />
-              </div>
-              <div class="form-group">
-                <label class="form-label">經度</label>
-                <input class="form-input" type="number" name="lng" step="any" required />
-              </div>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-              <div class="form-group">
-                <label class="form-label">觸發半徑（公尺）</label>
-                <input class="form-input" type="number" name="radius" required />
-              </div>
-              <div class="form-group">
-                <label class="form-label">積分</label>
-                <input class="form-input" type="number" name="points" min="0" step="1" value="0" required />
-              </div>
-            </div>
-            
-              <div class="form-group">
-                <label class="form-label">任務類型</label>
-                <select name="task_type" id="taskTypeSelect" class="form-select">
-                  <option value="qa">問答題 (人工審核)</option>
-                  <option value="multiple_choice">選擇題 (自動驗證)</option>
-                  <option value="photo">拍照/上傳照片 (人工審核)</option>
-                  <option value="number">數字解謎 (自動驗證)</option>
-                  <option value="keyword">關鍵字解碼 (自動驗證)</option>
-                  <option value="location">地理圍欄打卡 (自動驗證)</option>
-                </select>
-              </div>
-
-              <div id="multipleChoiceOptions" style="display:none;background:#f9f9f9;padding:15px;border-radius:8px;margin-bottom:20px;border:1px solid #eee;">
-                <div class="form-group">
-                   <label class="form-label">選項 A</label>
-                   <input class="form-input" type="text" name="optionA" />
-                </div>
-                <div class="form-group">
-                   <label class="form-label">選項 B</label>
-                   <input class="form-input" type="text" name="optionB" />
-                </div>
-                <div class="form-group">
-                   <label class="form-label">選項 C</label>
-                   <input class="form-input" type="text" name="optionC" />
-                </div>
-                <div class="form-group">
-                   <label class="form-label">選項 D</label>
-                   <input class="form-input" type="text" name="optionD" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">正確答案</label>
-                  <select name="correct_answer_select" class="form-select">
-                    <option value="A">選項 A</option>
-                    <option value="B">選項 B</option>
-                    <option value="C">選項 C</option>
-                    <option value="D">選項 D</option>
+            <details class="sd-section" open>
+              <summary>1. 基本設定</summary>
+              <div class="sd-section-body">
+                <div class="form-group sd-subpanel" style="margin-bottom:0.85rem;background:#eef2f7;border-color:#dbeafe;">
+                  <label class="form-label" style="font-weight:700;color:#1e293b;">任務分類</label>
+                  <select name="type" id="taskCategorySelect" class="form-select">
+                    <option value="single">一般單題任務 (Single)</option>
+                    <option value="timed">限時/限量任務 (Timed)</option>
+                    <option value="quest">劇情連續任務 (Quest)</option>
                   </select>
                 </div>
-              </div>
 
-              <div id="standardAnswerBlock" style="display:none;background:#f0f8ff;padding:15px;border-radius:8px;margin-bottom:20px;border:1px solid #cce5ff;">
-                <div class="form-group">
-                  <label class="form-label">標準答案</label>
-                  <input class="form-input" type="text" name="correct_answer_text" placeholder="請輸入正確的數字或關鍵字" />
-                  <small style="color:var(--text-secondary);display:block;margin-top:4px;">系統將精確比對此答案 (不分大小寫)</small>
-                </div>
-              </div>
-            
-            <div class="form-group">
-              <label class="form-label">任務說明</label>
-              <textarea name="description" class="form-textarea" required style="height:100px;"></textarea>
-            </div>
-
-            <!-- 道具關聯設定 -->
-            <div class="form-group" style="background:#fdfdfe; border:1px solid #eaeaea; padding:10px; border-radius:6px;">
-              <label class="form-label" style="color:#555;">道具關聯設定 (選填)</label>
-              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-                <div>
-                  <label class="form-label" style="font-size:0.85rem;">🔒 解鎖所需道具</label>
-                  <select name="required_item_id" class="form-select item-select">
-                    <option value="">-- 無 --</option>
-                  </select>
-                  <small style="color:#999; font-size:0.8rem;">玩家必須持有此道具才能進行任務</small>
-                </div>
-                <div>
-                  <label class="form-label" style="font-size:0.85rem;">🎁 完成獎勵道具</label>
-                  <select name="reward_item_id" class="form-select item-select">
-                    <option value="">-- 無 --</option>
-                  </select>
-                  <small style="color:#999; font-size:0.8rem;">任務完成後自動發放</small>
-                </div>
-              </div>
-            </div>
-            
-            <div class="form-group">
-              <label class="form-label">任務照片 (封面)</label>
-              <input class="form-input" type="file" name="photo" accept="image/*" required />
-            </div>
-
-            <!-- AR 內容設定區塊 -->
-            <div class="form-group" style="background:#f8f9fa; border:1px solid #ddd; padding:15px; border-radius:8px;">
-              <label class="form-label" style="font-weight:bold; color:#2c3e50;">AR 內容顯示設定 (多步驟提示)</label>
-              <div style="font-size:0.85rem; color:#666; margin-bottom:15px;">設定顯示順序：1=第一步，2=第二步... 留空=不顯示</div>
-              
-              <!-- 3D 模型 -->
-              <div style="margin-bottom:15px; padding:10px; background:white; border-radius:6px; border:1px solid #ddd;">
-                <div style="display:flex; gap:10px; align-items:center; margin-bottom:8px;">
-                  <label class="form-label" style="margin:0; flex:1;">🧊 3D 模型</label>
-                  <input type="number" name="ar_order_model" min="1" placeholder="順序" style="width:80px; padding:5px; border:1px solid #ccc; border-radius:4px;" />
-                </div>
-                <select name="ar_model_id" class="form-select" id="arModelSelect">
-                  <option value="">-- 請選擇模型 (選填) --</option>
-                </select>
-                <div style="margin-top:5px; font-size:0.8rem; color:#666;">沒有想要的？<a href="#" id="quickUploadModelBtn" style="color:#0d6efd;">上傳新模型</a></div>
-              </div>
-
-              <!-- AR 圖片 -->
-              <div style="margin-bottom:15px; padding:10px; background:white; border-radius:6px; border:1px solid #ddd;">
-                <div style="display:flex; gap:10px; align-items:center; margin-bottom:8px;">
-                  <label class="form-label" style="margin:0; flex:1;">🖼️ AR 圖片</label>
-                  <input type="number" name="ar_order_image" min="1" placeholder="順序" style="width:80px; padding:5px; border:1px solid #ccc; border-radius:4px;" />
-                </div>
-                <input class="form-input" type="file" name="arImage" accept="image/*" />
-                <small style="color:#666;">將在 AR 中懸浮顯示</small>
-              </div>
-
-              <!-- YouTube -->
-              <div style="padding:10px; background:white; border-radius:6px; border:1px solid #ddd;">
-                <div style="display:flex; gap:10px; align-items:center; margin-bottom:8px;">
-                  <label class="form-label" style="margin:0; flex:1;">📺 YouTube</label>
-                  <input type="number" name="ar_order_youtube" min="1" placeholder="順序" style="width:80px; padding:5px; border:1px solid #ccc; border-radius:4px;" />
-                </div>
-                <input class="form-input" type="text" name="youtubeUrl" placeholder="https://youtu.be/..." />
-                <small style="color:#666;">將在 AR 中播放影片</small>
-              </div>
-
-              <!-- 背景音樂 -->
-              <div style="margin-top:15px; padding:10px; background:white; border-radius:6px; border:1px solid #ddd;">
-                <label class="form-label" style="margin-bottom:8px;">🎵 背景音樂 (到達任務地點後自動播放)</label>
-                <div style="display:flex; gap:10px; align-items:center; margin-bottom:8px;">
-                  <input class="form-input" type="file" name="bgmFile" id="bgmFileInput" accept="audio/*" style="flex:1; padding:5px;" />
-                  <button type="button" id="uploadBgmBtn" class="btn btn-sm" style="background:#007bff; color:white; padding:8px 16px; border:none; border-radius:4px; cursor:pointer;">上傳</button>
-                </div>
-                <div id="bgmUploadProgress" style="display:none; margin-top:8px; margin-bottom:8px;">
-                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                    <span style="font-size:0.9rem; color:#666;">上傳中...</span>
-                    <span id="bgmUploadPercent" style="font-size:0.9rem; color:#007bff; font-weight:bold;">0%</span>
+                <div id="questFields" class="sd-subpanel sd-subpanel--quest" style="display:none;">
+                  <div class="form-group">
+                    <label class="form-label">選擇所屬劇情</label>
+                    <select name="quest_chain_id" id="questChainSelect" class="form-select">
+                      <option value="">-- 請先建立劇情 --</option>
+                    </select>
                   </div>
-                  <div style="width:100%; height:8px; background:#e0e0e0; border-radius:4px; overflow:hidden;">
-                    <div id="bgmUploadProgressBar" style="width:0%; height:100%; background:#007bff; transition:width 0.3s;"></div>
+                  <div class="sd-grid-2">
+                    <div class="form-group" style="margin-bottom:0;">
+                      <label class="form-label">劇情順序 (Step Order)</label>
+                      <input class="form-input" type="number" name="quest_order" min="1" placeholder="例如：1 代表第一關" />
+                      <span class="sd-field-note">必須完成第 1 關才能解鎖第 2 關</span>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                      <label class="sd-checkbox-row">
+                        <input type="checkbox" name="is_final_step" value="1" />
+                        <span>🏆 標記為結局關卡</span>
+                      </label>
+                      <span class="sd-field-note">完成後可獲得劇情全破獎勵</span>
+                    </div>
                   </div>
                 </div>
-                <input class="form-input" type="text" name="bgm_url" id="bgmUrlInput" placeholder="或直接輸入音樂 URL (例如: /audio/task1.mp3)" style="margin-top:8px;" />
-                <div id="bgmPreview" style="margin-top:8px; display:none;">
-                  <audio id="bgmPreviewAudio" controls style="width:100%; max-width:400px;"></audio>
+
+                <div id="timedFields" class="sd-subpanel sd-subpanel--timed" style="display:none;">
+                  <div class="sd-grid-2">
+                    <div class="form-group">
+                      <label class="form-label">開始時間</label>
+                      <input class="form-input" type="datetime-local" name="time_limit_start" />
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">結束時間</label>
+                      <input class="form-input" type="datetime-local" name="time_limit_end" />
+                    </div>
+                  </div>
+                  <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">名額限制 (Max Participants)</label>
+                    <input class="form-input" type="number" name="max_participants" min="0" placeholder="0 或空值代表不限" />
+                  </div>
                 </div>
-                <small style="color:#666;">支援 MP3, WAV, OGG 等格式。到達任務地點後會自動播放。</small>
+
+                <div class="form-group">
+                  <label class="form-label">任務名稱</label>
+                  <input class="form-input" type="text" name="name" required />
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label">任務說明</label>
+                  <textarea name="description" class="form-textarea" required style="height:100px;"></textarea>
+                </div>
               </div>
+            </details>
+
+            <details class="sd-section" open>
+              <summary>2. 位置與積分</summary>
+              <div class="sd-section-body">
+                <p class="sd-section-hint">經緯度請貼入十進位格式（如 24.678222, 121.760361），可用 Google Maps 右鍵複製座標。</p>
+                <div class="sd-grid-2">
+                  <div class="form-group">
+                    <label class="form-label">緯度</label>
+                    <input class="form-input" type="number" name="lat" step="any" required />
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">經度</label>
+                    <input class="form-input" type="number" name="lng" step="any" required />
+                  </div>
+                </div>
+                <div class="sd-grid-2">
+                  <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">觸發半徑（公尺）</label>
+                    <input class="form-input" type="number" name="radius" required />
+                  </div>
+                  <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">積分</label>
+                    <input class="form-input" type="number" name="points" min="0" step="1" value="0" required />
+                  </div>
+                </div>
+              </div>
+            </details>
+
+            <details class="sd-section">
+              <summary>3. 題型與答案</summary>
+              <div class="sd-section-body">
+                <div class="form-group">
+                  <label class="form-label">任務類型</label>
+                  <select name="task_type" id="taskTypeSelect" class="form-select">
+                    <option value="qa">問答題 (人工審核)</option>
+                    <option value="multiple_choice">選擇題 (自動驗證)</option>
+                    <option value="photo">拍照/上傳照片 (人工審核)</option>
+                    <option value="number">數字解謎 (自動驗證)</option>
+                    <option value="keyword">關鍵字解碼 (自動驗證)</option>
+                    <option value="location">地理圍欄打卡 (自動驗證)</option>
+                  </select>
+                </div>
+
+                <div id="multipleChoiceOptions" class="sd-subpanel sd-subpanel--choice" style="display:none;">
+                  <div class="sd-grid-2">
+                    <div class="form-group">
+                      <label class="form-label">選項 A</label>
+                      <input class="form-input" type="text" name="optionA" />
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">選項 B</label>
+                      <input class="form-input" type="text" name="optionB" />
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">選項 C</label>
+                      <input class="form-input" type="text" name="optionC" />
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">選項 D</label>
+                      <input class="form-input" type="text" name="optionD" />
+                    </div>
+                  </div>
+                  <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">正確答案</label>
+                    <select name="correct_answer_select" class="form-select">
+                      <option value="A">選項 A</option>
+                      <option value="B">選項 B</option>
+                      <option value="C">選項 C</option>
+                      <option value="D">選項 D</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div id="standardAnswerBlock" class="sd-subpanel sd-subpanel--answer" style="display:none;">
+                  <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">標準答案</label>
+                    <input class="form-input" type="text" name="correct_answer_text" placeholder="請輸入正確的數字或關鍵字" />
+                    <span class="sd-field-note">系統將精確比對此答案 (不分大小寫)</span>
+                  </div>
+                </div>
+              </div>
+            </details>
+
+            <details class="sd-section">
+              <summary>4. 道具、封面與 AR</summary>
+              <div class="sd-section-body">
+                <div class="form-group sd-subpanel sd-subpanel--items">
+                  <label class="form-label">道具關聯設定 (選填)</label>
+                  <div class="sd-grid-2">
+                    <div>
+                      <label class="form-label" style="font-size:0.85rem;">🔒 解鎖所需道具</label>
+                      <select name="required_item_id" class="form-select item-select">
+                        <option value="">-- 無 --</option>
+                      </select>
+                      <span class="sd-field-note">玩家必須持有此道具才能進行任務</span>
+                    </div>
+                    <div>
+                      <label class="form-label" style="font-size:0.85rem;">🎁 完成獎勵道具</label>
+                      <select name="reward_item_id" class="form-select item-select">
+                        <option value="">-- 無 --</option>
+                      </select>
+                      <span class="sd-field-note">任務完成後自動發放</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">任務照片 (封面)</label>
+                  <input class="form-input" type="file" name="photo" accept="image/*" required />
+                </div>
+
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label" style="font-weight:700;">AR 內容顯示設定 (多步驟提示)</label>
+                  <span class="sd-field-note" style="margin-bottom:0.75rem;">設定顯示順序：1=第一步，2=第二步… 留空=不顯示</span>
+
+                  <div class="sd-ar-grid">
+                    <div class="sd-ar-item">
+                      <div class="sd-ar-item-head">
+                        <label class="form-label">🧊 3D 模型</label>
+                        <input type="number" name="ar_order_model" min="1" placeholder="順序" class="form-input sd-order-input" />
+                      </div>
+                      <select name="ar_model_id" class="form-select" id="arModelSelect">
+                        <option value="">-- 請選擇模型 (選填) --</option>
+                      </select>
+                      <span class="sd-field-note">沒有想要的？<a href="#" id="quickUploadModelBtn" class="sd-link-inline">上傳新模型</a></span>
+                    </div>
+
+                    <div class="sd-ar-item">
+                      <div class="sd-ar-item-head">
+                        <label class="form-label">🖼️ AR 圖片</label>
+                        <input type="number" name="ar_order_image" min="1" placeholder="順序" class="form-input sd-order-input" />
+                      </div>
+                      <input class="form-input" type="file" name="arImage" accept="image/*" />
+                      <span class="sd-field-note">將在 AR 中懸浮顯示</span>
+                    </div>
+
+                    <div class="sd-ar-item">
+                      <div class="sd-ar-item-head">
+                        <label class="form-label">📺 YouTube</label>
+                        <input type="number" name="ar_order_youtube" min="1" placeholder="順序" class="form-input sd-order-input" />
+                      </div>
+                      <input class="form-input" type="text" name="youtubeUrl" placeholder="https://youtu.be/..." />
+                      <span class="sd-field-note">將在 AR 中播放影片</span>
+                    </div>
+
+                    <div class="sd-ar-item">
+                      <label class="form-label">🎵 背景音樂 (到達任務地點後自動播放)</label>
+                      <div class="sd-bgm-row">
+                        <input class="form-input" type="file" name="bgmFile" id="bgmFileInput" accept="audio/*" />
+                        <button type="button" id="uploadBgmBtn" class="sd-btn-accent">上傳</button>
+                      </div>
+                      <div id="bgmUploadProgress" style="display:none; margin-top:8px; margin-bottom:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                          <span style="font-size:0.9rem; color:#666;">上傳中...</span>
+                          <span id="bgmUploadPercent" style="font-size:0.9rem; color:#2563eb; font-weight:bold;">0%</span>
+                        </div>
+                        <div class="sd-progress-track">
+                          <div id="bgmUploadProgressBar" class="sd-progress-bar"></div>
+                        </div>
+                      </div>
+                      <input class="form-input" type="text" name="bgm_url" id="bgmUrlInput" placeholder="或直接輸入音樂 URL (例如: /audio/task1.mp3)" style="margin-top:8px;" />
+                      <div id="bgmPreview" style="margin-top:8px; display:none;">
+                        <audio id="bgmPreviewAudio" controls style="width:100%; max-width:400px;"></audio>
+                      </div>
+                      <span class="sd-field-note">支援 MP3, WAV, OGG 等格式</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </details>
+
+            <div class="sd-submit-bar">
+              <button type="submit" class="btn btn-primary">新增任務</button>
+              <div id="addTaskMsg" class="mt-2 text-center text-danger" style="min-height: 24px;"></div>
             </div>
-            
-            <button type="submit" class="btn btn-primary w-100">新增任務</button>
-            <div id="addTaskMsg" class="mt-2 text-center text-danger" style="min-height: 24px;"></div>
           </form>
         </div>
       </div>
+    </div>
 
-      <!-- 右欄：道具 + 劇情 -->
-      <div class="right-col" style="display: flex; flex-direction: column; gap: 20px;">
-        
-        <!-- 道具管理區塊 -->
-        <div class="form-container" style="background: #fffcf5; border: 1px solid #ffeeba;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h2 style="margin: 0; color: #856404;">🎒 道具管理</h2>
-            <button id="btnCreateItem" class="btn btn-secondary" style="font-size: 0.9rem; background: #ffc107; border-color: #ffc107; color: #212529;">+ 新增道具</button>
+    <!-- 分頁：資源管理 -->
+    <div class="sd-panel" id="panelResources">
+      <div class="sd-resource-grid">
+        <section class="sd-card sd-resource-card sd-resource-card--items">
+          <div class="sd-card-header">
+            <div>
+              <h3>🎒 道具管理</h3>
+              <p>解鎖條件與完成獎勵</p>
+            </div>
+            <button id="btnCreateItem" class="sd-btn-warn" type="button">+ 新增道具</button>
           </div>
-          <div id="itemList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem;">
-            <!-- 道具列表動態載入 -->
-            <div style="color: #888; font-size: 0.9rem;">載入中...</div>
-          </div>
-        </div>
-
-        <!-- 3D 模型庫管理區塊 -->
-        <div class="form-container" style="background: #e3f2fd; border: 1px solid #b6d4fe;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h2 style="margin: 0; color: #052c65;">🧊 3D 模型庫</h2>
-            <button id="btnUploadModel" class="btn btn-secondary" style="font-size: 0.9rem; background: #0d6efd; border-color: #0d6efd; color: white;">+ 上傳模型</button>
-          </div>
-          <div id="modelList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem;">
-            <!-- 模型列表動態載入 -->
-            <div style="color: #888; font-size: 0.9rem;">載入中...</div>
-          </div>
-        </div>
-
-        <!-- 劇情任務管理區塊 -->
-        <div class="form-container" style="background: #fdfdfd; border: 1px solid #e0e0e0;">
-          <div style="display: flex; justify-content: space-between; align-items: center; gap:8px; flex-wrap:wrap; margin-bottom: 1rem;">
-            <h2 style="margin: 0;">劇情任務線管理</h2>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <button id="btnCreateLeShuiTemplate" class="btn btn-secondary" style="font-size: 0.9rem; background:#166534; border-color:#166534; color:white;">建立樂水 10 關範本</button>
-              <button id="btnCreateQuest" class="btn btn-secondary" style="font-size: 0.9rem;">+ 新增劇情</button>
+          <div class="sd-card-body">
+            <div id="itemList">
+              <div style="color: #888; font-size: 0.9rem;">載入中...</div>
             </div>
           </div>
-          <div id="questChainList" style="display: grid; grid-template-columns: 1fr; gap: 1rem;">
-            <!-- 劇情列表動態載入 -->
-            <div style="color: #888; font-size: 0.9rem;">載入中...</div>
-          </div>
-        </div>
+        </section>
 
+        <section class="sd-card sd-resource-card sd-resource-card--models">
+          <div class="sd-card-header">
+            <div>
+              <h3>🧊 3D 模型庫</h3>
+              <p>AR 場景使用的模型</p>
+            </div>
+            <button id="btnUploadModel" class="sd-btn-accent" type="button">+ 上傳模型</button>
+          </div>
+          <div class="sd-card-body">
+            <div id="modelList">
+              <div style="color: #888; font-size: 0.9rem;">載入中...</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="sd-card sd-resource-card sd-resource-card--quests">
+          <div class="sd-card-header">
+            <div>
+              <h3>📚 劇情任務線</h3>
+              <p>連續關卡與全破獎勵</p>
+            </div>
+            <div class="sd-card-actions">
+              <button id="btnCreateLeShuiTemplate" class="sd-btn-success-dark" type="button">樂水 10 關範本</button>
+              <button id="btnCreateQuest" class="btn btn-secondary" type="button" style="font-size:0.88rem;padding:0.45rem 0.85rem;">+ 新增劇情</button>
+            </div>
+          </div>
+          <div class="sd-card-body">
+            <div id="questChainList">
+              <div style="color: #888; font-size: 0.9rem;">載入中...</div>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
 
-    <section class="task-list">
-      <h2 class="text-center mb-4">所有任務</h2>
-      <div id="allTasks" class="card-grid"></div>
-    </section>
+    <!-- 分頁：所有任務 -->
+    <div class="sd-panel" id="panelTasks">
+      <div class="sd-tasks-toolbar">
+        <h3>所有任務</h3>
+        <span style="color:#64748b;font-size:0.88rem;">劇情任務會依劇情分組顯示</span>
+      </div>
+      <section class="task-list">
+        <div id="allTasks" class="card-grid"></div>
+      </section>
+    </div>
 
     <!-- 編輯任務 Modal -->
     <div class="task-modal" id="editModal">
@@ -828,6 +822,34 @@
   </footer>
   <script src="/js/staff-dashboard.js?v=2"></script>
   <script src="/js/leshui-template.js?v=1"></script>
+  <script>
+    (function initStaffDashboardTabs() {
+      const tabs = Array.from(document.querySelectorAll('.sd-tab'));
+      const panels = Array.from(document.querySelectorAll('.sd-panel'));
+      if (!tabs.length || !panels.length) return;
+
+      function activate(panelId) {
+        tabs.forEach((tab) => {
+          tab.classList.toggle('active', tab.dataset.sdPanel === panelId);
+        });
+        panels.forEach((panel) => {
+          panel.classList.toggle('active', panel.id === panelId);
+        });
+        try { sessionStorage.setItem('staffDashboardTab', panelId); } catch (_) {}
+      }
+
+      tabs.forEach((tab) => {
+        tab.addEventListener('click', () => activate(tab.dataset.sdPanel));
+      });
+
+      let initial = 'panelCreate';
+      try {
+        const saved = sessionStorage.getItem('staffDashboardTab');
+        if (saved && document.getElementById(saved)) initial = saved;
+      } catch (_) {}
+      activate(initial);
+    })();
+  </script>
   <script>
     // Header功能
     window.loginUser = JSON.parse(localStorage.getItem('loginUser') || 'null');
