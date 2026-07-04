@@ -408,6 +408,96 @@
   font-size: 0.68rem;
 }
 
+.sd-quest-step-marker-wrap {
+  background: transparent;
+  border: none;
+}
+
+.sd-quest-step-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: var(--step-color, #2563eb);
+  color: #fff;
+  font-size: 0.92rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.28);
+}
+
+.sd-quest-step-badge.active {
+  width: 40px;
+  height: 40px;
+  margin: -3px;
+  font-size: 1rem;
+  border-width: 3px;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.22), 0 6px 18px rgba(15, 23, 42, 0.32);
+}
+
+.sd-quest-legend {
+  padding: 0.65rem 0.75rem 0.75rem;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+}
+
+.sd-quest-legend.hidden {
+  display: none;
+}
+
+.sd-quest-legend-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 0.45rem;
+}
+
+.sd-quest-legend-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.65rem;
+}
+
+.sd-quest-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: #475569;
+  padding: 0.18rem 0.45rem 0.18rem 0.25rem;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+}
+
+.sd-quest-legend-item.current {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.sd-quest-legend-item i {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.sd-quest-status {
+  min-height: 18px;
+  margin-top: 0.45rem;
+  font-size: 0.78rem;
+  color: #059669;
+}
+
+.sd-quest-status.error {
+  color: #dc2626;
+}
+
 .sd-checkbox-row {
   display: flex;
   align-items: center;

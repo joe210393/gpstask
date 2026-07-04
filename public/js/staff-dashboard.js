@@ -675,6 +675,10 @@ function loadTasks() {
     .then(res => res.json())
     .then(data => {
       if (!data.success) return;
+      window.staffAdminTasks = data.tasks;
+      if (typeof window.refreshStaffQuestMaps === 'function') {
+        window.refreshStaffQuestMaps();
+      }
       const container = document.getElementById('allTasks');
       container.innerHTML = '';
 
@@ -836,6 +840,7 @@ function loadTasks() {
               form.radius.value = t.radius;
               if (window.staffMapPickers?.edit) {
                 window.staffMapPickers.edit.setLatLng(t.lat, t.lng);
+                window.staffMapPickers.edit.updateQuestMarkers();
               }
               form.points.value = t.points || 0;
               form.description.value = t.description;
