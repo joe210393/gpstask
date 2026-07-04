@@ -162,6 +162,11 @@ if (!SKIP_DB) {
 }
 
 const ALLOWED_TASK_TYPES = ['qa', 'multiple_choice', 'photo', 'number', 'keyword', 'location'];
+
+function isPhotoAnswerValid(answer) {
+  const url = String(answer || '').trim();
+  return /^https?:\/\//i.test(url) || url.startsWith('/');
+}
 const DATABASE_UNAVAILABLE_ERROR_CODES = new Set([
   'ECONNREFUSED',
   'ECONNRESET',
@@ -2113,6 +2118,14 @@ app.patch('/api/user-tasks/:id/answer', authenticateToken, async (req, res) => {
       } else {
         // 答錯，不完成任務
         message = '答案不正確，請再試一次';
+      }
+    } else if (userTask.task_type === 'photo' && userTask.quest_chain_id) {
+      // 劇情線內拍照：上傳照片 URL 即通關；單題拍照仍須 staff 人工審核
+      if (isPhotoAnswerValid(answer)) {
+        isCompleted = true;
+        message = '📸 拍照完成！';
+      } else {
+        message = '請先上傳照片';
       }
     }
 
