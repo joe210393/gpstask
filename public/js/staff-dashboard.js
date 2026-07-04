@@ -834,6 +834,9 @@ function loadTasks() {
               form.lat.value = t.lat;
               form.lng.value = t.lng;
               form.radius.value = t.radius;
+              if (window.staffMapPickers?.edit) {
+                window.staffMapPickers.edit.setLatLng(t.lat, t.lng);
+              }
               form.points.value = t.points || 0;
               form.description.value = t.description;
               form.photoUrl.value = t.photoUrl;
