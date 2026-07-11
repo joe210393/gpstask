@@ -3968,6 +3968,10 @@ if (!SKIP_DB) {
           )
         `);
         console.log('✅ 資料庫遷移: push_subscriptions 表已建立');
+
+        const { migrateSafetySystem } = require('./scripts/migrations/migrate-safety-system');
+        await migrateSafetySystem(conn);
+        console.log('✅ 安全設施 / SOS 資料表就緒');
         
         conn.release();
         console.log('✅ AR 多步驟系統資料庫結構檢查完成');
