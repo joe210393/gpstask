@@ -125,12 +125,15 @@ function initMap(lat, lng, zoom) {
   }).addTo(map);
 
   taskMarkersLayer = L.layerGroup().addTo(map);
+  window.gpsTaskMap = map;
   createTaskNavigator();
 
   // 強制刷新進度後載入任務（確保顯示最新進度的任務）
   loadTasks(true);
 
   setTimeout(() => map.invalidateSize(), 50);
+
+  if (window.mapSafety?.init) window.mapSafety.init();
 }
 
 // 顯示手動定位選項
@@ -1134,6 +1137,8 @@ function setUserPosition(latitude, longitude, accuracy = 20, options = {}) {
 
   lastUserLat = latitude;
   lastUserLng = longitude;
+  window.lastUserLat = latitude;
+  window.lastUserLng = longitude;
   userLatLng = { lat: latitude, lng: longitude };
   firstLocationFix = true;
   locationPermissionGranted = true;
@@ -1190,6 +1195,8 @@ function setUserPosition(latitude, longitude, accuracy = 20, options = {}) {
   if (distFromCenter > 0.3) {
     map.setView([latitude, longitude], map.getZoom());
   }
+
+  if (window.mapSafety?.renderMarkers) window.mapSafety.renderMarkers();
 }
 
 function handleGeoError(err) {

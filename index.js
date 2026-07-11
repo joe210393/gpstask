@@ -3978,6 +3978,11 @@ if (!SKIP_DB) {
   })();
 }
 
+if (pool) {
+  const { registerSafetyRoutes } = require('./server/safety-routes');
+  registerSafetyRoutes(app, pool, { authenticateToken, requireRole, adminAuth });
+}
+
 app.listen(PORT, () => {
   console.log('Server running on port ' + PORT);
   console.log(`🌐 應用程式運行在: http://localhost:${PORT}`);

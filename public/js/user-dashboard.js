@@ -41,6 +41,41 @@ function initDashboard() {
   loadInventory();
   loadBadges();
   loadTasks();
+  loadEmergencyContactsForm();
+}
+
+async function loadEmergencyContactsForm() {
+  const form = document.getElementById('emergencyContactsForm');
+  if (!form || !window.sosWidget) return;
+  try {
+    const data = await window.sosWidget.loadEmergencyContacts();
+    const contacts = data.contacts || [];
+    document.getElementById('dashEcName1').value = contacts[0]?.name || '';
+    document.getElementById('dashEcPhone1').value = contacts[0]?.phone || '';
+    document.getElementById('dashEcName2').value = contacts[1]?.name || '';
+    document.getElementById('dashEcPhone2').value = contacts[1]?.phone || '';
+  } catch (err) {
+    console.warn('載入緊急聯絡人失敗:', err);
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById('dashEcMsg');
+    const contacts = [];
+    const p1 = document.getElementById('dashEcPhone1').value.trim();
+    const p2 = document.getElementById('dashEcPhone2').value.trim();
+    if (p1) contacts.push({ name: document.getElementById('dashEcName1').value.trim(), phone: p1 });
+    if (p2) contacts.push({ name: document.getElementById('dashEcName2').value.trim(), phone: p2 });
+    try {
+      await window.sosWidget.saveEmergencyContacts(contacts);
+      localStorage.setItem('safetyEmergencyContactsDone', '1');
+      msg.textContent = '已儲存';
+      msg.style.color = '#15803d';
+    } catch (err) {
+      msg.textContent = err.message || '儲存失敗';
+      msg.style.color = '#dc2626';
+    }
+  });
 }
 
 async function loadInventory() {

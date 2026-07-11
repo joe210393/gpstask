@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>使用者任務中心 | GPS 觸發任務系統</title>
   <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="/css/sos-widget.css" />
   <link rel="icon" type="image/png" href="/images/mascot.png" />
   <style>
     /* Header styles */
@@ -454,6 +455,24 @@
       </div>
     </section>
 
+    <!-- 緊急聯絡人 -->
+    <section class="mb-4" style="margin-bottom: 2rem;">
+      <h2 style="font-size: 1.25rem; margin-bottom: 1rem; color: #333;">🆘 緊急聯絡人（選填）</h2>
+      <p style="color:#64748b;font-size:0.92rem;margin-bottom:0.75rem;">供活動緊急專線必要時參考，最多 2 位。</p>
+      <form id="emergencyContactsForm" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1rem;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.65rem;margin-bottom:0.55rem;">
+          <input class="form-input" type="text" id="dashEcName1" placeholder="聯絡人 1 姓名" />
+          <input class="form-input" type="tel" id="dashEcPhone1" placeholder="聯絡人 1 電話" />
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.65rem;margin-bottom:0.75rem;">
+          <input class="form-input" type="text" id="dashEcName2" placeholder="聯絡人 2 姓名" />
+          <input class="form-input" type="tel" id="dashEcPhone2" placeholder="聯絡人 2 電話" />
+        </div>
+        <button type="submit" class="btn btn-primary">儲存緊急聯絡人</button>
+        <div id="dashEcMsg" style="min-height:1.2rem;margin-top:0.5rem;font-size:0.9rem;"></div>
+      </form>
+    </section>
+
     <section class="task-filter-bar">
       <div class="filter-group">
         <label for="statusFilter">任務狀態</label>
@@ -480,6 +499,7 @@
   <footer>
     &copy; 2025 任務網頁系統
   </footer>
+  <script src="/js/sos-widget.js"></script>
   <script src="/js/user-dashboard.js"></script>
   <script>
     // Header功能

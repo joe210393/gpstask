@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SOS 即時監控 | GPS 觸發任務系統</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="/css/admin-sos-panel.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="icon" type="image/png" href="/images/mascot.png" />
+</head>
+<body class="admin-sos-page">
+  <header class="sos-header">
+    <div>
+      <h1>SOS 即時監控面板</h1>
+      <p>所有 SOS 事件會自動顯示位置與玩家資訊，請由活動專線人員確認處理。</p>
+    </div>
+    <div class="sos-header-actions">
+      <span id="sosPollStatus" class="sos-poll-status">連線中...</span>
+      <a href="/staff-dashboard.html" class="btn btn-secondary">返回後台</a>
+      <button type="button" id="sosRefreshBtn" class="btn btn-primary">立即刷新</button>
+    </div>
+  </header>
+
+  <main class="sos-layout">
+    <section class="sos-list-panel">
+      <div class="sos-filter-bar">
+        <label>
+          狀態
+          <select id="sosStatusFilter">
+            <option value="">全部</option>
+            <option value="pending" selected>待處理</option>
+            <option value="handling">處理中</option>
+            <option value="resolved">已結案</option>
+          </select>
+        </label>
+      </div>
+      <div id="sosEventList" class="sos-event-list">
+        <div class="sos-empty">載入中...</div>
+      </div>
+    </section>
+
+    <section class="sos-map-panel">
+      <div id="sosMap" aria-label="SOS 事件地圖"></div>
+      <div id="sosDetailCard" class="sos-detail-card hidden">
+        <h3 id="sosDetailTitle">事件詳情</h3>
+        <div id="sosDetailBody"></div>
+        <div class="sos-detail-actions">
+          <button type="button" class="btn btn-warning btn-sm" data-set-status="handling">標記處理中</button>
+          <button type="button" class="btn btn-success btn-sm" data-set-status="resolved">標記已結案</button>
+        </div>
+        <label class="sos-notes-label">
+          備註
+          <textarea id="sosAdminNotes" rows="3" placeholder="記錄通聯或處置情形"></textarea>
+        </label>
+        <button type="button" id="sosSaveNotesBtn" class="btn btn-primary btn-sm">儲存備註</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="/js/admin-sos-panel.js"></script>
+</body>
+</html>

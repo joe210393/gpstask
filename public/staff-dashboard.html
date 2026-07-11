@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>新增任務（工作人員）| GPS 觸發任務系統</title>
   <link rel="stylesheet" href="/css/style.css" />
-  <link rel="stylesheet" href="/css/staff-dashboard.css?v=4" />
+  <link rel="stylesheet" href="/css/staff-dashboard.css?v=5" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
     crossorigin="" />
@@ -26,6 +26,7 @@
         <a href="/staff-dashboard.html" class="current-page" id="navStaff">新增任務</a>
         <a href="/role-management.html" id="navRoleMgmt">權限管理</a>
         <a href="/admin-users.html" id="navAdminUsers">會員管理</a>
+        <a href="/admin-sos-panel.html" id="navAdminSos" style="display:none;">SOS 監控</a>
         <a href="/user-dashboard.html" id="navUserTasks" style="display:none;">用戶任務管理</a>
         <a href="/redeem-tasks.html" id="navRedeem">兌換商品管理</a>
         <span id="loginUserInfo" style="display:none; color:var(--text-secondary); padding:0.5rem 1rem;"></span>
@@ -43,6 +44,7 @@
     <nav class="sd-tabs" aria-label="工作台分頁">
       <button type="button" class="sd-tab active" data-sd-panel="panelCreate">新增任務</button>
       <button type="button" class="sd-tab" data-sd-panel="panelResources">資源管理</button>
+      <button type="button" class="sd-tab sd-tab-admin-only" data-sd-panel="panelSafety" style="display:none;">安全管理</button>
       <button type="button" class="sd-tab" data-sd-panel="panelTasks">所有任務</button>
     </nav>
 
@@ -346,6 +348,54 @@
             </div>
           </div>
         </details>
+      </div>
+    </div>
+
+    <!-- 分頁：安全管理（Admin） -->
+    <div class="sd-panel" id="panelSafety">
+      <div class="sd-safety-grid">
+        <section class="sd-card sd-safety-settings-card">
+          <div class="sd-card-header">
+            <div>
+              <h3>SOS 系統設定</h3>
+              <p>活動緊急專線由 Admin 設定；玩家按 SOS 後會記錄至 <a href="/admin-sos-panel.html">SOS 監控面板</a></p>
+            </div>
+            <a href="/admin-sos-panel.html" class="btn btn-danger">開啟 SOS 即時面板</a>
+          </div>
+          <div class="sd-card-body">
+            <form id="safetySettingsForm" class="sd-form-shell">
+              <label class="sd-checkbox-row sd-safety-toggle">
+                <input type="checkbox" name="sos_enabled" checked />
+                <span>啟用 SOS 功能</span>
+              </label>
+              <div class="form-group">
+                <label class="form-label">活動緊急專線</label>
+                <input class="form-input" type="tel" name="emergency_phone" placeholder="例如：0912345678" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">SOS 說明文字（顯示給玩家）</label>
+                <textarea class="form-textarea" name="sos_instructions" rows="3"></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary">儲存 SOS 設定</button>
+              <div id="safetySettingsMsg" class="sd-safety-msg"></div>
+            </form>
+          </div>
+        </section>
+
+        <section class="sd-card">
+          <div class="sd-card-header">
+            <div>
+              <h3>安全設施管理</h3>
+              <p>救護站、補水站、補給站位置與物資清單</p>
+            </div>
+            <button type="button" id="btnAddSafetyFacility" class="btn btn-primary">+ 新增設施</button>
+          </div>
+          <div class="sd-card-body">
+            <div id="safetyFacilityList" class="sd-safety-list">
+              <div class="sd-safety-empty">載入中...</div>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
 
@@ -747,6 +797,76 @@
         </div>
       </div>
     </div>
+    <!-- 安全設施 Modal -->
+    <div class="task-modal" id="safetyFacilityModal">
+      <div class="task-modal-overlay"></div>
+      <div class="task-modal-content" style="max-width:760px;">
+        <div class="task-modal-header">
+          <h3 id="safetyFacilityModalTitle">安全設施</h3>
+          <button type="button" class="close-btn" id="closeSafetyFacilityModal">&times;</button>
+        </div>
+        <div class="task-modal-body">
+          <form id="safetyFacilityForm">
+            <input type="hidden" name="id" />
+            <div class="sd-grid-2">
+              <div class="form-group">
+                <label class="form-label">設施類型</label>
+                <select name="facility_type" class="form-select" required>
+                  <option value="medical">🏥 救護站</option>
+                  <option value="water">💧 補水站</option>
+                  <option value="supply">📦 補給站</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">名稱</label>
+                <input class="form-input" type="text" name="name" required />
+              </div>
+            </div>
+            <div id="safetyFacilityMap" class="sd-safety-map"></div>
+            <div class="sd-grid-2" style="margin-top:0.75rem;">
+              <div class="form-group">
+                <label class="form-label">緯度</label>
+                <input class="form-input" type="number" step="any" name="lat" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label">經度</label>
+                <input class="form-input" type="number" step="any" name="lng" required />
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">說明</label>
+              <textarea class="form-textarea" name="description" rows="2"></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">開放時間</label>
+              <input class="form-input" type="text" name="open_hours" placeholder="例如：09:00–17:00" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">站內物資（勾選）</label>
+              <div id="safetySuppliesBox" class="sd-safety-supplies"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">備註</label>
+              <textarea class="form-textarea" name="notes" rows="2"></textarea>
+            </div>
+            <div class="sd-grid-2">
+              <div class="form-group">
+                <label class="form-label">排序</label>
+                <input class="form-input" type="number" name="sort_order" value="0" />
+              </div>
+              <div class="form-group" style="display:flex;align-items:center;padding-top:1.6rem;">
+                <label class="sd-checkbox-row">
+                  <input type="checkbox" name="is_active" checked />
+                  <span>啟用顯示</span>
+                </label>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">儲存設施</button>
+            <div id="safetyFacilityMsg" class="sd-safety-msg"></div>
+          </form>
+        </div>
+      </div>
+    </div>
   </main>
 
   <footer>
@@ -757,6 +877,7 @@
     crossorigin=""></script>
   <script src="/js/staff-dashboard.js?v=2"></script>
   <script src="/js/staff-map-picker.js?v=4"></script>
+  <script src="/js/staff-safety.js?v=1"></script>
   <script>
     (function initStaffDashboardTabs() {
       const tabs = Array.from(document.querySelectorAll('.sd-tab'));
@@ -772,6 +893,9 @@
         });
         if (panelId === 'panelCreate' && window.staffMapPickers?.add) {
           window.staffMapPickers.add.invalidateSize();
+        }
+        if (panelId === 'panelSafety' && window.staffSafetyAdmin?.init) {
+          window.staffSafetyAdmin.init();
         }
         try { sessionStorage.setItem('staffDashboardTab', panelId); } catch (_) {}
       }
@@ -818,6 +942,13 @@
       if (window.loginUser && (window.loginUser.role === 'shop' || window.loginUser.role === 'admin')) {
         const navTasksList = document.getElementById('navTasksList');
         if (navTasksList) navTasksList.style.display = 'none';
+      }
+
+      if (window.loginUser.role === 'admin') {
+        document.querySelectorAll('.sd-tab-admin-only').forEach((el) => { el.style.display = ''; });
+        const navAdminSos = document.getElementById('navAdminSos');
+        if (navAdminSos) navAdminSos.style.display = '';
+        if (window.staffSafetyAdmin?.init) window.staffSafetyAdmin.init();
       }
     }
 

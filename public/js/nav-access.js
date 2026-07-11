@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const navRoleMgmt = document.getElementById('navRoleMgmt');
   const navRedeem = document.getElementById('navRedeem');
   const navAdminUsers = document.getElementById('navAdminUsers');
+  const navAdminSos = document.getElementById('navAdminSos');
   const reviewLinks = document.querySelectorAll('a[href="/user-tasks.html"]');
 
   const show = el => { if (el) el.style.display = ''; };
@@ -40,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hide(navRoleMgmt);
     hide(navRedeem);
     hide(navAdminUsers);
+    hide(navAdminSos);
     showReviewLinks(false);
     return;
   }
@@ -51,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hide(navRoleMgmt);
     hide(navRedeem);
     hide(navAdminUsers);
+    hide(navAdminSos);
     showReviewLinks(false);
   } else if (loginUser.role === 'staff') {
     // staff：只能審核，不顯示任務列表/用戶任務管理
@@ -60,6 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hide(navRoleMgmt);
     hide(navRedeem);
     hide(navAdminUsers);
+    hide(navAdminSos);
     showReviewLinks(true);
   } else {
     hide(navTasksList);
@@ -70,8 +74,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // 僅 admin 顯示會員管理
     if (loginUser.role === 'admin') {
       show(navAdminUsers);
+      show(navAdminSos);
     } else {
       hide(navAdminUsers);
+      hide(navAdminSos);
     }
     showReviewLinks(true);
   }

@@ -15,6 +15,7 @@
   
   <link rel="stylesheet" href="/css/style.css" />
   <link rel="stylesheet" href="/css/map.css" />
+  <link rel="stylesheet" href="/css/sos-widget.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <link rel="icon" type="image/png" href="/images/mascot.png" />
   <style>
@@ -220,6 +221,15 @@
     });
   </script>
   <script src="/js/map.js"></script>
+  <script src="/js/map-safety.js"></script>
+  <script src="/js/sos-widget.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      if (window.sosWidget) {
+        window.sosWidget.init({ onboarding: window.location.pathname.includes('map.html') });
+      }
+    });
+  </script>
   <script src="/js/nav-access.js"></script>
 </body>
 </html>
